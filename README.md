@@ -2,7 +2,10 @@
 
 NBA game tracker that streams play-by-play, box score, and schedule data into a fast React front end. Use it to scan a day’s games, jump into a matchup, and explore every action on a timeline with player on/off detail.
 
+Light Mode:
 ![Desktop overview](docs/images/overview-desktop.png)
+
+Dark Mode:
 ![Desktop overview dark mode](docs/images/overview-desktop-dark.png)
 
 ## Features
