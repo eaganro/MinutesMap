@@ -4,9 +4,10 @@ import './StatButtons.scss';
 export default function StatButtons({ statOn, changeStatOn, showScoreDiff, setShowScoreDiff, isLoading, statusMessage }) {
 
   const eventKeys = Object.keys(EVENT_TYPES);
+  const isReady = !isLoading && !statusMessage;
 
   const buttons = eventKeys.map((key, i) => {
-    if (isLoading || statusMessage) {
+    if (!isReady) {
       return <div key={key}></div>;
     }
     
@@ -27,7 +28,7 @@ export default function StatButtons({ statOn, changeStatOn, showScoreDiff, setSh
   });
 
   // Score differential toggle
-  const scoreDiffButton = !isLoading && !statusMessage && (
+  const scoreDiffButton = isReady && (
     <div 
       className={`buttonGroup scoreDiff ${showScoreDiff ? '' : 'off'}`}
       onClick={() => setShowScoreDiff(!showScoreDiff)}
@@ -56,7 +57,7 @@ export default function StatButtons({ statOn, changeStatOn, showScoreDiff, setSh
   return (
     <div className='statButtons'>
       {buttons}
-      <div className="separator" />
+      {isReady && <div className="separator" />}
       {scoreDiffButton}
     </div>
   );
