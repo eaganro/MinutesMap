@@ -1,4 +1,4 @@
-# BasketballStats
+# [nba.roryegan.com](https://nba.roryeagan.com)
 
 NBA game tracker that streams play-by-play, box score, and schedule data into a fast React front end. Use it to scan a day’s games, jump into a matchup, and explore every action on a timeline with player on/off detail.
 
