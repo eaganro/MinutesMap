@@ -8,7 +8,9 @@
     "devpi": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "build:prod:upload": "npm run build && aws s3 sync dist s3://roryeagan.com-nba --delete --size-only"
+    "build:prod:upload": "npm run build && npm run sync:static && npm run sync:build",
+    "sync:static": "aws s3 sync dist s3://roryeagan.com-nba --delete --size-only --exclude \"index.html\" --exclude \"js/*\" --exclude \"css/*\"",
+    "sync:build": "aws s3 sync dist s3://roryeagan.com-nba --delete --exclude \"*\" --include \"index.html\" --include \"js/*\" --include \"css/*\""
   },
   "author": "",
   "license": "ISC",
