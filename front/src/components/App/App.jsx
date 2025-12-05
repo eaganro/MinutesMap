@@ -633,7 +633,13 @@ export default function App() {
 
   return (
     <div className='topLevel'>
-      <DarkModeToggle />
+      <header className='appHeader'>
+        <div className='appBranding'>
+          <img src="/logo.png" alt="CourtVision logo" className='appLogo' />
+          <span className='appName'>CourtVision</span>
+        </div>
+        <DarkModeToggle />
+      </header>
       <Schedule
         games={sortedGamesForSchedule}
         date={date}
