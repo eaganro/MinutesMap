@@ -104,13 +104,13 @@
   --bg-game: #2a2a2a;
   --bg-game-hover: #333;
   
-  // Table colors
+  // Table colors (hover color stays opaque to avoid bleed on sticky player column)
   --bg-table-header: #252525;
   --bg-table-odd: #1e1e1e;
   --bg-table-even: #252525;
-  --bg-table-hover: rgba(59, 130, 246, 0.15);
-  --bg-highlight-col: rgba(59, 130, 246, 0.1);
-  --bg-highlight-col-header: rgba(59, 130, 246, 0.2);
+  --bg-table-hover: #253041;
+  --bg-highlight-col: #242b37;
+  --bg-highlight-col-header: #29384f;
   
   // Tooltip/popup
   --bg-tooltip: #2a2a2a;
@@ -186,4 +186,3 @@ body {
     color: var(--circular-progress-color) !important;
   }
 }
-
