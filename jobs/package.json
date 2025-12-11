@@ -1,0 +1,21 @@
+{
+  "name": "nba-stats-jobs",
+  "version": "1.0.0",
+  "description": "Collection of utility scripts for NBA data processing",
+  "type": "module",
+  "scripts": {
+    "get-schedule": "node getFullSchedule.js",
+    "poll-data": "node pollingGetData.js",
+    "rebuild-manifest": "node manifest-rebuild-utility.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.699.0",
+    "@aws-sdk/client-s3": "^3.699.0",
+    "@aws-sdk/lib-dynamodb": "^3.699.0",
+    "node-fetch": "^3.3.2",
+    "node-schedule": "^2.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
