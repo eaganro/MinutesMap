@@ -111,4 +111,8 @@
   width: 45px;
   margin: 10px;
   color: var(--text-secondary);
+
+  &:hover {
+    background-color: var(--bg-hover) !important;
+  }
 }
