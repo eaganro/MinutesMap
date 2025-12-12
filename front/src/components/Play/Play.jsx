@@ -308,12 +308,12 @@ export default function Play({ awayTeamNames, homeTeamNames, awayPlayers, homePl
 
   for (let i = 0; i < numLines; i += 1) {
     let posy = 300 + ((i + 1) * lineJump) * - 300 / maxY
-    timeline.unshift(<line key={`sp${i}-${awayTeamName}-${homeTeamName}`} x1={leftMargin - 5} y1={posy} x2={leftMargin + width} y2={posy} strokeDasharray={"5,5"} style={{ stroke: 'var(--line-color-light)', strokeWidth: 0.5 }} />)
-    timeline.unshift(<text key={`sp-label-${i}`} x={leftMargin - 10} y={posy + 4} textAnchor="end" style={quarterLabelStyle}>{(i + 1) * lineJump}</text>)
+    timeline.unshift(<line key={`sp${i}-${awayTeamName}-${homeTeamName}`} x1={leftMargin - 5} y1={posy} x2={leftMargin + width - 5} y2={posy} strokeDasharray={"5,5"} style={{ stroke: teamColors.away, strokeWidth: 0.5 }} />)
+    timeline.unshift(<text key={`sp-label-${i}`} x={leftMargin + width + 10} y={posy + 4} textAnchor="end" style={{ ...quarterLabelStyle, fill: teamColors.away }}>{(i + 1) * lineJump}</text>)
     
     let negy = 300 + (-1 * (i + 1) * lineJump) * - 300 / maxY
-    timeline.unshift(<line key={`sn${i}-${awayTeamName}-${homeTeamName}`} x1={leftMargin - 5} y1={negy} x2={leftMargin + width} y2={negy} strokeDasharray={"5,5"} style={{ stroke: 'var(--line-color-light)', strokeWidth: 0.5 }} />)
-    timeline.unshift(<text key={`sn-label-${i}`} x={leftMargin - 10} y={negy + 4} textAnchor="end" style={quarterLabelStyle}>{(i + 1) * lineJump}</text>)
+    timeline.unshift(<line key={`sn${i}-${awayTeamName}-${homeTeamName}`} x1={leftMargin - 5} y1={negy} x2={leftMargin + width - 5} y2={negy} strokeDasharray={"5,5"} style={{ stroke: teamColors.home, strokeWidth: 0.5 }} />)
+    timeline.unshift(<text key={`sn-label-${i}`} x={leftMargin + width + 10} y={negy + 4} textAnchor="end" style={{ ...quarterLabelStyle, fill: teamColors.home }}>{(i + 1) * lineJump}</text>)
   }
 
 
