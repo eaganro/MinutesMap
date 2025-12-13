@@ -1,5 +1,5 @@
 # [CourtVision](https://courtvision.roryeagan.com) 🏀
-**Serverless Real-Time NBA Analytics Platform**
+**Serverless Real-Time NBA Analytics & Play-by-Play Visualization**
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-blue) ![DynamoDB](https://img.shields.io/badge/Database-DynamoDB-blueviolet) ![License](https://img.shields.io/badge/License-MIT-green)
 
