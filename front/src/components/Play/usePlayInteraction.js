@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { timeToSeconds } from '../../helpers/utils';
+import { timeToSeconds } from '../../helpers/utils.js';
 import { getEventType } from '../../helpers/eventStyles.jsx';
 
 export const usePlayInteraction = ({

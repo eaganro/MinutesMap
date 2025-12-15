@@ -10,7 +10,7 @@ import PlayTooltip from './PlayTooltip';
 import TimelineGrid from './TimelineGrid'; 
 
 // Custom Hook
-import { usePlayInteraction } from '../hooks/usePlayInteraction';
+import { usePlayInteraction } from './usePlayInteraction';
 
 import './Play.scss';
 
