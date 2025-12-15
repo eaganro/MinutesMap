@@ -172,6 +172,33 @@ node jobs/pollingGetData.js
 ```
 </details>
 
+## 🏗️ Infrastructure as Code (Terraform)
+
+The entire AWS serverless architecture (S3, DynamoDB, Lambda, API Gateway, and CloudFront) is defined and managed using **Terraform**. This ensures the infrastructure is reproducible, version-controlled, and automated.
+
+The configuration in `terraform/` handles:
+* **Storage:** S3 buckets (hosting & data) and DynamoDB tables (connection state & schedule).
+* **Compute:** Lambda functions for WebSocket handlers and data processing.
+* **Networking:** API Gateway (WebSocket API) and CloudFront CDN.
+* **Build Automation:** Automatically runs `npm install` and packages Lambda functions from `functions/` into zip files during deployment.
+
+### Deploying Infrastructure
+
+1. **Navigate to the Terraform directory:**
+   ```bash
+   cd terraform
+   ```
+
+2. **Initialize Terraform:** Downloads required providers (AWS, Archive, Null).
+   ```bash
+   terraform init
+   ```
+
+3. **Apply Changes:** This will build the local Lambda functions and deploy any infrastructure changes to AWS.
+   ```bash
+   terraform apply
+   ```
+
 ## 🚀 Roadmap / Next Improvements
 
 - **WebSocket resiliency:** automatic reconnect with exponential backoff + heartbeat/ping, plus server-side cleanup of stale connections.
