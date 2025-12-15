@@ -1,0 +1,77 @@
+# frontend.tf
+
+resource "aws_cloudfront_distribution" "main" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  aliases             = ["courtvision.roryeagan.com"]
+  price_class         = "PriceClass_All"
+  default_root_object = "index.html"
+
+  # ---------------------------------------------------------
+  # ORIGINS
+  # ---------------------------------------------------------
+
+  # Origin 1: Frontend Bucket (The Website)
+  origin {
+    domain_name              = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
+    origin_id                = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
+    origin_access_control_id = "E1XIFOPBUJ5S25"
+  }
+
+  # Origin 2: Data Bucket (The JSON stats)
+  origin {
+    domain_name              = aws_s3_bucket.data_bucket.bucket_regional_domain_name
+    origin_id                = aws_s3_bucket.data_bucket.bucket_regional_domain_name
+    origin_access_control_id = "E3V205NEY044Q6"
+  }
+
+  # ---------------------------------------------------------
+  # BEHAVIORS
+  # ---------------------------------------------------------
+
+  # 1. SPECIAL RULE: Serve JSON data from the Data Bucket
+  ordered_cache_behavior {
+    path_pattern     = "/data/*"
+    target_origin_id = aws_s3_bucket.data_bucket.bucket_regional_domain_name
+
+    # Modern Policy IDs
+    cache_policy_id            = "cff81036-bd3d-46a6-8956-eafed459cbae"
+    origin_request_policy_id   = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+    response_headers_policy_id = "60669652-455b-4ae9-85a4-c4c02393f86c"
+
+    compress               = true
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+  }
+
+  # 2. DEFAULT RULE: Serve the App from the Frontend Bucket
+  default_cache_behavior {
+    target_origin_id = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
+
+    # Modern Policy IDs
+    cache_policy_id          = "0d7df755-a8a6-40e4-8aae-39dd1536636c"
+    origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+
+    compress               = true
+    viewer_protocol_policy = "allow-all" # Matches your current settings
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+  }
+
+  # ---------------------------------------------------------
+  # SSL & RESTRICTIONS
+  # ---------------------------------------------------------
+
+  viewer_certificate {
+    acm_certificate_arn      = data.aws_acm_certificate.site_cert.arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+}
