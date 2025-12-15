@@ -28,33 +28,22 @@ locals {
 
 # --- Function 1: ws-joinDate-handler ---
 
-# 1. Build (npm install) only if package.json changes
-resource "null_resource" "build_ws_join_date" {
-  triggers = {
-    package_json = filemd5("${local.src_ws_join_date}/package.json")
-  }
-  provisioner "local-exec" {
-    command = "cd ${local.src_ws_join_date} && npm install --production"
-  }
-}
-
-# 2. Zip the directory
+# Zip the directory
 data "archive_file" "zip_ws_join_date" {
   type        = "zip"
   source_dir  = local.src_ws_join_date
   output_path = "${local.build_dir}/ws-joinDate-handler.zip"
-  depends_on  = [null_resource.build_ws_join_date]
 }
 
-# 3. The AWS Resource
+# The AWS Resource
 resource "aws_lambda_function" "ws_join_date" {
   function_name = "ws-joinDate-handler"
   role          = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/service-role/ws-joinDate-handler-role-rv947zq3"
-  handler       = "index.handler"
-  runtime       = "nodejs22.x"
+  
+  handler       = "lambda_function.handler"
+  runtime       = "python3.11"
   publish       = false
 
-  # POINT TO THE DYNAMIC ZIP FILE
   filename         = data.archive_file.zip_ws_join_date.output_path
   source_code_hash = data.archive_file.zip_ws_join_date.output_base64sha256
 
@@ -68,27 +57,20 @@ resource "aws_lambda_function" "ws_join_date" {
 
 # --- Function 2: ws-sendGameUpdate-handler ---
 
-resource "null_resource" "build_ws_send_update" {
-  triggers = {
-    package_json = filemd5("${local.src_ws_send_update}/package.json")
-  }
-  provisioner "local-exec" {
-    command = "cd ${local.src_ws_send_update} && npm install --production"
-  }
-}
-
+# 1. Zip the source directory directly
 data "archive_file" "zip_ws_send_update" {
   type        = "zip"
   source_dir  = local.src_ws_send_update
   output_path = "${local.build_dir}/ws-sendGameUpdate-handler.zip"
-  depends_on  = [null_resource.build_ws_send_update]
 }
 
+# 2. AWS Resource
 resource "aws_lambda_function" "ws_send_update" {
   function_name = "ws-sendGameUpdate-handler"
   role          = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/service-role/ws-sendGameUpdate-handler-role-35xi2g86"
-  handler       = "index.handler"
-  runtime       = "nodejs22.x"
+  
+  handler       = "lambda_function.handler"
+  runtime       = "python3.11"
   publish       = false
 
   filename         = data.archive_file.zip_ws_send_update.output_path
@@ -105,27 +87,20 @@ resource "aws_lambda_function" "ws_send_update" {
 
 # --- Function 3: ws-disconnect-handler ---
 
-resource "null_resource" "build_ws_disconnect" {
-  triggers = {
-    package_json = filemd5("${local.src_ws_disconnect}/package.json")
-  }
-  provisioner "local-exec" {
-    command = "cd ${local.src_ws_disconnect} && npm install --production"
-  }
-}
-
+# Zip the source directory directly
 data "archive_file" "zip_ws_disconnect" {
   type        = "zip"
   source_dir  = local.src_ws_disconnect
   output_path = "${local.build_dir}/ws-disconnect-handler.zip"
-  depends_on  = [null_resource.build_ws_disconnect]
 }
 
+# The AWS Resource
 resource "aws_lambda_function" "ws_disconnect" {
   function_name = "ws-disconnect-handler"
   role          = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/service-role/ws-disconnect-handler-role-wtkmi22f"
-  handler       = "index.handler"
-  runtime       = "nodejs22.x"
+  
+  handler       = "lambda_function.handler"
+  runtime       = "python3.11"
   publish       = false
 
   filename         = data.archive_file.zip_ws_disconnect.output_path
@@ -135,27 +110,20 @@ resource "aws_lambda_function" "ws_disconnect" {
 
 # --- Function 4: gameDateUpdates ---
 
-resource "null_resource" "build_game_date_updates" {
-  triggers = {
-    package_json = filemd5("${local.src_game_date_updates}/package.json")
-  }
-  provisioner "local-exec" {
-    command = "cd ${local.src_game_date_updates} && npm install --production"
-  }
-}
-
+# Zip the source directory directly
 data "archive_file" "zip_game_date_updates" {
   type        = "zip"
   source_dir  = local.src_game_date_updates
   output_path = "${local.build_dir}/gameDateUpdates.zip"
-  depends_on  = [null_resource.build_game_date_updates]
 }
 
+# AWS Resource
 resource "aws_lambda_function" "game_date_updates" {
   function_name = "gameDateUpdates"
   role          = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/service-role/gameDateUpdates-role-jwv747j7"
-  handler       = "index.handler"
-  runtime       = "nodejs22.x"
+  
+  handler       = "lambda_function.handler"
+  runtime       = "python3.11"
   publish       = false
 
   filename         = data.archive_file.zip_game_date_updates.output_path
@@ -175,27 +143,17 @@ resource "aws_lambda_function" "game_date_updates" {
 
 # --- Function 5: ws-joinGame-handler ---
 
-resource "null_resource" "build_ws_join_game" {
-  triggers = {
-    package_json = filemd5("${local.src_ws_join_game}/package.json")
-  }
-  provisioner "local-exec" {
-    command = "cd ${local.src_ws_join_game} && npm install --production"
-  }
-}
-
 data "archive_file" "zip_ws_join_game" {
   type        = "zip"
   source_dir  = local.src_ws_join_game
   output_path = "${local.build_dir}/ws-joinGame-handler.zip"
-  depends_on  = [null_resource.build_ws_join_game]
 }
 
 resource "aws_lambda_function" "ws_join_game" {
   function_name = "ws-joinGame-handler"
   role          = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/service-role/ws-joinGame-handler-role-f5dhkdmc"
-  handler       = "index.handler"
-  runtime       = "nodejs22.x"
+  handler       = "lambda_function.handler"
+  runtime       = "python3.11"
   publish       = false
 
   filename         = data.archive_file.zip_ws_join_game.output_path
@@ -207,16 +165,24 @@ resource "aws_lambda_function" "ws_join_game" {
 
 resource "null_resource" "build_fetch_scoreboard" {
   triggers = {
-    package_json = filemd5("${local.src_fetch_scoreboard}/package.json")
+    requirements = filemd5("${local.src_fetch_scoreboard}/requirements.txt")
+    source_code  = filemd5("${local.src_fetch_scoreboard}/lambda_function.py")
   }
+
   provisioner "local-exec" {
-    command = "cd ${local.src_fetch_scoreboard} && npm install --production"
+    command = <<EOT
+      rm -rf ${local.src_fetch_scoreboard}/build
+      mkdir -p ${local.src_fetch_scoreboard}/build
+      pip install -r ${local.src_fetch_scoreboard}/requirements.txt -t ${local.src_fetch_scoreboard}/build
+      cp ${local.src_fetch_scoreboard}/lambda_function.py ${local.src_fetch_scoreboard}/build/
+    EOT
   }
 }
 
 data "archive_file" "zip_fetch_scoreboard" {
   type        = "zip"
-  source_dir  = local.src_fetch_scoreboard
+  
+  source_dir  = "${local.src_fetch_scoreboard}/build"
   output_path = "${local.build_dir}/FetchTodaysScoreboard.zip"
   depends_on  = [null_resource.build_fetch_scoreboard]
 }
@@ -224,8 +190,9 @@ data "archive_file" "zip_fetch_scoreboard" {
 resource "aws_lambda_function" "fetch_scoreboard" {
   function_name = "FetchTodaysScoreboard"
   role          = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/service-role/FetchTodaysScoreboard-role-vyrjnget"
-  handler       = "index.handler"
-  runtime       = "nodejs22.x"
+  
+  handler       = "lambda_function.handler" 
+  runtime       = "python3.11"
   publish       = false
 
   filename         = data.archive_file.zip_fetch_scoreboard.output_path
