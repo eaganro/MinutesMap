@@ -1,0 +1,244 @@
+import { useState, useEffect, useCallback } from 'react';
+import { timeToSeconds } from '../../helpers/utils';
+import { getEventType } from '../../helpers/eventStyles.jsx';
+
+export const usePlayInteraction = ({
+  allActions,
+  sectionWidth,
+  leftMargin,
+  rightMargin,
+  qWidth, // Passed from parent to ensure grid alignment matches
+  playRef // We need the ref to calculate mouse offsets correctly
+}) => {
+  const [descriptionArray, setDescriptionArray] = useState([]);
+  const [mouseLinePos, setMouseLinePos] = useState(null);
+  const [highlightActionIds, setHighlightActionIds] = useState([]);
+  const [infoLocked, setInfoLocked] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // HELPER: Calculate X Position on Timeline
+  const calculateXPosition = useCallback((clock, period) => {
+    const seconds = timeToSeconds(clock);
+    let rawPos;
+    
+    // Regular Regulation (Periods 1-4)
+    if (period <= 4) {
+      const totalSecondsPassed = (period - 1) * 12 * 60 + (12 * 60 - seconds);
+      const totalGameSeconds = 4 * 12 * 60;
+      rawPos = (totalSecondsPassed / totalGameSeconds) * (qWidth * 4);
+    } 
+    // Overtime (Periods 5+)
+    else {
+      const regulationSeconds = 4 * 12 * 60;
+      const otSecondsPassed = 5 * (period - 4) * 60 - seconds;
+      const totalGameSeconds = 4 * 12 * 60; // normalization factor used in original code
+      rawPos = ((regulationSeconds + otSecondsPassed) / totalGameSeconds) * (qWidth * 4);
+    }
+    
+    return rawPos + leftMargin;
+  }, [qWidth, leftMargin]);
+
+  // LOGIC: Keyboard Navigation (Left/Right Arrows)
+  useEffect(() => {
+    if (!infoLocked || !allActions || allActions.length === 0) return;
+
+    const handleKeyDown = (ev) => {
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      ev.preventDefault();
+
+      // Find current action index based on the first highlighted ID
+      const currentActionId = highlightActionIds[0];
+      const currentIndex = allActions.findIndex(a => a.actionNumber === currentActionId);
+      if (currentIndex === -1) return;
+
+      const currentAction = allActions[currentIndex];
+      const { clock: currentClock, period: currentPeriod } = currentAction;
+
+      // Find next/prev action at a DIFFERENT time
+      let newIndex = ev.key === 'ArrowLeft' ? currentIndex - 1 : currentIndex + 1;
+      const direction = ev.key === 'ArrowLeft' ? -1 : 1;
+
+      // Scan until we find a different timestamp or hit the ends
+      while (
+        newIndex >= 0 && 
+        newIndex < allActions.length && 
+        allActions[newIndex].clock === currentClock && 
+        allActions[newIndex].period === currentPeriod
+      ) {
+        newIndex += direction;
+      }
+
+      // Boundary check
+      if (newIndex < 0 || newIndex >= allActions.length) return;
+
+      const newAction = allActions[newIndex];
+      
+      // Group all actions at this new time
+      const sameTimeActions = allActions.filter(
+        a => a.clock === newAction.clock && a.period === newAction.period
+      );
+      const newActionIds = sameTimeActions.map(a => a.actionNumber);
+      const newX = calculateXPosition(newAction.clock, newAction.period);
+
+      setHighlightActionIds(newActionIds);
+      setDescriptionArray(sameTimeActions);
+      setMouseLinePos(newX);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [infoLocked, highlightActionIds, allActions, calculateXPosition]);
+
+  // LOGIC: Click Outside to Close
+  useEffect(() => {
+    const handleOutside = (ev) => {
+      if (!infoLocked) return;
+      const container = playRef.current;
+      if (!container) return;
+      
+      // If clicking outside the container, reset everything
+      if (!container.contains(ev.target)) {
+        setInfoLocked(false);
+        setMouseLinePos(null);
+        setDescriptionArray([]);
+        setHighlightActionIds([]);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleOutside, { passive: true });
+    document.addEventListener('touchstart', handleOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [infoLocked, playRef]);
+
+  // LOGIC: Main Hover Handler
+  const updateHoverAt = useCallback((clientX, clientY, targetEl) => {
+    if (infoLocked || !playRef.current) return;
+
+    // Calculate position relative to the play container
+    const rect = playRef.current.getBoundingClientRect();
+    const rawPos = clientX - rect.left - leftMargin;
+    const width = sectionWidth - leftMargin - rightMargin;
+
+    // Update global mouse position for tooltip placement
+    setMousePosition({ x: clientX, y: clientY });
+
+    // Tolerance check (if mouse drifted too far left/right)
+    const hoverPadding = 5;
+    if (rawPos < -hoverPadding || rawPos > width + hoverPadding) {
+      setMouseLinePos(null);
+      setDescriptionArray([]);
+      setHighlightActionIds([]);
+      return;
+    }
+
+    // Clamp position for calculation
+    let pos = Math.max(0, Math.min(rawPos, width));
+
+    // Check for direct hover on a specific shape/icon
+    let hoveredActionId = null;
+    let checkEl = targetEl;
+    
+    // Traverse up to find data-action-number (handles SVG nesting)
+    while (checkEl && hoveredActionId === null && checkEl !== playRef.current) {
+      if (checkEl.dataset && checkEl.dataset.actionNumber) {
+        hoveredActionId = checkEl.dataset.actionNumber;
+      }
+      if (checkEl.tagName === 'svg') break; // Optimization boundary
+      checkEl = checkEl.parentElement;
+    }
+
+    if (hoveredActionId !== null) {
+      const hoveredAction = allActions.find(a => String(a.actionNumber) === String(hoveredActionId));
+      
+      if (hoveredAction) {
+        const eventType = getEventType(hoveredAction.description);
+        const isFreeThrow = hoveredAction.description.includes('Free Throw') || hoveredAction.description.includes('FT');
+
+        let hoverActions = [hoveredAction];
+        
+        // Special case: Group Points and Free Throws visually
+        if (eventType === 'point' || isFreeThrow) {
+          hoverActions = allActions.filter(a => 
+            a.clock === hoveredAction.clock && 
+            a.period === hoveredAction.period &&
+            (getEventType(a.description) === 'point' || a.description.includes('Free Throw') || a.description.includes('FT'))
+          );
+        }
+
+        const hoverIds = hoverActions.map(a => a.actionNumber);
+        const actionX = calculateXPosition(hoveredAction.clock, hoveredAction.period);
+
+        setHighlightActionIds(hoverIds);
+        setDescriptionArray(hoverActions);
+        setMouseLinePos(actionX);
+        return; // Exit early if we found a direct target
+      }
+    }
+
+    // Fallback: Find closest action by X-Axis position
+    // Iterate to find where the mouse `pos` lands in the timeline
+    let actionIndex = 0;
+    let found = false;
+    
+    for (let i = 1; i < allActions.length && !found; i++) {
+      const currentActionX = calculateXPosition(allActions[i].clock, allActions[i].period);
+      
+      // Adjust comparison to account for leftMargin
+      if ((currentActionX - leftMargin) > pos) {
+        found = true;
+      } else {
+        // Check if time is identical to previous, group them
+        actionIndex = i;
+      }
+    }
+
+    const matchedAction = allActions[actionIndex];
+    if (matchedAction) {
+        // Collect all actions occurring at this exact timestamp
+        const sameTimeActions = allActions.filter(a => 
+            a.clock === matchedAction.clock && a.period === matchedAction.period
+        );
+        
+        const sameTimeIds = sameTimeActions.map(a => a.actionNumber);
+
+        setHighlightActionIds(sameTimeIds);
+        setDescriptionArray(sameTimeActions);
+        setMouseLinePos(pos + leftMargin);
+    }
+  }, [
+    infoLocked, 
+    playRef, 
+    leftMargin, 
+    rightMargin, 
+    sectionWidth, 
+    allActions, 
+    calculateXPosition
+  ]);
+
+  // Exposed Reset Function
+  const resetInteraction = useCallback(() => {
+    if (!infoLocked) {
+      setMouseLinePos(null);
+      setDescriptionArray([]);
+      setHighlightActionIds([]);
+    }
+  }, [infoLocked]);
+
+  return {
+    descriptionArray,
+    mouseLinePos,
+    highlightActionIds,
+    infoLocked,
+    setInfoLocked,
+    mousePosition,
+    setMousePosition,
+    setMouseLinePos,
+    setDescriptionArray,
+    setHighlightActionIds,
+    updateHoverAt,
+    resetInteraction
+  };
+};
