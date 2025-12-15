@@ -148,7 +148,9 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   };
   const onTouchMove = (e) => {
     if (!isDragging.current || !scrollRef.current) return;
-    e.preventDefault();
+    if (e.cancelable) {
+       e.preventDefault();
+    }
     const touch = e.touches[0];
     const x = touch.pageX - scrollRef.current.offsetLeft;
     const walk = x - startX.current;
