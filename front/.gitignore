@@ -11,3 +11,9 @@ dist
 
 # Allow the example file to be committed
 !.env.example
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
