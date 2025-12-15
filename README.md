@@ -66,8 +66,6 @@ flowchart LR
     L_WS -- Manage Conn --> DDB
 ```
 
-> **Design goal:** Real-time feel without blasting large payloads through WebSockets. Keep costs low by using CDN caching for data reads and small WebSocket notifications for freshness.
-
 ### High-Level Components
 - **Frontend:** React (Vite) static app served via **CloudFront** (origin: **S3**).
 - **Game data storage:** JSON files in **S3**, served through **CloudFront**.
@@ -89,20 +87,9 @@ Clients “subscribe” to a **game + date**:
 4. Lambda sends a **small WebSocket message** like “new data available.”
 5. The browser fetches the updated JSON via **CloudFront → S3**.
 
-**Why this pattern?**
-- WebSockets stay lightweight (notifications only).
-- CDN handles the heavy lifting for reads.
-- It scales better than pushing full data payloads through WS as usage grows.
-
 ### 3) Schedule Updates
 - A DynamoDB table holds basic schedule metadata.
 - A Lambda can send the full schedule payload to clients directly via WebSocket (useful for navigation without extra fetches).
-
-### Cost Notes
-This setup is intentionally cost-conscious:
-- Writes are mainly driven by ingestion frequency (S3 PUTs).
-- Reads are mostly CDN-backed.
-- With minimal users and tiered polling (favorite team more frequent), the monthly cost can stay extremely low.
 
 ## ⚡ Key Features
 
@@ -198,10 +185,3 @@ The configuration in `terraform/` handles:
    ```bash
    terraform apply
    ```
-
-## 🚀 Roadmap / Next Improvements
-
-- **WebSocket resiliency:** automatic reconnect with exponential backoff + heartbeat/ping, plus server-side cleanup of stale connections.
-- **TypeScript migration (gradual):** introduce shared types for payloads/models first, then convert components incrementally.
-- **Testing:** add a Playwright E2E smoke test (load game, connect WS, render chart) and a small set of unit tests for data transforms/parsing.
-- **Ingestion hardening:** better handling for NBA API outages/rate limits, plus alerting/logging around missed updates.
