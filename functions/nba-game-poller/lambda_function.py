@@ -4,6 +4,8 @@ import boto3
 import os
 import urllib.request
 import urllib.error
+import random
+import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from boto3.dynamodb.conditions import Key
@@ -26,6 +28,20 @@ KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
 # 3. Security (From Terraform)
 LAMBDA_ARN = os.environ.get('LAMBDA_ARN')
 SCHEDULER_ROLE_ARN = os.environ.get('SCHEDULER_ROLE_ARN')
+
+# --- User Agents List ---
+USER_AGENTS = [
+    # Chrome on Windows
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    # Chrome on macOS
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    # Firefox on Windows
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0',
+    # Safari on macOS
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15',
+    # Edge on Windows
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'
+]
 
 # AWS Clients
 s3_client = boto3.client('s3', region_name=REGION)
@@ -123,7 +139,7 @@ def enable_poller_logic():
 # ==============================================================================
 # 3. POLLER LOGIC (Runs Every Minute)
 # ==============================================================================
-def poller_logic():
+ddef poller_logic():
     today_str = get_nba_date()
     games = get_games_from_ddb(today_str)
 
@@ -132,10 +148,13 @@ def poller_logic():
         disable_self()
         return
 
+    # --- RANDOMIZATION 1: Shuffle the processing order ---
+    random.shuffle(games)
+
     active_count = 0
     updates_made = 0
 
-    for game in games:
+    for i, game in enumerate(games):
         game_id = game['id']
         
         # Skip if already marked Final in our DB
@@ -150,6 +169,13 @@ def poller_logic():
                 print(f"Poller: Game {game_id} just went Final.")
                 update_manifest(game_id)
                 updates_made += 1
+            
+            # --- RANDOMIZATION 2: Jitter (Sleep) ---
+            if i < len(games) - 1:
+                sleep_duration = random.uniform(1.5, 3.5)
+                print(f"Sleeping {sleep_duration:.2f}s to be polite...")
+                time.sleep(sleep_duration)
+
         except Exception as e:
             print(f"Poller Error on game {game_id}: {e}")
 
@@ -234,27 +260,54 @@ def process_game(game_item):
 # ==============================================================================
 def fetch_nba_data_urllib(url, etag=None):
     """
-    Fetches JSON using standard library. Handles 304 Not Modified.
+    Fetches JSON using standard library with Randomized User-Agents.
     """
+    # Pick a random agent from the list
+    current_agent = random.choice(USER_AGENTS)
+    
     req = urllib.request.Request(url)
+    req.add_header('User-Agent', current_agent)
+    req.add_header('Accept', 'application/json, text/plain, */*')
+    req.add_header('Accept-Language', 'en-US,en;q=0.9')
+    req.add_header('Referer', 'https://www.nba.com/')
+    req.add_header('Origin', 'https://www.nba.com')
+    req.add_header('Connection', 'keep-alive')
+    req.add_header('Accept-Encoding', 'gzip, deflate')
+
     if etag:
         req.add_header('If-None-Match', etag)
     
     try:
         with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
-                data = json.load(response)
-                new_etag = response.getheader('ETag')
-                return data, new_etag
+                content = response.read()
+                
+                # Decompress if Gzipped
+                if content.startswith(b'\x1f\x8b'):
+                    try:
+                        content = gzip.decompress(content)
+                    except OSError:
+                        pass
+                
+                try:
+                    data = json.loads(content)
+                    new_etag = response.getheader('ETag')
+                    return data, new_etag
+                except json.JSONDecodeError:
+                    print(f"JSON Decode Error for {url}")
+                    return None, etag
+            
             return None, etag
+
     except urllib.error.HTTPError as e:
         if e.code == 304:
-            # Not Modified
             return None, etag
         else:
             print(f"Network Error {url}: {e.code} {e.reason}")
             return None, etag
     except Exception as e:
+        print(f"Network Exception {url}: {e}")
+        return None, etag
         print(f"Network Exception {url}: {e}")
         return None, etag
 
@@ -350,14 +403,34 @@ def get_games_from_ddb(date_str):
         return []
 
 def get_earliest_start_time(games):
+    """
+    Parses 'starttime' from DynamoDB. 
+    Handles the NBA API quirk where EST times are labeled with 'Z'.
+    """
     starts = []
+    
+    # Define Timezones
+    et_zone = ZoneInfo("America/New_York")
+    utc_zone = ZoneInfo("UTC")
+
     for g in games:
-        ts = g.get('starttime') # e.g. '2023-10-25T19:30:00.000Z'
+        ts = g.get('starttime') # e.g., "2025-12-16T20:30:00Z"
         if ts:
             try:
-                # Handle Z as UTC
-                dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                starts.append(dt)
+                # 1. Remove the Z so we can treat it as naive
+                ts_clean = ts.replace('Z', '')
+                
+                # 2. Parse as naive datetime
+                dt_naive = datetime.fromisoformat(ts_clean)
+                
+                # 3. FORCE it to be Eastern Time (Fixing the NBA Data error)
+                dt_et = dt_naive.replace(tzinfo=et_zone)
+                
+                # 4. Convert to UTC for the Scheduler
+                dt_utc = dt_et.astimezone(utc_zone)
+                
+                starts.append(dt_utc)
             except ValueError:
+                print(f"Date Parse Error for {ts}")
                 pass
     return min(starts) if starts else None
