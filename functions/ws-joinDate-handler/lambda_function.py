@@ -7,9 +7,9 @@ from boto3.dynamodb.conditions import Key
 from decimal import Decimal
 
 # Constants
-DATE_CONN_TABLE = "DateConnections"
-GAMES_TABLE = "NBA_Games"
-GAMES_GSI = "ByDate"
+DATE_CONN_TABLE = os.environ.get('DATE_CONN_TABLE')
+GAMES_TABLE = os.environ.get('GAMES_TABLE')
+GAMES_GSI = os.environ.get('GAMES_GSI')
 WS_API_ENDPOINT = os.environ.get('WS_API_ENDPOINT')
 
 # Initialize clients

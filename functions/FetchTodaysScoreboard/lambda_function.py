@@ -1,5 +1,6 @@
 import os
-import requests
+import json
+import urllib.request
 import boto3
 from botocore.exceptions import ClientError
 
@@ -11,10 +12,13 @@ def handler(event, context):
     try:
         # Fetch Scoreboard Data
         url = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
-        resp = requests.get(url)
-        resp.raise_for_status()
-        
-        data = resp.json()
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req) as response:
+            if response.status != 200:
+                raise Exception(f"HTTP error: {response.status}")
+            # Read and parse JSON
+            data = json.loads(response.read().decode('utf-8'))
+
         games = data.get('scoreboard', {}).get('games', [])
         
         if not isinstance(games, list):

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 # Initialize DynamoDB resource outside the handler for connection reuse
 dynamodb = boto3.resource('dynamodb')
-TABLE_NAME = "GameConnections"
+TABLE_NAME = os.environ.get('CONNECTIONS_TABLE')
 
 def handler(event, context):
     # Parse Input
