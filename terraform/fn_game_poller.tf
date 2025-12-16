@@ -115,10 +115,10 @@ resource "aws_lambda_function" "nba_poller" {
   filename         = data.archive_file.zip_nba_poller.output_path
   source_code_hash = data.archive_file.zip_nba_poller.output_base64sha256
 
-environment {
+  environment {
     variables = {
       # 1. Identity & Security
-      LAMBDA_ARN         = "arn:aws:lambda:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
+      LAMBDA_ARN = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
       SCHEDULER_ROLE_ARN = aws_iam_role.nba_scheduler_role.arn
 
       # 2. Resource Names
