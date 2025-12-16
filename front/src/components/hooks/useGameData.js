@@ -16,14 +16,11 @@ export function useGameData() {
   
   const [isBoxLoading, setIsBoxLoading] = useState(true);
   const [isPlayLoading, setIsPlayLoading] = useState(true);
-  const [isPlayRefreshing, setIsPlayRefreshing] = useState(false);
   
   const latestBoxRef = useRef(box);
-  const latestPlayByPlayRef = useRef(playByPlay);
 
   // Keep refs in sync
   latestBoxRef.current = box;
-  latestPlayByPlayRef.current = playByPlay;
 
   /**
    * Fetch both box score and play-by-play data for a game
@@ -36,7 +33,6 @@ export function useGameData() {
 
     setIsBoxLoading(true);
     setIsPlayLoading(true);
-    setIsPlayRefreshing(false);
     setGameStatusMessage(null);
 
     try {
@@ -102,12 +98,6 @@ export function useGameData() {
    * Fetch play-by-play data from a specific URL
    */
   const fetchPlayByPlay = useCallback(async (url, gameId, onGameEnd) => {
-    const hasExistingData = latestPlayByPlayRef.current.length > 0;
-    if (hasExistingData) {
-      setIsPlayRefreshing(true);
-    } else {
-      setIsPlayLoading(true);
-    }
 
     try {
       const res = await fetch(url);
@@ -117,14 +107,12 @@ export function useGameData() {
           setPlayByPlay([]);
           setLastAction(null);
           setNumQs(4);
-          setIsPlayRefreshing(false);
           return;
         }
         if (res.status === 404) {
           setPlayByPlay([]);
           setLastAction(null);
           setNumQs(4);
-          setIsPlayRefreshing(false);
           return;
         }
         throw new Error(`S3 fetch failed: ${res.status}`);
@@ -145,7 +133,6 @@ export function useGameData() {
       console.error('Error in fetchPlayByPlay:', err);
     } finally {
       setIsPlayLoading(false);
-      setIsPlayRefreshing(false);
     }
   }, []);
 
@@ -201,7 +188,6 @@ export function useGameData() {
     // Loading states
     isBoxLoading,
     isPlayLoading,
-    isPlayRefreshing,
     
     // Actions
     fetchBoth,

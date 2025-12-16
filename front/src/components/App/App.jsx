@@ -1,5 +1,3 @@
-import CircularProgress from '@mui/material/CircularProgress';
-
 import { useCourtVision } from '../hooks';
 
 import Schedule from '../Schedule/Schedule';
@@ -33,7 +31,6 @@ export default function App() {
     playByPlaySectionRef,
     playByPlaySectionWidth,
     isPlayLoading,
-    isPlayRefreshing,
     showScoreDiff,
 
     // Stat controls
@@ -73,11 +70,6 @@ export default function App() {
       />
       
       <div className='playByPlaySection' ref={playByPlaySectionRef}>
-        {isPlayRefreshing && (
-          <div className='dataRefresh' role='status' aria-label='Updating data'>
-            <CircularProgress size={14} thickness={4} />
-          </div>
-        )}
         <Play
           awayTeamNames={awayTeamName}
           homeTeamNames={homeTeamName}

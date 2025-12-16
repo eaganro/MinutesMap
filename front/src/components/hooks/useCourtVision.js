@@ -46,7 +46,6 @@ export function useCourtVision() {
     gameStatusMessage,
     isBoxLoading,
     isPlayLoading,
-    isPlayRefreshing,
     fetchBoth,
     fetchPlayByPlay,
     fetchBox,
@@ -216,7 +215,6 @@ export function useCourtVision() {
     playByPlaySectionRef,
     playByPlaySectionWidth,
     isPlayLoading: isPlayVisible,
-    isPlayRefreshing,
     showScoreDiff,
 
     // Stat controls
