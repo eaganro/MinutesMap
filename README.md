@@ -23,22 +23,26 @@ flowchart LR
     classDef client fill:#61DAFB,stroke:#20232a,stroke-width:2px,color:black;
     classDef ext fill:#333,stroke:#fff,stroke-width:2px,color:white;
 
-    subgraph Ingestion [Ingestion Layer]
+    subgraph External [External Source]
         NBA["NBA API"]:::ext
-        RPi["Raspberry Pi"]:::ext
     end
 
     subgraph AWS [AWS Cloud]
+        subgraph Ingestion [Serverless Ingestion]
+            EB["EventBridge<br/>(Rules & Sched)"]:::aws
+            L_Poller["Lambda<br/>(Poller/Manager)"]:::aws
+        end
+
         subgraph Storage [Storage & CDN]
-            S3["S3 Bucket"]:::aws
+            S3["S3 Bucket<br/>(Data Lake)"]:::aws
             CF["CloudFront"]:::aws
         end
 
         subgraph Backend [Real-Time Backend]
-            L_Event["Lambda<br/>(S3 Event)"]:::aws
-            L_WS["Lambda<br/>(WebSocket)"]:::aws
+            L_Event["Lambda<br/>(S3 Trigger)"]:::aws
+            L_WS["Lambda<br/>(WS Handlers)"]:::aws
             APIG["API Gateway<br/>(WebSocket)"]:::aws
-            DDB[("DynamoDB<br/>State & Sched")]:::aws
+            DDB[("DynamoDB<br/>State & Data")]:::aws
         end
     end
 
@@ -46,24 +50,28 @@ flowchart LR
         Browser["React Client"]:::client
     end
 
-    %% Data Flow Steps
-    NBA -- 1. Poll Game Data --> RPi
-    RPi -- 2. Upload JSON --> S3
-    S3 -- 3. Event Trigger --> L_Event
-    
-    %% Notification Flow
-    L_Event -. Query Subs .-> DDB
-    L_Event -- 4. New Data Signal --> APIG
-    APIG -- Push Notification --> Browser
+    %% --- Data Flow Steps ---
 
-    %% Fetch Flow
-    Browser -- 5. Fetch JSON --> CF
+    %% 1. Polling & Ingestion Flow (The new part)
+    EB -- Trigger (Cron/Rate) --> L_Poller
+    L_Poller -- 1. Fetch Game Data --> NBA
+    L_Poller -- 2. Upload .gz JSON --> S3
+    L_Poller -. Update Status/Scores .-> DDB
+
+    %% 2. Real-Time Notification Flow
+    S3 -- 3. ObjectCreated Trigger --> L_Event
+    L_Event -. Query Subs .-> DDB
+    L_Event -- 4. Broadcast Signal --> APIG
+    APIG -- Push Data --> Browser
+
+    %% 3. Client Access Flow
+    Browser -- 5. Fetch JSON via Edge --> CF
     CF -- Origin Read --> S3
 
-    %% Connection Flow
-    Browser -- Subscribe/Connect --> APIG
+    %% 4. WebSocket Connection Flow
+    Browser -- Connect/Subscribe --> APIG
     APIG -- Route --> L_WS
-    L_WS -- Manage Conn --> DDB
+    L_WS -- Manage Connections --> DDB
 ```
 
 ### High-Level Components
@@ -72,7 +80,7 @@ flowchart LR
 - **Real-time signaling:** **API Gateway WebSocket API** with **Lambda** handlers.
 - **Connection/session state:** **DynamoDB** (stores connection IDs + current subscription info such as game/date).
 - **Schedule metadata:** **DynamoDB** table for schedule basics; schedule payload is pushed via WebSockets.
-- **Ingestion:** **Raspberry Pi** polls the NBA API and uploads new data to S3.
+- **Ingestion:** **AWS Lambda** (Poller) triggered by **EventBridge** (Cron/Rate) polls the NBA API and uploads new data to S3.
 
 ### 1) Client Subscription Model
 Clients “subscribe” to a **game + date**:
@@ -81,11 +89,12 @@ Clients “subscribe” to a **game + date**:
 - When the user changes game/date, the subscription info updates so notifications can be targeted.
 
 ### 2) Data Update Flow (Hybrid Push/Pull)
-1. Raspberry Pi polls NBA endpoints and uploads updated JSON to **S3**.
-2. **S3 event notification** triggers a **Lambda**.
-3. Lambda queries **DynamoDB** (via a GSI keyed by `gameId`) to find connections currently subscribed to that game/date.
-4. Lambda sends a **small WebSocket message** like “new data available.”
-5. The browser fetches the updated JSON via **CloudFront → S3**.
+1. **EventBridge** triggers the **Poller Lambda** during active games.
+2. The Lambda fetches data from NBA endpoints, updates **DynamoDB** (scores/status), and uploads compressed JSON to **S3**.
+3. **S3 event notification** triggers a **Lambda**.
+4. Lambda queries **DynamoDB** (via a GSI keyed by `gameId`) to find connections currently subscribed to that game/date.
+5. Lambda sends a **small WebSocket message** like “new data available.”
+6. The browser fetches the updated JSON via **CloudFront → S3**.
 
 ### 3) Schedule Updates
 - A DynamoDB table holds basic schedule metadata.
@@ -112,8 +121,8 @@ The codebase is organized into three distinct logical units:
 | Directory | Description |
 | :--- | :--- |
 | **`front/`** | **Frontend Client.** A Vite + React application. Contains the WebSocket connection manager, visualization components, and global state management logic. |
-| **`functions/`** | **Serverless Backend.** AWS Lambda functions written in Node.js. Handles WebSocket lifecycle events (`$connect`, `$disconnect`) and broadcasts updates via API Gateway. |
-| **`jobs/`** | **Data Pipeline.** Standalone Node.js workers that poll external NBA APIs, normalize the data, compressed it (GZIP), and upload to S3/DynamoDB. |
+| **`functions/`** | **Serverless Backend.** AWS Lambda functions written in **Python**. Handles WebSocket lifecycle events, polls external NBA APIs (Ingestion), and broadcasts updates via API Gateway. |
+| **`terraform/`** | **Infrastructure as Code.** Contains all AWS resource definitions (S3, DynamoDB, Lambda, IAM, EventBridge) to deploy the stack automatically. |
 
 ## 🛠️ Local Development & Setup
 
@@ -122,7 +131,6 @@ The codebase is organized into three distinct logical units:
 
 ### Prerequisites
 * **Node.js** v18+
-* **AWS Credentials** configured (with access to the target S3 Bucket and DynamoDB Tables)
 
 ### Installation
 1. Clone the repository:
@@ -147,27 +155,19 @@ The codebase is organized into three distinct logical units:
    ```bash
    npm run dev
    ```
-
-### Running the Data Pipeline (Manual Trigger)
-To seed the database or force an update locally:
-```bash
-# Fetch full schedule
-node jobs/getFullSchedule.js
-
-# Poll for live game data
-node jobs/pollingGetData.js
-```
 </details>
 
 ## 🏗️ Infrastructure as Code (Terraform)
 
-The entire AWS serverless architecture (S3, DynamoDB, Lambda, API Gateway, and CloudFront) is defined and managed using **Terraform**. This ensures the infrastructure is reproducible, version-controlled, and automated.
+The entire AWS serverless architecture (S3, DynamoDB, Lambda, API Gateway, EventBridge, and CloudFront) is defined and managed using **Terraform**. This ensures the infrastructure is reproducible, version-controlled, and automated.
 
 The configuration in `terraform/` handles:
 * **Storage:** S3 buckets (hosting & data) and DynamoDB tables (connection state & schedule).
-* **Compute:** Lambda functions for WebSocket handlers and data processing.
+* **Compute:** Lambda functions for WebSocket handlers, data polling, and self-scheduling logic.
 * **Networking:** API Gateway (WebSocket API) and CloudFront CDN.
-* **Build Automation:** Automatically runs `npm install` and packages Lambda functions from `functions/` into zip files during deployment.
+* **Orchestration:** EventBridge Rules (Cron & Rate) and Scheduler Roles for automated data ingestion.
+* **Security:** Granular IAM Roles and Policies attached directly to each Lambda function.
+* **Build Automation:** Automatically zips Python Lambda functions from functions/ into artifacts during deployment.
 
 ### Deploying Infrastructure
 
@@ -185,3 +185,12 @@ The configuration in `terraform/` handles:
    ```bash
    terraform apply
    ```
+### Project Structure (Terraform)
+The configuration is split into domain-specific files to maintain readability:
+
+* **`main.tf`:** Provider config, backend state, and global settings.
+* **`locals.tf`:** Centralized variables (source paths, build directories).
+* **`storage.tf`:** S3 Buckets and Notifications.
+* **`database.tf`:** DynamoDB Tables and Indexes.
+* **`api_gateway.tf`:** WebSocket API definitions, routes, and stages.
+* **`fn_*.tf`:** Modular files for each Lambda function (e.g., `fn_nba_poller.tf`), containing the Function resource, IAM Role, and Triggers.
