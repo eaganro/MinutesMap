@@ -35,6 +35,8 @@ jobs:
         run: npm ci
 
       - name: Run Tests
+        env:
+            HOME: /root
         run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=blob
 
       - name: Upload Shard Report
