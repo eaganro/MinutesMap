@@ -37,6 +37,7 @@ jobs:
       - name: Run Tests
         env:
             HOME: /root
+            VITE_WS_LOCATION: ${{ vars.VITE_WS_LOCATION }}
         run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=blob
 
       - name: Upload Shard Report
