@@ -106,3 +106,9 @@ jobs:
       - name: Build and Sync to S3
         run: |
           VITE_WS_LOCATION=${{ vars.VITE_WS_LOCATION }} npm run build:prod:upload
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E27FQC8AKVWFV6 \
+            --paths "/*"
