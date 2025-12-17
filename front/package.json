@@ -17,7 +17,6 @@
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug"
   },
-  
   "author": "",
   "license": "ISC",
   "devDependencies": {
