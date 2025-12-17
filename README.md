@@ -17,61 +17,76 @@ The app runs on a **serverless AWS architecture** and uses a **hybrid push/pull 
 ## ☁️ Architecture & Data Flow
 
 ```mermaid
-flowchart LR
-    %% Styling
-    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white;
-    classDef client fill:#61DAFB,stroke:#20232a,stroke-width:2px,color:black;
+flowchart TD
+    %% --- Styling ---
+    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white,font-weight:bold;
+    classDef storage fill:#E05243,stroke:#232F3E,stroke-width:2px,color:white;
+    classDef db fill:#3F8624,stroke:#232F3E,stroke-width:2px,color:white;
+    classDef client fill:#61DAFB,stroke:#20232a,stroke-width:2px,color:black,font-weight:bold;
     classDef ext fill:#333,stroke:#fff,stroke-width:2px,color:white;
 
+    %% --- Nodes ---
     subgraph External [External Source]
-        NBA["NBA API"]:::ext
+        NBA[("🏀 NBA API")]:::ext
     end
 
-    subgraph AWS [AWS Cloud]
-        subgraph Ingestion [Serverless Ingestion]
-            EB["EventBridge<br/>(Rules & Sched)"]:::aws
-            L_Poller["Lambda<br/>(Poller/Manager)"]:::aws
+    subgraph Ingestion [Ingestion Layer]
+        EB[EventBridge<br/>Cron/Rules]:::aws
+        L_Poller[Lambda<br/>Poller & Manager]:::aws
+    end
+
+    subgraph Core [AWS Core Infrastructure]
+        %% Group Static Assets
+        subgraph Static [Static Delivery]
+            direction TB
+            S3[("S3 Bucket<br/>Data Lake")]:::storage
+            CF[CloudFront CDN]:::aws
         end
 
-        subgraph Storage [Storage & CDN]
-            S3["S3 Bucket<br/>(Data Lake)"]:::aws
-            CF["CloudFront"]:::aws
-        end
-
-        subgraph Backend [Real-Time Backend]
-            L_Event["Lambda<br/>(S3 Trigger)"]:::aws
-            L_WS["Lambda<br/>(WS Handlers)"]:::aws
-            APIG["API Gateway<br/>(WebSocket)"]:::aws
-            DDB[("DynamoDB<br/>State & Data")]:::aws
+        %% Group Real-Time Logic
+        subgraph RealTime [Real-Time Backend]
+            L_Event[Lambda<br/>S3 Trigger]:::aws
+            L_WS[Lambda<br/>WS Handler]:::aws
+            DDB[("DynamoDB<br/>State & Schedule")]:::db
+            APIG[API Gateway<br/>WebSocket]:::aws
         end
     end
 
-    subgraph Frontend [Client]
-        Browser["React Client"]:::client
+    subgraph Frontend [User Interface]
+        direction TB
+        %% SPLIT THE CLIENT: This forces the arrows to distinct targets
+        Client_Signal[("🔌 Signal<br/>Listener")]:::client
+        Client_View[("💻 Data<br/>Fetcher")]:::client
+        
+        %% Invisible link to keep them stacked nicely
+        Client_Signal ~~~ Client_View
     end
 
-    %% --- Data Flow Steps ---
+    %% --- Connections ---
 
-    %% 1. Polling & Ingestion Flow (The new part)
-    EB -- Trigger (Cron/Rate) --> L_Poller
-    L_Poller -- 1. Fetch Game Data --> NBA
-    L_Poller -- 2. Upload .gz JSON --> S3
-    L_Poller -. Update Status/Scores .-> DDB
+    %% 1. Ingestion
+    EB --> L_Poller
+    L_Poller -- 1. Polls --> NBA
+    L_Poller -- 2. Uploads JSON --> S3
+    L_Poller -. Updates Status .-> DDB
 
-    %% 2. Real-Time Notification Flow
-    S3 -- 3. ObjectCreated Trigger --> L_Event
+    %% 2. Notification Flow (Points to SIGNAL node)
+    S3 -- 3. Trigger --> L_Event
     L_Event -. Query Subs .-> DDB
-    L_Event -- 4. Broadcast Signal --> APIG
-    APIG -- Push Data --> Browser
+    L_Event -- 4. Broadcast --> APIG
+    APIG -- Push Notification --> Client_Signal
 
-    %% 3. Client Access Flow
-    Browser -- 5. Fetch JSON via Edge --> CF
-    CF -- Origin Read --> S3
+    %% 3. Static Data Flow (Points to DATA/VIEW node)
+    S3 -- Origin Read --> CF
+    CF -- 5. Fetch via Edge --> Client_View
 
-    %% 4. WebSocket Connection Flow
-    Browser -- Connect/Subscribe --> APIG
+    %% 4. Client Internal Logic (Optional: Shows the reaction)
+    Client_Signal -. Triggers Fetch .-> Client_View
+
+    %% 5. WebSocket Connection (Outgoing)
+    Client_Signal -- Connect/Sub --> APIG
     APIG -- Route --> L_WS
-    L_WS -- Manage Connections --> DDB
+    L_WS -- Manage Conn --> DDB
 ```
 
 ### High-Level Components
