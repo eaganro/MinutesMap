@@ -101,6 +101,7 @@ export default function App() {
         isLoading={isBoxLoading} 
         statusMessage={gameStatusMessage} 
       />
+      t
     </div>
   );
 }
