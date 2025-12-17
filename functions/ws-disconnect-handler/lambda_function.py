@@ -1,4 +1,5 @@
 import boto3
+import os
 from botocore.exceptions import ClientError
 
 # Initialize DynamoDB resource

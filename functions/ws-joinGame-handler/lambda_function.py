@@ -1,6 +1,7 @@
 import json
 import time
 import boto3
+import os
 from datetime import datetime, timezone
 
 # Initialize DynamoDB resource outside the handler for connection reuse

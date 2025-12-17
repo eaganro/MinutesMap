@@ -139,7 +139,7 @@ def enable_poller_logic():
 # ==============================================================================
 # 3. POLLER LOGIC (Runs Every Minute)
 # ==============================================================================
-ddef poller_logic():
+def poller_logic():
     today_str = get_nba_date()
     games = get_games_from_ddb(today_str)
 
