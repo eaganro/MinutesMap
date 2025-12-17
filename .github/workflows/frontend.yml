@@ -14,10 +14,12 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.49.0-jammy
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4] # Runs 4 parallel runners
+        shard: [1, 2, 3, 4]
     defaults:
       run:
         working-directory: ./front
@@ -32,35 +34,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Get Playwright version
-        id: playwright-version
-        run: echo "version=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_OUTPUT
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
-
-      - name: Install Playwright Browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps
-
       - name: Run Tests
-        # We use 'blob' reporter for sharding so results can be merged later
         run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=blob
 
       - name: Upload Shard Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: all-blob-reports
+          name: playwright-blob-report-${{ matrix.shard }}
           path: front/blob-report/
           retention-days: 1
 
   merge-reports:
-    # This job runs after all test shards finish
     if: always()
     needs: [test]
     runs-on: ubuntu-latest
@@ -76,7 +61,8 @@ jobs:
       - name: Download all Shard Reports
         uses: actions/download-artifact@v4
         with:
-          name: all-blob-reports
+          pattern: playwright-blob-report-*
+          merge-multiple: true
           path: front/all-blob-reports
 
       - name: Merge into HTML Report
