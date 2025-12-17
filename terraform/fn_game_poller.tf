@@ -14,10 +14,11 @@ resource "aws_iam_role" "nba_poller_role" {
       Principal = { Service = "lambda.amazonaws.com" }
     }]
   })
+
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # B. Role for the EventBridge Scheduler
-# The Lambda passes this role to the Scheduler so the Scheduler can call the Lambda back later.
 resource "aws_iam_role" "nba_scheduler_role" {
   name = "nba-poller-scheduler-role"
   assume_role_policy = jsonencode({
@@ -28,6 +29,8 @@ resource "aws_iam_role" "nba_scheduler_role" {
       Principal = { Service = "scheduler.amazonaws.com" }
     }]
   })
+
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # C. Policy for the Lambda
@@ -40,12 +43,14 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
     Statement = [
       # 1. Logging
       {
-        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
-        Effect   = "Allow"
-        Resource = "arn:aws:logs:*:*:*"
+        Sid      = "WriteLambdaLogs",
+        Effect   = "Allow",
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+        Resource = "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/NBAGamePoller:*"
       },
       # 2. DynamoDB Access
       {
+        Sid      = "DynamoDbReadWriteGamesByDate"
         Action   = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
         Effect   = "Allow"
         Resource = [
@@ -55,24 +60,28 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
       },
       # 3. S3 Access
       {
+        Sid      = "S3ReadWriteOnlyDataPrefix"
         Action   = ["s3:PutObject", "s3:GetObject"]
         Effect   = "Allow"
-        Resource = "arn:aws:s3:::roryeagan.com-nba-processed-data/*"
+        Resource = "arn:aws:s3:::roryeagan.com-nba-processed-data/data/*"
       },
-      # 4. EventBridge Rule Control (To enable/disable the 1-minute poller)
+      # 4. EventBridge Rule Control
       {
+        Sid      = "EventBridgeTogglePollerRule"
         Action   = ["events:EnableRule", "events:DisableRule"]
         Effect   = "Allow"
         Resource = aws_cloudwatch_event_rule.nba_poller_rule.arn
       },
-      # 5. Scheduler Control (To create the "One-Time Wake Up" schedule)
+      # 5. Scheduler Control
       {
+        Sid      = "SchedulerManageOnlyKickoffSchedule"
         Action   = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
         Effect   = "Allow"
-        Resource = "*" # Scheduler ARNs are dynamic based on name, wildcard is standard here
+        Resource = "arn:aws:events:us-east-1:*:schedule/default/NBA_Daily_Kickoff"
       },
-      # 6. PassRole (Allows Lambda to assign the Scheduler Role to the new Schedule)
+      # 6. PassRole
       {
+        Sid      = "AllowPassSchedulerRoleToScheduler"
         Action   = "iam:PassRole"
         Effect   = "Allow"
         Resource = aws_iam_role.nba_scheduler_role.arn
@@ -81,7 +90,7 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
   })
 }
 
-# D. Policy for the Scheduler (Allow it to invoke the Lambda)
+# D. Policy for the Scheduler
 resource "aws_iam_role_policy" "nba_scheduler_policy" {
   name = "nba-scheduler-invoke-policy"
   role = aws_iam_role.nba_scheduler_role.id
@@ -117,16 +126,11 @@ resource "aws_lambda_function" "nba_poller" {
 
   environment {
     variables = {
-      # 1. Identity & Security
       LAMBDA_ARN = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
       SCHEDULER_ROLE_ARN = aws_iam_role.nba_scheduler_role.arn
-
-      # 2. Resource Names
-      # These prevent the "Hardcoded String" problem
       DATA_BUCKET      = aws_s3_bucket.data_bucket.id
       DDB_TABLE        = aws_dynamodb_table.nba_games.name
       POLLER_RULE_NAME = aws_cloudwatch_event_rule.nba_poller_rule.name
-      
       DDB_GSI          = "ByDate" 
     }
   }
@@ -135,8 +139,6 @@ resource "aws_lambda_function" "nba_poller" {
 
 # --- 3. EventBridge Triggers ---
 
-# A. The Manager (Daily Check)
-# Runs at 12:00 PM EST (17:00 UTC). Checks schedule and sets the "Alarm Clock"
 resource "aws_cloudwatch_event_rule" "nba_daily_manager" {
   name                = "NBADailyManager"
   description         = "Daily trigger to check game schedule and set polling time"
@@ -147,19 +149,14 @@ resource "aws_cloudwatch_event_target" "manager_target" {
   rule      = aws_cloudwatch_event_rule.nba_daily_manager.name
   target_id = "ManagerLogic"
   arn       = aws_lambda_function.nba_poller.arn
-  
-  # Sends {"task": "manager"} to the Lambda
   input = jsonencode({
     task = "manager"
   })
 }
 
-# B. The Poller (The Worker)
-# Runs every minute, but STARTS DISABLED. The Lambda enables it when games start.
 resource "aws_cloudwatch_event_rule" "nba_poller_rule" {
-  name                = "NBAGamePollerRule" # Must match POLLER_RULE_NAME in Python
+  name                = "NBAGamePollerRule"
   description         = "Polls active games every minute (Enabled/Disabled dynamically)"
-  # schedule_expression = "rate(1 minute)"
   schedule_expression = "rate(1 minute)"
   state               = "DISABLED" 
 }
@@ -168,8 +165,6 @@ resource "aws_cloudwatch_event_target" "poller_target" {
   rule      = aws_cloudwatch_event_rule.nba_poller_rule.name
   target_id = "PollerLogic"
   arn       = aws_lambda_function.nba_poller.arn
-  
-  # Sends {"task": "poller"} to the Lambda
   input = jsonencode({
     task = "poller"
   })
@@ -177,7 +172,6 @@ resource "aws_cloudwatch_event_target" "poller_target" {
 
 # --- 4. Invoke Permissions ---
 
-# Allow the Manager Rule to call Lambda
 resource "aws_lambda_permission" "allow_manager_rule" {
   statement_id  = "AllowExecutionFromManagerRule"
   action        = "lambda:InvokeFunction"
@@ -186,7 +180,6 @@ resource "aws_lambda_permission" "allow_manager_rule" {
   source_arn    = aws_cloudwatch_event_rule.nba_daily_manager.arn
 }
 
-# Allow the Poller Rule to call Lambda
 resource "aws_lambda_permission" "allow_poller_rule" {
   statement_id  = "AllowExecutionFromPollerRule"
   action        = "lambda:InvokeFunction"

@@ -18,10 +18,10 @@ data "aws_iam_policy_document" "fetch_scoreboard_trust" {
 resource "aws_iam_role" "fetch_scoreboard_role" {
   name               = "FetchTodaysScoreboard-role"
   assume_role_policy = data.aws_iam_policy_document.fetch_scoreboard_trust.json
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # C. Basic Logging Permissions (Managed Policy)
-# This gives permission to create log groups and write logs to CloudWatch.
 resource "aws_iam_role_policy_attachment" "fetch_scoreboard_logs" {
   role       = aws_iam_role.fetch_scoreboard_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -58,7 +58,6 @@ data "archive_file" "zip_fetch_scoreboard" {
 resource "aws_lambda_function" "fetch_scoreboard" {
   function_name = "FetchTodaysScoreboard"
   
-  # Connects the function to the new role we created above
   role          = aws_iam_role.fetch_scoreboard_role.arn
    
   handler       = "lambda_function.handler" 

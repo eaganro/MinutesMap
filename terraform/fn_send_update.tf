@@ -18,6 +18,8 @@ data "aws_iam_policy_document" "ws_send_update_trust" {
 resource "aws_iam_role" "ws_send_update_role" {
   name               = "ws-sendGameUpdate-handler-role"
   assume_role_policy = data.aws_iam_policy_document.ws_send_update_trust.json
+
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # C. Basic Logging
@@ -105,7 +107,6 @@ resource "aws_lambda_function" "ws_send_update" {
 }
 
 # --- 3. S3 Trigger Permission (Crucial!) ---
-
 
 resource "aws_lambda_permission" "allow_s3_trigger" {
   statement_id  = "AllowExecutionFromS3"

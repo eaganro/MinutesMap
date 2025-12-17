@@ -18,6 +18,8 @@ data "aws_iam_policy_document" "game_date_updates_trust" {
 resource "aws_iam_role" "game_date_updates_role" {
   name               = "gameDateUpdates-role"
   assume_role_policy = data.aws_iam_policy_document.game_date_updates_trust.json
+
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # C. Basic Logging
@@ -134,16 +136,9 @@ resource "aws_lambda_function" "game_date_updates" {
 # --- 3. The Trigger (Event Source Mapping) ---
 
 resource "aws_lambda_event_source_mapping" "nba_games_stream_trigger" {
-  # The source of the data (The DynamoDB Stream)
   event_source_arn  = aws_dynamodb_table.nba_games.stream_arn
-  
-  # The destination
   function_name     = aws_lambda_function.game_date_updates.arn
-  
-  # LATEST = Only process new data that arrives after this trigger is created.
   starting_position = "LATEST"
-
   batch_size        = 10
-
   maximum_retry_attempts = 1
 }

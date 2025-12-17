@@ -18,6 +18,7 @@ data "aws_iam_policy_document" "ws_disconnect_trust" {
 resource "aws_iam_role" "ws_disconnect_role" {
   name               = "ws-disconnect-handler-role"
   assume_role_policy = data.aws_iam_policy_document.ws_disconnect_trust.json
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # C. Basic Logging

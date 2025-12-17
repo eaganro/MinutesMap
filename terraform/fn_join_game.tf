@@ -18,6 +18,8 @@ data "aws_iam_policy_document" "ws_join_game_trust" {
 resource "aws_iam_role" "ws_join_game_role" {
   name               = "ws-joinGame-handler-role"
   assume_role_policy = data.aws_iam_policy_document.ws_join_game_trust.json
+
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # C. Basic Logging Permissions (Managed Policy)

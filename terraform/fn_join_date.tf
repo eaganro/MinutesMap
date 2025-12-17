@@ -18,6 +18,8 @@ data "aws_iam_policy_document" "ws_join_date_trust" {
 resource "aws_iam_role" "ws_join_date_role" {
   name               = "ws-joinDate-handler-role"
   assume_role_policy = data.aws_iam_policy_document.ws_join_date_trust.json
+
+  permissions_boundary = var.iam_boundary_arn
 }
 
 # C. Basic Logging

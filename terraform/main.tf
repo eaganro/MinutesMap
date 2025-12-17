@@ -10,6 +10,13 @@ terraform {
       version = "~> 5.0"
     }
   }
+  backend "s3" {
+    bucket         = "roryeagan.com-nba-terraform-state"
+    key            = "state/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    use_lockfile   = true
+  }
 }
 
 data "aws_caller_identity" "current" {}
