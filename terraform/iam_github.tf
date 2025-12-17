@@ -1,12 +1,15 @@
 # iam_github.tf
 
+# 1. Get current account ID
+data "aws_caller_identity" "current" {}
+
 # ==============================================================================
 # SHARD 1: IAM & Security
-# (Includes: Discovery, IAM Management, IAM Read, IAM PassRole)
 # ==============================================================================
 data "aws_iam_policy_document" "github_shard_iam" {
   
-  # --- Section 1: General Discovery (Read-Only) ---
+  # --- Section 1: General Discovery & Read-Only ---
+  # FIX: Added iam:GetPolicy/Version here so Terraform can read the Shard policies it creates
   statement {
     sid    = "GeneralReadDiscovery"
     effect = "Allow"
@@ -17,7 +20,9 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "acm:GetCertificate",
       "acm:ListTagsForCertificate",
       "lambda:ListFunctions",
-      "lambda:GetAccountSettings"
+      "lambda:GetAccountSettings",
+      "iam:GetPolicy",
+      "iam:GetPolicyVersion" 
     ]
     resources = ["*"]
   }
@@ -48,7 +53,7 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "arn:aws:iam::*:role/nba-poller-scheduler-role"
     ]
     
-    # IMPORTANT: This enforces the boundary on any new role created
+    # Enforces boundary on NEW roles
     condition {
       test     = "StringEquals"
       variable = "iam:PermissionsBoundary"
@@ -75,13 +80,6 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "arn:aws:iam::*:role/nba-poller-lambda-role",
       "arn:aws:iam::*:role/nba-poller-scheduler-role"
     ]
-  }
-
-  statement {
-    sid       = "IamReadPolicyForTerraform"
-    effect    = "Allow"
-    actions   = ["iam:GetPolicy", "iam:GetPolicyVersion"]
-    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/CourtVisionBoundary"]
   }
 
   statement {
@@ -119,7 +117,6 @@ resource "aws_iam_role_policy_attachment" "attach_shard_iam" {
 
 # ==============================================================================
 # SHARD 2: Data & Storage
-# (Includes: DynamoDB, S3 App Buckets, Terraform State)
 # ==============================================================================
 data "aws_iam_policy_document" "github_shard_data" {
 
@@ -148,7 +145,7 @@ data "aws_iam_policy_document" "github_shard_data" {
     ]
   }
 
-  # --- Section 5: S3 Management (The big one!) ---
+  # --- Section 5: S3 Management ---
   statement {
     sid    = "S3ManageStackBuckets"
     effect = "Allow"
@@ -211,7 +208,6 @@ resource "aws_iam_role_policy_attachment" "attach_shard_data" {
 
 # ==============================================================================
 # SHARD 3: Compute & Networking
-# (Includes: Lambda, EventBridge, Scheduler, API Gateway, CloudFront)
 # ==============================================================================
 data "aws_iam_policy_document" "github_shard_compute" {
 
@@ -231,23 +227,24 @@ data "aws_iam_policy_document" "github_shard_compute" {
       "lambda:ListVersionsByFunction",
       "lambda:AddPermission",
       "lambda:RemovePermission",
-      "lambda:GetPolicy",
-      "lambda:ListTags",
-      "lambda:TagResource",
-      "lambda:UntagResource"
+      "lambda:GetPolicy"
     ]
     resources = ["arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:*"]
   }
 
+  # FIX: Moved Tagging actions here because Mappings are NOT functions.
   statement {
-    sid    = "LambdaManageEventSourceMappings"
+    sid    = "LambdaManageMappingsAndTags"
     effect = "Allow"
     actions = [
       "lambda:CreateEventSourceMapping",
       "lambda:UpdateEventSourceMapping",
       "lambda:DeleteEventSourceMapping",
       "lambda:GetEventSourceMapping",
-      "lambda:ListEventSourceMappings"
+      "lambda:ListEventSourceMappings",
+      "lambda:ListTags",
+      "lambda:TagResource",
+      "lambda:UntagResource"
     ]
     resources = ["*"]
   }
