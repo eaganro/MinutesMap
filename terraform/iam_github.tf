@@ -75,7 +75,8 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "arn:aws:iam::*:role/ws-joinGame-handler-role",
       "arn:aws:iam::*:role/FetchTodaysScoreboard-role",
       "arn:aws:iam::*:role/nba-poller-lambda-role",
-      "arn:aws:iam::*:role/nba-poller-scheduler-role"
+      "arn:aws:iam::*:role/nba-poller-scheduler-role",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/GitHubActionRole"
     ]
   }
 
