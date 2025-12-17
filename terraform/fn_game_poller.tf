@@ -140,8 +140,7 @@ resource "aws_lambda_function" "nba_poller" {
 resource "aws_cloudwatch_event_rule" "nba_daily_manager" {
   name                = "NBADailyManager"
   description         = "Daily trigger to check game schedule and set polling time"
-  # schedule_expression = "cron(0 17 * * ? *)" 
-  schedule_expression = "cron(0 20 * * ? *)" 
+  schedule_expression = "cron(0 15 * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "manager_target" {
@@ -161,7 +160,7 @@ resource "aws_cloudwatch_event_rule" "nba_poller_rule" {
   name                = "NBAGamePollerRule" # Must match POLLER_RULE_NAME in Python
   description         = "Polls active games every minute (Enabled/Disabled dynamically)"
   # schedule_expression = "rate(1 minute)"
-  schedule_expression = "rate(5 minutes)"
+  schedule_expression = "rate(1 minute)"
   state               = "DISABLED" 
 }
 

@@ -55,8 +55,9 @@ scheduler_client = boto3.client('scheduler', region_name=REGION)
 def main_handler(event, context):
     """
     Dispatcher: routes execution based on the 'task' field in the event.
+    Pass 'context' to the poller for time-aware sleeping.
     """
-    task = event.get('task', 'poller') # Default to poller for simple rate triggers
+    task = event.get('task', 'poller')
     print(f"--- Execution started with task: {task} ---")
 
     if task == 'manager':
@@ -64,7 +65,7 @@ def main_handler(event, context):
     elif task == 'enable_poller':
         return enable_poller_logic()
     else:
-        return poller_logic()
+        return poller_logic(context)
 
 # ==============================================================================
 # 1. MANAGER LOGIC (Runs Daily at Noon)
@@ -98,7 +99,6 @@ def manager_logic():
     schedule_kickoff(kickoff_time)
 
 def schedule_kickoff(run_at_dt):
-    # Format: yyyy-mm-ddThh:mm:ss (No timezone needed if using 'at()' in scheduler)
     at_expression = f"at({run_at_dt.strftime('%Y-%m-%dT%H:%M:%S')})"
 
     try:
@@ -139,7 +139,7 @@ def enable_poller_logic():
 # ==============================================================================
 # 3. POLLER LOGIC (Runs Every Minute)
 # ==============================================================================
-def poller_logic():
+def poller_logic(context):
     today_str = get_nba_date()
     games = get_games_from_ddb(today_str)
 
@@ -148,11 +148,16 @@ def poller_logic():
         disable_self()
         return
 
-    # --- RANDOMIZATION 1: Shuffle the processing order ---
+    # --- SECURITY: Pick ONE identity for this entire session ---
+    session_user_agent = random.choice(USER_AGENTS)
+
+    # --- RANDOMIZATION: Shuffle processing order ---
     random.shuffle(games)
 
     active_count = 0
     updates_made = 0
+    
+    total_games_to_process = len(games)
 
     for i, game in enumerate(games):
         game_id = game['id']
@@ -163,28 +168,76 @@ def poller_logic():
 
         active_count += 1
         try:
-            # Process the game
-            is_final = process_game(game)
+            # Pass the SESSION user agent down
+            is_final = process_game(game, user_agent=session_user_agent)
+            
             if is_final:
-                print(f"Poller: Game {game_id} just went Final.")
+                print(f"Poller: Game {game_id} went Final.")
                 update_manifest(game_id)
                 updates_made += 1
             
-            # --- RANDOMIZATION 2: Jitter (Sleep) ---
-            if i < len(games) - 1:
-                sleep_duration = random.uniform(1.5, 3.5)
-                print(f"Sleeping {sleep_duration:.2f}s to be polite...")
-                time.sleep(sleep_duration)
+            # --- DYNAMIC SLEEP LOGIC ---
+            # We skip sleep after the very last game
+            if i < total_games_to_process - 1:
+                sleep_duration = calculate_safe_sleep(context, i, total_games_to_process)
+                if sleep_duration > 0:
+                    time.sleep(sleep_duration)
 
         except Exception as e:
             print(f"Poller Error on game {game_id}: {e}")
 
-    # Self-Shutdown check
     if active_count == 0:
-        print("Poller: All games are Final. Disabling self.")
         disable_self()
-    else:
-        print(f"Poller: {active_count} games still active.")
+
+def calculate_safe_sleep(context, current_index, total_items):
+    """
+    Calculates a sleep time that fits within the remaining Lambda execution window.
+    """
+    # Desired "Polite" range
+    MIN_SLEEP = 1.0
+    MAX_SLEEP = 3.0
+    
+    # If no context (local testing), just return random normal
+    if not context or not hasattr(context, 'get_remaining_time_in_millis'):
+        return random.uniform(MIN_SLEEP, MAX_SLEEP)
+
+    # 1. Get remaining time in seconds
+    remaining_ms = context.get_remaining_time_in_millis()
+    remaining_sec = remaining_ms / 1000.0
+
+    # 2. Reserve a safety buffer (5 seconds for teardown/overhead)
+    SAFETY_BUFFER = 5.0
+    
+    # 3. Estimate time needed for FUTURE network calls
+    # We estimate 1.5s per remaining game to process (network IO)
+    items_remaining = total_items - 1 - current_index
+    estimated_work_sec = items_remaining * 1.5
+
+    # 4. Calculate Budget
+    time_budget_for_sleep = remaining_sec - estimated_work_sec - SAFETY_BUFFER
+    
+    # If we are negative, we are already late. Don't sleep.
+    if time_budget_for_sleep <= 0:
+        return 0.0
+
+    # 5. Distribute budget across remaining gaps
+    if items_remaining < 1: 
+        return 0.0
+
+    max_allowable_sleep = time_budget_for_sleep / items_remaining
+
+    # 6. Cap it at our polite max, but shrink if needed
+    actual_upper_limit = min(MAX_SLEEP, max_allowable_sleep)
+    
+    # If the budget is super tight (e.g. < 0.2s), just skip sleeping
+    if actual_upper_limit < 0.2:
+        return 0.0
+    
+    # 7. Return random jitter
+    # Ensure lower bound isn't higher than upper bound
+    actual_lower_limit = min(MIN_SLEEP, actual_upper_limit)
+    
+    return random.uniform(actual_lower_limit, actual_upper_limit)
 
 def disable_self():
     try:
@@ -196,7 +249,7 @@ def disable_self():
 # ==============================================================================
 # CORE PROCESSING (Fetch -> Upload -> Update)
 # ==============================================================================
-def process_game(game_item):
+def process_game(game_item, user_agent=None):
     game_id = game_item['id']
     
     # Get stored ETags
@@ -209,8 +262,8 @@ def process_game(game_item):
     }
 
     # Fetch Data
-    play_data, play_etag = fetch_nba_data_urllib(urls['play'], last_play_etag)
-    box_data, box_etag = fetch_nba_data_urllib(urls['box'], last_box_etag)
+    play_data, play_etag = fetch_nba_data_urllib(urls['play'], last_play_etag, user_agent)
+    box_data, box_etag = fetch_nba_data_urllib(urls['box'], last_box_etag, user_agent)
 
     # 304 Optimization: If neither changed, exit early
     if play_data is None and box_data is None:
@@ -258,15 +311,16 @@ def process_game(game_item):
 # ==============================================================================
 # HELPERS
 # ==============================================================================
-def fetch_nba_data_urllib(url, etag=None):
+def fetch_nba_data_urllib(url, etag=None, user_agent=None):
     """
     Fetches JSON using standard library with Randomized User-Agents.
     """
-    # Pick a random agent from the list
-    current_agent = random.choice(USER_AGENTS)
+    # Fallback if no agent passed
+    if not user_agent:
+        user_agent = random.choice(USER_AGENTS)
     
     req = urllib.request.Request(url)
-    req.add_header('User-Agent', current_agent)
+    req.add_header('User-Agent', user_agent)
     req.add_header('Accept', 'application/json, text/plain, */*')
     req.add_header('Accept-Language', 'en-US,en;q=0.9')
     req.add_header('Referer', 'https://www.nba.com/')
@@ -306,8 +360,6 @@ def fetch_nba_data_urllib(url, etag=None):
             print(f"Network Error {url}: {e.code} {e.reason}")
             return None, etag
     except Exception as e:
-        print(f"Network Exception {url}: {e}")
-        return None, etag
         print(f"Network Exception {url}: {e}")
         return None, etag
 
@@ -382,7 +434,6 @@ def get_nba_date():
     """
     Returns today's date in 'YYYY-MM-DD' format, adjusted for NBA "day"
     (where games finishing at 1AM count for the previous calendar day).
-    Uses 'America/New_York' logic via simple offset if needed, or zoneinfo.
     """
     # Using ZoneInfo for accuracy
     now_et = datetime.now(ZoneInfo("America/New_York"))
