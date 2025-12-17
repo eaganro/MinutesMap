@@ -79,7 +79,6 @@ jobs:
           retention-days: 7
 
   deploy:
-    # Deployment ONLY happens if all test shards pass
     needs: [test]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
@@ -104,8 +103,11 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Build and Sync to S3
-        run: |
-          VITE_WS_LOCATION=${{ vars.VITE_WS_LOCATION }} npm run build:prod:upload
+        env:
+          HOME: /root
+          VITE_WS_LOCATION: ${{ vars.VITE_WS_LOCATION }}
+          VITE_PREFIX: ${{ vars.VITE_PREFIX }}
+        run: npm run build:prod:upload
 
       - name: Invalidate CloudFront
         run: |
