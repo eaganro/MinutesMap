@@ -36,14 +36,13 @@ flowchart TD
     end
 
     subgraph Core [AWS Core Infrastructure]
-        %% Group Static Assets
+        %% We group S3 and CF together to force them to the right side
         subgraph Static [Static Delivery]
             direction TB
             S3[("S3 Bucket<br/>Data Lake")]:::storage
             CF[CloudFront CDN]:::aws
         end
 
-        %% Group Real-Time Logic
         subgraph RealTime [Real-Time Backend]
             L_Event[Lambda<br/>S3 Trigger]:::aws
             L_WS[Lambda<br/>WS Handler]:::aws
@@ -53,38 +52,30 @@ flowchart TD
     end
 
     subgraph Frontend [User Interface]
-        direction TB
-        %% SPLIT THE CLIENT: This forces the arrows to distinct targets
-        Client_Signal[("🔌 Signal<br/>Listener")]:::client
-        Client_View[("💻 Data<br/>Fetcher")]:::client
-        
-        %% Invisible link to keep them stacked nicely
-        Client_Signal ~~~ Client_View
+        Browser[("💻 React Client")]:::client
     end
 
     %% --- Connections ---
 
-    %% 1. Ingestion
+    %% 1. Ingestion Flow (Top to Bottom)
     EB --> L_Poller
     L_Poller -- 1. Polls --> NBA
     L_Poller -- 2. Uploads JSON --> S3
     L_Poller -. Updates Status .-> DDB
 
-    %% 2. Notification Flow (Points to SIGNAL node)
+    %% 2. Notification Flow (Left Side)
     S3 -- 3. Trigger --> L_Event
     L_Event -. Query Subs .-> DDB
     L_Event -- 4. Broadcast --> APIG
-    APIG -- Push Notification --> Client_Signal
+    APIG -- Push Data --> Browser
 
-    %% 3. Static Data Flow (Points to DATA/VIEW node)
+    %% 3. Static Data Flow (Right Side)
+    %% CHANGED: We model this as Data Flow (S3 -> CF) to avoid the upward arrow crossing
     S3 -- Origin Read --> CF
-    CF -- 5. Fetch via Edge --> Client_View
+    CF -- 5. Fetch via Edge --> Browser
 
-    %% 4. Client Internal Logic (Optional: Shows the reaction)
-    Client_Signal -. Triggers Fetch .-> Client_View
-
-    %% 5. WebSocket Connection (Outgoing)
-    Client_Signal -- Connect/Sub --> APIG
+    %% 4. WebSocket Connection (Bottom Up - inevitable, but cleaner now)
+    Browser -- Connect/Sub --> APIG
     APIG -- Route --> L_WS
     L_WS -- Manage Conn --> DDB
 ```
