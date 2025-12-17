@@ -168,11 +168,16 @@ data "aws_iam_policy_document" "github_shard_data" {
       "s3:GetAccelerateConfiguration",
       "s3:GetBucketRequestPayment",
       "s3:GetBucketObjectLockConfiguration",
-      "s3:GetReplicationConfiguration"
+      "s3:GetReplicationConfiguration",
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:GetObject"
     ]
     resources = [
       "arn:aws:s3:::roryeagan.com-nba-processed-data",
-      "arn:aws:s3:::roryeagan.com-nba"
+      "arn:aws:s3:::roryeagan.com-nba-processed-data/*",
+      "arn:aws:s3:::roryeagan.com-nba",
+      "arn:aws:s3:::roryeagan.com-nba/*"
     ]
   }
 
