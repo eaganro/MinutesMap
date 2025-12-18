@@ -1,15 +1,16 @@
 import json
-import gzip
 import boto3
 import os
-import urllib.request
-import urllib.error
 import random
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
+
+from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
+from nba_game_poller.playbyplay_processing import infer_team_ids_from_actions, process_playbyplay_payload
+from nba_game_poller.storage import upload_json_to_s3, update_manifest as storage_update_manifest
 
 # --- Configuration & Environment ---
 REGION = os.environ.get('AWS_REGION', 'us-east-1')
@@ -28,20 +29,6 @@ KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
 # 3. Security (From Terraform)
 LAMBDA_ARN = os.environ.get('LAMBDA_ARN')
 SCHEDULER_ROLE_ARN = os.environ.get('SCHEDULER_ROLE_ARN')
-
-# --- User Agents List ---
-USER_AGENTS = [
-    # Chrome on Windows
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    # Chrome on macOS
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-    # Firefox on Windows
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0',
-    # Safari on macOS
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15',
-    # Edge on Windows
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'
-]
 
 # AWS Clients
 s3_client = boto3.client('s3', region_name=REGION)
@@ -173,7 +160,12 @@ def poller_logic(context):
             
             if is_final:
                 print(f"Poller: Game {game_id} went Final.")
-                update_manifest(game_id)
+                storage_update_manifest(
+                    s3_client=s3_client,
+                    bucket=BUCKET,
+                    manifest_key=MANIFEST_KEY,
+                    game_id=game_id,
+                )
                 updates_made += 1
             
             # --- DYNAMIC SLEEP LOGIC ---
@@ -272,6 +264,22 @@ def process_game(game_item, user_agent=None):
     updates = {}
     is_game_final = False
 
+    # Best-effort team IDs for play-by-play processing (used when box is a 304).
+    home_team_id = None
+    away_team_id = None
+    play_game = play_data.get("game", {}) if play_data else {}
+    if play_game:
+        home_team_id = play_game.get("homeTeamId") or play_game.get("homeTeam", {}).get("teamId")
+        away_team_id = play_game.get("awayTeamId") or play_game.get("awayTeam", {}).get("teamId")
+
+    box_game = box_data.get("game", {}) if box_data else {}
+    if box_game:
+        home_team_id = home_team_id or box_game.get("homeTeam", {}).get("teamId") or box_game.get("homeTeamId")
+        away_team_id = away_team_id or box_game.get("awayTeam", {}).get("teamId") or box_game.get("awayTeamId")
+
+    home_team_id = home_team_id or game_item.get("homeTeamId")
+    away_team_id = away_team_id or game_item.get("awayTeamId")
+
     # --- 1. Play by Play ---
     if play_data:
         actions = play_data.get('game', {}).get('actions', [])
@@ -279,17 +287,60 @@ def process_game(game_item, user_agent=None):
             # Check if last action is "Game End"
             last_desc = actions[-1].get('description', '').strip()
             is_play_final = last_desc.startswith('Game End')
-            
-            upload_json_to_s3(f"playByPlayData/{game_id}.json", actions, is_final=is_play_final)
+
+            # 1) Upload raw actions to the original location (backwards-compatible).
+            upload_json_to_s3(
+                s3_client=s3_client,
+                bucket=BUCKET,
+                prefix=PREFIX,
+                key=f"playByPlayData/{game_id}.json",
+                data=actions,
+                is_final=is_play_final,
+            )
+
+            # 2) Upload slim processed payload to the new processed-data location.
+            if not (home_team_id and away_team_id):
+                inferred_away, inferred_home = infer_team_ids_from_actions(actions)
+                away_team_id = away_team_id or inferred_away
+                home_team_id = home_team_id or inferred_home
+
+            if home_team_id and away_team_id:
+                processed = process_playbyplay_payload(
+                    game_id=game_id,
+                    actions=actions,
+                    away_team_id=away_team_id,
+                    home_team_id=home_team_id,
+                    include_actions=False,
+                    include_all_actions=False,
+                )
+                upload_json_to_s3(
+                    s3_client=s3_client,
+                    bucket=BUCKET,
+                    prefix=PREFIX,
+                    key=f"processed-data/playByPlayData/{game_id}.json",
+                    data=processed,
+                    is_final=is_play_final,
+                )
+
             updates['play_etag'] = play_etag
 
     # --- 2. Box Score ---
     if box_data:
-        box_game = box_data.get('game', {})
         status_text = box_game.get('gameStatusText', '').strip()
         is_game_final = status_text.startswith('Final')
 
-        upload_json_to_s3(f"boxData/{game_id}.json", box_game, is_final=is_game_final)
+        upload_json_to_s3(
+            s3_client=s3_client,
+            bucket=BUCKET,
+            prefix=PREFIX,
+            key=f"boxData/{game_id}.json",
+            data=box_game,
+            is_final=is_game_final,
+        )
+
+        # Cache stable IDs so play-by-play processing can run even if boxscore is a 304 later.
+        home_team_id = box_game.get("homeTeam", {}).get("teamId") or box_game.get("homeTeamId")
+        away_team_id = box_game.get("awayTeam", {}).get("teamId") or box_game.get("awayTeamId")
         
         # Prepare DDB fields
         updates.update({
@@ -299,7 +350,9 @@ def process_game(game_item, user_agent=None):
             'homescore': box_game.get('homeTeam', {}).get('score', 0),
             'awayscore': box_game.get('awayTeam', {}).get('score', 0),
             'homerecord': f"{box_game.get('homeTeam', {}).get('wins','0')}-{box_game.get('homeTeam', {}).get('losses','0')}",
-            'awayrecord': f"{box_game.get('awayTeam', {}).get('wins','0')}-{box_game.get('awayTeam', {}).get('losses','0')}"
+            'awayrecord': f"{box_game.get('awayTeam', {}).get('wins','0')}-{box_game.get('awayTeam', {}).get('losses','0')}",
+            'homeTeamId': home_team_id,
+            'awayTeamId': away_team_id,
         })
 
     # --- 3. Update DB ---
@@ -307,79 +360,6 @@ def process_game(game_item, user_agent=None):
         update_ddb_game(game_id, game_item['date'], updates)
 
     return is_game_final
-
-# ==============================================================================
-# HELPERS
-# ==============================================================================
-def fetch_nba_data_urllib(url, etag=None, user_agent=None):
-    """
-    Fetches JSON using standard library with Randomized User-Agents.
-    """
-    # Fallback if no agent passed
-    if not user_agent:
-        user_agent = random.choice(USER_AGENTS)
-    
-    req = urllib.request.Request(url)
-    req.add_header('User-Agent', user_agent)
-    req.add_header('Accept', 'application/json, text/plain, */*')
-    req.add_header('Accept-Language', 'en-US,en;q=0.9')
-    req.add_header('Referer', 'https://www.nba.com/')
-    req.add_header('Origin', 'https://www.nba.com')
-    req.add_header('Connection', 'keep-alive')
-    req.add_header('Accept-Encoding', 'gzip, deflate')
-
-    if etag:
-        req.add_header('If-None-Match', etag)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            if response.status == 200:
-                content = response.read()
-                
-                # Decompress if Gzipped
-                if content.startswith(b'\x1f\x8b'):
-                    try:
-                        content = gzip.decompress(content)
-                    except OSError:
-                        pass
-                
-                try:
-                    data = json.loads(content)
-                    new_etag = response.getheader('ETag')
-                    return data, new_etag
-                except json.JSONDecodeError:
-                    print(f"JSON Decode Error for {url}")
-                    return None, etag
-            
-            return None, etag
-
-    except urllib.error.HTTPError as e:
-        if e.code == 304:
-            return None, etag
-        else:
-            print(f"Network Error {url}: {e.code} {e.reason}")
-            return None, etag
-    except Exception as e:
-        print(f"Network Exception {url}: {e}")
-        return None, etag
-
-def upload_json_to_s3(key, data, is_final=False):
-    json_str = json.dumps(data)
-    compressed = gzip.compress(json_str.encode('utf-8'))
-    
-    # 1 week cache if final, otherwise 0
-    cache_control = "public, max-age=604800" if is_final else "s-maxage=0, max-age=0, must-revalidate"
-    full_key = f"{PREFIX}{key}.gz"
-
-    s3_client.put_object(
-        Bucket=BUCKET,
-        Key=full_key,
-        Body=compressed,
-        ContentType='application/json',
-        ContentEncoding='gzip',
-        CacheControl=cache_control
-    )
-    print(f"Uploaded S3: {full_key}")
 
 def update_ddb_game(game_id, date_str, updates):
     exp_parts = []
@@ -402,33 +382,6 @@ def update_ddb_game(game_id, date_str, updates):
         )
     except ClientError as e:
         print(f"DDB Update Error {game_id}: {e}")
-
-def update_manifest(game_id):
-    """Loads manifest.json from S3, adds game_id, uploads it back."""
-    try:
-        # Load
-        try:
-            resp = s3_client.get_object(Bucket=BUCKET, Key=MANIFEST_KEY)
-            content = resp['Body'].read().decode('utf-8')
-            manifest = set(json.loads(content))
-        except ClientError:
-            manifest = set()
-
-        if game_id in manifest:
-            return # No change needed
-
-        manifest.add(game_id)
-        
-        # Save
-        s3_client.put_object(
-            Bucket=BUCKET,
-            Key=MANIFEST_KEY,
-            Body=json.dumps(list(manifest)),
-            ContentType='application/json'
-        )
-        print(f"Manifest updated with {game_id}")
-    except Exception as e:
-        print(f"Manifest Error: {e}")
 
 def get_nba_date():
     """

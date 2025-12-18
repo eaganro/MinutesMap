@@ -67,7 +67,7 @@ function getColor(config) {
 /**
  * Detect event type from action description
  */
-export function getEventType(description) {
+export function getEventType(description, actionType = null) {
   if (!description) return null;
   
   if (description.includes('MISS')) return 'miss';
@@ -77,7 +77,7 @@ export function getEventType(description) {
   if (description.includes('TO)')) return 'turnover';
   if (description.includes('BLK')) return 'block';
   if (description.includes('STL')) return 'steal';
-  if (description.includes('PF)')) return 'foul';
+  if (description.includes('PF)') || actionType?.toLowerCase() === 'foul') return 'foul';
   
   return null;
 }

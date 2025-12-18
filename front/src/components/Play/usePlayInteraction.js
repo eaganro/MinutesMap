@@ -154,7 +154,7 @@ export const usePlayInteraction = ({
       const hoveredAction = allActions.find(a => String(a.actionNumber) === String(hoveredActionId));
       
       if (hoveredAction) {
-        const eventType = getEventType(hoveredAction.description);
+        const eventType = getEventType(hoveredAction.description, hoveredAction.actionType);
         const isFreeThrow = hoveredAction.description.includes('Free Throw') || hoveredAction.description.includes('FT');
 
         let hoverActions = [hoveredAction];
@@ -164,7 +164,7 @@ export const usePlayInteraction = ({
           hoverActions = allActions.filter(a => 
             a.clock === hoveredAction.clock && 
             a.period === hoveredAction.period &&
-            (getEventType(a.description) === 'point' || a.description.includes('Free Throw') || a.description.includes('FT'))
+            (getEventType(a.description, a.actionType) === 'point' || a.description.includes('Free Throw') || a.description.includes('FT'))
           );
         }
 

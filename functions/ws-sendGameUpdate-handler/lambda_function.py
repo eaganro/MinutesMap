@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import urllib.parse
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
@@ -14,23 +15,29 @@ WS_API_ENDPOINT = os.environ.get('WS_API_ENDPOINT')
 apigw_client = boto3.client('apigatewaymanagementapi', endpoint_url=WS_API_ENDPOINT)
 
 def handler(event, context):
-    # Regex to match S3 Key pattern
-    pattern = re.compile(r"data/(?:boxData|playByPlayData)/(.+?)\.json")
+    # Regex to match relevant S3 keys. Note: the S3 event key is URL-encoded.
+    box_pattern = re.compile(r"^data/boxData/(.+?)\.json")
+    pbp_processed_pattern = re.compile(r"^data/processed-data/playByPlayData/(.+?)\.json")
 
     for record in event.get('Records', []):
         s3_object = record.get('s3', {}).get('object', {})
-        key = s3_object.get('key', '')
+        key = urllib.parse.unquote_plus(s3_object.get('key', ''))
         raw_etag = s3_object.get('eTag', '')
         
         # Clean eTag (remove quotes)
         version = raw_etag.replace('"', '')
 
-        # Check if key matches our game data pattern
-        match = pattern.search(key)
-        if not match:
-            continue
-            
-        game_id = match.group(1)
+        # Determine which kind of update this is.
+        # - Box score: keep legacy location `data/boxData/...`
+        # - Play-by-play: ONLY notify for the processed slim payload under `data/processed-data/...`
+        match = pbp_processed_pattern.match(key)
+        if match:
+            game_id = match.group(1)
+        else:
+            match = box_pattern.match(key)
+            if not match:
+                continue
+            game_id = match.group(1)
 
         # Find all subscribers for this game
         table = dynamodb.Table(CONN_TABLE_NAME)

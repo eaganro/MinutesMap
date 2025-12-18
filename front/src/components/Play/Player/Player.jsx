@@ -23,7 +23,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
       if (a.period > 4) {
         pos = ((4 * 12 * 60 + 5 * (a.period - 4) * 60 - timeToSeconds(a.clock)) / (4 * 12 * 60)) * (qWidth * 4);
       }
-      const eventType = getEventType(a.description);
+      const eventType = getEventType(a.description, a.actionType);
       const is3PT = a.description.includes('3PT');
       return renderEventShape(eventType, pos, 14, 4, `action-${a.actionNumber}`, is3PT, a.actionNumber);
     });
@@ -35,7 +35,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
       if (a.period > 4) {
         pos = ((4 * 12 * 60 + 5 * (a.period - 4) * 60 - timeToSeconds(a.clock)) / (4 * 12 * 60)) * (qWidth * 4);
       }
-      const eventType = getEventType(a.description);
+      const eventType = getEventType(a.description, a.actionType);
       const is3PT = a.description.includes('3PT');
       return renderEventShape(eventType, pos, 14, 8, `action-${a.actionNumber}`, is3PT, a.actionNumber);
     });

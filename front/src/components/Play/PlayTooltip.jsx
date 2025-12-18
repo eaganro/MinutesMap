@@ -112,7 +112,7 @@ export default function PlayTooltip({
   const ActionsComponent = () => (
     <div className="actions-container">
       {sortedActions.map((a, index) => {
-        const eventType = getEventType(a.description);
+        const eventType = getEventType(a.description, a.actionType);
         const is3PT = a.description.includes('3PT');
         const actionTeamColor = a.teamTricode === awayTeamNames.abr ? teamColors.away : teamColors.home;
         
