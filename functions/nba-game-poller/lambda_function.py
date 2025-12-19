@@ -515,3 +515,4 @@ def get_earliest_start_time(games):
         elif g.get('starttime'):
             print(f"Date Parse Error for {g.get('starttime')}")
     return min(starts) if starts else None
+
