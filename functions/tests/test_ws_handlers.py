@@ -5,6 +5,7 @@ import boto3
 import pytest
 from moto import mock_aws
 from unittest.mock import patch, MagicMock
+from decimal import Decimal
 
 class TestWsJoinGame:
     @pytest.fixture(autouse=True)
@@ -124,6 +125,29 @@ class TestWsJoinDate:
         assert payload["type"] == "date"
         assert payload["data"][0]["hometeam"] == "MIA"
 
+    def test_join_date_send_failure_returns_500(self):
+        # Send failures should return 500 but still persist the subscription.
+        mock_apigw = MagicMock()
+        mock_apigw.post_to_connection.side_effect = Exception("boom")
+        self.module.apigw_client = mock_apigw
+
+        date_str = "2023-11-01"
+        event = {
+            "requestContext": {"connectionId": "conn_fail"},
+            "body": json.dumps({"date": date_str})
+        }
+
+        resp = self.module.handler(event, {})
+        assert resp["statusCode"] == 500
+
+        item = self.conn_table.get_item(Key={"connectionId": "conn_fail"})["Item"]
+        assert item["dateString"] == date_str
+
+    def test_to_native_converts_decimal(self):
+        # Decimal values should be cast to int/float for JSON serialization.
+        assert self.module.to_native(Decimal("4")) == 4
+        assert self.module.to_native(Decimal("4.25")) == 4.25
+
 class TestWsDisconnect:
     @pytest.fixture(autouse=True)
     def setup_env(self, lambda_loader):
@@ -170,3 +194,14 @@ class TestWsDisconnect:
         # Verify deletion
         assert "Item" not in self.table_games.get_item(Key={"connectionId": conn_id})
         assert "Item" not in self.table_dates.get_item(Key={"connectionId": conn_id})
+
+    def test_disconnect_exception_returns_200(self):
+        # Disconnect errors should be swallowed so API Gateway doesn't retry.
+        failing_table = MagicMock()
+        failing_table.delete_item.side_effect = Exception("boom")
+        self.module.dynamodb = MagicMock()
+        self.module.dynamodb.Table.return_value = failing_table
+
+        event = {"requestContext": {"connectionId": "conn_fail"}}
+        resp = self.module.handler(event, {})
+        assert resp["statusCode"] == 200

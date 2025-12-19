@@ -5,6 +5,7 @@ import boto3
 import pytest
 from moto import mock_aws
 from unittest.mock import patch, MagicMock
+from decimal import Decimal
 
 LAMBDA_PATH = os.path.join(os.path.dirname(__file__), "../gameDateUpdates/lambda_function.py")
 
@@ -161,3 +162,20 @@ class TestGameDateUpdates:
         # Check if item is gone from DateConnections
         resp = self.date_conn_table.get_item(Key={"dateString": date_str, "connectionId": conn_id})
         assert "Item" not in resp
+
+    def test_handler_ignores_records_missing_date(self):
+        # Records without a usable date should not trigger any fanout.
+        self.module.process_date_update = MagicMock()
+        event = {
+            "Records": [
+                {"eventName": "MODIFY", "dynamodb": {"NewImage": {}}},
+                {"eventName": "INSERT", "dynamodb": {"NewImage": {"date": {"N": "1"}}}},
+            ]
+        }
+        self.module.handler(event, {})
+        assert not self.module.process_date_update.called
+
+    def test_to_native_converts_decimal(self):
+        # Decimal values should convert to int/float for JSON serialization.
+        assert self.module.to_native(Decimal("10")) == 10
+        assert self.module.to_native(Decimal("10.5")) == 10.5

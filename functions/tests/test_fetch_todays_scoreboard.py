@@ -57,3 +57,19 @@ class TestFetchTodaysScoreboard:
         assert items[0]["PK"] == "GAME#12345"
         assert items[0]["hometeam"] == "NYK"
         assert items[0]["awayscore"] == 104
+
+    @patch("urllib.request.urlopen")
+    def test_handler_no_games_array(self, mock_urlopen):
+        # Non-list games payloads should exit without writing rows.
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps({
+            "scoreboard": {"games": {"gameId": "123"}}
+        }).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        self.module.handler({}, {})
+
+        items = self.table.scan()["Items"]
+        assert len(items) == 0

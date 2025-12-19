@@ -437,6 +437,8 @@ def status_indicates_live(game):
         return False
     if status.startswith(PREGAME_STATUS_PREFIXES) or 'tbd' in status:
         return False
+    if status.startswith('q') and any(ch.isdigit() for ch in status):
+        return True
     if ':' in status and (
         ' am' in status
         or ' pm' in status
