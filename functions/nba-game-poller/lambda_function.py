@@ -37,6 +37,9 @@ table = ddb.Table(DDB_TABLE)
 events_client = boto3.client('events', region_name=REGION)
 scheduler_client = boto3.client('scheduler', region_name=REGION)
 
+ET_ZONE = ZoneInfo("America/New_York")
+UTC_ZONE = ZoneInfo("UTC")
+
 # --- Main Handler ---
 
 def main_handler(event, context):
@@ -135,25 +138,39 @@ def poller_logic(context):
         disable_self()
         return
 
+    now_et = datetime.now(ET_ZONE)
+
+    active_games = []
+    remaining_games = 0
+
+    for game in games:
+        status_text = (game.get('status') or '').strip()
+        if is_terminal_status(status_text):
+            continue
+        remaining_games += 1
+        if has_game_started(game, now_et):
+            active_games.append(game)
+
+    if remaining_games == 0:
+        print("Poller: All games are final or inactive. Disabling self.")
+        disable_self()
+        return
+
+    if not active_games:
+        print("Poller: No active games yet. Keeping poller enabled.")
+        return
+
     # --- SECURITY: Pick ONE identity for this entire session ---
     session_user_agent = random.choice(USER_AGENTS)
 
     # --- RANDOMIZATION: Shuffle processing order ---
-    random.shuffle(games)
+    random.shuffle(active_games)
 
-    active_count = 0
-    updates_made = 0
-    
-    total_games_to_process = len(games)
+    total_games_to_process = len(active_games)
 
-    for i, game in enumerate(games):
+    for i, game in enumerate(active_games):
         game_id = game['id']
         
-        # Skip if already marked Final in our DB
-        if game.get('status', '').startswith('Final'):
-            continue
-
-        active_count += 1
         try:
             # Pass the SESSION user agent down
             is_final = process_game(game, user_agent=session_user_agent)
@@ -166,7 +183,6 @@ def poller_logic(context):
                     manifest_key=MANIFEST_KEY,
                     game_id=game_id,
                 )
-                updates_made += 1
             
             # --- DYNAMIC SLEEP LOGIC ---
             # We skip sleep after the very last game
@@ -177,9 +193,6 @@ def poller_logic(context):
 
         except Exception as e:
             print(f"Poller Error on game {game_id}: {e}")
-
-    if active_count == 0:
-        disable_self()
 
 def calculate_safe_sleep(context, current_index, total_items):
     """
@@ -389,11 +402,91 @@ def get_nba_date():
     (where games finishing at 1AM count for the previous calendar day).
     """
     # Using ZoneInfo for accuracy
-    now_et = datetime.now(ZoneInfo("America/New_York"))
+    now_et = datetime.now(ET_ZONE)
     # If it's before 4 AM, count it as "yesterday" (for late night games)
     if now_et.hour < 4:
         now_et = now_et - timedelta(days=1)
     return now_et.strftime('%Y-%m-%d')
+
+TERMINAL_STATUS_PREFIXES = (
+    'final',
+    'postponed',
+    'cancelled',
+    'canceled',
+    'ppd',
+)
+
+PREGAME_STATUS_PREFIXES = (
+    'scheduled',
+    'pre',
+    'tbd',
+)
+
+def normalize_status(status_text):
+    return (status_text or '').strip().lower()
+
+def is_terminal_status(status_text):
+    status = normalize_status(status_text)
+    return any(status.startswith(prefix) for prefix in TERMINAL_STATUS_PREFIXES)
+
+def status_indicates_live(game):
+    status = normalize_status(game.get('status'))
+    if not status:
+        return False
+    if is_terminal_status(status):
+        return False
+    if status.startswith(PREGAME_STATUS_PREFIXES) or 'tbd' in status:
+        return False
+    if ':' in status and (
+        ' am' in status
+        or ' pm' in status
+        or status.endswith('am')
+        or status.endswith('pm')
+        or ' et' in status
+    ):
+        return False
+    if game.get('clock'):
+        return True
+    if any(token in status for token in (
+        'qtr',
+        'quarter',
+        'half',
+        'halftime',
+        'in progress',
+        'end of',
+    )):
+        return True
+    if 'overtime' in status or status == 'ot' or ' ot' in status:
+        return True
+    if status.endswith('ot') and status[:-2].isdigit():
+        return True
+    return False
+
+def parse_start_time_et(start_time):
+    """
+    Parse a game start time and normalize it to Eastern Time.
+    The NBA API sometimes labels ET times with 'Z', so treat 'Z' as ET.
+    """
+    if not start_time:
+        return None
+    ts = start_time.strip()
+    if ts.endswith('Z'):
+        ts = ts[:-1]
+    try:
+        dt = datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=ET_ZONE)
+    return dt.astimezone(ET_ZONE)
+
+def has_game_started(game, now_et):
+    if status_indicates_live(game):
+        return True
+    start_et = parse_start_time_et(game.get('starttime'))
+    if not start_et:
+        return False
+    return now_et >= start_et
 
 def get_games_from_ddb(date_str):
     try:
@@ -412,29 +505,11 @@ def get_earliest_start_time(games):
     Handles the NBA API quirk where EST times are labeled with 'Z'.
     """
     starts = []
-    
-    # Define Timezones
-    et_zone = ZoneInfo("America/New_York")
-    utc_zone = ZoneInfo("UTC")
 
     for g in games:
-        ts = g.get('starttime') # e.g., "2025-12-16T20:30:00Z"
-        if ts:
-            try:
-                # 1. Remove the Z so we can treat it as naive
-                ts_clean = ts.replace('Z', '')
-                
-                # 2. Parse as naive datetime
-                dt_naive = datetime.fromisoformat(ts_clean)
-                
-                # 3. FORCE it to be Eastern Time (Fixing the NBA Data error)
-                dt_et = dt_naive.replace(tzinfo=et_zone)
-                
-                # 4. Convert to UTC for the Scheduler
-                dt_utc = dt_et.astimezone(utc_zone)
-                
-                starts.append(dt_utc)
-            except ValueError:
-                print(f"Date Parse Error for {ts}")
-                pass
+        dt_et = parse_start_time_et(g.get('starttime'))
+        if dt_et:
+            starts.append(dt_et.astimezone(UTC_ZONE))
+        elif g.get('starttime'):
+            print(f"Date Parse Error for {g.get('starttime')}")
     return min(starts) if starts else None
