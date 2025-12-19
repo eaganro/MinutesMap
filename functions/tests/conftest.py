@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../nba-
 # Note: Other lambda directories are not added to sys.path to avoid namespace collisions
 # since they all contain 'lambda_function.py'. We use the 'lambda_loader' fixture below instead.
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session", autouse=True)
 def aws_credentials():
     """Mocked AWS Credentials for moto."""
     os.environ["AWS_ACCESS_KEY_ID"] = "testing"
