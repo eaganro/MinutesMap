@@ -1,28 +1,17 @@
 import json
 import os
-import sys
 import unittest
 from datetime import datetime
-
-
-THIS_DIR = os.path.dirname(__file__)
-LAMBDA_DIR = os.path.abspath(os.path.join(THIS_DIR, ".."))
-sys.path.insert(0, LAMBDA_DIR)
-
-
-from nba_game_poller.playbyplay_processing import process_playbyplay_payload, time_to_seconds  # noqa: E402
-
+from nba_game_poller.playbyplay_processing import process_playbyplay_payload, time_to_seconds
 
 class TestPlayByPlayProcessing(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        fixture_path = os.path.join(LAMBDA_DIR, "tests/0012200039.processed.json")
+        fixture_path = os.path.join(os.path.dirname(__file__), "fixtures/0012200039.json")
         with open(fixture_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
         cls.actions = payload["actions"] if isinstance(payload, dict) else payload
 
-        # From the fixture content (location 'h' / 'v' and team tricodes),
-        # SAS is the home team and NOP is the away team.
         cls.home_team_id = "1610612759"  # SAS
         cls.away_team_id = "1610612740"  # NOP
 
@@ -117,7 +106,3 @@ class TestPlayByPlayProcessing(unittest.TestCase):
                     self.assertIsNotNone(seg["start"])
                     self.assertIsNotNone(seg["end"])
         self.assertGreater(checked, 0, "Expected at least one playtime segment to be produced")
-
-
-if __name__ == "__main__":
-    unittest.main()

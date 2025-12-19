@@ -97,10 +97,9 @@ def process_date_update(date_str):
             # 410 Gone: Connection is stale, delete it
             print(f"Found stale connection: {conn_id}")
             try:
-                # The table key is composite: { dateString, connectionId }
+                # The table key is simple: { connectionId }
                 conn_table.delete_item(
                     Key={
-                        'dateString': date_str,
                         'connectionId': conn_id
                     }
                 )
