@@ -2,6 +2,7 @@
 **Serverless Real-Time NBA Analytics & Play-by-Play Visualization**
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-blue) ![DynamoDB](https://img.shields.io/badge/Database-DynamoDB-blueviolet) ![License](https://img.shields.io/badge/License-MIT-green)
+![Backend Build](https://github.com/eaganro/courtvision/actions/workflows/infra.yml/badge.svg) ![Frontend Build](https://github.com/eaganro/courtvision/actions/workflows/frontend.yml/badge.svg)
 
 [ **Launch Live App** ](https://courtvision.roryeagan.com)
 
@@ -78,23 +79,28 @@ flowchart TD
     Browser -- Connect/Sub --> APIG
     APIG -- Route --> L_WS
     L_WS -- Manage Conn --> DDB
+
 ```
 
 ### High-Level Components
-- **Frontend:** React (Vite) static app served via **CloudFront** (origin: **S3**).
-- **Game data storage:** JSON files in **S3**, served through **CloudFront**.
-- **Real-time signaling:** **API Gateway WebSocket API** with **Lambda** handlers.
-- **Connection/session state:** **DynamoDB** (stores connection IDs + current subscription info such as game/date).
-- **Schedule metadata:** **DynamoDB** table for schedule basics; schedule payload is pushed via WebSockets.
-- **Ingestion:** **AWS Lambda** (Poller) triggered by **EventBridge** (Cron/Rate) polls the NBA API and uploads new data to S3.
+
+* **Frontend:** React (Vite) static app served via **CloudFront** (origin: **S3**).
+* **Game data storage:** JSON files in **S3**, served through **CloudFront**.
+* **Real-time signaling:** **API Gateway WebSocket API** with **Lambda** handlers.
+* **Connection/session state:** **DynamoDB** (stores connection IDs + current subscription info such as game/date).
+* **Schedule metadata:** **DynamoDB** table for schedule basics; schedule payload is pushed via WebSockets.
+* **Ingestion:** **AWS Lambda** (Poller) triggered by **EventBridge** (Cron/Rate) polls the NBA API and uploads new data to S3.
 
 ### 1) Client Subscription Model
+
 Clients “subscribe” to a **game + date**:
-- The WebSocket connection is established via API Gateway.
-- The backend stores the connection/session in DynamoDB.
-- When the user changes game/date, the subscription info updates so notifications can be targeted.
+
+* The WebSocket connection is established via API Gateway.
+* The backend stores the connection/session in DynamoDB.
+* When the user changes game/date, the subscription info updates so notifications can be targeted.
 
 ### 2) Data Update Flow (Hybrid Push/Pull)
+
 1. **EventBridge** triggers the **Poller Lambda** during active games.
 2. The Lambda fetches data from NBA endpoints, updates **DynamoDB** (scores/status), and uploads compressed JSON to **S3**.
 3. **S3 event notification** triggers a **Lambda**.
@@ -103,29 +109,33 @@ Clients “subscribe” to a **game + date**:
 6. The browser fetches the updated JSON via **CloudFront → S3**.
 
 ### 3) Schedule Updates
-- A DynamoDB table holds basic schedule metadata.
-- A Lambda can send the full schedule payload to clients directly via WebSocket (useful for navigation without extra fetches).
+
+* A DynamoDB table holds basic schedule metadata.
+* A Lambda can send the full schedule payload to clients directly via WebSocket (useful for navigation without extra fetches).
 
 ## ⚡ Key Features
 
 ### 📊 High-Density Visualization
-- **Interactive SVG charting** (pure SVG — no Canvas/D3 requirement).
-- Hover/tooltip-style inspection of game events and game state.
+
+* **Interactive SVG charting** (pure SVG — no Canvas/D3 requirement).
+* Hover/tooltip-style inspection of game events and game state.
 
 ### 🔌 Real-Time Updates
-- WebSocket “data changed” notifications keep the UI feeling live.
-- Data is fetched via CloudFront for caching efficiency.
+
+* WebSocket “data changed” notifications keep the UI feeling live.
+* Data is fetched via CloudFront for caching efficiency.
 
 ### 🎨 UI/UX
-- Dark-mode friendly layout.
-- Designed for desktop-first analysis, usable on smaller screens.
+
+* Dark-mode friendly layout.
+* Designed for desktop-first analysis, usable on smaller screens.
 
 ## 📂 Repository Structure
 
 The codebase is organized into three distinct logical units:
 
 | Directory | Description |
-| :--- | :--- |
+| --- | --- |
 | **`front/`** | **Frontend Client.** A Vite + React application. Contains the WebSocket connection manager, visualization components, and global state management logic. |
 | **`functions/`** | **Serverless Backend.** AWS Lambda functions written in **Python**. Handles WebSocket lifecycle events, polls external NBA APIs (Ingestion), and broadcasts updates via API Gateway. |
 | **`terraform/`** | **Infrastructure as Code.** Contains all AWS resource definitions (S3, DynamoDB, Lambda, IAM, EventBridge) to deploy the stack automatically. |
@@ -136,31 +146,43 @@ The codebase is organized into three distinct logical units:
 <summary><strong>Click to expand Setup Instructions</strong></summary>
 
 ### Prerequisites
+
 * **Node.js** v18+
 
 ### Installation
+
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/eaganro/courtvision.git
-   ```
+```bash
+git clone [https://github.com/eaganro/courtvision.git](https://github.com/eaganro/courtvision.git)
+
+```
+
 
 2. Install dependencies:
-   ```bash
-   cd front
-   npm install
-   ```
+```bash
+cd front
+npm install
+
+```
+
 
 3. Configure Environment:
-   Create a `.env.local` file in the `front/` directory:
-   ```env
-   VITE_WS_LOCATION=wss://<your-api-gateway-websocket-endpoint>
-   VITE_PREFIX=https://<your-s3-cdn-url>
-   ```
+Create a `.env.local` file in the `front/` directory:
+```env
+VITE_WS_LOCATION=wss://<your-api-gateway-websocket-endpoint>
+VITE_PREFIX=https://<your-s3-cdn-url>
+
+```
+
 
 4. Run the development server:
-   ```bash
-   npm run dev
-   ```
+```bash
+npm run dev
+
+```
+
+
+
 </details>
 
 ## 🏗️ Infrastructure as Code (Terraform)
@@ -168,6 +190,7 @@ The codebase is organized into three distinct logical units:
 The entire AWS serverless architecture (S3, DynamoDB, Lambda, API Gateway, EventBridge, and CloudFront) is defined and managed using **Terraform**. This ensures the infrastructure is reproducible, version-controlled, and automated.
 
 The configuration in `terraform/` handles:
+
 * **Storage:** S3 buckets (hosting & data) and DynamoDB tables (connection state & schedule).
 * **Compute:** Lambda functions for WebSocket handlers, data polling, and self-scheduling logic.
 * **Networking:** API Gateway (WebSocket API) and CloudFront CDN.
@@ -178,20 +201,29 @@ The configuration in `terraform/` handles:
 ### Deploying Infrastructure
 
 1. **Navigate to the Terraform directory:**
-   ```bash
-   cd terraform
-   ```
+```bash
+cd terraform
+
+```
+
 
 2. **Initialize Terraform:** Downloads required providers (AWS, Archive, Null).
-   ```bash
-   terraform init
-   ```
+```bash
+terraform init
+
+```
+
 
 3. **Apply Changes:** This will build the local Lambda functions and deploy any infrastructure changes to AWS.
-   ```bash
-   terraform apply
-   ```
+```bash
+terraform apply
+
+```
+
+
+
 ### Project Structure (Terraform)
+
 The configuration is split into domain-specific files to maintain readability:
 
 * **`main.tf`:** Provider config, backend state, and global settings.
@@ -200,3 +232,49 @@ The configuration is split into domain-specific files to maintain readability:
 * **`database.tf`:** DynamoDB Tables and Indexes.
 * **`api_gateway.tf`:** WebSocket API definitions, routes, and stages.
 * **`fn_*.tf`:** Modular files for each Lambda function (e.g., `fn_nba_poller.tf`), containing the Function resource, IAM Role, and Triggers.
+
+## 🚀 CI/CD Pipelines
+
+This project uses **GitHub Actions** to automate testing, infrastructure provisioning, and deployment.
+
+### 1. Frontend Pipeline (`frontend.yml`)
+Triggered on changes to `front/**`.
+* **Automated Testing:** Runs **Playwright** end-to-end tests across **4 parallel shards** to minimize execution time.
+* **Report Generation:** Merges test results into a single HTML report artifact.
+* **Continuous Deployment:** If tests pass on `main`:
+    1.  Builds the Vite application.
+    2.  Syncs static assets to **S3**.
+    3.  Invalidates the **CloudFront** cache to ensure users see the latest version immediately.
+
+### 2. Infrastructure Pipeline (`infra.yml`)
+Triggered on changes to `terraform/**` or `functions/**`.
+* **Infrastructure as Code:** Automatically runs `terraform init` and `terraform apply` to provision AWS resources.
+* **Backend Updates:** Because the Python Lambda functions are zipped and deployed via Terraform, updates to `functions/` also trigger this pipeline to redeploy the backend logic.
+
+### Automation Workflow
+```mermaid
+flowchart LR
+    %% Styles
+    classDef git fill:#F05032,stroke:#333,stroke-width:2px,color:white;
+    classDef action fill:#2088FF,stroke:#333,stroke-width:2px,color:white;
+    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white;
+
+    subgraph GitHub_Actions [GitHub Actions]
+        direction TB
+        Push((Push to Main)):::git
+
+        subgraph Infra_Job [Backend & Infra]
+            TF[Terraform Apply]:::action
+        end
+
+        subgraph Front_Job [Frontend Deploy]
+            Test["Playwright Tests<br/>(4 Shards)"]:::action
+            Build[Vite Build]:::action
+            Sync["S3 Sync &<br/>CF Invalidation"]:::action
+        end
+    end
+
+    Push -->|terraform/**| TF
+    Push -->|front/**| Test
+    Test --> Build --> Sync
+```
