@@ -148,8 +148,9 @@ The codebase is organized into three distinct logical units:
 ### Prerequisites
 
 * **Node.js** v18+
+* **Python** 3.11+ (for Backend/Lambda development)
 
-### Installation
+### Frontend Setup
 
 1. Clone the repository:
 ```bash
@@ -178,6 +179,25 @@ VITE_PREFIX=https://<your-s3-cdn-url>
 4. Run the development server:
 ```bash
 npm run dev
+
+```
+
+
+
+### Backend Setup (Optional)
+
+To run the Lambda unit tests locally:
+
+1. Install test dependencies:
+```bash
+pip install -r functions/requirements-dev.txt
+
+```
+
+
+2. Run Pytest:
+```bash
+python -m pytest functions/tests
 
 ```
 
@@ -238,7 +258,9 @@ The configuration is split into domain-specific files to maintain readability:
 This project uses **GitHub Actions** to automate testing, infrastructure provisioning, and deployment.
 
 ### 1. Frontend Pipeline (`frontend.yml`)
+
 Triggered on changes to `front/**`.
+
 * **Automated Testing:** Runs **Playwright** end-to-end tests across **4 parallel shards** to minimize execution time.
 * **Report Generation:** Merges test results into a single HTML report artifact.
 * **Continuous Deployment:** If tests pass on `main`:
@@ -247,11 +269,15 @@ Triggered on changes to `front/**`.
     3.  Invalidates the **CloudFront** cache to ensure users see the latest version immediately.
 
 ### 2. Infrastructure Pipeline (`infra.yml`)
+
 Triggered on changes to `terraform/**` or `functions/**`.
-* **Infrastructure as Code:** Automatically runs `terraform init` and `terraform apply` to provision AWS resources.
-* **Backend Updates:** Because the Python Lambda functions are zipped and deployed via Terraform, updates to `functions/` also trigger this pipeline to redeploy the backend logic.
+
+* **Backend Verification:** Sets up Python 3.11 and runs **pytest** on the `functions/` directory.
+* **Infrastructure as Code:** If tests pass, automatically runs `terraform init` and `terraform apply`.
+* **Updates:** Because Python Lambda functions are deployed via Terraform, this single pipeline handles both code logic updates and AWS resource changes.
 
 ### Automation Workflow
+
 ```mermaid
 flowchart LR
     %% Styles
@@ -264,7 +290,9 @@ flowchart LR
         Push((Push to Main)):::git
 
         subgraph Infra_Job [Backend & Infra]
+            PyTest[Run Pytest]:::action
             TF[Terraform Apply]:::action
+            PyTest --> TF
         end
 
         subgraph Front_Job [Frontend Deploy]
@@ -274,7 +302,8 @@ flowchart LR
         end
     end
 
-    Push -->|terraform/**| TF
+    Push -->|terraform/**| PyTest
     Push -->|front/**| Test
     Test --> Build --> Sync
+
 ```
