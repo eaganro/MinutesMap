@@ -158,7 +158,13 @@ resource "aws_cloudwatch_event_rule" "nba_poller_rule" {
   name                = "NBAGamePollerRule"
   description         = "Polls active games every minute (Enabled/Disabled dynamically)"
   schedule_expression = "rate(1 minute)"
-  state               = "DISABLED" 
+  state               = "DISABLED"
+
+  lifecycle {
+    ignore_changes = [
+      state,
+    ]
+  }
 }
 
 resource "aws_cloudwatch_event_target" "poller_target" {
