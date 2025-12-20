@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavigateNext, NavigateBefore } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -7,6 +7,31 @@ import { PREFIX } from '../../environment';
 
 
 import './Schedule.scss';
+
+function TeamLogo({ team }) {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(false);
+  }, [team]);
+
+  if (!team) return null;
+
+  return (
+    <div className={`teamLogoWrapper${!isLoaded ? ' isPending' : ''}`}>
+      <img
+        height="16"
+        width="16"
+        draggable={false}
+        className='teamLogo'
+        src={`${PREFIX ? PREFIX : ''}/img/teams/${team}.png`}
+        alt={team}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setIsLoaded(true)}
+      />
+    </div>
+  );
+}
 
 export default function Schedule({ games, date, changeDate, changeGame, isLoading, selectedGameId }) {
 
@@ -29,11 +54,9 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
       return (
         <div className={gameClassName} key={g.id} onClick={() => handleGameClick(g.id)}>
           <div className='iconRow'>
-            <img height="16" width="16" draggable={false} src={`${PREFIX ? PREFIX : ''}/img/teams/${g.awayteam}.png`} alt={g.awayteam}></img>
+            <TeamLogo team={g.awayteam} />
             {g.awayteam} - {g.hometeam}
-            {g.hometeam && (
-              <img height="16" width="16" draggable={false} src={`${PREFIX ? PREFIX : ''}/img/teams/${g.hometeam}.png`} alt={g.hometeam} />
-            )}
+            <TeamLogo team={g.hometeam} />
           </div>
           <div>{g.awayscore} - {g.homescore}</div>
           <div>{g.status}</div>
@@ -43,11 +66,9 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
       return (
         <div className={gameClassName} key={g.id} onClick={() => handleGameClick(g.id)}>
           <div className='iconRow'>
-            <img height="16" width="16" draggable={false} src={`${PREFIX ? PREFIX : ''}/img/teams/${g.awayteam}.png`} alt={g.awayteam}></img>
+            <TeamLogo team={g.awayteam} />
             {g.awayteam} - {g.hometeam}
-            {g.hometeam && (
-              <img height="16" width="16" draggable={false} src={`${PREFIX ? PREFIX : ''}/img/teams/${g.hometeam}.png`} alt={g.hometeam} />
-            )}
+            <TeamLogo team={g.hometeam} />
           </div>
           <div className='recordRow'>
             {/* <span>{g.awayrecord}</span>

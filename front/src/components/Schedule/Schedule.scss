@@ -92,6 +92,43 @@
             display: flex;
             align-items: center;
             height: 21px;
+            gap: 4px;
+
+            .teamLogoWrapper {
+              position: relative;
+              width: 16px;
+              height: 16px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            }
+
+            .teamLogoWrapper::before {
+              content: '';
+              position: absolute;
+              inset: 1px;
+              border-radius: 50%;
+              background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.1)), var(--bg-table-even);
+              border: 1px solid var(--divider);
+              opacity: 0;
+              transition: opacity 0.2s ease, filter 0.2s ease;
+            }
+
+            .teamLogoWrapper.isPending::before {
+              opacity: 0.7;
+              filter: blur(1px);
+            }
+
+            .teamLogo {
+              display: block;
+              object-fit: contain;
+              transition: opacity 0.2s ease, filter 0.2s ease;
+            }
+
+            .teamLogoWrapper.isPending .teamLogo {
+              opacity: 0;
+            }
           }
           .recordRow {
             display: flex;
