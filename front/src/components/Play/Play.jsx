@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme'; // Adjust path
 import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
@@ -13,6 +13,8 @@ import TimelineGrid from './TimelineGrid';
 import { usePlayInteraction } from './usePlayInteraction';
 
 import './Play.scss';
+
+const LOADING_TEXT_DELAY_MS = 500;
 
 export default function Play({ 
   awayTeamNames, 
@@ -31,7 +33,84 @@ export default function Play({
   showScoreDiff = true 
 }) {
   const playRef = useRef(null);
+  const lastStableRef = useRef(null);
+  const [showLoadingText, setShowLoadingText] = useState(false);
   const { isDarkMode } = useTheme();
+
+  useEffect(() => {
+    if (!isLoading) {
+      lastStableRef.current = {
+        awayTeamNames,
+        homeTeamNames,
+        awayPlayers,
+        homePlayers,
+        allActions,
+        scoreTimeline,
+        awayPlayerTimeline,
+        homePlayerTimeline,
+        numQs,
+        lastAction,
+      };
+    }
+  }, [
+    isLoading,
+    awayTeamNames,
+    homeTeamNames,
+    awayPlayers,
+    homePlayers,
+    allActions,
+    scoreTimeline,
+    awayPlayerTimeline,
+    homePlayerTimeline,
+    numQs,
+    lastAction,
+  ]);
+
+  const displayData = isLoading && lastStableRef.current
+    ? lastStableRef.current
+    : {
+        awayTeamNames,
+        homeTeamNames,
+        awayPlayers,
+        homePlayers,
+        allActions,
+        scoreTimeline,
+        awayPlayerTimeline,
+        homePlayerTimeline,
+        numQs,
+        lastAction,
+      };
+
+  const {
+    awayTeamNames: displayAwayTeamNames,
+    homeTeamNames: displayHomeTeamNames,
+    awayPlayers: displayAwayPlayers,
+    homePlayers: displayHomePlayers,
+    allActions: displayAllActions,
+    scoreTimeline: displayScoreTimeline,
+    awayPlayerTimeline: displayAwayPlayerTimeline,
+    homePlayerTimeline: displayHomePlayerTimeline,
+    numQs: displayNumQs,
+    lastAction: displayLastAction,
+  } = displayData;
+
+  const hasDisplayData = Boolean(
+    (displayAllActions && displayAllActions.length) ||
+    (displayScoreTimeline && displayScoreTimeline.length) ||
+    Object.keys(displayAwayPlayers || {}).length ||
+    Object.keys(displayHomePlayers || {}).length
+  );
+  const isDataLoading = isLoading && hasDisplayData;
+
+  useEffect(() => {
+    if (isLoading && hasDisplayData) {
+      const timer = setTimeout(() => setShowLoadingText(true), LOADING_TEXT_DELAY_MS);
+      return () => clearTimeout(timer);
+    }
+    setShowLoadingText(false);
+  }, [isLoading, hasDisplayData]);
+
+  const showLoadingOverlay = isDataLoading && showLoadingText;
 
   // --- Layout Constants ---
   const leftMargin = 96;
@@ -41,11 +120,11 @@ export default function Play({
 
   // Calculate Quarter Width (Dynamic based on Overtime)
   const qWidth = useMemo(() => {
-    if (numQs > 4) {
-      return width * (12 / (12 * 4 + 5 * (numQs - 4)));
+    if (displayNumQs > 4) {
+      return width * (12 / (12 * 4 + 5 * (displayNumQs - 4)));
     }
     return width / 4;
-  }, [width, numQs]);
+  }, [width, displayNumQs]);
 
   // --- Custom Hook for Logic ---
   const {
@@ -59,7 +138,7 @@ export default function Play({
     updateHoverAt,
     resetInteraction
   } = usePlayInteraction({
-    allActions,
+    allActions: displayAllActions,
     sectionWidth,
     leftMargin,
     rightMargin,
@@ -68,7 +147,7 @@ export default function Play({
   });
 
   // --- Visual Data Prep ---
-  const teamColors = getMatchupColors(awayTeamNames.abr, homeTeamNames.abr, isDarkMode);
+  const teamColors = getMatchupColors(displayAwayTeamNames.abr, displayHomeTeamNames.abr, isDarkMode);
   
   const awayColor = teamColors.away ? getSafeBackground(teamColors.away, isDarkMode) : '';
   const homeColor = teamColors.home ? getSafeBackground(teamColors.home, isDarkMode) : '';
@@ -76,8 +155,8 @@ export default function Play({
   // Max Score Lead & Y-Axis Scale
   const { maxLead, maxY } = useMemo(() => {
     let max = 0;
-    if (scoreTimeline) {
-      scoreTimeline.forEach(t => {
+    if (displayScoreTimeline) {
+      displayScoreTimeline.forEach(t => {
         const scoreDiff = Math.abs(Number(t.away) - Number(t.home));
         if (scoreDiff > max) max = scoreDiff;
       });
@@ -87,7 +166,7 @@ export default function Play({
       // Round to nearest 5 and add padding for the chart ceiling
       maxY: Math.floor(max / 5) * 5 + 10
     };
-  }, [scoreTimeline]);
+  }, [displayScoreTimeline]);
 
 
   // --- Event Handlers ---
@@ -106,7 +185,7 @@ export default function Play({
   };
 
   // --- Render Loading/Error States ---
-  if (isLoading) {
+  if (isLoading && !hasDisplayData) {
     return (
       <div className='play'>
         <div className='loadingIndicator'>
@@ -117,7 +196,7 @@ export default function Play({
     );
   }
 
-  if (statusMessage) {
+  if (statusMessage && !isLoading) {
     return (
       <div className='play'>
         <div className='statusMessage'>{statusMessage}</div>
@@ -129,108 +208,119 @@ export default function Play({
   return (
     <div
       ref={playRef}
-      className='play'
+      className={`play ${isDataLoading ? 'isLoading' : ''}`}
       style={{ width: sectionWidth }} // Use full section width including margins
-      onMouseMove={handleMouseMove}
-      onMouseLeave={resetInteraction}
-      onClick={handleClick}
+      onMouseMove={isDataLoading ? undefined : handleMouseMove}
+      onMouseLeave={isDataLoading ? undefined : resetInteraction}
+      onClick={isDataLoading ? undefined : handleClick}
       // Touch support
-      onTouchStart={(e) => e.touches[0] && updateHoverAt(e.touches[0].clientX, e.touches[0].clientY, e.target)}
+      onTouchStart={(e) => !isDataLoading && e.touches[0] && updateHoverAt(e.touches[0].clientX, e.touches[0].clientY, e.target)}
       onTouchMove={(e) => { 
-        if(e.touches[0]) {
+        if(!isDataLoading && e.touches[0]) {
           e.preventDefault(); 
           updateHoverAt(e.touches[0].clientX, e.touches[0].clientY, e.target);
         }
       }}
     >
       {/* Floating Tooltip */}
-      <PlayTooltip 
-        descriptionArray={descriptionArray}
-        mousePosition={mousePosition}
-        infoLocked={infoLocked}
-        containerRef={playRef}
-        awayTeamNames={awayTeamNames}
-        homeTeamNames={homeTeamNames}
-        teamColors={teamColors}
-        leftMargin={leftMargin}
-      />
-
-      {/* Main SVG Visualization (Grid + Graph + MouseLine) */}
-      <svg height="600" width={sectionWidth} className='line'>
-        <TimelineGrid 
-          width={width}
-          leftMargin={leftMargin}
-          qWidth={qWidth}
-          numQs={numQs}
-          maxLead={maxLead}
-          maxY={maxY}
-          showScoreDiff={showScoreDiff}
-          awayTeamName={awayTeamNames.name}
-          homeTeamName={homeTeamNames.name}
+      {!isDataLoading && (
+        <PlayTooltip 
+          descriptionArray={descriptionArray}
+          mousePosition={mousePosition}
+          infoLocked={infoLocked}
+          containerRef={playRef}
+          awayTeamNames={displayAwayTeamNames}
+          homeTeamNames={displayHomeTeamNames}
           teamColors={teamColors}
-        />
-        
-        <ScoreGraph 
-          scoreTimeline={scoreTimeline}
-          lastAction={lastAction}
-          width={width}
           leftMargin={leftMargin}
-          qWidth={qWidth}
-          maxY={maxY}
-          showScoreDiff={showScoreDiff}
-          awayColor={awayColor}
-          homeColor={homeColor}
         />
+      )}
 
-        {mouseLinePos !== null && (
-          <line 
-            x1={mouseLinePos} y1={10} 
-            x2={mouseLinePos} y2={590} 
-            style={{ stroke: 'var(--mouse-line-color)', strokeWidth: 1 }} 
-          />
-        )}
-      </svg>
+      {showLoadingOverlay && (
+        <div className='loadingOverlay'>
+          <CircularProgress size={20} thickness={5} />
+          <span>Loading play-by-play...</span>
+        </div>
+      )}
 
-      {/* Player Rows - Away */}
-      <div className="teamName" style={{color: teamColors.away}}>
-        {awayTeamNames.name}
-      </div>
-      <div className='teamSection'>
-        {Object.keys(awayPlayers).map(name => (
-          <Player 
-            key={name} 
-            actions={awayPlayers[name]} 
-            timeline={awayPlayerTimeline[name]}
-            name={name} 
-            width={width} 
-            rightMargin={rightMargin} 
-            numQs={numQs} 
-            heightDivide={Object.keys(awayPlayers).length}
-            highlight={highlightActionIds} 
+      <div className='playContent'>
+        {/* Main SVG Visualization (Grid + Graph + MouseLine) */}
+        <svg height="600" width={sectionWidth} className='line'>
+          <TimelineGrid 
+            width={width}
             leftMargin={leftMargin}
+            qWidth={qWidth}
+            numQs={displayNumQs}
+            maxLead={maxLead}
+            maxY={maxY}
+            showScoreDiff={showScoreDiff}
+            awayTeamName={displayAwayTeamNames.name}
+            homeTeamName={displayHomeTeamNames.name}
+            teamColors={teamColors}
           />
-        ))}
-      </div>
-
-      {/* Player Rows - Home */}
-      <div className="teamName" style={{color: teamColors.home}}>
-        {homeTeamNames.name}
-      </div>
-      <div className='teamSection'>
-        {Object.keys(homePlayers).map(name => (
-          <Player 
-            key={name} 
-            actions={homePlayers[name]} 
-            timeline={homePlayerTimeline[name]}
-            name={name} 
-            width={width} 
-            rightMargin={rightMargin} 
-            numQs={numQs} 
-            heightDivide={Object.keys(homePlayers).length}
-            highlight={highlightActionIds} 
+          
+          <ScoreGraph 
+            scoreTimeline={displayScoreTimeline}
+            lastAction={displayLastAction}
+            width={width}
             leftMargin={leftMargin}
+            qWidth={qWidth}
+            maxY={maxY}
+            showScoreDiff={showScoreDiff}
+            awayColor={awayColor}
+            homeColor={homeColor}
           />
-        ))}
+
+          {mouseLinePos !== null && (
+            <line 
+              x1={mouseLinePos} y1={10} 
+              x2={mouseLinePos} y2={590} 
+              style={{ stroke: 'var(--mouse-line-color)', strokeWidth: 1 }} 
+            />
+          )}
+        </svg>
+
+        {/* Player Rows - Away */}
+        <div className="teamName" style={{color: teamColors.away}}>
+          {displayAwayTeamNames.name}
+        </div>
+        <div className='teamSection'>
+          {Object.keys(displayAwayPlayers).map(name => (
+            <Player 
+              key={name} 
+              actions={displayAwayPlayers[name]} 
+              timeline={displayAwayPlayerTimeline[name]}
+              name={name} 
+              width={width} 
+              rightMargin={rightMargin} 
+              numQs={displayNumQs} 
+              heightDivide={Object.keys(displayAwayPlayers).length}
+              highlight={highlightActionIds} 
+              leftMargin={leftMargin}
+            />
+          ))}
+        </div>
+
+        {/* Player Rows - Home */}
+        <div className="teamName" style={{color: teamColors.home}}>
+          {displayHomeTeamNames.name}
+        </div>
+        <div className='teamSection'>
+          {Object.keys(displayHomePlayers).map(name => (
+            <Player 
+              key={name} 
+              actions={displayHomePlayers[name]} 
+              timeline={displayHomePlayerTimeline[name]}
+              name={name} 
+              width={width} 
+              rightMargin={rightMargin} 
+              numQs={displayNumQs} 
+              heightDivide={Object.keys(displayHomePlayers).length}
+              highlight={highlightActionIds} 
+              leftMargin={leftMargin}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

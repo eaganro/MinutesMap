@@ -127,16 +127,14 @@ export function useCourtVision() {
     }
   }, [gameId, fetchBoth]);
 
-  // === LOADING DELAY (avoid flash) ===
+  // === SCHEDULE LOADING DELAY (avoid flash) ===
   useEffect(() => {
-    const isLoading = isBoxLoading || isPlayLoading || isScheduleLoading;
-    if (isLoading) {
+    if (isScheduleLoading) {
       const timer = setTimeout(() => setShowLoading(true), LOADING_DELAY_MS);
       return () => clearTimeout(timer);
-    } else {
-      setShowLoading(false);
     }
-  }, [isBoxLoading, isPlayLoading, isScheduleLoading]);
+    setShowLoading(false);
+  }, [isScheduleLoading]);
 
   // === PUBLIC EVENT HANDLERS ===
   const changeDate = useCallback((e) => {
@@ -179,9 +177,9 @@ export function useCourtVision() {
   }), [box?.homeTeam]);
 
   const isScheduleVisible = isScheduleLoading && showLoading;
-  const isGameDataVisible = (isBoxLoading || isPlayLoading) && showLoading;
-  const isPlayVisible = isPlayLoading && showLoading;
-  const isBoxVisible = isBoxLoading && showLoading;
+  const isGameDataVisible = isBoxLoading || isPlayLoading;
+  const isPlayVisible = isPlayLoading;
+  const isBoxVisible = isBoxLoading;
 
   // === PUBLIC API ===
   return {
@@ -227,4 +225,3 @@ export function useCourtVision() {
     isBoxLoading: isBoxVisible,
   };
 }
-

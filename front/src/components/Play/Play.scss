@@ -9,6 +9,18 @@
   -ms-user-select: none;
   user-select: none;
   transition: background-color 0.3s ease;
+
+  &.isLoading {
+    .playContent {
+      filter: blur(3px);
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  }
+
+  .playContent {
+    transition: filter 0.2s ease, opacity 0.2s ease;
+  }
   
   .line {
     position: absolute;
@@ -140,5 +152,18 @@
     min-height: 300px;
     text-align: center;
     padding: 0 20px;
+  }
+
+  .loadingOverlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-weight: 500;
+    gap: 10px;
+    z-index: 2;
+    pointer-events: none;
   }
 }

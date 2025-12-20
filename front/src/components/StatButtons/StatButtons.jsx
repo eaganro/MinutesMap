@@ -4,20 +4,21 @@ import './StatButtons.scss';
 export default function StatButtons({ statOn, changeStatOn, showScoreDiff, setShowScoreDiff, isLoading, statusMessage }) {
 
   const eventKeys = Object.keys(EVENT_TYPES);
-  const isReady = !isLoading && !statusMessage;
+  const isInteractive = !isLoading && !statusMessage;
+  const handleToggle = (index) => {
+    if (!isInteractive) return;
+    changeStatOn(index);
+  };
 
   const buttons = eventKeys.map((key, i) => {
-    if (!isReady) {
-      return <div key={key}></div>;
-    }
-    
     const isActive = statOn[i];
     
     return (
       <div 
         className={`buttonGroup ${isActive ? '' : 'off'}`} 
         key={key}
-        onClick={() => changeStatOn(i)}
+        onClick={() => handleToggle(i)}
+        aria-disabled={!isInteractive}
       >
         <div className="shapeContainer">
           <LegendShape eventType={key} size={18} />
@@ -28,10 +29,14 @@ export default function StatButtons({ statOn, changeStatOn, showScoreDiff, setSh
   });
 
   // Score differential toggle
-  const scoreDiffButton = isReady && (
+  const scoreDiffButton = (
     <div 
       className={`buttonGroup scoreDiff ${showScoreDiff ? '' : 'off'}`}
-      onClick={() => setShowScoreDiff(!showScoreDiff)}
+      onClick={() => {
+        if (!isInteractive) return;
+        setShowScoreDiff(!showScoreDiff);
+      }}
+      aria-disabled={!isInteractive}
     >
       <div className="shapeContainer scoreDiffIcon">
         <svg width="18" height="18" viewBox="0 0 18 18">
@@ -55,9 +60,9 @@ export default function StatButtons({ statOn, changeStatOn, showScoreDiff, setSh
   );
 
   return (
-    <div className='statButtons'>
+    <div className={`statButtons ${!isInteractive ? 'isLoading' : ''}`}>
       {buttons}
-      {isReady && <div className="separator" />}
+      <div className="separator" />
       {scoreDiffButton}
     </div>
   );

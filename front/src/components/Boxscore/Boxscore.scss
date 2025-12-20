@@ -1,7 +1,20 @@
 .box {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   min-height: 545px;
+  position: relative;
   transition: background-color 0.3s ease;
+
+  &.isLoading {
+    .boxContent {
+      filter: blur(3px);
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  }
+
+  .boxContent {
+    transition: filter 0.2s ease, opacity 0.2s ease;
+  }
 
   .rowGrid {
     display: grid;
@@ -119,6 +132,19 @@
     font-weight: 500;
     gap: 10px;
     min-height: 200px;
+  }
+
+  .loadingOverlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-weight: 500;
+    gap: 10px;
+    z-index: 2;
+    pointer-events: none;
   }
 
   .statusMessage {

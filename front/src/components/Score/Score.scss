@@ -1,4 +1,5 @@
 .scoreElement {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6,9 +7,25 @@
   color: var(--text-primary);
   transition: color 0.3s ease;
 
+  &.isLoading {
+    .scoreContent {
+      filter: blur(3px);
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  }
+
   .gameDate {
     cursor: pointer;
     color: var(--text-secondary);
+  }
+
+  .scoreContent {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: filter 0.2s ease, opacity 0.2s ease;
   }
   
   .scoreArea {
@@ -39,9 +56,39 @@
     }
 
     // The logos
-    img {
+    .logoWrapper {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logoWrapper::before {
+      content: '';
+      position: absolute;
+      inset: 6px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.08)), var(--bg-table-even);
+      border: 1px solid var(--divider);
+      opacity: 0;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .logoWrapper.isPending::before {
+      opacity: 0.7;
+      filter: blur(2px);
+    }
+
+    .teamLogo {
       display: block;
       object-fit: contain;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .logoWrapper.isPending .teamLogo {
+      opacity: 0;
     }
   }
 
@@ -53,6 +100,19 @@
     font-weight: 500;
     gap: 10px;
     min-height: 120px;
+  }
+
+  .loadingOverlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    z-index: 2;
+    pointer-events: none;
   }
 
   .statusMessage {
