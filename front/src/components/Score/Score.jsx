@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import './Score.scss';
 import { PREFIX } from '../../environment';
@@ -15,6 +15,8 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
   const [awayLogoLoaded, setAwayLogoLoaded] = useState(false);
   const [homeLogoLoaded, setHomeLogoLoaded] = useState(false);
   const [showLoadingText, setShowLoadingText] = useState(false);
+  const awayImgRef = useRef(null);
+  const homeImgRef = useRef(null);
 
   useEffect(() => {
     if (!isLoading) {
@@ -26,6 +28,20 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
     setAwayLogoLoaded(false);
     setHomeLogoLoaded(false);
   }, [displayData.awayTeam, displayData.homeTeam]);
+
+  useEffect(() => {
+    const awayImg = awayImgRef.current;
+    if (awayImg?.complete && awayImg.naturalWidth > 0) {
+      setAwayLogoLoaded(true);
+    }
+  }, [displayData.awayTeam]);
+
+  useEffect(() => {
+    const homeImg = homeImgRef.current;
+    if (homeImg?.complete && homeImg.naturalWidth > 0) {
+      setHomeLogoLoaded(true);
+    }
+  }, [displayData.homeTeam]);
 
   const hasDisplayData = Boolean(
     displayData?.homeTeam ||
@@ -97,13 +113,14 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
           {displayData.awayTeam && (
             <div className={`logoWrapper${awayLogoPending ? ' isPending' : ''}`}>
               <img
+                ref={awayImgRef}
                 height="80"
                 width="80"
                 className='teamLogo awayImg'
                 src={`${PREFIX ? PREFIX : ''}/img/teams/${displayData.awayTeam}.png`}
                 alt={displayData.awayTeam}
                 onLoad={() => setAwayLogoLoaded(true)}
-                onError={() => setAwayLogoLoaded(true)}
+                onError={() => setAwayLogoLoaded(false)}
               />
             </div>
           )}
@@ -111,13 +128,14 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
           {displayData.homeTeam && (
             <div className={`logoWrapper${homeLogoPending ? ' isPending' : ''}`}>
               <img
+                ref={homeImgRef}
                 height="80"
                 width="80"
                 className='teamLogo homeImg'
                 src={`${PREFIX ? PREFIX : ''}/img/teams/${displayData.homeTeam}.png`}
                 alt={displayData.homeTeam}
                 onLoad={() => setHomeLogoLoaded(true)}
-                onError={() => setHomeLogoLoaded(true)}
+                onError={() => setHomeLogoLoaded(false)}
               />
             </div>
           )}

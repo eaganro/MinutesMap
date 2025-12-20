@@ -10,9 +10,18 @@ import './Schedule.scss';
 
 function TeamLogo({ team }) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const imgRef = useRef(null);
 
   useEffect(() => {
     setIsLoaded(false);
+  }, [team]);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    if (img.complete && img.naturalWidth > 0) {
+      setIsLoaded(true);
+    }
   }, [team]);
 
   if (!team) return null;
@@ -20,6 +29,7 @@ function TeamLogo({ team }) {
   return (
     <div className={`teamLogoWrapper${!isLoaded ? ' isPending' : ''}`}>
       <img
+        ref={imgRef}
         height="16"
         width="16"
         draggable={false}
@@ -27,7 +37,7 @@ function TeamLogo({ team }) {
         src={`${PREFIX ? PREFIX : ''}/img/teams/${team}.png`}
         alt={team}
         onLoad={() => setIsLoaded(true)}
-        onError={() => setIsLoaded(true)}
+        onError={() => setIsLoaded(false)}
       />
     </div>
   );
