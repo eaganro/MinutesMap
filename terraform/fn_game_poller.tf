@@ -142,7 +142,7 @@ resource "aws_lambda_function" "nba_poller" {
 resource "aws_cloudwatch_event_rule" "nba_daily_manager" {
   name                = "NBADailyManager"
   description         = "Daily trigger to check game schedule and set polling time"
-  schedule_expression = "cron(11 0 * * ? *)"
+  schedule_expression = "cron(22 52 * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "manager_target" {
