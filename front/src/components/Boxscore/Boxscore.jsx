@@ -2,8 +2,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import './Boxscore.scss';
 import processTeamStats from './processTeamStats';
 import { useState, useEffect, useRef } from 'react';
+import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 
 const LOADING_TEXT_DELAY_MS = 500;
+const MIN_BLUR_MS = 300;
 
 
 export default function Boxscore({ box, isLoading, statusMessage }) {
@@ -12,6 +14,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const [width, setWidth] = useState(window.innerWidth);
   const lastStableBoxRef = useRef(box);
   const [showLoadingText, setShowLoadingText] = useState(false);
+  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
   useEffect(() => {
     function handleResize() {
@@ -22,14 +25,22 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   }, [width]);
 
   useEffect(() => {
-    if (!isLoading) {
-      lastStableBoxRef.current = box;
+    if (isLoading) {
+      return;
     }
-  }, [box, isLoading]);
+    const hasStableBoxData = lastStableBoxRef.current && Object.keys(lastStableBoxRef.current).length > 0;
+    if (isBlurred && hasStableBoxData) {
+      return;
+    }
+    lastStableBoxRef.current = box;
+  }, [box, isLoading, isBlurred]);
 
-  const displayBox = isLoading && lastStableBoxRef.current ? lastStableBoxRef.current : box;
+  const hasStableBoxData = lastStableBoxRef.current && Object.keys(lastStableBoxRef.current).length > 0;
+  const displayBox = (isLoading || (isBlurred && hasStableBoxData)) && lastStableBoxRef.current
+    ? lastStableBoxRef.current
+    : box;
   const hasBoxData = displayBox && Object.keys(displayBox).length > 0;
-  const isDataLoading = isLoading && hasBoxData;
+  const isDataLoading = isBlurred && hasBoxData;
 
   useEffect(() => {
     if (isLoading && hasBoxData) {
@@ -39,7 +50,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     setShowLoadingText(false);
   }, [isLoading, hasBoxData]);
 
-  const showLoadingOverlay = isDataLoading && showLoadingText;
+  const showLoadingOverlay = isLoading && hasBoxData && showLoadingText;
 
   const awayBox = processTeamStats(displayBox?.awayTeam, false, showMore, setShowMore, scrollPos, setScrollPos);
   const homeBox = processTeamStats(displayBox?.homeTeam, true, showMore, setShowMore, scrollPos, setScrollPos);

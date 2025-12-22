@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import './Score.scss';
 import { PREFIX } from '../../environment';
+import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 
 const LOADING_TEXT_DELAY_MS = 500;
+const MIN_BLUR_MS = 300;
 
 export default function Score({ homeTeam, awayTeam, score, date, changeDate, isLoading, statusMessage }) {
   const [displayData, setDisplayData] = useState(() => ({
@@ -17,12 +19,25 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
   const [showLoadingText, setShowLoadingText] = useState(false);
   const awayImgRef = useRef(null);
   const homeImgRef = useRef(null);
+  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
   useEffect(() => {
-    if (!isLoading) {
-      setDisplayData({ homeTeam, awayTeam, score, date });
+    if (isLoading) {
+      return;
     }
-  }, [homeTeam, awayTeam, score, date, isLoading]);
+    setDisplayData((prev) => {
+      const hasPrevData = Boolean(
+        prev?.homeTeam ||
+        prev?.awayTeam ||
+        prev?.score ||
+        prev?.date
+      );
+      if (isBlurred && hasPrevData) {
+        return prev;
+      }
+      return { homeTeam, awayTeam, score, date };
+    });
+  }, [homeTeam, awayTeam, score, date, isLoading, isBlurred]);
 
   useEffect(() => {
     setAwayLogoLoaded(false);
@@ -51,7 +66,7 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
   );
   const awayLogoPending = Boolean(displayData.awayTeam) && !awayLogoLoaded;
   const homeLogoPending = Boolean(displayData.homeTeam) && !homeLogoLoaded;
-  const isDataLoading = isLoading;
+  const isDataLoading = isBlurred && hasDisplayData;
 
   useEffect(() => {
     if (isLoading && hasDisplayData) {
@@ -63,7 +78,7 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
 
   const showOverlay = isLoading && hasDisplayData && showLoadingText;
 
-  if (isDataLoading && !hasDisplayData) {
+  if (isLoading && !hasDisplayData) {
     return (
       <div className='scoreElement'>
         <div className='loadingIndicator'>

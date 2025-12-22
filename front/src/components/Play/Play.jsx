@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme'; // Adjust path
 import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
+import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 
 // Sub-components
 import Player from './Player/Player';
@@ -15,6 +16,17 @@ import { usePlayInteraction } from './usePlayInteraction';
 import './Play.scss';
 
 const LOADING_TEXT_DELAY_MS = 500;
+const MIN_BLUR_MS = 300;
+
+const hasPlayData = (data) => Boolean(
+  data &&
+  (
+    (data.allActions && data.allActions.length) ||
+    (data.scoreTimeline && data.scoreTimeline.length) ||
+    Object.keys(data.awayPlayers || {}).length ||
+    Object.keys(data.homePlayers || {}).length
+  )
+);
 
 export default function Play({ 
   awayTeamNames, 
@@ -36,24 +48,30 @@ export default function Play({
   const lastStableRef = useRef(null);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const { isDarkMode } = useTheme();
+  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
   useEffect(() => {
-    if (!isLoading) {
-      lastStableRef.current = {
-        awayTeamNames,
-        homeTeamNames,
-        awayPlayers,
-        homePlayers,
-        allActions,
-        scoreTimeline,
-        awayPlayerTimeline,
-        homePlayerTimeline,
-        numQs,
-        lastAction,
-      };
+    if (isLoading) {
+      return;
     }
+    if (isBlurred && hasPlayData(lastStableRef.current)) {
+      return;
+    }
+    lastStableRef.current = {
+      awayTeamNames,
+      homeTeamNames,
+      awayPlayers,
+      homePlayers,
+      allActions,
+      scoreTimeline,
+      awayPlayerTimeline,
+      homePlayerTimeline,
+      numQs,
+      lastAction,
+    };
   }, [
     isLoading,
+    isBlurred,
     awayTeamNames,
     homeTeamNames,
     awayPlayers,
@@ -66,20 +84,21 @@ export default function Play({
     lastAction,
   ]);
 
-  const displayData = isLoading && lastStableRef.current
+  const hasStableData = hasPlayData(lastStableRef.current);
+  const displayData = (isLoading || (isBlurred && hasStableData)) && lastStableRef.current
     ? lastStableRef.current
     : {
-        awayTeamNames,
-        homeTeamNames,
-        awayPlayers,
-        homePlayers,
-        allActions,
-        scoreTimeline,
-        awayPlayerTimeline,
-        homePlayerTimeline,
-        numQs,
-        lastAction,
-      };
+      awayTeamNames,
+      homeTeamNames,
+      awayPlayers,
+      homePlayers,
+      allActions,
+      scoreTimeline,
+      awayPlayerTimeline,
+      homePlayerTimeline,
+      numQs,
+      lastAction,
+    };
 
   const {
     awayTeamNames: displayAwayTeamNames,
@@ -94,13 +113,8 @@ export default function Play({
     lastAction: displayLastAction,
   } = displayData;
 
-  const hasDisplayData = Boolean(
-    (displayAllActions && displayAllActions.length) ||
-    (displayScoreTimeline && displayScoreTimeline.length) ||
-    Object.keys(displayAwayPlayers || {}).length ||
-    Object.keys(displayHomePlayers || {}).length
-  );
-  const isDataLoading = isLoading && hasDisplayData;
+  const hasDisplayData = hasPlayData(displayData);
+  const isDataLoading = isBlurred && hasDisplayData;
 
   useEffect(() => {
     if (isLoading && hasDisplayData) {
@@ -110,7 +124,7 @@ export default function Play({
     setShowLoadingText(false);
   }, [isLoading, hasDisplayData]);
 
-  const showLoadingOverlay = isDataLoading && showLoadingText;
+  const showLoadingOverlay = isLoading && hasDisplayData && showLoadingText;
 
   // --- Layout Constants ---
   const leftMargin = 96;
