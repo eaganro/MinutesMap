@@ -18,7 +18,7 @@ if (gaId) {
 const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
 if (posthogKey) {
   posthog.init(posthogKey, {
-    api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://app.posthog.com',
+    api_host: import.meta.env.VITE_POSTHOG_HOST,
     capture_pageview: false,
   });
   posthog.capture('$pageview');
