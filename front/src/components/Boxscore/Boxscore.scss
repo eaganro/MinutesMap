@@ -13,7 +13,8 @@
   }
 
   .boxContent {
-    transition: filter 0.2s ease, opacity 0.2s ease;
+    filter: blur(0px);
+    transition: filter 0.15s ease, opacity 0.15s ease;
   }
 
   .rowGrid {
