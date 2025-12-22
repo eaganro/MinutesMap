@@ -107,6 +107,7 @@ jobs:
           HOME: /root
           VITE_WS_LOCATION: ${{ vars.VITE_WS_LOCATION }}
           VITE_PREFIX: ${{ vars.VITE_PREFIX || '' }}
+          VITE_GA_ID: ${{ vars.VITE_GA_ID }}
         run: npm run build:prod:upload
 
       - name: Invalidate CloudFront
