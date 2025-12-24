@@ -301,15 +301,16 @@ def process_game(game_item, user_agent=None):
             last_desc = actions[-1].get('description', '').strip()
             is_play_final = last_desc.startswith('Game End')
 
-            # 1) Upload raw actions to the original location (backwards-compatible).
-            upload_json_to_s3(
-                s3_client=s3_client,
-                bucket=BUCKET,
-                prefix=PREFIX,
-                key=f"playByPlayData/{game_id}.json",
-                data=actions,
-                is_final=is_play_final,
-            )
+            # 1) Upload raw actions only once when the game is final.
+            if is_play_final:
+                upload_json_to_s3(
+                    s3_client=s3_client,
+                    bucket=BUCKET,
+                    prefix=PREFIX,
+                    key=f"playByPlayData/{game_id}.json",
+                    data=actions,
+                    is_final=is_play_final,
+                )
 
             # 2) Upload slim processed payload to the new processed-data location.
             if not (home_team_id and away_team_id):
@@ -515,4 +516,3 @@ def get_earliest_start_time(games):
         elif g.get('starttime'):
             print(f"Date Parse Error for {g.get('starttime')}")
     return min(starts) if starts else None
-
