@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getTodayString, sortGamesForSelection } from '../../helpers/gameSelectionUtils';
+import { sortGamesForSelection } from '../../helpers/gameSelectionUtils';
 import { PREFIX } from '../../environment';
 
 import { useQueryParams } from './useQueryParams';
@@ -15,16 +15,22 @@ const LOADING_DELAY_MS = 500;
 
 /**
  * Facade hook that orchestrates all game data, WebSocket, and UI state.
+ * Uses Server-Side Init to determine the landing state.
  */
 export function useCourtVision() {
   // === INITIALIZATION ===
   const { getInitialParams, updateQueryParams } = useQueryParams();
   const initialParams = useMemo(() => getInitialParams(), []);
-  const today = useMemo(() => getTodayString(), []);
+  
+  // Note: We removed getTodayString() because we now trust init.json
 
   // === CORE STATE ===
-  const [date, setDate] = useState(initialParams.date || today);
+  // Start null if no URL params; wait for init.json to tell us the date
+  const [date, setDate] = useState(initialParams.date || null);
   const [gameId, setGameId] = useState(initialParams.gameId || null);
+  
+  // Loading state for the boot sequence
+  const [isInitLoading, setIsInitLoading] = useState(!initialParams.date);
   const [showLoading, setShowLoading] = useState(false);
 
   // === USER PREFERENCES ===
@@ -67,16 +73,48 @@ export function useCourtVision() {
   // === REFS FOR CALLBACKS ===
   const gameIdRef = useRef(gameId);
   const wsCloseRef = useRef(() => {});
-
   useEffect(() => { gameIdRef.current = gameId; }, [gameId]);
 
-  // === AUTO-SELECT GAME ===
+  // === 1. BOOT SEQUENCE: FETCH INIT STATE ===
+  // If the user didn't provide a date in the URL, fetch init.json
+  useEffect(() => {
+    if (date) return;
+
+    const fetchInitState = async () => {
+      try {
+        const res = await fetch(`${PREFIX}/data/init.json`);
+        if (res.ok) {
+          const data = await res.json();
+          // The server tells us the correct "NBA Day"
+          setDate(data.date);
+          
+          // The server also tells us the "Best Game" to show automatically
+          if (data.autoSelectGameId && !initialParams.gameId) {
+            setGameId(data.autoSelectGameId);
+          }
+        } else {
+          // Fallback: Browser date (only if init.json is missing/broken)
+          setDate(new Date().toISOString().split('T')[0]);
+        }
+      } catch (err) {
+        console.error("Init fetch failed:", err);
+        setDate(new Date().toISOString().split('T')[0]);
+      } finally {
+        setIsInitLoading(false);
+      }
+    };
+
+    fetchInitState();
+  }, [date, initialParams.gameId]);
+
+  // === 2. AUTO-SELECT LOGIC ===
+  // We keep this simpler now. Its main job is to handle date changes *after* load.
   const handleLookbackDate = useCallback((newDate) => {
     setDate(newDate);
   }, []);
 
   const { attemptAutoSelect, disableAutoSelect } = useAutoSelectGame({
-    initialDate: initialParams.date || today,
+    initialDate: initialParams.date,
     initialGameId: initialParams.gameId,
     date,
     gameId,
@@ -86,12 +124,13 @@ export function useCourtVision() {
 
   // === EFFECT: FETCH SCHEDULE ON DATE CHANGE ===
   useEffect(() => {
-    fetchSchedule(date);
+    if (date) {
+      fetchSchedule(date);
+    }
   }, [date, fetchSchedule]);
 
   // === EFFECT: TRIGGER AUTO-SELECT WHEN DATA ARRIVES ===
   useEffect(() => {
-    // When schedule loads/updates, try to select a game
     if (schedule && schedule.length > 0) {
       attemptAutoSelect(schedule, date);
     }
@@ -109,7 +148,7 @@ export function useCourtVision() {
   }, [fetchBox]);
 
   const handleDateUpdate = useCallback((updatedDate) => {
-    // Only fetch if the update is for the date we are currently viewing
+    // If we receive a signal that the date we are viewing changed, refresh it
     if (updatedDate === date) {
       fetchSchedule(date);
     }
@@ -128,7 +167,9 @@ export function useCourtVision() {
 
   // === URL SYNC ===
   useEffect(() => {
-    updateQueryParams(date, gameId);
+    if (date) {
+      updateQueryParams(date, gameId);
+    }
   }, [date, gameId, updateQueryParams]);
 
   // === GAME DATA FETCHING ===
@@ -138,14 +179,16 @@ export function useCourtVision() {
     }
   }, [gameId, fetchBoth]);
 
-  // === SCHEDULE LOADING DELAY (avoid flash) ===
+  // === LOADING DELAY (avoid flash) ===
+  const isGlobalLoading = isInitLoading || isScheduleLoading;
+
   useEffect(() => {
-    if (isScheduleLoading) {
+    if (isGlobalLoading) {
       const timer = setTimeout(() => setShowLoading(true), LOADING_DELAY_MS);
       return () => clearTimeout(timer);
     }
     setShowLoading(false);
-  }, [isScheduleLoading]);
+  }, [isGlobalLoading]);
 
   // === PUBLIC EVENT HANDLERS ===
   const changeDate = useCallback((e) => {
@@ -184,7 +227,7 @@ export function useCourtVision() {
     abr: box?.homeTeam?.teamTricode || '',
   }), [box?.homeTeam]);
 
-  const isScheduleVisible = isScheduleLoading && showLoading;
+  const isScheduleVisible = isGlobalLoading && showLoading;
   const isGameDataVisible = isBoxLoading || isPlayLoading;
   const isPlayVisible = isPlayLoading;
   const isBoxVisible = isBoxLoading;
@@ -193,7 +236,7 @@ export function useCourtVision() {
   return {
     // Schedule
     games: sortedGames,
-    date,
+    date: date || "", // Guard against null during init
     gameId,
     changeDate,
     changeGame,
