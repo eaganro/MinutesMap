@@ -70,7 +70,7 @@ def migrate_data():
     for date_str, games in games_by_date.items():
         games.sort(key=lambda x: x.get('starttime', ''))
 
-        key = f"{S3_FOLDER}/{date_str}.json"
+        key = f"{S3_FOLDER}/{date_str}.json.gz"
         
         # Serialize & Compress
         json_str = json.dumps(games, cls=DecimalEncoder)
