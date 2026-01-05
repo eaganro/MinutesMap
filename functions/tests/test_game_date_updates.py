@@ -18,6 +18,7 @@ class TestGameDateUpdates:
             self.date_conn_table_name = "DateConnections"
             self.date_index_name = "date-index"
             self.ws_endpoint = "https://example.com"
+            self.request_id = "test-req-123"
         
             # Set environment variables
             os.environ["GAMES_TABLE"] = self.games_table_name
@@ -25,11 +26,12 @@ class TestGameDateUpdates:
             os.environ["DATE_CONN_TABLE"] = self.date_conn_table_name
             os.environ["DATE_INDEX_NAME"] = self.date_index_name
             os.environ["WS_API_ENDPOINT"] = self.ws_endpoint
+            os.environ["aws_request_id"] = self.request_id
         
             # Mock DynamoDB
             self.dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
         
-            # Create Games Table
+            # Create Games Table (We don't query this anymore in the lambda, but good for completeness)
             self.games_table = self.dynamodb.create_table(
                 TableName=self.games_table_name,
                 KeySchema=[{"AttributeName": "PK", "KeyType": "HASH"}, {"AttributeName": "SK", "KeyType": "RANGE"}],
@@ -65,7 +67,7 @@ class TestGameDateUpdates:
                 ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
             )
 
-            # Import module (re-import to pick up env vars if necessary, though mocked boto3 resource handles logic)
+            # Import module
             self.module = lambda_loader(LAMBDA_PATH, "game_date_updates_lambda")
             # Patch the module's dynamodb resource to use our mocked one
             self.module.dynamodb = self.dynamodb
@@ -75,18 +77,9 @@ class TestGameDateUpdates:
     def test_handler_fanout_success(self):
         # Seed Data
         date_str = "2023-12-25"
-        
-        # Seed a Game
-        self.games_table.put_item(Item={
-            "PK": "GAME#1", "SK": f"DATE#{date_str}", "date": date_str,
-            "id": "1", "hometeam": "LAL", "awayteam": "BOS", 
-            "homescore": 100, "awayscore": 90, 
-            "status": "Final", "starttime": "2023-12-25T12:00:00",
-            "clock": "00:00", "homerecord": "10-0", "awayrecord": "0-10"
-        })
-
-        # Seed a Connection
         conn_id = "conn123"
+
+        # Seed a Connection (User is looking at this date)
         self.date_conn_table.put_item(Item={
             "dateString": date_str,
             "connectionId": conn_id
@@ -120,22 +113,20 @@ class TestGameDateUpdates:
         assert call_args.kwargs['ConnectionId'] == conn_id
         
         payload = json.loads(call_args.kwargs['Data'])
-        assert payload['type'] == 'date'
-        assert len(payload['data']) == 1
-        assert payload['data'][0]['hometeam'] == 'LAL'
+        assert payload['type'] == 'date_update'
+        assert payload['date'] == date_str
 
     def test_handler_stale_connection_deletion(self):
         # Seed Data
         date_str = "2023-12-25"
         conn_id = "stale_conn"
-        self.date_conn_table.put_item(Item={"dateString": date_str, "connectionId": conn_id})
         
-        # Seed a game so the loop runs
-        self.games_table.put_item(Item={
-            "PK": "GAME#1", "SK": f"DATE#{date_str}", "date": date_str,
-            "id": "1", "homescore": 0, "awayscore": 0
+        # Seed the connection
+        self.date_conn_table.put_item(Item={
+            "dateString": date_str, 
+            "connectionId": conn_id
         })
-
+        
         # Mock API Gateway to raise GoneException
         mock_apigw = MagicMock()
         
@@ -160,22 +151,19 @@ class TestGameDateUpdates:
 
         # Verify Deletion
         # Check if item is gone from DateConnections
-        resp = self.date_conn_table.get_item(Key={"dateString": date_str, "connectionId": conn_id})
+        resp = self.date_conn_table.get_item(Key={"connectionId": conn_id})
         assert "Item" not in resp
 
     def test_handler_ignores_records_missing_date(self):
         # Records without a usable date should not trigger any fanout.
-        self.module.process_date_update = MagicMock()
+        # We mock 'notify_subscribers'
+        self.module.notify_subscribers = MagicMock()
+        
         event = {
             "Records": [
-                {"eventName": "MODIFY", "dynamodb": {"NewImage": {}}},
-                {"eventName": "INSERT", "dynamodb": {"NewImage": {"date": {"N": "1"}}}},
+                {"eventName": "MODIFY", "dynamodb": {"NewImage": {}}}, # Missing date
+                {"eventName": "INSERT", "dynamodb": {"NewImage": {"date": {"N": "1"}}}}, # Wrong type
             ]
         }
         self.module.handler(event, {})
-        assert not self.module.process_date_update.called
-
-    def test_to_native_converts_decimal(self):
-        # Decimal values should convert to int/float for JSON serialization.
-        assert self.module.to_native(Decimal("10")) == 10
-        assert self.module.to_native(Decimal("10.5")) == 10.5
+        assert not self.module.notify_subscribers.called
