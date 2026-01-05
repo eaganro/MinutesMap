@@ -17,6 +17,7 @@ import './Play.scss';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
+const TOUCH_AXIS_LOCK_PX = 8;
 
 const hasPlayData = (data) => Boolean(
   data &&
@@ -46,6 +47,10 @@ export default function Play({
 }) {
   const playRef = useRef(null);
   const lastStableRef = useRef(null);
+  const touchStartRef = useRef({ x: 0, y: 0 });
+  const touchAxisRef = useRef(null);
+  const touchMovedRef = useRef(false);
+  const touchClickGuardUntilRef = useRef(0);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const { isDarkMode } = useTheme();
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
@@ -189,6 +194,9 @@ export default function Play({
   };
 
   const handleClick = (e) => {
+    if (Date.now() < touchClickGuardUntilRef.current) {
+      return;
+    }
     if (!infoLocked) {
       setInfoLocked(true);
       setMousePosition({ x: e.clientX, y: e.clientY });
@@ -196,6 +204,64 @@ export default function Play({
       setInfoLocked(false);
       resetInteraction();
     }
+  };
+
+  const handleTouchStart = (e) => {
+    if (isDataLoading || !e.touches[0]) return;
+    touchAxisRef.current = null;
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    touchMovedRef.current = false;
+    resetInteraction();
+  };
+
+  const handleTouchMove = (e) => {
+    if (isDataLoading || !e.touches[0]) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    if (!touchAxisRef.current) {
+      if (absDx < TOUCH_AXIS_LOCK_PX && absDy < TOUCH_AXIS_LOCK_PX) {
+        return;
+      }
+      touchAxisRef.current = absDx >= absDy ? 'horizontal' : 'vertical';
+      touchMovedRef.current = true;
+    }
+
+    if (touchAxisRef.current === 'vertical') {
+      if (!infoLocked) {
+        resetInteraction();
+      }
+      return;
+    }
+
+    touchMovedRef.current = true;
+    e.preventDefault();
+    updateHoverAt(touch.clientX, touch.clientY, e.target);
+  };
+
+  const handleTouchEnd = () => {
+    if (isDataLoading) return;
+    if (touchMovedRef.current) {
+      touchClickGuardUntilRef.current = Date.now() + 700;
+      if (!infoLocked) {
+        resetInteraction();
+      }
+    }
+    touchAxisRef.current = null;
+    touchMovedRef.current = false;
+  };
+
+  const handleTouchCancel = () => {
+    if (isDataLoading) return;
+    touchClickGuardUntilRef.current = Date.now() + 700;
+    if (!infoLocked) {
+      resetInteraction();
+    }
+    touchAxisRef.current = null;
+    touchMovedRef.current = false;
   };
 
   // --- Render Loading/Error States ---
@@ -228,13 +294,10 @@ export default function Play({
       onMouseLeave={isDataLoading ? undefined : resetInteraction}
       onClick={isDataLoading ? undefined : handleClick}
       // Touch support
-      onTouchStart={(e) => !isDataLoading && e.touches[0] && updateHoverAt(e.touches[0].clientX, e.touches[0].clientY, e.target)}
-      onTouchMove={(e) => { 
-        if(!isDataLoading && e.touches[0]) {
-          e.preventDefault(); 
-          updateHoverAt(e.touches[0].clientX, e.touches[0].clientY, e.target);
-        }
-      }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
     >
       {/* Floating Tooltip */}
       {!isDataLoading && (
