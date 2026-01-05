@@ -45,7 +45,23 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods         = ["GET", "HEAD"]
   }
 
-  # 2. DEFAULT RULE: Serve the App from the Frontend Bucket
+  # 2. SPECIAL RULE: Serve Schedule from the Data Bucket
+  ordered_cache_behavior {
+    path_pattern     = "/schedule/*"
+    target_origin_id = aws_s3_bucket.data_bucket.bucket_regional_domain_name
+
+    # Use exact same policies as /data/ for consistency
+    cache_policy_id            = "cff81036-bd3d-46a6-8956-eafed459cbae" 
+    origin_request_policy_id   = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+    response_headers_policy_id = "60669652-455b-4ae9-85a4-c4c02393f86c"
+
+    compress               = true
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+  }
+
+  # 3. DEFAULT RULE: Serve the App from the Frontend Bucket
   default_cache_behavior {
     target_origin_id = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
 
