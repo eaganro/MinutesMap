@@ -5,12 +5,13 @@ import random
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from decimal import Decimal
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
 from nba_game_poller.playbyplay_processing import infer_team_ids_from_actions, process_playbyplay_payload
-from nba_game_poller.storage import upload_json_to_s3, update_manifest as storage_update_manifest
+from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
 
 # --- Configuration & Environment ---
 REGION = os.environ.get('AWS_REGION', 'us-east-1')
@@ -153,6 +154,8 @@ def poller_logic(context):
 
     if remaining_games == 0:
         print("Poller: All games are final or inactive. Disabling self.")
+        # Ensure we do one final upload to mark everything as closed/final in the schedule file
+        upload_schedule_s3(games, today_str) 
         disable_self()
         return
 
@@ -173,17 +176,24 @@ def poller_logic(context):
         
         try:
             # Pass the SESSION user agent down
-            is_final = process_game(game, user_agent=session_user_agent)
+            is_final, updates = process_game(game, user_agent=session_user_agent)
             
             if is_final:
                 print(f"Poller: Game {game_id} went Final.")
-                storage_update_manifest(
+                update_manifest(
                     s3_client=s3_client,
                     bucket=BUCKET,
                     manifest_key=MANIFEST_KEY,
                     game_id=game_id,
                 )
             
+            # --- UPDATE SCHEDULE FILE ---
+            # If we have updates, apply them to our local 'games' list and upload immediately
+            if updates:
+                game.update(updates) # Updates the object inside the 'games' list
+                print(f"Poller: Updates found for {game_id}, refreshing schedule file.")
+                upload_schedule_s3(games, today_str)
+
             # --- DYNAMIC SLEEP LOGIC ---
             # We skip sleep after the very last game
             if i < total_games_to_process - 1:
@@ -255,6 +265,9 @@ def disable_self():
 # CORE PROCESSING (Fetch -> Upload -> Update)
 # ==============================================================================
 def process_game(game_item, user_agent=None):
+    """
+    Returns (is_final, updates_dict)
+    """
     game_id = game_item['id']
     
     # Get stored ETags
@@ -272,7 +285,7 @@ def process_game(game_item, user_agent=None):
 
     # 304 Optimization: If neither changed, exit early
     if play_data is None and box_data is None:
-        return False
+        return False, {}
 
     updates = {}
     is_game_final = False
@@ -373,7 +386,7 @@ def process_game(game_item, user_agent=None):
     if updates:
         update_ddb_game(game_id, game_item['date'], updates)
 
-    return is_game_final
+    return is_game_final, updates
 
 def update_ddb_game(game_id, date_str, updates):
     exp_parts = []

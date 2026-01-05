@@ -1,7 +1,6 @@
 import gzip
 import json
 
-
 def upload_json_to_s3(*, s3_client, bucket, prefix, key, data, is_final=False):
     json_str = json.dumps(data)
     compressed = gzip.compress(json_str.encode("utf-8"))
@@ -48,3 +47,40 @@ def update_manifest(*, s3_client, bucket, manifest_key, game_id):
     except Exception as e:
         print(f"Manifest Error: {e}")
 
+def upload_schedule_s3(games_list, date_str):
+    """
+    Cleans, sorts, and uploads the daily schedule to S3.
+    """
+    # 1. Clean decimals from DDB
+    cleaned_games = convert_decimals(games_list)
+    
+    # 2. Sort by starttime
+    cleaned_games.sort(key=lambda x: x.get('starttime', ''))
+
+    # 3. Upload to schedule/{date}.json
+    # We purposefully pass is_final=False to the storage helper because 
+    # we want the cache to expire quickly (it's live data!)
+    # However, your storage.py logic for is_final=False sets 's-maxage=0'.
+    # That is good for live.
+    
+    upload_json_to_s3(
+        s3_client=s3_client,
+        bucket=BUCKET,
+        prefix="schedule/",  # Matches schedule/2026-01-05.json.gz
+        key=f"{date_str}.json",
+        data=cleaned_games,
+        is_final=False # Forces volatile cache headers
+    )
+
+def convert_decimals(obj):
+    """
+    Recursively converts Decimal objects to int or float.
+    """
+    if isinstance(obj, list):
+        return [convert_decimals(i) for i in obj]
+    elif isinstance(obj, dict):
+        return {k: convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, Decimal):
+        return int(obj) if obj % 1 == 0 else float(obj)
+    else:
+        return obj

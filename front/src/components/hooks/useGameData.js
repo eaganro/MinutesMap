@@ -3,9 +3,10 @@ import { PREFIX } from '../../environment';
 import { GAME_NOT_STARTED_MESSAGE } from '../../helpers/gameSelectionUtils';
 
 /**
- * Hook for fetching and managing game data (box score and play-by-play)
+ * Hook for fetching and managing game data (box score, play-by-play, and schedule)
  */
 export function useGameData() {
+  // --- Game Detail State ---
   const [box, setBox] = useState({});
   const [playByPlay, setPlayByPlay] = useState([]);
   const [awayTeamId, setAwayTeamId] = useState(null);
@@ -14,6 +15,11 @@ export function useGameData() {
   const [lastAction, setLastAction] = useState(null);
   const [gameStatusMessage, setGameStatusMessage] = useState(null);
   
+  // --- Schedule State ---
+  const [schedule, setSchedule] = useState([]);
+  const [isScheduleLoading, setIsScheduleLoading] = useState(false);
+
+  // --- Loading States ---
   const [isBoxLoading, setIsBoxLoading] = useState(true);
   const [isPlayLoading, setIsPlayLoading] = useState(true);
   
@@ -21,6 +27,37 @@ export function useGameData() {
 
   // Keep refs in sync
   latestBoxRef.current = box;
+
+  /**
+   * Fetch daily schedule from S3
+   * @param {string} dateString - Format 'YYYY-MM-DD'
+   */
+  const fetchSchedule = useCallback(async (dateString) => {
+    if (!dateString) return;
+
+    setIsScheduleLoading(true);
+    const url = `${PREFIX}/schedule/${dateString}.json.gz`;
+
+    try {
+      const res = await fetch(url);
+      
+      // Handle cases where schedule doesn't exist yet (e.g. far future)
+      if (res.status === 403 || res.status === 404) {
+        setSchedule([]);
+        return;
+      }
+
+      if (!res.ok) throw new Error(`Schedule fetch failed: ${res.status}`);
+      
+      const data = await res.json();
+      setSchedule(data);
+    } catch (err) {
+      console.error('Error in fetchSchedule:', err);
+      setSchedule([]);
+    } finally {
+      setIsScheduleLoading(false);
+    }
+  }, []);
 
   /**
    * Fetch both box score and play-by-play data for a game
@@ -41,6 +78,7 @@ export function useGameData() {
         fetch(playUrl),
       ]);
 
+      // --- Handle Box Score ---
       if (boxRes.status === 403 || boxRes.status === 404) {
         setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
         setBox({});
@@ -61,6 +99,7 @@ export function useGameData() {
       setHomeTeamId(boxData.homeTeamId ?? boxData.homeTeam.teamId);
       setIsBoxLoading(false);
 
+      // --- Handle Play-by-Play ---
       if (playResRaw.status === 403) {
         setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
         setPlayByPlay([]);
@@ -98,7 +137,6 @@ export function useGameData() {
    * Fetch play-by-play data from a specific URL
    */
   const fetchPlayByPlay = useCallback(async (url, gameId, onGameEnd) => {
-
     try {
       const res = await fetch(url);
       if (!res.ok) {
@@ -182,6 +220,7 @@ export function useGameData() {
     // Data
     box,
     playByPlay,
+    schedule,
     awayTeamId,
     homeTeamId,
     numQs,
@@ -191,11 +230,13 @@ export function useGameData() {
     // Loading states
     isBoxLoading,
     isPlayLoading,
+    isScheduleLoading,
     
     // Actions
     fetchBoth,
     fetchPlayByPlay,
     fetchBox,
+    fetchSchedule,
     resetLoadingStates,
   };
 }

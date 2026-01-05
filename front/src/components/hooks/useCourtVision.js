@@ -15,8 +15,6 @@ const LOADING_DELAY_MS = 500;
 
 /**
  * Facade hook that orchestrates all game data, WebSocket, and UI state.
- * This is the single point of entry for the App component - it handles
- * all internal wiring between smaller hooks so the component can focus on layout.
  */
 export function useCourtVision() {
   // === INITIALIZATION ===
@@ -26,9 +24,7 @@ export function useCourtVision() {
 
   // === CORE STATE ===
   const [date, setDate] = useState(initialParams.date || today);
-  const [games, setGames] = useState([]);
   const [gameId, setGameId] = useState(initialParams.gameId || null);
-  const [isScheduleLoading, setIsScheduleLoading] = useState(true);
   const [showLoading, setShowLoading] = useState(false);
 
   // === USER PREFERENCES ===
@@ -37,6 +33,9 @@ export function useCourtVision() {
 
   // === GAME DATA ===
   const {
+    schedule,
+    fetchSchedule,
+    isScheduleLoading,
     box,
     playByPlay,
     awayTeamId,
@@ -73,7 +72,6 @@ export function useCourtVision() {
 
   // === AUTO-SELECT GAME ===
   const handleLookbackDate = useCallback((newDate) => {
-    setIsScheduleLoading(true);
     setDate(newDate);
   }, []);
 
@@ -86,6 +84,19 @@ export function useCourtVision() {
     onLookbackDate: handleLookbackDate,
   });
 
+  // === EFFECT: FETCH SCHEDULE ON DATE CHANGE ===
+  useEffect(() => {
+    fetchSchedule(date);
+  }, [date, fetchSchedule]);
+
+  // === EFFECT: TRIGGER AUTO-SELECT WHEN DATA ARRIVES ===
+  useEffect(() => {
+    // When schedule loads/updates, try to select a game
+    if (schedule && schedule.length > 0) {
+      attemptAutoSelect(schedule, date);
+    }
+  }, [schedule, date, attemptAutoSelect]);
+
   // === WEBSOCKET HANDLERS ===
   const handlePlayByPlayUpdate = useCallback((key, version) => {
     const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
@@ -97,11 +108,12 @@ export function useCourtVision() {
     fetchBox(url);
   }, [fetchBox]);
 
-  const handleDateUpdate = useCallback((data, scheduleDate) => {
-    setGames(data);
-    setIsScheduleLoading(false);
-    attemptAutoSelect(data, scheduleDate);
-  }, [attemptAutoSelect]);
+  const handleDateUpdate = useCallback((updatedDate) => {
+    // Only fetch if the update is for the date we are currently viewing
+    if (updatedDate === date) {
+      fetchSchedule(date);
+    }
+  }, [date, fetchSchedule]);
 
   // === WEBSOCKET CONNECTION ===
   const { close: wsClose } = useWebSocket({
@@ -112,7 +124,6 @@ export function useCourtVision() {
     onDateUpdate: handleDateUpdate,
   });
 
-  // Store wsClose in ref for use in callbacks
   useEffect(() => { wsCloseRef.current = wsClose; }, [wsClose]);
 
   // === URL SYNC ===
@@ -142,15 +153,12 @@ export function useCourtVision() {
     if (newDate === date) return;
     
     disableAutoSelect();
-    setIsScheduleLoading(true);
     setDate(newDate);
   }, [date, disableAutoSelect]);
 
   const changeGame = useCallback((id) => {
     disableAutoSelect();
-    
     if (!id || id === gameId) return;
-    
     resetLoadingStates();
     setGameId(id);
   }, [gameId, resetLoadingStates, disableAutoSelect]);
@@ -164,7 +172,7 @@ export function useCourtVision() {
   }, [setStatOn]);
 
   // === COMPUTED VALUES ===
-  const sortedGames = useMemo(() => sortGamesForSelection(games), [games]);
+  const sortedGames = useMemo(() => sortGamesForSelection(schedule || []), [schedule]);
 
   const awayTeamName = useMemo(() => ({
     name: box?.awayTeam?.teamName || 'Away Team',

@@ -58,8 +58,9 @@ export function useWebSocket({
           onPlayByPlayUpdate?.(msg.key, msg.version);
         } else if (msg.key?.includes("boxData")) {
           onBoxUpdate?.(msg.key, msg.version);
-        } else if (msg.type === "date") {
-          onDateUpdate?.(msg.data, msg.date);
+        } 
+        else if (msg.type === "date_update") {
+          onDateUpdate?.(msg.date);
         }
       } catch (err) {
         console.error("Error handling WS message", msg, err);
@@ -102,4 +103,3 @@ export function useWebSocket({
 
   return { ws, connect, close };
 }
-
