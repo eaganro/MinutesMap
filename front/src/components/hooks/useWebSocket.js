@@ -41,7 +41,9 @@ export function useWebSocket({
       if (gameIdRef.current) {
         newWs.send(JSON.stringify({ action: 'followGame', gameId: gameIdRef.current }));
       }
-      newWs.send(JSON.stringify({ action: 'followDate', date: dateRef.current }));
+      if (dateRef.current) {
+        newWs.send(JSON.stringify({ action: 'followDate', date: dateRef.current }));
+      }
     };
 
     newWs.onmessage = async (event) => {
@@ -79,6 +81,7 @@ export function useWebSocket({
 
   // Follow date changes
   useEffect(() => {
+    if (!date) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ action: 'followDate', date }));
     } else if (wsRef.current !== null) {
