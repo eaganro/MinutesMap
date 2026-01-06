@@ -317,9 +317,14 @@ data "aws_iam_policy_document" "github_shard_compute" {
     sid    = "CloudFrontCreate"
     effect = "Allow"
     actions = [
+      "cloudfront:CreateCachePolicy",
       "cloudfront:CreateDistribution",
       "cloudfront:CreateOriginAccessControl",
+      "cloudfront:DeleteCachePolicy",
+      "cloudfront:GetCachePolicy",
       "cloudfront:GetOriginAccessControl",
+      "cloudfront:ListCachePolicies",
+      "cloudfront:UpdateCachePolicy",
       "cloudfront:DeleteOriginAccessControl"
     ]
     resources = ["*"]
