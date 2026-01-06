@@ -28,9 +28,9 @@ resource "aws_iam_role_policy_attachment" "ws_join_date_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# D. DynamoDB Permissions (Read Games + Write Connection)
+# D. DynamoDB Permissions (Write Connection)
 resource "aws_iam_role_policy" "ws_join_date_dynamo" {
-  name = "dynamodb_access"
+  name = "data_access"
   role = aws_iam_role.ws_join_date_role.id
 
   policy = jsonencode({
@@ -43,36 +43,6 @@ resource "aws_iam_role_policy" "ws_join_date_dynamo" {
           "dynamodb:PutItem"
         ]
         Resource = aws_dynamodb_table.date_connections.arn
-      },
-      {
-        # Permission to look up games in NBA_Games using the ByDate index
-        Effect = "Allow"
-        Action = [
-          "dynamodb:Query"
-        ]
-        Resource = [
-          aws_dynamodb_table.nba_games.arn,
-          "${aws_dynamodb_table.nba_games.arn}/index/ByDate" # Explicitly allowing the index
-        ]
-      }
-    ]
-  })
-}
-
-# E. API Gateway Permissions (Reply to client)
-resource "aws_iam_role_policy" "ws_join_date_apigateway" {
-  name = "apigateway_manage_connections"
-  role = aws_iam_role.ws_join_date_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "execute-api:ManageConnections"
-        ]
-        Resource = "${aws_apigatewayv2_api.websocket_api.execution_arn}/*"
       }
     ]
   })
@@ -101,9 +71,6 @@ resource "aws_lambda_function" "ws_join_date" {
   environment {
     variables = {
       DATE_CONN_TABLE = aws_dynamodb_table.date_connections.name
-      GAMES_TABLE     = aws_dynamodb_table.nba_games.name
-      GAMES_GSI       = "ByDate"
-      WS_API_ENDPOINT = "${replace(aws_apigatewayv2_api.websocket_api.api_endpoint, "wss://", "https://")}/production"
     }
   }
 }

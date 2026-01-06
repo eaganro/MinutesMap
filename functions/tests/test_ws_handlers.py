@@ -1,11 +1,9 @@
-import sys
 import os
 import json
 import boto3
 import pytest
 from moto import mock_aws
-from unittest.mock import patch, MagicMock
-from decimal import Decimal
+from unittest.mock import MagicMock
 
 class TestWsJoinGame:
     @pytest.fixture(autouse=True)
@@ -43,14 +41,8 @@ class TestWsJoinDate:
     def setup_env(self, lambda_loader):
         with mock_aws():
             self.conn_table_name = "DateConnections"
-            self.games_table_name = "NBA_Games"
-            self.games_gsi = "ByDate"
-            self.ws_endpoint = "https://example.com"
         
             os.environ["DATE_CONN_TABLE"] = self.conn_table_name
-            os.environ["GAMES_TABLE"] = self.games_table_name
-            os.environ["GAMES_GSI"] = self.games_gsi
-            os.environ["WS_API_ENDPOINT"] = self.ws_endpoint
         
             self.dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
         
@@ -71,40 +63,13 @@ class TestWsJoinDate:
                 ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
             )
 
-            # Games Table
-            self.games_table = self.dynamodb.create_table(
-                TableName=self.games_table_name,
-                KeySchema=[{"AttributeName": "PK", "KeyType": "HASH"}, {"AttributeName": "SK", "KeyType": "RANGE"}],
-                AttributeDefinitions=[
-                    {"AttributeName": "PK", "AttributeType": "S"}, 
-                    {"AttributeName": "SK", "AttributeType": "S"},
-                    {"AttributeName": "date", "AttributeType": "S"}
-                ],
-                GlobalSecondaryIndexes=[{
-                    "IndexName": self.games_gsi,
-                    "KeySchema": [{"AttributeName": "date", "KeyType": "HASH"}],
-                    "Projection": {"ProjectionType": "ALL"},
-                    "ProvisionedThroughput": {"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
-                }],
-                ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
-            )
-            
             path = os.path.join(os.path.dirname(__file__), "../ws-joinDate-handler/lambda_function.py")
             self.module = lambda_loader(path, "ws_join_date")
             self.module.dynamodb = self.dynamodb
             yield
     def test_join_date_success(self):
-        # Mock API Gateway
-        mock_apigw = MagicMock()
-        self.module.apigw_client = mock_apigw
-        
-        # Seed Game
+        # Store the subscription only
         date_str = "2023-10-30"
-        self.games_table.put_item(Item={
-            "PK": "G1", "SK": f"D#{date_str}", "date": date_str,
-            "id": "G1", "hometeam": "MIA", "awayteam": "ORL",
-            "homescore": 0, "awayscore": 0
-        })
 
         event = {
             "requestContext": {"connectionId": "conn2"},
@@ -117,36 +82,6 @@ class TestWsJoinDate:
         # Check Connection stored
         item = self.conn_table.get_item(Key={"connectionId": "conn2"})["Item"]
         assert item["connectionId"] == "conn2"
-
-        # Check Initial Data Sent
-        assert mock_apigw.post_to_connection.called
-        call_args = mock_apigw.post_to_connection.call_args
-        payload = json.loads(call_args.kwargs["Data"])
-        assert payload["type"] == "date"
-        assert payload["data"][0]["hometeam"] == "MIA"
-
-    def test_join_date_send_failure_returns_500(self):
-        # Send failures should return 500 but still persist the subscription.
-        mock_apigw = MagicMock()
-        mock_apigw.post_to_connection.side_effect = Exception("boom")
-        self.module.apigw_client = mock_apigw
-
-        date_str = "2023-11-01"
-        event = {
-            "requestContext": {"connectionId": "conn_fail"},
-            "body": json.dumps({"date": date_str})
-        }
-
-        resp = self.module.handler(event, {})
-        assert resp["statusCode"] == 500
-
-        item = self.conn_table.get_item(Key={"connectionId": "conn_fail"})["Item"]
-        assert item["dateString"] == date_str
-
-    def test_to_native_converts_decimal(self):
-        # Decimal values should be cast to int/float for JSON serialization.
-        assert self.module.to_native(Decimal("4")) == 4
-        assert self.module.to_native(Decimal("4.25")) == 4.25
 
 class TestWsDisconnect:
     @pytest.fixture(autouse=True)
