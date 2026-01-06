@@ -77,7 +77,6 @@ def notify_subscribers(date_str):
     payload = json.dumps({
         'type': 'date_update',
         'date': date_str,
-        'timestamp': os.environ.get('aws_request_id') # Optional: helpful for debugging/deduping
     })
 
     print(f"Notifying {len(connections)} connections for date {date_str}")
@@ -99,5 +98,5 @@ def notify_subscribers(date_str):
             except ClientError as e:
                 print(f"Failed to delete stale connection {conn_id}: {e}")
         except Exception as e:
-            # Log other errors (e.g. Throttling) but keep the loop going
+            # Log other errors but keep the loop going
             print(f"Failed to send to {conn_id}: {e}")
