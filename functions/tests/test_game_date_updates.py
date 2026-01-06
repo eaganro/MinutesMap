@@ -1,11 +1,9 @@
-import sys
 import os
 import json
 import boto3
 import pytest
 from moto import mock_aws
-from unittest.mock import patch, MagicMock
-from decimal import Decimal
+from unittest.mock import MagicMock
 
 LAMBDA_PATH = os.path.join(os.path.dirname(__file__), "../gameDateUpdates/lambda_function.py")
 
@@ -14,15 +12,12 @@ class TestGameDateUpdates:
     def setup_env(self, lambda_loader):
         with mock_aws():
             self.games_table_name = "NBA_Games"
-            self.games_gsi_name = "ByDate"
             self.date_conn_table_name = "DateConnections"
             self.date_index_name = "date-index"
             self.ws_endpoint = "https://example.com"
             self.request_id = "test-req-123"
         
             # Set environment variables
-            os.environ["GAMES_TABLE"] = self.games_table_name
-            os.environ["GAMES_GSI"] = self.games_gsi_name
             os.environ["DATE_CONN_TABLE"] = self.date_conn_table_name
             os.environ["DATE_INDEX_NAME"] = self.date_index_name
             os.environ["WS_API_ENDPOINT"] = self.ws_endpoint
@@ -31,24 +26,6 @@ class TestGameDateUpdates:
             # Mock DynamoDB
             self.dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
         
-            # Create Games Table (We don't query this anymore in the lambda, but good for completeness)
-            self.games_table = self.dynamodb.create_table(
-                TableName=self.games_table_name,
-                KeySchema=[{"AttributeName": "PK", "KeyType": "HASH"}, {"AttributeName": "SK", "KeyType": "RANGE"}],
-                AttributeDefinitions=[
-                    {"AttributeName": "PK", "AttributeType": "S"},
-                    {"AttributeName": "SK", "AttributeType": "S"},
-                    {"AttributeName": "date", "AttributeType": "S"}
-                ],
-                GlobalSecondaryIndexes=[{
-                    "IndexName": self.games_gsi_name,
-                    "KeySchema": [{"AttributeName": "date", "KeyType": "HASH"}],
-                    "Projection": {"ProjectionType": "ALL"},
-                    "ProvisionedThroughput": {"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
-                }],
-                ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
-            )
-
             # Create Date Connections Table
             # Matches Terraform: PK = connectionId, GSI = dateString
             self.date_conn_table = self.dynamodb.create_table(
@@ -89,16 +66,17 @@ class TestGameDateUpdates:
         mock_apigw = MagicMock()
         self.module.apigw_client = mock_apigw
 
-        # Simulate DynamoDB Stream Event
+        # Simulate S3 Event
         event = {
             "Records": [
                 {
-                    "eventName": "MODIFY",
-                    "dynamodb": {
-                        "NewImage": {
-                            "date": {"S": date_str}
+                    "eventSource": "aws:s3",
+                    "s3": {
+                        "object": {
+                            "key": f"schedule/{date_str}.json.gz"
                         }
-                    }
+                    },
+                    "eventName": "ObjectCreated:Put"
                 }
             ]
         }
@@ -143,7 +121,13 @@ class TestGameDateUpdates:
 
         # Event
         event = {
-            "Records": [{"eventName": "MODIFY", "dynamodb": {"NewImage": {"date": {"S": date_str}}}}]
+            "Records": [
+                {
+                    "eventSource": "aws:s3",
+                    "s3": {"object": {"key": f"schedule/{date_str}.json.gz"}},
+                    "eventName": "ObjectCreated:Put",
+                }
+            ]
         }
 
         # Run
@@ -161,8 +145,8 @@ class TestGameDateUpdates:
         
         event = {
             "Records": [
-                {"eventName": "MODIFY", "dynamodb": {"NewImage": {}}}, # Missing date
-                {"eventName": "INSERT", "dynamodb": {"NewImage": {"date": {"N": "1"}}}}, # Wrong type
+                {"eventSource": "aws:s3", "s3": {"object": {"key": "schedule/not-a-date.json.gz"}}},
+                {"eventSource": "aws:s3", "s3": {"object": {"key": "data/boxData/123.json.gz"}}},
             ]
         }
         self.module.handler(event, {})

@@ -44,8 +44,6 @@ resource "aws_iam_role_policy" "game_date_updates_dynamo_data" {
         ]
         # Needs access to the tables AND their indexes (GSIs)
         Resource = [
-          aws_dynamodb_table.nba_games.arn,
-          "${aws_dynamodb_table.nba_games.arn}/index/*",
           aws_dynamodb_table.date_connections.arn,
           "${aws_dynamodb_table.date_connections.arn}/index/*"
         ]
@@ -55,28 +53,6 @@ resource "aws_iam_role_policy" "game_date_updates_dynamo_data" {
         Effect   = "Allow"
         Action   = ["dynamodb:DeleteItem"]
         Resource = aws_dynamodb_table.date_connections.arn
-      }
-    ]
-  })
-}
-
-# E. DynamoDB Stream Access (Reading the trigger)
-resource "aws_iam_role_policy" "game_date_updates_stream" {
-  name = "dynamodb_stream_access"
-  role = aws_iam_role.game_date_updates_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetRecords",
-          "dynamodb:GetShardIterator",
-          "dynamodb:DescribeStream",
-          "dynamodb:ListStreams"
-        ]
-        Resource = aws_dynamodb_table.nba_games.stream_arn
       }
     ]
   })
@@ -125,20 +101,18 @@ resource "aws_lambda_function" "game_date_updates" {
     variables = {
       DATE_CONN_TABLE = aws_dynamodb_table.date_connections.name
       DATE_INDEX_NAME = "date-index"
-      GAMES_GSI       = "ByDate"
-      GAMES_TABLE     = aws_dynamodb_table.nba_games.name
+      SCHEDULE_PREFIX = "schedule/"
       
       WS_API_ENDPOINT = "${replace(aws_apigatewayv2_api.websocket_api.api_endpoint, "wss://", "https://")}/production"
     }
   }
 }
 
-# --- 3. The Trigger (Event Source Mapping) ---
+resource "aws_lambda_permission" "allow_s3_game_date_updates" {
+  statement_id  = "AllowExecutionFromS3GameDateUpdates"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.game_date_updates.function_name
+  principal     = "s3.amazonaws.com"
 
-resource "aws_lambda_event_source_mapping" "nba_games_stream_trigger" {
-  event_source_arn  = aws_dynamodb_table.nba_games.stream_arn
-  function_name     = aws_lambda_function.game_date_updates.arn
-  starting_position = "LATEST"
-  batch_size        = 10
-  maximum_retry_attempts = 1
+  source_arn    = aws_s3_bucket.data_bucket.arn
 }

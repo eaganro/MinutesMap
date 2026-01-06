@@ -21,7 +21,17 @@ resource "aws_s3_bucket_notification" "data_bucket_trigger" {
     filter_suffix       = ".json.gz"
   }
 
-  depends_on = [aws_lambda_permission.allow_s3_trigger]
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.game_date_updates.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "schedule/"
+    filter_suffix       = ".json.gz"
+  }
+
+  depends_on = [
+    aws_lambda_permission.allow_s3_trigger,
+    aws_lambda_permission.allow_s3_game_date_updates,
+  ]
 }
 
 # 2. The Frontend Hosting Bucket

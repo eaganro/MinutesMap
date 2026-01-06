@@ -1,6 +1,8 @@
 import json
 import os
+import re
 import boto3
+from urllib.parse import unquote_plus
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
@@ -11,28 +13,47 @@ dynamodb = boto3.resource('dynamodb')
 DATE_CONN_TABLE_NAME = os.environ.get('DATE_CONN_TABLE', 'DateConnections')
 DATE_INDEX_NAME = os.environ.get('DATE_INDEX_NAME', 'date-index')
 WS_API_ENDPOINT = os.environ.get('WS_API_ENDPOINT')
+SCHEDULE_PREFIX = os.environ.get('SCHEDULE_PREFIX', 'schedule/')
 
 # API Gateway Client
 apigw_client = boto3.client('apigatewaymanagementapi', endpoint_url=WS_API_ENDPOINT)
 
 def handler(event, context):
     """
-    Triggered by DynamoDB Stream on NBA_Games table.
+    Triggered by S3 uploads to the schedule prefix.
     Sends a "fetch signal" to any clients subscribed to the updated date.
     """
-    # Collect distinct dates from the Stream batch to avoid duplicate notifications
+    # Collect distinct dates from the S3 event batch to avoid duplicate notifications
     dates = set()
     for record in event.get('Records', []):
-        if record['eventName'] in ['INSERT', 'MODIFY']:
-            try:
-                date_val = record['dynamodb']['NewImage']['date']['S']
-                dates.add(date_val)
-            except (KeyError, TypeError):
-                continue
+        if record.get('eventSource') != 'aws:s3':
+            continue
+        key = record.get('s3', {}).get('object', {}).get('key')
+        if not key:
+            continue
+        date_val = extract_date_from_key(key)
+        if date_val:
+            dates.add(date_val)
 
     # Process each unique date
     for date_str in dates:
         notify_subscribers(date_str)
+
+def extract_date_from_key(key):
+    decoded = unquote_plus(key)
+    if not decoded.startswith(SCHEDULE_PREFIX):
+        return None
+    filename = decoded[len(SCHEDULE_PREFIX):]
+    for suffix in ('.json.gz', '.json'):
+        if filename.endswith(suffix):
+            filename = filename[: -len(suffix)]
+            break
+    else:
+        return None
+    date_str = filename.split('/')[-1]
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+        return None
+    return date_str
 
 def notify_subscribers(date_str):
     conn_table = dynamodb.Table(DATE_CONN_TABLE_NAME)
