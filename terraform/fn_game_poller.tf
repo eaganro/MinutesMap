@@ -48,38 +48,28 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
         Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
         Resource = "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/NBAGamePoller:*"
       },
-      # 2. DynamoDB Access
-      {
-        Sid      = "DynamoDbReadWriteGamesByDate"
-        Action   = ["dynamodb:Query", "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
-        Effect   = "Allow"
-        Resource = [
-            aws_dynamodb_table.nba_games.arn,
-            "${aws_dynamodb_table.nba_games.arn}/index/*"
-        ]
-      },
-      # 3. S3 Access
+      # 2. S3 Access
       {
         Sid      = "S3ReadWriteOnlyDataPrefix"
         Action   = ["s3:PutObject", "s3:GetObject"]
         Effect   = "Allow"
         Resource = "arn:aws:s3:::roryeagan.com-nba-processed-data/data/*"
       },
-      # 4. EventBridge Rule Control
+      # 3. EventBridge Rule Control
       {
         Sid      = "EventBridgeTogglePollerRule"
         Action   = ["events:EnableRule", "events:DisableRule"]
         Effect   = "Allow"
         Resource = aws_cloudwatch_event_rule.nba_poller_rule.arn
       },
-      # 5. Scheduler Control
+      # 4. Scheduler Control
       {
         Sid      = "SchedulerManageOnlyKickoffSchedule"
         Action   = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
         Effect   = "Allow"
         Resource = "arn:aws:events:us-east-1:*:schedule/default/NBA_Daily_Kickoff"
       },
-      # 6. PassRole
+      # 5. PassRole
       {
         Sid      = "AllowPassSchedulerRoleToScheduler"
         Action   = "iam:PassRole"
@@ -129,9 +119,7 @@ resource "aws_lambda_function" "nba_poller" {
       LAMBDA_ARN = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
       SCHEDULER_ROLE_ARN = aws_iam_role.nba_scheduler_role.arn
       DATA_BUCKET      = aws_s3_bucket.data_bucket.id
-      DDB_TABLE        = aws_dynamodb_table.nba_games.name
       POLLER_RULE_NAME = aws_cloudwatch_event_rule.nba_poller_rule.name
-      DDB_GSI          = "ByDate" 
     }
   }
 }

@@ -1,3 +1,4 @@
+import gzip
 import json
 import boto3
 import os
@@ -5,8 +6,6 @@ import random
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from decimal import Decimal
-from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
@@ -18,14 +17,13 @@ REGION = os.environ.get('AWS_REGION', 'us-east-1')
 
 # 1. Dynamic Resources (From Terraform)
 BUCKET = os.environ['DATA_BUCKET']
-DDB_TABLE = os.environ['DDB_TABLE']
 POLLER_RULE_NAME = os.environ['POLLER_RULE_NAME']
 
 # 2. Optional / Defaults
-DDB_GSI = os.environ.get('DDB_GSI', 'ByDate')
 PREFIX = 'data/'
 MANIFEST_KEY = f'{PREFIX}manifest.json'
 KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
+SCHEDULE_PREFIX = 'schedule/'
 
 # 3. Security (From Terraform)
 LAMBDA_ARN = os.environ.get('LAMBDA_ARN')
@@ -33,8 +31,6 @@ SCHEDULER_ROLE_ARN = os.environ.get('SCHEDULER_ROLE_ARN')
 
 # AWS Clients
 s3_client = boto3.client('s3', region_name=REGION)
-ddb = boto3.resource('dynamodb', region_name=REGION)
-table = ddb.Table(DDB_TABLE)
 events_client = boto3.client('events', region_name=REGION)
 scheduler_client = boto3.client('scheduler', region_name=REGION)
 
@@ -65,10 +61,10 @@ def manager_logic():
     today_str = get_nba_date()
     print(f"Manager: Checking games for {today_str}...")
 
-    games = get_games_from_ddb(today_str)
+    games = get_games_from_s3(today_str)
     
     if not games:
-        print("Manager: No games found in DynamoDB for today.")
+        print("Manager: No games found in schedule for today.")
         return
 
     start_dt = get_earliest_start_time(games)
@@ -132,7 +128,7 @@ def enable_poller_logic():
 # ==============================================================================
 def poller_logic(context):
     today_str = get_nba_date()
-    games = get_games_from_ddb(today_str)
+    games = get_games_from_s3(today_str)
 
     if not games:
         print("Poller: No games found for today. Disabling self.")
@@ -155,7 +151,13 @@ def poller_logic(context):
     if remaining_games == 0:
         print("Poller: All games are final or inactive. Disabling self.")
         # Ensure we do one final upload to mark everything as closed/final in the schedule file
-        upload_schedule_s3(games, today_str) 
+        upload_schedule_s3(
+            s3_client=s3_client,
+            bucket=BUCKET,
+            games_list=games,
+            date_str=today_str,
+            prefix=SCHEDULE_PREFIX,
+        )
         disable_self()
         return
 
@@ -176,7 +178,11 @@ def poller_logic(context):
         
         try:
             # Pass the SESSION user agent down
-            is_final, updates = process_game(game, user_agent=session_user_agent)
+            is_final, updates = process_game(
+                game,
+                user_agent=session_user_agent,
+                date_str=today_str,
+            )
             
             if is_final:
                 print(f"Poller: Game {game_id} went Final.")
@@ -192,7 +198,13 @@ def poller_logic(context):
             if updates:
                 game.update(updates) # Updates the object inside the 'games' list
                 print(f"Poller: Updates found for {game_id}, refreshing schedule file.")
-                upload_schedule_s3(games, today_str)
+                upload_schedule_s3(
+                    s3_client=s3_client,
+                    bucket=BUCKET,
+                    games_list=games,
+                    date_str=today_str,
+                    prefix=SCHEDULE_PREFIX,
+                )
 
             # --- DYNAMIC SLEEP LOGIC ---
             # We skip sleep after the very last game
@@ -307,7 +319,7 @@ def disable_self():
 # ==============================================================================
 # CORE PROCESSING (Fetch -> Upload -> Update)
 # ==============================================================================
-def process_game(game_item, user_agent=None):
+def process_game(game_item, user_agent=None, date_str=None):
     """
     Returns (is_final, updates_dict)
     """
@@ -412,7 +424,7 @@ def process_game(game_item, user_agent=None):
         home_team_id = box_game.get("homeTeam", {}).get("teamId") or box_game.get("homeTeamId")
         away_team_id = box_game.get("awayTeam", {}).get("teamId") or box_game.get("awayTeamId")
         
-        # Prepare DDB fields
+        # Prepare schedule updates
         updates.update({
             'box_etag': box_etag,
             'status': status_text,
@@ -425,33 +437,7 @@ def process_game(game_item, user_agent=None):
             'awayTeamId': away_team_id,
         })
 
-    # --- 3. Update DB ---
-    if updates:
-        update_ddb_game(game_id, game_item['date'], updates)
-
     return is_game_final, updates
-
-def update_ddb_game(game_id, date_str, updates):
-    exp_parts = []
-    exp_names = {}
-    exp_values = {}
-
-    for k, v in updates.items():
-        attr_name = f"#{k}"
-        attr_val = f":{k}"
-        exp_parts.append(f"{attr_name} = {attr_val}")
-        exp_names[attr_name] = k
-        exp_values[attr_val] = v
-
-    try:
-        table.update_item(
-            Key={'PK': f"GAME#{game_id}", 'SK': f"DATE#{date_str}"},
-            UpdateExpression="SET " + ", ".join(exp_parts),
-            ExpressionAttributeNames=exp_names,
-            ExpressionAttributeValues=exp_values
-        )
-    except ClientError as e:
-        print(f"DDB Update Error {game_id}: {e}")
 
 def get_nba_date():
     """
@@ -547,20 +533,30 @@ def has_game_started(game, now_et):
         return False
     return now_et >= start_et
 
-def get_games_from_ddb(date_str):
+def get_games_from_s3(date_str):
+    key = f"{SCHEDULE_PREFIX}{date_str}.json.gz"
     try:
-        resp = table.query(
-            IndexName=DDB_GSI,
-            KeyConditionExpression=Key('date').eq(date_str)
-        )
-        return resp.get('Items', [])
+        resp = s3_client.get_object(Bucket=BUCKET, Key=key)
+        payload = resp["Body"].read()
+        try:
+            payload = gzip.decompress(payload)
+        except OSError:
+            pass
+        data = json.loads(payload.decode("utf-8"))
+        return data if isinstance(data, list) else []
     except ClientError as e:
-        print(f"DDB Query Error: {e}")
+        code = e.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404", "NotFound"):
+            return []
+        print(f"S3 Schedule Error: {e}")
+        return []
+    except Exception as e:
+        print(f"S3 Schedule Error: {e}")
         return []
 
 def get_earliest_start_time(games):
     """
-    Parses 'starttime' from DynamoDB. 
+    Parses 'starttime' from the schedule payload. 
     Handles the NBA API quirk where EST times are labeled with 'Z'.
     """
     starts = []

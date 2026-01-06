@@ -13,7 +13,6 @@ class TestNbaGamePollerHelpers:
     def setup_env(self, lambda_loader):
         os.environ["AWS_REGION"] = "us-east-1"
         os.environ["DATA_BUCKET"] = "test-bucket"
-        os.environ["DDB_TABLE"] = "test-table"
         os.environ["POLLER_RULE_NAME"] = "test-rule"
         os.environ["LAMBDA_ARN"] = "arn:aws:lambda:us-east-1:123:function:test"
         os.environ["SCHEDULER_ROLE_ARN"] = "arn:aws:iam::123:role/test"

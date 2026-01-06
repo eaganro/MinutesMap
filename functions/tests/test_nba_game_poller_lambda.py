@@ -14,7 +14,6 @@ class TestNbaGamePollerLambda:
     def setup_env(self, lambda_loader):
         os.environ["AWS_REGION"] = "us-east-1"
         os.environ["DATA_BUCKET"] = "test-bucket"
-        os.environ["DDB_TABLE"] = "test-table"
         os.environ["POLLER_RULE_NAME"] = "test-rule"
         os.environ["LAMBDA_ARN"] = "arn:aws:lambda:us-east-1:123:function:test"
         os.environ["SCHEDULER_ROLE_ARN"] = "arn:aws:iam::123:role/test"
@@ -49,7 +48,7 @@ class TestNbaGamePollerLambda:
     def test_poller_logic_disables_when_no_games(self):
         # Poller should disable itself when no games are scheduled.
         self.module.get_nba_date = MagicMock(return_value="2025-01-01")
-        self.module.get_games_from_ddb = MagicMock(return_value=[])
+        self.module.get_games_from_s3 = MagicMock(return_value=[])
         self.module.disable_self = MagicMock()
 
         self.module.poller_logic(None)

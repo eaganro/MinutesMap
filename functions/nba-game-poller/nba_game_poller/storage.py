@@ -1,5 +1,6 @@
 import gzip
 import json
+from decimal import Decimal
 
 def upload_json_to_s3(*, s3_client, bucket, prefix, key, data, is_final=False):
     json_str = json.dumps(data)
@@ -47,11 +48,11 @@ def update_manifest(*, s3_client, bucket, manifest_key, game_id):
     except Exception as e:
         print(f"Manifest Error: {e}")
 
-def upload_schedule_s3(games_list, date_str):
+def upload_schedule_s3(*, s3_client, bucket, games_list, date_str, prefix="schedule/"):
     """
     Cleans, sorts, and uploads the daily schedule to S3.
     """
-    # 1. Clean decimals from DDB
+    # 1. Clean decimals from the source payload
     cleaned_games = convert_decimals(games_list)
     
     # 2. Sort by starttime
@@ -65,11 +66,11 @@ def upload_schedule_s3(games_list, date_str):
     
     upload_json_to_s3(
         s3_client=s3_client,
-        bucket=BUCKET,
-        prefix="schedule/",  # Matches schedule/2026-01-05.json.gz
+        bucket=bucket,
+        prefix=prefix,  # Matches schedule/2026-01-05.json.gz
         key=f"{date_str}.json",
         data=cleaned_games,
-        is_final=False # Forces volatile cache headers
+        is_final=False,  # Forces volatile cache headers
     )
 
 def convert_decimals(obj):
