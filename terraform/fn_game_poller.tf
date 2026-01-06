@@ -53,7 +53,10 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
         Sid      = "S3ReadWriteOnlyDataPrefix"
         Action   = ["s3:PutObject", "s3:GetObject"]
         Effect   = "Allow"
-        Resource = "arn:aws:s3:::roryeagan.com-nba-processed-data/data/*"
+        Resource = [
+          "arn:aws:s3:::roryeagan.com-nba-processed-data/data/*",
+          "arn:aws:s3:::roryeagan.com-nba-processed-data/schedule/*"
+        ]
       },
       # 3. EventBridge Rule Control
       {
