@@ -41,7 +41,7 @@
   // Play area specific
   --bg-play: rgb(250, 250, 250);
   --line-color: black;
-  --line-color-light: darkgrey;
+  --line-color-light: #4b5563;
   --mouse-line-color: grey;
   --quarter-label-color: #666;
   
@@ -54,7 +54,7 @@
   
   // Stat button label
   --stat-label-color: #374151;
-  --stat-label-off: #9ca3af;
+  --stat-label-off: #475569;
   --score-diff-icon-color: #6366F1;
   
   // Stat event colors - these stay vibrant in both modes
@@ -119,7 +119,7 @@
   // Play area specific
   --bg-play: #1e1e1e;
   --line-color: #888;
-  --line-color-light: #727272;
+  --line-color-light: #a3a3a3;
   --mouse-line-color: #aaa;
   --quarter-label-color: #999;
   
@@ -128,7 +128,7 @@
   
   // Stat button label
   --stat-label-color: #d1d5db;
-  --stat-label-off: #6b7280;
+  --stat-label-off: #9ca3af;
   --score-diff-icon-color: #818CF8;
   
   // Stat event colors - brighten slightly for dark mode visibility

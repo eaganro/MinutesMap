@@ -49,58 +49,59 @@ export default function App() {
         </div>
         <DarkModeToggle />
       </header>
-      
-      <Schedule
-        games={games}
-        date={date}
-        changeDate={changeDate}
-        changeGame={changeGame}
-        isLoading={isScheduleLoading}
-        selectedGameId={gameId}
-      />
-      
-      <Score
-        homeTeam={homeTeam}
-        awayTeam={awayTeam}
-        score={currentScore}
-        date={gameDate}
-        changeDate={changeDate}
-        isLoading={isGameDataLoading}
-        statusMessage={gameStatusMessage}
-      />
-      
-      <div className='playByPlaySection' ref={playByPlaySectionRef}>
-        <Play
-          awayTeamNames={awayTeamName}
-          homeTeamNames={homeTeamName}
-          awayPlayers={awayActions}
-          homePlayers={homeActions}
-          allActions={allActions}
-          scoreTimeline={scoreTimeline}
-          awayPlayerTimeline={awayPlayerTimeline}
-          homePlayerTimeline={homePlayerTimeline}
-          numQs={numQs}
-          sectionWidth={playByPlaySectionWidth}
-          lastAction={lastAction}
-          isLoading={isPlayLoading}
-          statusMessage={gameStatusMessage}
-          showScoreDiff={showScoreDiff}
+      <main className='appMain'>
+        <Schedule
+          games={games}
+          date={date}
+          changeDate={changeDate}
+          changeGame={changeGame}
+          isLoading={isScheduleLoading}
+          selectedGameId={gameId}
         />
-        <StatButtons
-          statOn={statOn}
-          changeStatOn={changeStatOn}
-          showScoreDiff={showScoreDiff}
-          setShowScoreDiff={setShowScoreDiff}
-          isLoading={isPlayLoading}
+        
+        <Score
+          homeTeam={homeTeam}
+          awayTeam={awayTeam}
+          score={currentScore}
+          date={gameDate}
+          changeDate={changeDate}
+          isLoading={isGameDataLoading}
           statusMessage={gameStatusMessage}
         />
-      </div>
-      
-      <Boxscore 
-        box={box} 
-        isLoading={isBoxLoading} 
-        statusMessage={gameStatusMessage} 
-      />
+        
+        <div className='playByPlaySection' ref={playByPlaySectionRef}>
+          <Play
+            awayTeamNames={awayTeamName}
+            homeTeamNames={homeTeamName}
+            awayPlayers={awayActions}
+            homePlayers={homeActions}
+            allActions={allActions}
+            scoreTimeline={scoreTimeline}
+            awayPlayerTimeline={awayPlayerTimeline}
+            homePlayerTimeline={homePlayerTimeline}
+            numQs={numQs}
+            sectionWidth={playByPlaySectionWidth}
+            lastAction={lastAction}
+            isLoading={isPlayLoading}
+            statusMessage={gameStatusMessage}
+            showScoreDiff={showScoreDiff}
+          />
+          <StatButtons
+            statOn={statOn}
+            changeStatOn={changeStatOn}
+            showScoreDiff={showScoreDiff}
+            setShowScoreDiff={setShowScoreDiff}
+            isLoading={isPlayLoading}
+            statusMessage={gameStatusMessage}
+          />
+        </div>
+        
+        <Boxscore 
+          box={box} 
+          isLoading={isBoxLoading} 
+          statusMessage={gameStatusMessage} 
+        />
+      </main>
     </div>
   );
 }

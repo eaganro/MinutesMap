@@ -158,7 +158,16 @@ export default function(team, showButton, showMore, setShowMore, scrollPos, setS
             />
           ) : ''}
           <span>{team?.teamName}</span>
-          {showButton && <div className='showMore' onClick={() => setShowMore(!showMore)}><IconButton onClick={() =>{}}>{showMore ? <UnfoldLess /> : <UnfoldMore />}</IconButton></div>}
+          {showButton && (
+            <div className='showMore'>
+              <IconButton
+                aria-label={showMore ? 'Show fewer stats' : 'Show more stats'}
+                onClick={() => setShowMore(!showMore)}
+              >
+                {showMore ? <UnfoldLess /> : <UnfoldMore />}
+              </IconButton>
+            </div>
+          )}
         </div>
       </div>
       <div ref={ref} className="tableWrapper" onScroll={e => setScrollPos(e.target.scrollLeft)}>

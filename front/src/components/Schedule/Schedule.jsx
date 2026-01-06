@@ -193,12 +193,25 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
     <div className='schedule'>
       <div className='scheduleContent'>
         <div className='datePick'>
-          <IconButton className='scheduleButton' onClick={dateDown}><NavigateBefore /></IconButton>
-          <input className='dateInput' type="date" value={date} onChange={(e) => changeDate(e)}></input>
-          <IconButton className='scheduleButton' onClick={dateUp}><NavigateNext /></IconButton>
+          <label className='visuallyHidden' htmlFor='scheduleDate'>Select game date</label>
+          <IconButton className='scheduleButton' onClick={dateDown} aria-label='Previous date'>
+            <NavigateBefore />
+          </IconButton>
+          <input
+            id='scheduleDate'
+            className='dateInput'
+            type="date"
+            value={date}
+            onChange={(e) => changeDate(e)}
+          />
+          <IconButton className='scheduleButton' onClick={dateUp} aria-label='Next date'>
+            <NavigateNext />
+          </IconButton>
         </div>
         <div className='gamePick'>
-          <IconButton className='scheduleButton' onClick={scrollScheduleLeft}><NavigateBefore /></IconButton>
+          <IconButton className='scheduleButton' onClick={scrollScheduleLeft} aria-label='Scroll games left'>
+            <NavigateBefore />
+          </IconButton>
           {isLoading ? (
             <div className='loadingIndicator'>
               <CircularProgress size={24} thickness={5} />
@@ -221,7 +234,9 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
           ) : (
             <div className='noGames'>No Games Scheduled</div>
           )}
-          <IconButton className='scheduleButton end' onClick={scrollScheduleRight}><NavigateNext /></IconButton>
+          <IconButton className='scheduleButton end' onClick={scrollScheduleRight} aria-label='Scroll games right'>
+            <NavigateNext />
+          </IconButton>
         </div>
       </div>
     </div>
