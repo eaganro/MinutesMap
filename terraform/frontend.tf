@@ -1,28 +1,5 @@
 # frontend.tf
 
-resource "aws_cloudfront_cache_policy" "frontend_long_cache" {
-  name        = "frontend-long-cache"
-  comment     = "Long-term caching for static frontend assets."
-  default_ttl = 31536000
-  max_ttl     = 31536000
-  min_ttl     = 0
-
-  parameters_in_cache_key_and_forwarded_to_origin {
-    cookies_config {
-      cookie_behavior = "none"
-    }
-    headers_config {
-      header_behavior = "none"
-    }
-    query_strings_config {
-      query_string_behavior = "none"
-    }
-
-    enable_accept_encoding_brotli = true
-    enable_accept_encoding_gzip   = true
-  }
-}
-
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -89,7 +66,7 @@ resource "aws_cloudfront_distribution" "main" {
     target_origin_id = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
 
     # Modern Policy IDs
-    cache_policy_id          = aws_cloudfront_cache_policy.frontend_long_cache.id
+    cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"
     origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
 
     compress               = true
