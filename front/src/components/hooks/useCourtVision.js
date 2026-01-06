@@ -6,7 +6,6 @@ import { useQueryParams } from './useQueryParams';
 import { useLocalStorageState } from './useLocalStorageState';
 import { useGameData } from './useGameData';
 import { useWebSocket } from './useWebSocket';
-import { useAutoSelectGame } from './useAutoSelectGame';
 import { useGameTimeline } from './useGameTimeline';
 import { useElementWidth } from './useElementWidth';
 
@@ -28,7 +27,7 @@ export function useCourtVision() {
   // Start null if no URL params; wait for init.json to tell us the date
   const [date, setDate] = useState(initialParams.date || null);
   const [gameId, setGameId] = useState(initialParams.gameId || null);
-  
+
   // Loading state for the boot sequence
   const [isInitLoading, setIsInitLoading] = useState(!initialParams.date);
   const [showLoading, setShowLoading] = useState(false);
@@ -87,7 +86,6 @@ export function useCourtVision() {
           const data = await res.json();
           // The server tells us the correct "NBA Day"
           setDate(data.date);
-          
           // The server also tells us the "Best Game" to show automatically
           if (data.autoSelectGameId && !initialParams.gameId) {
             setGameId(data.autoSelectGameId);
@@ -107,34 +105,12 @@ export function useCourtVision() {
     fetchInitState();
   }, [date, initialParams.gameId]);
 
-  // === 2. AUTO-SELECT LOGIC ===
-  // We keep this simpler now. Its main job is to handle date changes *after* load.
-  const handleLookbackDate = useCallback((newDate) => {
-    setDate(newDate);
-  }, []);
-
-  const { attemptAutoSelect, disableAutoSelect } = useAutoSelectGame({
-    initialDate: initialParams.date,
-    initialGameId: initialParams.gameId,
-    date,
-    gameId,
-    onSelectGame: setGameId,
-    onLookbackDate: handleLookbackDate,
-  });
-
   // === EFFECT: FETCH SCHEDULE ON DATE CHANGE ===
   useEffect(() => {
     if (date) {
       fetchSchedule(date);
     }
   }, [date, fetchSchedule]);
-
-  // === EFFECT: TRIGGER AUTO-SELECT WHEN DATA ARRIVES ===
-  useEffect(() => {
-    if (schedule && schedule.length > 0) {
-      attemptAutoSelect(schedule, date);
-    }
-  }, [schedule, date, attemptAutoSelect]);
 
   // === WEBSOCKET HANDLERS ===
   const handlePlayByPlayUpdate = useCallback((key, version) => {
@@ -195,16 +171,14 @@ export function useCourtVision() {
     const newDate = e.target.value;
     if (newDate === date) return;
     
-    disableAutoSelect();
     setDate(newDate);
-  }, [date, disableAutoSelect]);
+  }, [date]);
 
   const changeGame = useCallback((id) => {
-    disableAutoSelect();
     if (!id || id === gameId) return;
     resetLoadingStates();
     setGameId(id);
-  }, [gameId, resetLoadingStates, disableAutoSelect]);
+  }, [gameId, resetLoadingStates]);
 
   const changeStatOn = useCallback((index) => {
     setStatOn(prev => {
