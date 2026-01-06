@@ -172,6 +172,7 @@ def poller_logic(context):
     random.shuffle(active_games)
 
     total_games_to_process = len(active_games)
+    schedule_dirty = False
 
     for i, game in enumerate(active_games):
         game_id = game['id']
@@ -194,17 +195,10 @@ def poller_logic(context):
                 )
             
             # --- UPDATE SCHEDULE FILE ---
-            # If we have updates, apply them to our local 'games' list and upload immediately
+            # If we have updates, apply them to our local 'games' list and upload after polling
             if updates:
                 game.update(updates) # Updates the object inside the 'games' list
-                print(f"Poller: Updates found for {game_id}, refreshing schedule file.")
-                upload_schedule_s3(
-                    s3_client=s3_client,
-                    bucket=BUCKET,
-                    games_list=games,
-                    date_str=today_str,
-                    prefix=SCHEDULE_PREFIX,
-                )
+                schedule_dirty = True
 
             # --- DYNAMIC SLEEP LOGIC ---
             # We skip sleep after the very last game
@@ -215,6 +209,15 @@ def poller_logic(context):
 
         except Exception as e:
             print(f"Poller Error on game {game_id}: {e}")
+    if schedule_dirty:
+        print("Poller: Updates found, refreshing schedule file.")
+        upload_schedule_s3(
+            s3_client=s3_client,
+            bucket=BUCKET,
+            games_list=games,
+            date_str=today_str,
+            prefix=SCHEDULE_PREFIX,
+        )
     # Update the global "Init State" file so the frontend knows where to land
     upload_init_state(games, today_str)
 
