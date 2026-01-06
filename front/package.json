@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "build:prod:upload": "npm run build && npm run sync:static && npm run sync:index",
     "sync:static": "aws s3 sync dist s3://roryeagan.com-nba --delete --size-only --exclude \"index.html\" --cache-control \"public, max-age=31536000, immutable\"",
+    "sync:static:headers": "aws s3 cp s3://roryeagan.com-nba s3://roryeagan.com-nba --recursive --exclude \"index.html\" --metadata-directive REPLACE --cache-control \"public, max-age=31536000, immutable\"",
     "sync:index": "aws s3 sync dist s3://roryeagan.com-nba --delete --exclude \"*\" --include \"index.html\" --cache-control \"no-cache, no-store, must-revalidate\"",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
