@@ -1,46 +1,54 @@
 import { useMemo } from 'react';
-import { timeToSeconds } from '../../helpers/utils';
+import { getSecondsElapsed } from '../../helpers/playTimeline';
 
 export default function ScoreGraph({ 
   scoreTimeline, 
   lastAction,
   width, 
   leftMargin, 
-  qWidth, 
+  timelineWindow,
   maxY, 
   showScoreDiff, 
   awayColor, 
-  homeColor 
+  homeColor,
+  startScoreDiff = 0
 }) {
 
   const { pospoints, negpoints } = useMemo(() => {
-    if (!scoreTimeline || scoreTimeline.length === 0) {
+    if (!showScoreDiff) {
       return { pospoints: '', negpoints: '' };
     }
 
-    let startx = 0;
-    let starty = 0;
+    let starty = (startScoreDiff * -300) / maxY;
     // Initial starting point at the center line (y=300 relative to SVG height)
     let pospointsArr = [`${leftMargin},300`];
     let negpointsArr = [`${leftMargin},300`];
-    let pos = true; // Tracks if we are currently in positive (Away lead) territory
+    let pos = starty <= 0; // Tracks if we are currently in positive (Away lead) territory
 
-    scoreTimeline.forEach((t) => {
+    if (starty < 0) {
+      pospointsArr.push(`${leftMargin},${300 + starty}`);
+    } else if (starty > 0) {
+      negpointsArr.push(`${leftMargin},${300 + starty}`);
+    }
+
+    const safeTimeline = scoreTimeline || [];
+    const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
+    const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
+    if (windowDurationSeconds <= 0) {
+      return { pospoints: '', negpoints: '' };
+    }
+
+    const getXForAction = (action) => {
+      const elapsed = getSecondsElapsed(action.period, action.clock);
+      const offset = elapsed - windowStartSeconds;
+      const ratio = offset / windowDurationSeconds;
+      return Math.max(0, Math.min(width, ratio * width));
+    };
+
+    safeTimeline.forEach((t) => {
       const scoreDiff = Number(t.away) - Number(t.home);
 
-      // Calculate X based on period and clock
-      let x2;
-      const secondsRemaining = timeToSeconds(t.clock);
-      
-      if (t.period <= 4) {
-        // Regulation: Periods 1-4
-        const secondsPassed = (t.period - 1) * 12 * 60 + 12 * 60 - secondsRemaining;
-        x2 = (secondsPassed / (4 * 12 * 60)) * (qWidth * 4);
-      } else {
-        // Overtime: Periods 5+
-        const secondsPassed = 4 * 12 * 60 + 5 * (t.period - 4) * 60 - secondsRemaining;
-        x2 = (secondsPassed / (4 * 12 * 60)) * (qWidth * 4);
-      }
+      const x2 = getXForAction(t);
 
       let y1 = starty;
       // Calculate Y based on score differential, scaled to max lead
@@ -76,30 +84,22 @@ export default function ScoreGraph({
         }
       }
 
-      startx = x2;
       starty = y2;
     });
 
     // Close the shape at the last recorded action
-    if (lastAction) {
-      const secondsRemaining = timeToSeconds(lastAction.clock);
-      let lastX;
-      
-      if (lastAction.period <= 4) {
-        lastX = (((lastAction.period - 1) * 12 * 60 + 12 * 60 - secondsRemaining) / (4 * 12 * 60)) * (qWidth * 4);
-      } else {
-        lastX = ((4 * 12 * 60 + 5 * (lastAction.period - 4) * 60 - secondsRemaining) / (4 * 12 * 60)) * (qWidth * 4);
-      }
+    const endX = lastAction ? getXForAction(lastAction) : width;
+    if (Number.isFinite(endX)) {
 
       // Extend the graph to the final second
       if (pos) {
-        pospointsArr.push(`${leftMargin + lastX},${300 + starty}`);
-        pospointsArr.push(`${leftMargin + lastX},300`);
+        pospointsArr.push(`${leftMargin + endX},${300 + starty}`);
+        pospointsArr.push(`${leftMargin + endX},300`);
         // Push "off-screen" to ensure fill closes cleanly if needed, though usually not required for polyline
         negpointsArr.push(`2000,300`); 
       } else {
-        negpointsArr.push(`${leftMargin + lastX},${300 + starty}`);
-        negpointsArr.push(`${leftMargin + lastX},300`);
+        negpointsArr.push(`${leftMargin + endX},${300 + starty}`);
+        negpointsArr.push(`${leftMargin + endX},300`);
         pospointsArr.push(`2000,300`);
       }
     }
@@ -108,7 +108,7 @@ export default function ScoreGraph({
       pospoints: pospointsArr.join(' '), 
       negpoints: negpointsArr.join(' ') 
     };
-  }, [scoreTimeline, lastAction, width, leftMargin, qWidth, maxY]);
+  }, [scoreTimeline, lastAction, width, leftMargin, maxY, showScoreDiff, timelineWindow, startScoreDiff]);
 
   if (!showScoreDiff) {
     return null;

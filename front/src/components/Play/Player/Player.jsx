@@ -1,16 +1,20 @@
-import { timeToSeconds } from '../../../helpers/utils';
+import { getSecondsElapsed } from '../../../helpers/playTimeline';
 import { getEventType, renderEventShape } from '../../../helpers/eventStyles.jsx';
 
 import './Player.scss';
 
-export default function Player({ actions, timeline, name, width, rightMargin = 0, numQs, heightDivide, highlight, leftMargin }) {
+export default function Player({ actions, timeline, name, width, rightMargin = 0, heightDivide, highlight, leftMargin, timelineWindow }) {
 
   const playerName = name;
+  const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
+  const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
 
-  let qWidth = width / 4;
-  if (numQs > 4) {
-    qWidth = width * (12 / (12 * 4 + 5 * (numQs - 4)))
-  }
+  const getXPosition = (period, clock) => {
+    if (windowDurationSeconds <= 0) return 0;
+    const elapsed = getSecondsElapsed(period, clock);
+    const ratio = (elapsed - windowStartSeconds) / windowDurationSeconds;
+    return Math.max(0, Math.min(width, ratio * width));
+  };
 
   const filteredActions = actions
     .filter(a => a.actionType !== 'Substitution' && a.actionType !== 'Jump Ball' && a.actionType !== 'Violation');
@@ -19,10 +23,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
   const nonHighlightedDots = filteredActions
     .filter(a => !highlight.includes(a.actionNumber))
     .map(a => {
-      let pos = (((a.period - 1) * 12 * 60 + 12 * 60 - timeToSeconds(a.clock)) / (4 * 12 * 60)) * (qWidth * 4);
-      if (a.period > 4) {
-        pos = ((4 * 12 * 60 + 5 * (a.period - 4) * 60 - timeToSeconds(a.clock)) / (4 * 12 * 60)) * (qWidth * 4);
-      }
+      const pos = getXPosition(a.period, a.clock);
       const eventType = getEventType(a.description, a.actionType);
       const is3PT = a.description.includes('3PT');
       return renderEventShape(eventType, pos, 14, 4, `action-${a.actionNumber}`, is3PT, a.actionNumber);
@@ -31,10 +32,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
   const highlightedDots = filteredActions
     .filter(a => highlight.includes(a.actionNumber))
     .map(a => {
-      let pos = (((a.period - 1) * 12 * 60 + 12 * 60 - timeToSeconds(a.clock)) / (4 * 12 * 60)) * (qWidth * 4);
-      if (a.period > 4) {
-        pos = ((4 * 12 * 60 + 5 * (a.period - 4) * 60 - timeToSeconds(a.clock)) / (4 * 12 * 60)) * (qWidth * 4);
-      }
+      const pos = getXPosition(a.period, a.clock);
       const eventType = getEventType(a.description, a.actionType);
       const is3PT = a.description.includes('3PT');
       return renderEventShape(eventType, pos, 14, 8, `action-${a.actionNumber}`, is3PT, a.actionNumber);
@@ -47,14 +45,8 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
     }
     return true;
   }).map((t, i) => {
-    let x1 = (((t.period - 1) * 12 * 60 + 12 * 60 - timeToSeconds(t.start)) / (4 * 12 * 60)) * (qWidth * 4);
-    if (t.period > 4) {
-      x1 = ((4 * 12 * 60 + 5 * (t.period - 4) * 60 - timeToSeconds(t.start)) / (4 * 12 * 60)) * (qWidth * 4);
-    }
-    let x2 = (((t.period - 1) * 12 * 60 + 12 * 60 - timeToSeconds(t.end)) / (4 * 12 * 60)) * (qWidth * 4);
-    if (t.period > 4) {
-      x2 = ((4 * 12 * 60 + 5 * (t.period - 4) * 60 - timeToSeconds(t.end)) / (4 * 12 * 60)) * (qWidth * 4);
-    }
+    let x1 = getXPosition(t.period, t.start);
+    let x2 = getXPosition(t.period, t.end);
     x2 = isNaN(x2) ? x1 : x2; 
     return <line key={i} x1={x1} y1={14} x2={x2} y2={14} style={{ stroke: 'var(--line-color-light)', strokeWidth: 1.5 }} />
   });

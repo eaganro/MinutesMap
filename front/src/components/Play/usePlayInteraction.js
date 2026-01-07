@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { timeToSeconds } from '../../helpers/utils.js';
+import { getSecondsElapsed } from '../../helpers/playTimeline';
 import { getEventType } from '../../helpers/eventStyles.jsx';
 
 export const usePlayInteraction = ({
   allActions,
-  sectionWidth,
   leftMargin,
-  rightMargin,
-  qWidth, // Passed from parent to ensure grid alignment matches
+  timelineWidth,
+  timelineWindow,
   playRef // We need the ref to calculate mouse offsets correctly
 }) => {
   const [descriptionArray, setDescriptionArray] = useState([]);
@@ -18,25 +17,15 @@ export const usePlayInteraction = ({
 
   // HELPER: Calculate X Position on Timeline
   const calculateXPosition = useCallback((clock, period) => {
-    const seconds = timeToSeconds(clock);
-    let rawPos;
-    
-    // Regular Regulation (Periods 1-4)
-    if (period <= 4) {
-      const totalSecondsPassed = (period - 1) * 12 * 60 + (12 * 60 - seconds);
-      const totalGameSeconds = 4 * 12 * 60;
-      rawPos = (totalSecondsPassed / totalGameSeconds) * (qWidth * 4);
-    } 
-    // Overtime (Periods 5+)
-    else {
-      const regulationSeconds = 4 * 12 * 60;
-      const otSecondsPassed = 5 * (period - 4) * 60 - seconds;
-      const totalGameSeconds = 4 * 12 * 60; // normalization factor used in original code
-      rawPos = ((regulationSeconds + otSecondsPassed) / totalGameSeconds) * (qWidth * 4);
+    if (!timelineWindow || timelineWindow.durationSeconds <= 0) {
+      return leftMargin;
     }
-    
+    const elapsed = getSecondsElapsed(period, clock);
+    const windowOffset = elapsed - timelineWindow.startSeconds;
+    const ratio = windowOffset / timelineWindow.durationSeconds;
+    const rawPos = Math.max(0, Math.min(timelineWidth, ratio * timelineWidth));
     return rawPos + leftMargin;
-  }, [qWidth, leftMargin]);
+  }, [timelineWindow, timelineWidth, leftMargin]);
 
   // LOGIC: Keyboard Navigation (Left/Right Arrows)
   useEffect(() => {
@@ -120,7 +109,7 @@ export const usePlayInteraction = ({
     // Calculate position relative to the play container
     const rect = playRef.current.getBoundingClientRect();
     const rawPos = clientX - rect.left - leftMargin;
-    const width = sectionWidth - leftMargin - rightMargin;
+    const width = timelineWidth;
 
     // Update global mouse position for tooltip placement
     setMousePosition({ x: clientX, y: clientY });
@@ -212,8 +201,7 @@ export const usePlayInteraction = ({
     infoLocked, 
     playRef, 
     leftMargin, 
-    rightMargin, 
-    sectionWidth, 
+    timelineWidth, 
     allActions, 
     calculateXPosition
   ]);

@@ -8,7 +8,9 @@ export default function TimelineGrid({
   showScoreDiff, 
   awayTeamName, 
   homeTeamName, 
-  teamColors 
+  teamColors,
+  isQuarterView,
+  activePeriodLabel
 }) {
   
   const timelineElements = [];
@@ -19,38 +21,48 @@ export default function TimelineGrid({
   );
 
   // 2. Vertical Quarter Lines
-  // Q1, Q2, Q3
-  for (let i = 1; i <= 3; i++) {
-    const x = leftMargin + qWidth * i;
-    timelineElements.push(
-      <line key={`q${i}`} x1={x} y1={10} x2={x} y2={590} style={{ stroke: 'var(--line-color)', strokeWidth: 1 }} />
-    );
-  }
-  
-  // Q4/OT Lines
-  for (let q = 4; q < numQs; q += 1) {
-    // OT periods are shorter (5 mins vs 12 mins), so they are 5/12th the width
-    let x = leftMargin + qWidth * 4 + (5/12 * qWidth) * (q - 4);
-    timelineElements.push(
-      <line key={`q${q}`} x1={x} y1={10} x2={x} y2={590} style={{ stroke: 'var(--line-color)', strokeWidth: 1 }} />
-    );
+  if (!isQuarterView) {
+    // Q1, Q2, Q3
+    for (let i = 1; i <= 3; i++) {
+      const x = leftMargin + qWidth * i;
+      timelineElements.push(
+        <line key={`q${i}`} x1={x} y1={10} x2={x} y2={590} style={{ stroke: 'var(--line-color)', strokeWidth: 1 }} />
+      );
+    }
+    
+    // Q4/OT Lines
+    for (let q = 4; q < numQs; q += 1) {
+      // OT periods are shorter (5 mins vs 12 mins), so they are 5/12th the width
+      let x = leftMargin + qWidth * 4 + (5/12 * qWidth) * (q - 4);
+      timelineElements.push(
+        <line key={`q${q}`} x1={x} y1={10} x2={x} y2={590} style={{ stroke: 'var(--line-color)', strokeWidth: 1 }} />
+      );
+    }
   }
 
   // 3. Labels (Q1... Q4, O1...)
   const labelStyle = { fontSize: '10px', fill: 'var(--quarter-label-color)', fontWeight: 500 };
   const otWidth = (5/12) * qWidth;
 
-  ['Q1', 'Q2', 'Q3', 'Q4'].forEach((label, i) => {
-    timelineElements.push(
-      <text key={`label-${label}`} x={leftMargin + qWidth * (i + 0.5)} y={8} textAnchor="middle" style={labelStyle}>{label}</text>
-    );
-  });
+  if (isQuarterView) {
+    if (activePeriodLabel) {
+      timelineElements.push(
+        <text key="label-active" x={leftMargin + width / 2} y={8} textAnchor="middle" style={labelStyle}>{activePeriodLabel}</text>
+      );
+    }
+  } else {
+    ['Q1', 'Q2', 'Q3', 'Q4'].forEach((label, i) => {
+      timelineElements.push(
+        <text key={`label-${label}`} x={leftMargin + qWidth * (i + 0.5)} y={8} textAnchor="middle" style={labelStyle}>{label}</text>
+      );
+    });
 
-  for (let ot = 1; ot <= numQs - 4; ot += 1) {
-    const otCenterX = leftMargin + qWidth * 4 + otWidth * (ot - 0.5);
-    timelineElements.push(
-      <text key={`label-o${ot}`} x={otCenterX} y={8} textAnchor="middle" style={labelStyle}>O{ot}</text>
-    );
+    for (let ot = 1; ot <= numQs - 4; ot += 1) {
+      const otCenterX = leftMargin + qWidth * 4 + otWidth * (ot - 0.5);
+      timelineElements.push(
+        <text key={`label-o${ot}`} x={otCenterX} y={8} textAnchor="middle" style={labelStyle}>O{ot}</text>
+      );
+    }
   }
 
   // 4. Score Differential Dashed Lines (Background Reference)
