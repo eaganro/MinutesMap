@@ -32,6 +32,8 @@ const hasPlayData = (data) => Boolean(
 );
 
 export default function Play({ 
+  gameId,
+  gameStatus,
   awayTeamNames, 
   homeTeamNames, 
   awayPlayers, 
@@ -48,6 +50,8 @@ export default function Play({
   showScoreDiff = true 
 }) {
   const playRef = useRef(null);
+  const appliedGameIdRef = useRef(gameId);
+  const pendingGameChangeRef = useRef(false);
   const lastStableRef = useRef(null);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const touchAxisRef = useRef(null);
@@ -92,7 +96,8 @@ export default function Play({
   ]);
 
   const hasStableData = hasPlayData(lastStableRef.current);
-  const displayData = (isLoading || (isBlurred && hasStableData)) && lastStableRef.current
+  const showStableData = (isLoading || (isBlurred && hasStableData)) && lastStableRef.current;
+  const displayData = showStableData
     ? lastStableRef.current
     : {
       awayTeamNames,
@@ -106,6 +111,7 @@ export default function Play({
       numQs,
       lastAction,
     };
+  const isShowingStableData = Boolean(showStableData);
 
   const {
     awayTeamNames: displayAwayTeamNames,
@@ -150,34 +156,65 @@ export default function Play({
   const numPeriods = Number(displayNumQs) || 0;
   const isQuarterView = sectionWidth > 0 && sectionWidth < QUARTER_VIEW_BREAKPOINT;
 
-  const periodOptions = useMemo(() => (
-    Array.from({ length: numPeriods }, (_, i) => {
+  const periodOptions = useMemo(() => {
+    if (numPeriods <= 0) return [];
+    const options = [{ period: 0, label: 'Game' }];
+    for (let i = 0; i < numPeriods; i += 1) {
       const period = i + 1;
-      return {
+      options.push({
         period,
         label: period <= 4 ? `Q${period}` : `O${period - 4}`,
-      };
-    })
-  ), [numPeriods]);
+      });
+    }
+    return options;
+  }, [numPeriods]);
+
+  const isFinal = useMemo(() => {
+    if (typeof gameStatus === 'string' && gameStatus.trim().startsWith('Final')) {
+      return true;
+    }
+    const status = displayLastAction?.status;
+    return typeof status === 'string' && status.trim().startsWith('Final');
+  }, [displayLastAction?.status, gameStatus]);
 
   const defaultPeriod = useMemo(() => {
+    if (isFinal) return 1;
     const fallback = Number(displayLastAction?.period || numPeriods || 4);
     if (!Number.isFinite(fallback) || fallback <= 0) return 1;
     return numPeriods > 0 ? Math.min(fallback, numPeriods) : fallback;
-  }, [displayLastAction?.period, numPeriods]);
+  }, [displayLastAction?.period, numPeriods, isFinal]);
 
   const [selectedPeriod, setSelectedPeriod] = useState(null);
 
   useEffect(() => {
+    if (gameId === appliedGameIdRef.current) return;
+    appliedGameIdRef.current = gameId;
+    pendingGameChangeRef.current = true;
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!pendingGameChangeRef.current) return;
+    if (isShowingStableData) return;
+    pendingGameChangeRef.current = false;
+    setSelectedPeriod(defaultPeriod);
+  }, [isShowingStableData, defaultPeriod]);
+
+  useEffect(() => {
     if (!isQuarterView || numPeriods <= 0) return;
+    if (pendingGameChangeRef.current) return;
     setSelectedPeriod((prev) => {
-      if (prev && prev <= numPeriods) return prev;
+      if (prev === 0) return 0;
+      if (Number.isFinite(prev) && prev > 0 && prev <= numPeriods) return prev;
       return defaultPeriod;
     });
   }, [isQuarterView, numPeriods, defaultPeriod]);
 
-  const activePeriod = isQuarterView ? (selectedPeriod || defaultPeriod) : null;
-  const activePeriodLabel = activePeriod
+  const resolvedSelectedPeriod = pendingGameChangeRef.current && !isShowingStableData
+    ? defaultPeriod
+    : selectedPeriod;
+  const activePeriod = isQuarterView ? (resolvedSelectedPeriod !== null ? resolvedSelectedPeriod : defaultPeriod) : null;
+  const isQuarterFocus = isQuarterView && activePeriod !== 0;
+  const activePeriodLabel = isQuarterFocus
     ? (activePeriod <= 4 ? `Q${activePeriod}` : `O${activePeriod - 4}`)
     : '';
 
@@ -260,6 +297,8 @@ export default function Play({
     });
     return diff;
   }, [activePeriod, displayScoreTimeline]);
+
+  const latestStartedPeriod = Number(displayLastAction?.period || 0);
 
   // --- Custom Hook for Logic ---
   const {
@@ -398,7 +437,7 @@ export default function Play({
           type="button"
           className={`quarterTab ${period === activePeriod ? 'isActive' : ''}`}
           onClick={() => setSelectedPeriod(period)}
-          disabled={isDataLoading}
+          disabled={isDataLoading || (period !== 0 && period > latestStartedPeriod)}
           aria-pressed={period === activePeriod}
         >
           {label}
@@ -485,7 +524,7 @@ export default function Play({
               awayTeamName={displayAwayTeamNames.name}
               homeTeamName={displayHomeTeamNames.name}
               teamColors={teamColors}
-              isQuarterView={isQuarterView}
+              isQuarterView={isQuarterFocus}
               activePeriodLabel={activePeriodLabel}
             />
             

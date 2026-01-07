@@ -190,6 +190,11 @@ export function useCourtVision() {
 
   // === COMPUTED VALUES ===
   const sortedGames = useMemo(() => sortGamesForSelection(schedule || []), [schedule]);
+  const selectedGameStatus = useMemo(() => {
+    if (!gameId || !sortedGames?.length) return null;
+    const match = sortedGames.find((game) => game.id === gameId);
+    return match?.status || null;
+  }, [sortedGames, gameId]);
 
   const awayTeamName = useMemo(() => ({
     name: box?.awayTeam?.teamName || 'Away Team',
@@ -239,6 +244,7 @@ export function useCourtVision() {
     playByPlaySectionWidth,
     isPlayLoading: isPlayVisible,
     showScoreDiff,
+    gameStatus: selectedGameStatus,
 
     // Stat controls
     statOn,

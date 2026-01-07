@@ -32,6 +32,7 @@ export default function App() {
     playByPlaySectionWidth,
     isPlayLoading,
     showScoreDiff,
+    gameStatus,
 
     // Stat controls
     statOn, changeStatOn, setShowScoreDiff,
@@ -71,6 +72,8 @@ export default function App() {
         
         <div className='playByPlaySection' ref={playByPlaySectionRef}>
           <Play
+            gameId={gameId}
+            gameStatus={gameStatus}
             awayTeamNames={awayTeamName}
             homeTeamNames={homeTeamName}
             awayPlayers={awayActions}

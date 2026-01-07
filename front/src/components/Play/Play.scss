@@ -26,9 +26,9 @@
 }
 
 .playQuarterSwitcher .quarterTab.isActive {
-  background: var(--bg-card);
-  border-color: var(--border-medium);
-  color: var(--text-primary);
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--bg-card);
 }
 
 .playQuarterSwitcher .quarterTab:disabled {
