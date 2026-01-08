@@ -7,26 +7,77 @@ import { wsLocation } from '../../environment';
 export function useWebSocket({ 
   gameId, 
   date, 
+  enabled = true,
+  followDate = true,
+  followGame = true,
   onPlayByPlayUpdate, 
   onBoxUpdate, 
   onDateUpdate 
 }) {
   const [ws, setWs] = useState(null);
   const wsRef = useRef(null);
+  const lastFollowDateRef = useRef(null);
+  const lastFollowGameRef = useRef(null);
+  const followDateRef = useRef(followDate);
+  const followGameRef = useRef(followGame);
   
   // Keep refs updated for callbacks
   const gameIdRef = useRef(gameId);
   const dateRef = useRef(date);
+
+  gameIdRef.current = gameId;
+  dateRef.current = date;
+  followDateRef.current = followDate;
+  followGameRef.current = followGame;
   
   useEffect(() => {
-    gameIdRef.current = gameId;
+    if (!gameId) {
+      lastFollowGameRef.current = null;
+    }
   }, [gameId]);
   
   useEffect(() => {
-    dateRef.current = date;
+    if (!date) {
+      lastFollowDateRef.current = null;
+    }
   }, [date]);
 
+  const sendSubscriptions = useCallback(() => {
+    const wsInstance = wsRef.current;
+    if (!wsInstance || wsInstance.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const currentDate = dateRef.current;
+    const currentGameId = gameIdRef.current;
+    const shouldFollowDate = followDateRef.current;
+    const shouldFollowGame = followGameRef.current;
+
+    if (shouldFollowDate && currentDate) {
+      if (lastFollowDateRef.current !== currentDate) {
+        wsInstance.send(JSON.stringify({ action: 'followDate', date: currentDate }));
+        lastFollowDateRef.current = currentDate;
+      }
+    } else if (!shouldFollowDate && lastFollowDateRef.current) {
+      wsInstance.send(JSON.stringify({ action: 'unfollowDate' }));
+      lastFollowDateRef.current = null;
+    }
+
+    if (shouldFollowGame && currentGameId) {
+      if (lastFollowGameRef.current !== currentGameId) {
+        wsInstance.send(JSON.stringify({ action: 'followGame', gameId: currentGameId }));
+        lastFollowGameRef.current = currentGameId;
+      }
+    } else if (!shouldFollowGame && lastFollowGameRef.current) {
+      wsInstance.send(JSON.stringify({ action: 'unfollowGame' }));
+      lastFollowGameRef.current = null;
+    }
+  }, []);
+
   const connect = useCallback(() => {
+    if (!enabled) {
+      return;
+    }
     if (wsRef.current?.readyState === WebSocket.OPEN || 
         wsRef.current?.readyState === WebSocket.CONNECTING) {
       return;
@@ -38,12 +89,7 @@ export function useWebSocket({
 
     newWs.onopen = () => {
       console.log('Connected to WebSocket');
-      if (gameIdRef.current) {
-        newWs.send(JSON.stringify({ action: 'followGame', gameId: gameIdRef.current }));
-      }
-      if (dateRef.current) {
-        newWs.send(JSON.stringify({ action: 'followDate', date: dateRef.current }));
-      }
+      sendSubscriptions();
     };
 
     newWs.onmessage = async (event) => {
@@ -71,34 +117,29 @@ export function useWebSocket({
 
     newWs.onclose = () => {
       console.log('Disconnected from WebSocket');
+      lastFollowDateRef.current = null;
+      lastFollowGameRef.current = null;
+      setWs(null);
     };
-  }, [onPlayByPlayUpdate, onBoxUpdate, onDateUpdate]);
+  }, [enabled, sendSubscriptions, onPlayByPlayUpdate, onBoxUpdate, onDateUpdate]);
 
-  // Initial connection
+  // Connection lifecycle
   useEffect(() => {
-    connect();
-  }, [connect]);
+    if (enabled) {
+      connect();
+      return;
+    }
+    wsRef.current?.close();
+  }, [enabled, connect]);
 
-  // Follow date changes
   useEffect(() => {
-    if (!date) return;
+    if (!enabled) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action: 'followDate', date }));
+      sendSubscriptions();
     } else if (wsRef.current !== null) {
       connect();
     }
-  }, [date, connect]);
-
-  // Follow game changes
-  useEffect(() => {
-    if (!gameId) return;
-    
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action: 'followGame', gameId }));
-    } else if (wsRef.current !== null) {
-      connect();
-    }
-  }, [gameId, connect]);
+  }, [enabled, date, gameId, followDate, followGame, connect, sendSubscriptions]);
 
   const close = useCallback(() => {
     wsRef.current?.close();

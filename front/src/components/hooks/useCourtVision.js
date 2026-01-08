@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { sortGamesForSelection } from '../../helpers/gameSelectionUtils';
+import { getNbaTodayString, sortGamesForSelection } from '../../helpers/gameSelectionUtils';
 import { PREFIX } from '../../environment';
 
 import { useQueryParams } from './useQueryParams';
 import { useLocalStorageState } from './useLocalStorageState';
 import { useGameData } from './useGameData';
+import { useSelectedGameMeta } from './useSelectedGameMeta';
 import { useWebSocket } from './useWebSocket';
+import { useWebSocketGate } from './useWebSocketGate';
 import { useGameTimeline } from './useGameTimeline';
 import { useElementWidth } from './useElementWidth';
 
@@ -39,8 +41,11 @@ export function useCourtVision() {
   // === GAME DATA ===
   const {
     schedule,
+    todaySchedule,
     fetchSchedule,
+    fetchTodaySchedule,
     isScheduleLoading,
+    isTodayScheduleLoading,
     box,
     playByPlay,
     awayTeamId,
@@ -72,6 +77,7 @@ export function useCourtVision() {
   // === REFS FOR CALLBACKS ===
   const gameIdRef = useRef(gameId);
   const wsCloseRef = useRef(() => {});
+  const wsFollowDateRef = useRef(false);
   useEffect(() => { gameIdRef.current = gameId; }, [gameId]);
 
   // === 1. BOOT SEQUENCE: FETCH INIT STATE ===
@@ -112,10 +118,33 @@ export function useCourtVision() {
     }
   }, [date, fetchSchedule]);
 
+  useEffect(() => {
+    if (!gameId) {
+      return;
+    }
+    const nbaToday = getNbaTodayString();
+    if (!nbaToday) {
+      return;
+    }
+    if (date === nbaToday && schedule && schedule.length > 0) {
+      return;
+    }
+    if (todaySchedule && todaySchedule.length > 0) {
+      return;
+    }
+    if (!isTodayScheduleLoading) {
+      fetchTodaySchedule(nbaToday);
+    }
+  }, [gameId, date, schedule, todaySchedule, fetchTodaySchedule, isTodayScheduleLoading]);
+
   // === WEBSOCKET HANDLERS ===
   const handlePlayByPlayUpdate = useCallback((key, version) => {
     const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
-    fetchPlayByPlay(url, gameIdRef.current, () => wsCloseRef.current());
+    fetchPlayByPlay(url, gameIdRef.current, () => {
+      if (!wsFollowDateRef.current) {
+        wsCloseRef.current();
+      }
+    });
   }, [fetchPlayByPlay]);
 
   const handleBoxUpdate = useCallback((key, version) => {
@@ -130,16 +159,43 @@ export function useCourtVision() {
     }
   }, [date, fetchSchedule]);
 
+  const {
+    selectedGameDate,
+    selectedGameStart,
+    selectedGameStatus,
+    selectedGameMetaId,
+  } = useSelectedGameMeta({
+    gameId,
+    date,
+    schedule,
+    todaySchedule,
+  });
+
+  const { enabled: wsEnabled, followDate: wsFollowDate, followGame: wsFollowGame } = useWebSocketGate({
+    date,
+    schedule,
+    todaySchedule,
+    gameId,
+    selectedGameDate,
+    selectedGameStart,
+    selectedGameStatus,
+    selectedGameMetaId,
+  });
+
   // === WEBSOCKET CONNECTION ===
   const { close: wsClose } = useWebSocket({
     gameId,
     date,
+    enabled: wsEnabled,
+    followDate: wsFollowDate,
+    followGame: wsFollowGame,
     onPlayByPlayUpdate: handlePlayByPlayUpdate,
     onBoxUpdate: handleBoxUpdate,
     onDateUpdate: handleDateUpdate,
   });
 
   useEffect(() => { wsCloseRef.current = wsClose; }, [wsClose]);
+  useEffect(() => { wsFollowDateRef.current = wsFollowDate; }, [wsFollowDate]);
 
   // === URL SYNC ===
   useEffect(() => {
@@ -190,9 +246,9 @@ export function useCourtVision() {
 
   // === COMPUTED VALUES ===
   const sortedGames = useMemo(() => sortGamesForSelection(schedule || []), [schedule]);
-  const selectedGameStatus = useMemo(() => {
+  const currentScheduleGameStatus = useMemo(() => {
     if (!gameId || !sortedGames?.length) return null;
-    const match = sortedGames.find((game) => game.id === gameId);
+    const match = sortedGames.find((game) => String(game.id) === String(gameId));
     return match?.status || null;
   }, [sortedGames, gameId]);
 
@@ -244,7 +300,7 @@ export function useCourtVision() {
     playByPlaySectionWidth,
     isPlayLoading: isPlayVisible,
     showScoreDiff,
-    gameStatus: selectedGameStatus,
+    gameStatus: currentScheduleGameStatus,
 
     // Stat controls
     statOn,

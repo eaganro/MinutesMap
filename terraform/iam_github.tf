@@ -45,6 +45,8 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "arn:aws:iam::*:role/ws-disconnect-handler-role",
       "arn:aws:iam::*:role/gameDateUpdates-role",
       "arn:aws:iam::*:role/ws-joinGame-handler-role",
+      "arn:aws:iam::*:role/ws-unfollowDate-handler-role",
+      "arn:aws:iam::*:role/ws-unfollowGame-handler-role",
       "arn:aws:iam::*:role/FetchTodaysScoreboard-role",
       "arn:aws:iam::*:role/nba-poller-lambda-role",
       "arn:aws:iam::*:role/nba-poller-scheduler-role"
@@ -73,6 +75,8 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "arn:aws:iam::*:role/ws-disconnect-handler-role",
       "arn:aws:iam::*:role/gameDateUpdates-role",
       "arn:aws:iam::*:role/ws-joinGame-handler-role",
+      "arn:aws:iam::*:role/ws-unfollowDate-handler-role",
+      "arn:aws:iam::*:role/ws-unfollowGame-handler-role",
       "arn:aws:iam::*:role/FetchTodaysScoreboard-role",
       "arn:aws:iam::*:role/nba-poller-lambda-role",
       "arn:aws:iam::*:role/nba-poller-scheduler-role",
@@ -90,6 +94,8 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ws-disconnect-handler-role",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/gameDateUpdates-role",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ws-joinGame-handler-role",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ws-unfollowDate-handler-role",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ws-unfollowGame-handler-role",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/FetchTodaysScoreboard-role",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/nba-poller-lambda-role",
       "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/nba-poller-scheduler-role"

@@ -2,8 +2,9 @@ export { useTheme, ThemeProvider } from './useTheme';
 export { useQueryParams } from './useQueryParams';
 export { useLocalStorageState } from './useLocalStorageState';
 export { useWebSocket } from './useWebSocket';
+export { useWebSocketGate } from './useWebSocketGate';
 export { useGameData } from './useGameData';
 export { useGameTimeline } from './useGameTimeline';
+export { useSelectedGameMeta } from './useSelectedGameMeta';
 export { useElementWidth } from './useElementWidth';
 export { useCourtVision } from './useCourtVision';
-

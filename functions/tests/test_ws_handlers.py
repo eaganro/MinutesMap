@@ -140,3 +140,57 @@ class TestWsDisconnect:
         event = {"requestContext": {"connectionId": "conn_fail"}}
         resp = self.module.handler(event, {})
         assert resp["statusCode"] == 200
+
+class TestWsUnfollowDate:
+    @pytest.fixture(autouse=True)
+    def setup_env(self, lambda_loader):
+        with mock_aws():
+            self.conn_table_name = "DateConnections"
+            os.environ["DATE_CONN_TABLE"] = self.conn_table_name
+            self.dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+            self.conn_table = self.dynamodb.create_table(
+                TableName=self.conn_table_name,
+                KeySchema=[{"AttributeName": "connectionId", "KeyType": "HASH"}],
+                AttributeDefinitions=[{"AttributeName": "connectionId", "AttributeType": "S"}],
+                ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
+            )
+
+            path = os.path.join(os.path.dirname(__file__), "../ws-unfollowDate-handler/lambda_function.py")
+            self.module = lambda_loader(path, "ws_unfollow_date")
+            self.module.dynamodb = self.dynamodb
+            yield
+
+    def test_unfollow_date_success(self):
+        conn_id = "conn_date"
+        self.conn_table.put_item(Item={"connectionId": conn_id})
+        event = {"requestContext": {"connectionId": conn_id}}
+        resp = self.module.handler(event, {})
+        assert resp["statusCode"] == 200
+        assert "Item" not in self.conn_table.get_item(Key={"connectionId": conn_id})
+
+class TestWsUnfollowGame:
+    @pytest.fixture(autouse=True)
+    def setup_env(self, lambda_loader):
+        with mock_aws():
+            self.conn_table_name = "GameConnections"
+            os.environ["GAME_CONN_TABLE"] = self.conn_table_name
+            self.dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+            self.conn_table = self.dynamodb.create_table(
+                TableName=self.conn_table_name,
+                KeySchema=[{"AttributeName": "connectionId", "KeyType": "HASH"}],
+                AttributeDefinitions=[{"AttributeName": "connectionId", "AttributeType": "S"}],
+                ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
+            )
+
+            path = os.path.join(os.path.dirname(__file__), "../ws-unfollowGame-handler/lambda_function.py")
+            self.module = lambda_loader(path, "ws_unfollow_game")
+            self.module.dynamodb = self.dynamodb
+            yield
+
+    def test_unfollow_game_success(self):
+        conn_id = "conn_game"
+        self.conn_table.put_item(Item={"connectionId": conn_id})
+        event = {"requestContext": {"connectionId": conn_id}}
+        resp = self.module.handler(event, {})
+        assert resp["statusCode"] == 200
+        assert "Item" not in self.conn_table.get_item(Key={"connectionId": conn_id})
