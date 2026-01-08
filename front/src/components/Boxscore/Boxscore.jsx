@@ -11,18 +11,30 @@ const MIN_BLUR_MS = 300;
 export default function Boxscore({ box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);
   const [scrollPos, setScrollPos] = useState(100);
-  const [width, setWidth] = useState(window.innerWidth);
   const lastStableBoxRef = useRef(box);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+  const [isCompact, setIsCompact] = useState(() => (
+    typeof window !== 'undefined'
+      ? window.matchMedia('(max-width: 640px)').matches
+      : false
+  ));
 
   useEffect(() => {
-    function handleResize() {
-      setWidth(window.innerWidth);
+    if (typeof window === 'undefined') {
+      return undefined;
     }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [width]);
+    const mediaQuery = window.matchMedia('(max-width: 640px)');
+    const handleChange = (event) => setIsCompact(event.matches);
+
+    setIsCompact(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
 
   useEffect(() => {
     if (isLoading) {
@@ -52,8 +64,24 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
 
   const showLoadingOverlay = isLoading && hasBoxData && showLoadingText;
 
-  const awayBox = processTeamStats(displayBox?.awayTeam, false, showMore, setShowMore, scrollPos, setScrollPos);
-  const homeBox = processTeamStats(displayBox?.homeTeam, true, showMore, setShowMore, scrollPos, setScrollPos);
+  const awayBox = processTeamStats(
+    displayBox?.awayTeam,
+    false,
+    showMore,
+    setShowMore,
+    scrollPos,
+    setScrollPos,
+    isCompact
+  );
+  const homeBox = processTeamStats(
+    displayBox?.homeTeam,
+    true,
+    showMore,
+    setShowMore,
+    scrollPos,
+    setScrollPos,
+    isCompact
+  );
 
   if (statusMessage && !isLoading) {
     return (
