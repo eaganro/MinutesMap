@@ -512,7 +512,7 @@ export default function Play({
 
         <div className='playContent'>
           {/* Main SVG Visualization (Grid + Graph + MouseLine) */}
-          <svg height="600" width={sectionWidth} className='line'>
+          <svg height="600" width={sectionWidth} className='line playGrid'>
             <TimelineGrid 
               width={width}
               leftMargin={leftMargin}
