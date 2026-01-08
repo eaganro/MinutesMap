@@ -10,10 +10,13 @@ const MIN_BLUR_MS = 300;
 
 export default function Boxscore({ box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);
-  const [scrollPos, setScrollPos] = useState(100);
   const lastStableBoxRef = useRef(box);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+  const awayTableRef = useRef(null);
+  const homeTableRef = useRef(null);
+  const isSyncingScrollRef = useRef(false);
+  const syncRafRef = useRef(null);
   const [isCompact, setIsCompact] = useState(() => (
     typeof window !== 'undefined'
       ? window.matchMedia('(max-width: 640px)').matches
@@ -64,13 +67,38 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
 
   const showLoadingOverlay = isLoading && hasBoxData && showLoadingText;
 
+  const syncScroll = (sourceRef, targetRef) => {
+    if (isSyncingScrollRef.current) {
+      return;
+    }
+    const sourceNode = sourceRef.current;
+    const targetNode = targetRef.current;
+    if (!sourceNode || !targetNode) {
+      return;
+    }
+    const nextScrollLeft = sourceNode.scrollLeft;
+    if (targetNode.scrollLeft === nextScrollLeft) {
+      return;
+    }
+    isSyncingScrollRef.current = true;
+    if (syncRafRef.current) {
+      cancelAnimationFrame(syncRafRef.current);
+    }
+    syncRafRef.current = requestAnimationFrame(() => {
+      targetNode.scrollLeft = nextScrollLeft;
+      requestAnimationFrame(() => {
+        isSyncingScrollRef.current = false;
+      });
+    });
+  };
+
   const awayBox = processTeamStats(
     displayBox?.awayTeam,
     false,
     showMore,
     setShowMore,
-    scrollPos,
-    setScrollPos,
+    awayTableRef,
+    () => syncScroll(awayTableRef, homeTableRef),
     isCompact
   );
   const homeBox = processTeamStats(
@@ -78,8 +106,8 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     true,
     showMore,
     setShowMore,
-    scrollPos,
-    setScrollPos,
+    homeTableRef,
+    () => syncScroll(homeTableRef, awayTableRef),
     isCompact
   );
 

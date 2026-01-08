@@ -1,6 +1,5 @@
 import { UnfoldMore, UnfoldLess } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
-import { useRef, useEffect } from 'react';
 import { PREFIX } from '../../environment';
 
 const COMPACT_LAST_NAME_MAX = 12;
@@ -67,14 +66,7 @@ const COLUMN_LABELS = {
 };
 const HIGHLIGHT_COLUMNS = new Set(['pts', 'reb', 'ast']);
 
-export default function(team, showButton, showMore, setShowMore, scrollPos, setScrollPos, isCompact) {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.scrollLeft = scrollPos;
-    }
-  }, [scrollPos]);
-
+export default function(team, showButton, showMore, setShowMore, tableWrapperRef, onScroll, isCompact) {
   const getDisplayName = (player) => {
     const firstName = (player.firstName || '').trim();
     const familyName = (player.familyName || '').trim();
@@ -328,7 +320,7 @@ export default function(team, showButton, showMore, setShowMore, scrollPos, setS
           )}
         </div>
       </div>
-      <div ref={ref} className="tableWrapper" onScroll={e => setScrollPos(e.target.scrollLeft)}>
+      <div ref={tableWrapperRef} className="tableWrapper" onScroll={onScroll}>
         {teamBox}
       </div>
     </div>
