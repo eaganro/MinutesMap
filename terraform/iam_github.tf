@@ -19,7 +19,8 @@ data "aws_iam_policy_document" "github_shard_iam" {
       "lambda:ListFunctions",
       "lambda:GetAccountSettings",
       "iam:GetPolicy",
-      "iam:GetPolicyVersion" 
+      "iam:GetPolicyVersion",
+      "iam:ListPolicyVersions"
     ]
     resources = ["*"]
   }

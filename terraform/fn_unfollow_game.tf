@@ -14,6 +14,7 @@ data "aws_iam_policy_document" "ws_unfollow_game_trust" {
 resource "aws_iam_role" "ws_unfollow_game_role" {
   name               = "ws-unfollowGame-handler-role"
   assume_role_policy = data.aws_iam_policy_document.ws_unfollow_game_trust.json
+  permissions_boundary = var.iam_boundary_arn
 }
 
 resource "aws_iam_role_policy_attachment" "ws_unfollow_game_logs" {
