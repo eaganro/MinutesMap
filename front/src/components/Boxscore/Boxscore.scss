@@ -116,6 +116,9 @@
   .tableWrapper {
     overflow-x: auto;
     position: relative;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   .showMore {
