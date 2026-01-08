@@ -62,7 +62,7 @@ export default function(team, showButton, showMore, setShowMore, scrollPos, setS
         <span>{p.statistics.blocks}</span>
         <span>{p.statistics.turnovers}</span>
         <span>{p.statistics.foulsPersonal}</span>
-        <span>{p.statistics.plusMinusPoints}</span>
+        <span>{p.statistics.plusMinusPoints > 0 ? '+' : ''}{p.statistics.plusMinusPoints}</span>
       </div>
     )
   });
