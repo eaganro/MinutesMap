@@ -134,10 +134,10 @@ test.describe('Navigation', () => {
     // Navigate with gameid parameter
     await page.goto('/?date=2024-01-15&gameid=0022300123');
     
-    await page.waitForLoadState('networkidle');
-    
-    const url = page.url();
-    expect(url).toContain('gameid=0022300123');
+    const datePicker = page.locator('input[type="date"]');
+    await expect(datePicker).toHaveValue('2024-01-15');
+
+    await expect(page).toHaveURL(/gameid=0022300123/);
   });
 });
 
@@ -178,4 +178,3 @@ test.describe('Loading States', () => {
     await expect(topLevel).toBeVisible();
   });
 });
-
