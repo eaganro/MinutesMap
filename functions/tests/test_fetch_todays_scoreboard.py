@@ -1,6 +1,6 @@
-import sys
 import os
 import json
+import gzip
 import boto3
 import pytest
 from moto import mock_aws
@@ -12,18 +12,14 @@ class TestFetchTodaysScoreboard:
     @pytest.fixture(autouse=True)
     def setup_env(self, lambda_loader):
         with mock_aws():
-            self.table_name = "TestGamesTable"
-            os.environ["GAMES_TABLE"] = self.table_name
-            # Use boto3.resource directly as moto mocks it
-            self.dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
-            self.table = self.dynamodb.create_table(
-                TableName=self.table_name,
-                KeySchema=[{"AttributeName": "PK", "KeyType": "HASH"}, {"AttributeName": "SK", "KeyType": "RANGE"}],
-                AttributeDefinitions=[{"AttributeName": "PK", "AttributeType": "S"}, {"AttributeName": "SK", "AttributeType": "S"}],
-                ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1}
-            )
+            self.bucket_name = "test-bucket"
+            os.environ["DATA_BUCKET"] = self.bucket_name
+            os.environ["SCHEDULE_PREFIX"] = "schedule/"
+            os.environ["AWS_REGION"] = "us-east-1"
+            self.s3 = boto3.client("s3", region_name="us-east-1")
+            self.s3.create_bucket(Bucket=self.bucket_name)
             self.module = lambda_loader(LAMBDA_PATH, "fetch_scoreboard_lambda")
-            self.module.dynamodb = self.dynamodb
+            self.module.s3_client = self.s3
             yield
 
     @patch("urllib.request.urlopen")
@@ -51,10 +47,15 @@ class TestFetchTodaysScoreboard:
         # Run handler
         self.module.handler({}, {})
 
-        # Verify DynamoDB
-        items = self.table.scan()["Items"]
+        # Verify S3 upload
+        resp = self.s3.get_object(
+            Bucket=self.bucket_name,
+            Key="schedule/2023-10-25.json.gz",
+        )
+        payload = gzip.decompress(resp["Body"].read())
+        items = json.loads(payload.decode("utf-8"))
         assert len(items) == 1
-        assert items[0]["PK"] == "GAME#12345"
+        assert items[0]["id"] == "12345"
         assert items[0]["hometeam"] == "NYK"
         assert items[0]["awayscore"] == 104
 
@@ -71,5 +72,5 @@ class TestFetchTodaysScoreboard:
 
         self.module.handler({}, {})
 
-        items = self.table.scan()["Items"]
-        assert len(items) == 0
+        resp = self.s3.list_objects_v2(Bucket=self.bucket_name, Prefix="schedule/")
+        assert resp.get("KeyCount", 0) == 0

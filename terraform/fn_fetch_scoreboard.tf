@@ -27,9 +27,9 @@ resource "aws_iam_role_policy_attachment" "fetch_scoreboard_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# D. DynamoDB Write Permissions (Custom Policy)
-resource "aws_iam_role_policy" "fetch_scoreboard_dynamo_write" {
-  name = "dynamodb_write_access"
+# D. S3 Schedule Write Permissions (Custom Policy)
+resource "aws_iam_role_policy" "fetch_scoreboard_s3_write" {
+  name = "s3_schedule_write_access"
   role = aws_iam_role.fetch_scoreboard_role.id
 
   policy = jsonencode({
@@ -38,10 +38,9 @@ resource "aws_iam_role_policy" "fetch_scoreboard_dynamo_write" {
       {
         Effect = "Allow"
         Action = [
-          "dynamodb:BatchWriteItem",
-          "dynamodb:PutItem"
+          "s3:PutObject"
         ]
-        Resource = aws_dynamodb_table.nba_games.arn
+        Resource = "${aws_s3_bucket.data_bucket.arn}/schedule/*"
       }
     ]
   })
@@ -69,7 +68,8 @@ resource "aws_lambda_function" "fetch_scoreboard" {
 
   environment {
     variables = {
-      GAMES_TABLE = aws_dynamodb_table.nba_games.name
+      DATA_BUCKET     = aws_s3_bucket.data_bucket.id
+      SCHEDULE_PREFIX = "schedule/"
     }
   }
 }
