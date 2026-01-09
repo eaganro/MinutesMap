@@ -57,6 +57,7 @@ export default function Play({
   const touchAxisRef = useRef(null);
   const touchMovedRef = useRef(false);
   const touchClickGuardUntilRef = useRef(0);
+  const userSelectedPeriodRef = useRef(false);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const { isDarkMode } = useTheme();
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
@@ -184,12 +185,18 @@ export default function Play({
     return numPeriods > 0 ? Math.min(fallback, numPeriods) : fallback;
   }, [displayLastAction?.period, numPeriods, isFinal]);
 
+  const hasPeriodData = useMemo(() => {
+    const period = Number(displayLastAction?.period);
+    return Number.isFinite(period) && period > 0;
+  }, [displayLastAction?.period]);
+
   const [selectedPeriod, setSelectedPeriod] = useState(null);
 
   useEffect(() => {
     if (gameId === appliedGameIdRef.current) return;
     appliedGameIdRef.current = gameId;
     pendingGameChangeRef.current = true;
+    userSelectedPeriodRef.current = false;
   }, [gameId]);
 
   useEffect(() => {
@@ -202,12 +209,14 @@ export default function Play({
   useEffect(() => {
     if (!isQuarterView || numPeriods <= 0) return;
     if (pendingGameChangeRef.current) return;
+    if (!hasPeriodData && !isFinal) return;
     setSelectedPeriod((prev) => {
       if (prev === 0) return 0;
-      if (Number.isFinite(prev) && prev > 0 && prev <= numPeriods) return prev;
+      const prevValid = Number.isFinite(prev) && prev > 0 && prev <= numPeriods;
+      if (userSelectedPeriodRef.current && prevValid) return prev;
       return defaultPeriod;
     });
-  }, [isQuarterView, numPeriods, defaultPeriod]);
+  }, [isQuarterView, numPeriods, defaultPeriod, hasPeriodData, isFinal]);
 
   const resolvedSelectedPeriod = pendingGameChangeRef.current && !isShowingStableData
     ? defaultPeriod
@@ -436,7 +445,10 @@ export default function Play({
           key={period}
           type="button"
           className={`quarterTab ${period === activePeriod ? 'isActive' : ''}`}
-          onClick={() => setSelectedPeriod(period)}
+          onClick={() => {
+            userSelectedPeriodRef.current = true;
+            setSelectedPeriod(period);
+          }}
           disabled={isDataLoading || (period !== 0 && period > latestStartedPeriod)}
           aria-pressed={period === activePeriod}
         >
