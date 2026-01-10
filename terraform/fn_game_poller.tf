@@ -70,7 +70,7 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
         Sid      = "SchedulerManageOnlyKickoffSchedule"
         Action   = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
         Effect   = "Allow"
-        Resource = "arn:aws:events:us-east-1:*:schedule/default/NBA_Daily_Kickoff"
+        Resource = "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_Daily_Kickoff"
       },
       # 5. PassRole
       {

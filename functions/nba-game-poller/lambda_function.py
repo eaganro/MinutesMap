@@ -73,8 +73,8 @@ def manager_logic():
         print("Manager: Games exist but have no valid start time. Enabling immediately.")
         return enable_poller_logic()
 
-    # Schedule kickoff 15 minutes before the first tip-off
-    kickoff_time = start_dt - timedelta(minutes=15)
+    # Schedule kickoff at the first tip-off
+    kickoff_time = start_dt
     now_utc = datetime.now(ZoneInfo("UTC"))
 
     # If the kickoff time is in the past (or very close), enable immediately
