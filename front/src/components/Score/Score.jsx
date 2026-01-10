@@ -2,17 +2,30 @@ import { useEffect, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import './Score.scss';
 import { PREFIX } from '../../environment';
+import { formatClock, formatPeriod } from '../../helpers/utils';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
 
-export default function Score({ homeTeam, awayTeam, score, date, changeDate, isLoading, statusMessage }) {
+export default function Score({
+  homeTeam,
+  awayTeam,
+  score,
+  date,
+  changeDate,
+  isLoading,
+  statusMessage,
+  lastAction,
+  gameStatus,
+}) {
   const [displayData, setDisplayData] = useState(() => ({
     homeTeam,
     awayTeam,
     score,
     date,
+    lastAction,
+    gameStatus,
   }));
   const [awayLogoLoaded, setAwayLogoLoaded] = useState(false);
   const [homeLogoLoaded, setHomeLogoLoaded] = useState(false);
@@ -35,9 +48,9 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
       if (isBlurred && hasPrevData) {
         return prev;
       }
-      return { homeTeam, awayTeam, score, date };
+      return { homeTeam, awayTeam, score, date, lastAction, gameStatus };
     });
-  }, [homeTeam, awayTeam, score, date, isLoading, isBlurred]);
+  }, [homeTeam, awayTeam, score, date, lastAction, gameStatus, isLoading, isBlurred]);
 
   useEffect(() => {
     setAwayLogoLoaded(false);
@@ -90,6 +103,25 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
   }
 
   const gameDate = displayData.date ? new Date(displayData.date) : null;
+  const statusLabel = typeof displayData.gameStatus === 'string' ? displayData.gameStatus.trim() : '';
+  const formattedPeriod = formatPeriod(displayData.lastAction?.period);
+  const formattedClock = formatClock(displayData.lastAction?.clock);
+  const hasActionTime = Boolean(formattedPeriod && formattedClock);
+  let gameTimeLabel = '';
+
+  if (statusLabel) {
+    const isFinal = statusLabel.startsWith('Final');
+    const isUpcoming = statusLabel.endsWith('ET');
+    if (isFinal || isUpcoming) {
+      gameTimeLabel = statusLabel;
+    }
+  }
+  if (!gameTimeLabel && hasActionTime) {
+    gameTimeLabel = `${formattedPeriod} ${formattedClock}`;
+  }
+  if (!gameTimeLabel && statusLabel) {
+    gameTimeLabel = statusLabel;
+  }
 
   const changeToGameDate = () => {
     if (!gameDate) {
@@ -156,6 +188,9 @@ export default function Score({ homeTeam, awayTeam, score, date, changeDate, isL
           )}
           <div>{displayData.score ? displayData.score.home : '--'}</div>
         </div>
+        {gameTimeLabel && (
+          <div className='gameTime'>{gameTimeLabel}</div>
+        )}
       </div>
       {/* {statusMessage && (
         <div className='statusMessage'>{statusMessage}</div>

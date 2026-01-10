@@ -68,6 +68,8 @@ export default function App() {
           changeDate={changeDate}
           isLoading={isGameDataLoading}
           statusMessage={gameStatusMessage}
+          lastAction={lastAction}
+          gameStatus={gameStatus}
         />
         
         <div className='playByPlaySection' ref={playByPlaySectionRef}>
