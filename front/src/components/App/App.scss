@@ -60,6 +60,7 @@
 .playByPlaySection {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   min-height: 675px;
   height: auto;
 }
