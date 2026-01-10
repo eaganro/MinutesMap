@@ -314,15 +314,15 @@ flowchart LR
         Push((Push to Main)):::git
 
         subgraph Infra_Job [Backend & Infra]
-            PyTest[Backend Tests (Vitest + Pytest)]:::action
+            PyTest[Backend Tests (Vitest and Pytest)]:::action
             TF[Terraform Apply]:::action
             PyTest --> TF
         end
 
         subgraph Front_Job [Frontend Deploy]
-            Test["Playwright Tests<br/>(4 Shards)"]:::action
+            Test[Playwright Tests (4 Shards)]:::action
             Build[Vite Build]:::action
-            Sync["S3 Sync &<br/>CF Invalidation"]:::action
+            Sync[S3 Sync and CF Invalidation]:::action
         end
     end
 
