@@ -314,7 +314,7 @@ flowchart LR
         Push((Push to Main)):::git
 
         subgraph Infra_Job [Backend & Infra]
-            PyTest[Backend Tests<br/>(Vitest + Pytest)]:::action
+            PyTest[Backend Tests (Vitest + Pytest)]:::action
             TF[Terraform Apply]:::action
             PyTest --> TF
         end
