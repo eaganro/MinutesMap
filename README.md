@@ -137,7 +137,7 @@ The codebase is organized into three distinct logical units:
 | Directory | Description |
 | --- | --- |
 | **`front/`** | **Frontend Client.** A Vite + React application. Contains the WebSocket connection manager, visualization components, and global state management logic. |
-| **`functions/`** | **Serverless Backend.** AWS Lambda functions written in **Python**. Handles WebSocket lifecycle events, polls external NBA APIs (Ingestion), and broadcasts updates via API Gateway. |
+| **`functions/`** | **Serverless Backend.** AWS Lambda functions written in **Python + TypeScript**. Handles WebSocket lifecycle events, polls external NBA APIs (Ingestion), and broadcasts updates via API Gateway. |
 | **`terraform/`** | **Infrastructure as Code.** Contains all AWS resource definitions (S3, DynamoDB, Lambda, IAM, EventBridge) to deploy the stack automatically. |
 
 ## 🛠️ Local Development & Setup
@@ -147,8 +147,8 @@ The codebase is organized into three distinct logical units:
 
 ### Prerequisites
 
-* **Node.js** v18+
-* **Python** 3.11+ (for Backend/Lambda development)
+* **Node.js** v20+ (frontend + TypeScript Lambdas)
+* **Python** 3.11+ (for Python Lambdas)
 
 ### Frontend Setup
 
@@ -186,7 +186,31 @@ npm run dev
 
 ### Backend Setup (Optional)
 
-To run the Lambda unit tests locally:
+To build and test the TypeScript Lambdas locally:
+
+1. Install Node dependencies:
+```bash
+cd functions
+npm install
+
+```
+
+
+2. Build the Lambda bundles:
+```bash
+npm run build:lambdas
+
+```
+
+
+3. Run Vitest:
+```bash
+npm run test
+
+```
+
+
+To run the Python Lambda unit tests locally:
 
 1. Install test dependencies:
 ```bash
@@ -216,7 +240,7 @@ The configuration in `terraform/` handles:
 * **Networking:** API Gateway (WebSocket API) and CloudFront CDN.
 * **Orchestration:** EventBridge Rules (Cron & Rate) and Scheduler Roles for automated data ingestion.
 * **Security:** Granular IAM Roles and Policies attached directly to each Lambda function.
-* **Build Automation:** Automatically zips Python Lambda functions from functions/ into artifacts during deployment.
+* **Build Automation:** Zips Lambda functions from functions/ into artifacts during deployment (run the TypeScript build before apply).
 
 ### Deploying Infrastructure
 
@@ -272,9 +296,9 @@ Triggered on changes to `front/**`.
 
 Triggered on changes to `terraform/**` or `functions/**`.
 
-* **Backend Verification:** Sets up Python 3.11 and runs **pytest** on the `functions/` directory.
+* **Backend Verification:** Sets up Node.js 20 + Python 3.11 and runs **Vitest** + **pytest** for the Lambda functions.
 * **Infrastructure as Code:** If tests pass, automatically runs `terraform init` and `terraform apply`.
-* **Updates:** Because Python Lambda functions are deployed via Terraform, this single pipeline handles both code logic updates and AWS resource changes.
+* **Updates:** Because Lambda functions are deployed via Terraform, this single pipeline handles both code logic updates and AWS resource changes.
 
 ### Automation Workflow
 
@@ -290,7 +314,7 @@ flowchart LR
         Push((Push to Main)):::git
 
         subgraph Infra_Job [Backend & Infra]
-            PyTest[Run Pytest]:::action
+            PyTest[Backend Tests<br/>(Vitest + Pytest)]:::action
             TF[Terraform Apply]:::action
             PyTest --> TF
         end

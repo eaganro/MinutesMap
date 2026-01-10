@@ -50,9 +50,9 @@ resource "aws_iam_role_policy" "ws_send_update_dynamo" {
       {
         Effect = "Allow"
         Action = [
-          "dynamodb:DeleteItem"
+          "dynamodb:BatchWriteItem"
         ]
-        # Deletion happens on the main table
+        # Batch deletion happens on the main table
         Resource = aws_dynamodb_table.game_connections.arn
       }
     ]
@@ -82,7 +82,7 @@ resource "aws_iam_role_policy" "ws_send_update_apigateway" {
 
 data "archive_file" "zip_ws_send_update" {
   type        = "zip"
-  source_dir  = local.src_ws_send_update
+  source_file = "${local.src_ws_send_update}/lambda_function.js"
   output_path = "${local.build_dir}/ws-sendGameUpdate-handler.zip"
 }
 
@@ -92,7 +92,8 @@ resource "aws_lambda_function" "ws_send_update" {
   role          = aws_iam_role.ws_send_update_role.arn
   
   handler       = "lambda_function.handler"
-  runtime       = "python3.11"
+  runtime       = "nodejs20.x"
+  timeout       = 60
   publish       = false
 
   filename         = data.archive_file.zip_ws_send_update.output_path
@@ -102,6 +103,8 @@ resource "aws_lambda_function" "ws_send_update" {
     variables = {
       CONN_TABLE      = aws_dynamodb_table.game_connections.name
       WS_API_ENDPOINT = "${replace(aws_apigatewayv2_api.websocket_api.api_endpoint, "wss://", "https://")}/production"
+      SEND_BATCH_SIZE = "50"
+      SEND_MAX_CONCURRENCY = "10"
     }
   }
 }

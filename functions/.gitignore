@@ -26,6 +26,8 @@ dist/
 *.egg-info/
 .installed.cfg
 *.egg
+**/lambda_function.js
+**/lambda_function.js.map
 
 # --- OS ---
 .DS_Store

@@ -1,0 +1,21 @@
+{
+  "name": "courtvision-functions",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build:lambdas": "esbuild gameDateUpdates/lambda_function.ts --bundle --platform=node --target=node20 --format=cjs --outfile=gameDateUpdates/lambda_function.js && esbuild ws-sendGameUpdate-handler/lambda_function.ts --bundle --platform=node --target=node20 --format=cjs --outfile=ws-sendGameUpdate-handler/lambda_function.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.658.1",
+    "@aws-sdk/client-dynamodb": "^3.658.1",
+    "@aws-sdk/util-dynamodb": "^3.658.1"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^20.12.12",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.4",
+    "vitest": "^1.6.0"
+  }
+}

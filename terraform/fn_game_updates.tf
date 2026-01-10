@@ -49,9 +49,9 @@ resource "aws_iam_role_policy" "game_date_updates_dynamo_data" {
         ]
       },
       {
-        # Permission to delete stale connections
+        # Permission to batch delete stale connections
         Effect   = "Allow"
-        Action   = ["dynamodb:DeleteItem"]
+        Action   = ["dynamodb:BatchWriteItem"]
         Resource = aws_dynamodb_table.date_connections.arn
       }
     ]
@@ -81,7 +81,7 @@ resource "aws_iam_role_policy" "game_date_updates_apigateway" {
 
 data "archive_file" "zip_game_date_updates" {
   type        = "zip"
-  source_dir  = local.src_game_date_updates
+  source_file = "${local.src_game_date_updates}/lambda_function.js"
   output_path = "${local.build_dir}/gameDateUpdates.zip"
 }
 
@@ -91,7 +91,8 @@ resource "aws_lambda_function" "game_date_updates" {
   role          = aws_iam_role.game_date_updates_role.arn
   
   handler       = "lambda_function.handler"
-  runtime       = "python3.11"
+  runtime       = "nodejs20.x"
+  timeout       = 60
   publish       = false
 
   filename         = data.archive_file.zip_game_date_updates.output_path
@@ -102,6 +103,8 @@ resource "aws_lambda_function" "game_date_updates" {
       DATE_CONN_TABLE = aws_dynamodb_table.date_connections.name
       DATE_INDEX_NAME = "date-index"
       SCHEDULE_PREFIX = "schedule/"
+      SEND_BATCH_SIZE = "50"
+      SEND_MAX_CONCURRENCY = "10"
       
       WS_API_ENDPOINT = "${replace(aws_apigatewayv2_api.websocket_api.api_endpoint, "wss://", "https://")}/production"
     }
