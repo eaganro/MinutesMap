@@ -309,25 +309,24 @@ flowchart LR
     classDef action fill:#2088FF,stroke:#333,stroke-width:2px,color:white;
     classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white;
 
-    subgraph GitHub_Actions [GitHub Actions]
+    subgraph GitHub_Actions["GitHub Actions"]
         direction TB
-        Push((Push to Main)):::git
+        Push["Push to Main"]:::git
 
-        subgraph Infra_Job [Backend and Infra]
-            PyTest[Backend Tests (Vitest and Pytest)]:::action
-            TF[Terraform Apply]:::action
+        subgraph Infra_Job["Backend and Infra"]
+            PyTest["Backend Tests - Vitest and Pytest"]:::action
+            TF["Terraform Apply"]:::action
             PyTest --> TF
         end
 
-        subgraph Front_Job [Frontend Deploy]
-            Test[Playwright Tests (4 Shards)]:::action
-            Build[Vite Build]:::action
-            Sync[S3 Sync and CF Invalidation]:::action
+        subgraph Front_Job["Frontend Deploy"]
+            Test["Playwright Tests - 4 Shards"]:::action
+            Build["Vite Build"]:::action
+            Sync["S3 Sync and CF Invalidation"]:::action
+            Test --> Build --> Sync
         end
     end
 
     Push -->|terraform/**| PyTest
     Push -->|front/**| Test
-    Test --> Build --> Sync
-
 ```
