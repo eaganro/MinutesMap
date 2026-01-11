@@ -69,31 +69,49 @@ def _normalize_special_cases(name, team_tricode):
     return name
 
 
-def add_assist_actions(action, players):
+def parse_assist_name(action):
     desc = action.get("description") or ""
+    if "AST" not in desc:
+        return None
     start_name = desc.rfind("(") + 1
     last_space = desc.rfind(" ")
+    if last_space <= 0:
+        return None
     end_name = start_name + (desc[start_name:last_space].rfind(" ") if last_space > start_name else -1)
     name = desc[start_name:end_name] if end_name > start_name else desc[start_name:last_space]
     name = _normalize_special_cases(name, action.get("teamTricode"))
+    return name or None
+
+
+def add_assist_actions(action, players):
+    desc = action.get("description") or ""
+    name = parse_assist_name(action)
+    if not name:
+        return players
+
+    start_desc = desc.rfind("(") + 1
+    end_desc = desc.rfind(")")
+    assist_desc = desc[start_desc:end_desc] if start_desc > 0 and end_desc > start_desc else desc
 
     if name not in players:
         players[name] = []
 
     first = players[name][0] if players[name] else {}
     base_id = action.get("actionId") or action.get("actionNumber")
+    assist_player_name = first.get("playerName") or name
+    assist_player_name_i = first.get("playerNameI") or action.get("assistPlayerNameInitial") or name
     assist_action = {
         "actionType": "Assist",
         "clock": action.get("clock"),
-        "description": desc[start_name:-1],
+        "description": assist_desc,
         "actionId": f"{base_id}a" if base_id is not None else None,
         "actionNumber": f"{action.get('actionNumber')}a",
         "teamId": action.get("teamId"),
         "scoreHome": action.get("scoreHome"),
         "scoreAway": action.get("scoreAway"),
-        "personId": first.get("personId"),
-        "playerName": first.get("playerName"),
-        "playerNameI": first.get("playerNameI"),
+        "personId": action.get("assistPersonId") or first.get("personId"),
+        "playerName": assist_player_name,
+        "playerNameI": assist_player_name_i,
         "period": action.get("period"),
         "teamTricode": action.get("teamTricode"),
     }
@@ -142,6 +160,21 @@ def create_playtimes(players):
     playtimes = {}
     for player in (players or {}).keys():
         playtimes[player] = {"times": [], "on": False}
+    return playtimes
+
+
+def update_playtime_for_name(player_name, action, playtimes):
+    if not player_name or player_name not in playtimes:
+        return playtimes
+    if playtimes[player_name]["on"] is False:
+        playtimes[player_name]["on"] = True
+        playtimes[player_name]["times"].append(
+            {"start": "PT12M00.00S", "period": action.get("period"), "end": action.get("clock")}
+        )
+    else:
+        t = playtimes[player_name]["times"]
+        if t:
+            t[-1]["end"] = action.get("clock")
     return playtimes
 
 
@@ -199,15 +232,11 @@ def update_playtimes_with_action(action, playtimes):
             playtimes[name]["on"] = True
 
     else:
-        if player_name and player_name in playtimes and playtimes[player_name]["on"] is False:
-            playtimes[player_name]["on"] = True
-            playtimes[player_name]["times"].append(
-                {"start": "PT12M00.00S", "period": action.get("period"), "end": action.get("clock")}
-            )
-        elif player_name and player_name in playtimes and playtimes[player_name]["on"] is True:
-            t = playtimes[player_name]["times"]
-            if t:
-                t[-1]["end"] = action.get("clock")
+        playtimes = update_playtime_for_name(player_name, action, playtimes)
+        if action_type not in ("Assist", "assist"):
+            assist_name = parse_assist_name(action)
+            if assist_name and assist_name != player_name:
+                playtimes = update_playtime_for_name(assist_name, action, playtimes)
 
     return playtimes
 

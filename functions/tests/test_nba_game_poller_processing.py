@@ -71,6 +71,37 @@ class TestPlayByPlayProcessing(unittest.TestCase):
             "Expected injected assist action '11a' under away player 'Jones'",
         )
 
+    def test_assist_only_player_has_timeline(self):
+        actions = [
+            {
+                "actionNumber": 1,
+                "actionId": 1,
+                "clock": "PT11M10.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 999,
+                "playerName": "Scorer",
+                "playerNameI": "S. Scorer",
+                "description": "Scorer 2PT Jump Shot (2 PTS) (A. Helper 1 AST)",
+                "actionType": "Made Shot",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "2",
+            }
+        ]
+        processed = process_playbyplay_payload(
+            game_id="test-assist-only",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+        )
+        helper_timeline = processed["awayPlayerTimeline"].get("A. Helper")
+        self.assertIsNotNone(helper_timeline)
+        self.assertGreater(len(helper_timeline), 0)
+        self.assertEqual(helper_timeline[0]["start"], "PT12M00.00S")
+        self.assertEqual(helper_timeline[0]["end"], "PT11M10.00S")
+
     def test_all_actions_sorted_period_then_clock_desc(self):
         processed = process_playbyplay_payload(
             game_id="0012200039",
