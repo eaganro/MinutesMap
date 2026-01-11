@@ -123,6 +123,7 @@ resource "aws_lambda_function" "nba_poller" {
       SCHEDULER_ROLE_ARN = aws_iam_role.nba_scheduler_role.arn
       DATA_BUCKET      = aws_s3_bucket.data_bucket.id
       POLLER_RULE_NAME = aws_cloudwatch_event_rule.nba_poller_rule.name
+      SCHEDULE_RECONCILE_DAYS = "4"
     }
   }
 }

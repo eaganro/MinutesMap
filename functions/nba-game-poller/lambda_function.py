@@ -4,6 +4,7 @@ import boto3
 import os
 import random
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from botocore.exceptions import ClientError
@@ -24,6 +25,8 @@ PREFIX = 'data/'
 MANIFEST_KEY = f'{PREFIX}manifest.json'
 KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
 SCHEDULE_PREFIX = 'schedule/'
+SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
+SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
 
 # 3. Security (From Terraform)
 LAMBDA_ARN = os.environ.get('LAMBDA_ARN')
@@ -58,6 +61,7 @@ def main_handler(event, context):
 # 1. MANAGER LOGIC (Runs Daily at Noon)
 # ==============================================================================
 def manager_logic():
+    reconcile_recent_schedule()
     today_str = get_nba_date()
     print(f"Manager: Checking games for {today_str}...")
 
@@ -528,6 +532,20 @@ def parse_start_time_et(start_time):
         return dt.replace(tzinfo=ET_ZONE)
     return dt.astimezone(ET_ZONE)
 
+def parse_start_time_utc(start_time):
+    if not start_time:
+        return None
+    ts = start_time.strip()
+    if ts.endswith('Z'):
+        ts = f"{ts[:-1]}+00:00"
+    try:
+        dt = datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC_ZONE)
+    return dt.astimezone(UTC_ZONE)
+
 def has_game_started(game, now_et):
     if status_indicates_live(game):
         return True
@@ -556,6 +574,190 @@ def get_games_from_s3(date_str):
     except Exception as e:
         print(f"S3 Schedule Error: {e}")
         return []
+
+def reconcile_recent_schedule():
+    days = parse_positive_int(SCHEDULE_RECONCILE_DAYS, 3)
+    if days <= 0:
+        return
+
+    today_str = get_nba_date()
+    try:
+        today = datetime.strptime(today_str, "%Y-%m-%d").date()
+    except ValueError:
+        print(f"Reconcile: Invalid NBA date '{today_str}', skipping.")
+        return
+
+    feed = fetch_schedule_feed()
+    if not feed:
+        print("Reconcile: Schedule feed unavailable, skipping.")
+        return
+
+    feed_map = build_schedule_feed_map(feed)
+    if not feed_map:
+        print("Reconcile: Schedule feed empty, skipping.")
+        return
+    updated = 0
+
+    for offset in range(days):
+        date_str = (today - timedelta(days=offset)).strftime("%Y-%m-%d")
+        feed_games = feed_map.get(date_str, {})
+        if reconcile_schedule_date(date_str, feed_games):
+            updated += 1
+
+    if updated:
+        print(f"Reconcile: Updated {updated} schedule file(s).")
+
+def reconcile_schedule_date(date_str, feed_games):
+    existing = get_games_from_s3(date_str)
+    existing_by_id = {
+        str(game.get("id")): game
+        for game in existing
+        if isinstance(game, dict) and game.get("id")
+    }
+
+    merged = []
+    for game_id, feed_game in feed_games.items():
+        existing_game = existing_by_id.get(str(game_id))
+        if existing_game:
+            merged_game = {**feed_game, **existing_game}
+            if is_cancelled_status(feed_game.get("status")):
+                merged_game["status"] = feed_game.get("status")
+        else:
+            merged_game = feed_game
+        merged_game["date"] = date_str
+        merged.append(merged_game)
+
+    merged = normalize_schedule_list(merged)
+    existing_norm = normalize_schedule_list(existing)
+
+    if schedules_equal(existing_norm, merged):
+        return False
+
+    upload_schedule_s3(
+        s3_client=s3_client,
+        bucket=BUCKET,
+        games_list=merged,
+        date_str=date_str,
+        prefix=SCHEDULE_PREFIX,
+    )
+    return True
+
+def fetch_schedule_feed():
+    data, _ = fetch_nba_data_urllib(SCHEDULE_FEED_URL, user_agent=random.choice(USER_AGENTS))
+    if not data:
+        return None
+    league = data.get("leagueSchedule", {})
+    if not isinstance(league, dict):
+        return None
+    if not isinstance(league.get("gameDates"), list):
+        return None
+    return league
+
+def build_schedule_feed_map(league_schedule):
+    feed_map = defaultdict(dict)
+    for game_date in league_schedule.get("gameDates", []):
+        games = game_date.get("games", [])
+        if not isinstance(games, list):
+            continue
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            game_id = game.get("gameId")
+            if not game_id:
+                continue
+            starttime = extract_feed_starttime(game, game_date)
+            date_str = None
+            if starttime and "T" in starttime:
+                date_str = starttime.split("T")[0]
+            if not date_str:
+                date_str = extract_feed_date(game_date)
+            if not date_str:
+                continue
+            feed_map[date_str][str(game_id)] = build_schedule_item_from_feed(
+                game=game,
+                game_id=game_id,
+                date_str=date_str,
+                starttime=starttime,
+            )
+    return feed_map
+
+def extract_feed_starttime(game, game_date):
+    for key in ("gameDateTimeEst", "gameDateEst"):
+        dt = parse_start_time_et(game.get(key))
+        if dt:
+            return dt.strftime("%Y-%m-%dT%H:%M:%S")
+    for key in ("gameDateTimeUTC", "gameDateUTC", "gameTimeUTC"):
+        dt = parse_start_time_utc(game.get(key))
+        if dt:
+            return dt.astimezone(ET_ZONE).strftime("%Y-%m-%dT%H:%M:%S")
+    date_str = extract_feed_date(game_date) or extract_feed_date(game)
+    if date_str:
+        return f"{date_str}T00:00:00"
+    return None
+
+def extract_feed_date(payload):
+    game_date = None
+    if isinstance(payload, dict):
+        game_date = payload.get("gameDate")
+    if not game_date:
+        return None
+    for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            parsed = datetime.strptime(game_date, fmt)
+            return parsed.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
+
+def build_schedule_item_from_feed(*, game, game_id, date_str, starttime):
+    home = game.get("homeTeam") or {}
+    away = game.get("awayTeam") or {}
+    status_text = (game.get("gameStatusText") or "").strip()
+    if not status_text and game.get("gameStatus") == 1:
+        status_text = "Scheduled"
+
+    item = {
+        "id": game_id,
+        "date": date_str,
+        "starttime": starttime,
+        "hometeam": home.get("teamTricode"),
+        "awayteam": away.get("teamTricode"),
+        "homescore": home.get("score") or 0,
+        "awayscore": away.get("score") or 0,
+        "status": status_text,
+        "clock": game.get("gameClock", "") or "",
+        "homerecord": f"{home.get('wins') or 0}-{home.get('losses') or 0}",
+        "awayrecord": f"{away.get('wins') or 0}-{away.get('losses') or 0}",
+    }
+
+    home_team_id = home.get("teamId") or game.get("homeTeamId")
+    away_team_id = away.get("teamId") or game.get("awayTeamId")
+    if home_team_id:
+        item["homeTeamId"] = home_team_id
+    if away_team_id:
+        item["awayTeamId"] = away_team_id
+    return item
+
+def normalize_schedule_list(games):
+    cleaned = [g for g in games if isinstance(g, dict)]
+    return sorted(
+        cleaned,
+        key=lambda g: (g.get("starttime") or "", str(g.get("id") or "")),
+    )
+
+def schedules_equal(existing, merged):
+    return json.dumps(existing, sort_keys=True) == json.dumps(merged, sort_keys=True)
+
+def is_cancelled_status(status_text):
+    status = normalize_status(status_text)
+    return status.startswith(("postponed", "cancelled", "canceled", "ppd"))
+
+def parse_positive_int(value, fallback):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return parsed if parsed >= 0 else fallback
 
 def get_earliest_start_time(games):
     """
