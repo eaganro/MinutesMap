@@ -234,6 +234,18 @@ export function useGameData() {
     }
   }, []);
 
+  const setGameNotStarted = useCallback(() => {
+    setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
+    setBox({});
+    setAwayTeamId(null);
+    setHomeTeamId(null);
+    setPlayByPlay([]);
+    setLastAction(null);
+    setNumQs(4);
+    setIsBoxLoading(false);
+    setIsPlayLoading(false);
+  }, []);
+
   /**
    * Reset loading states when game changes
    */
@@ -265,6 +277,7 @@ export function useGameData() {
     fetchBoth,
     fetchPlayByPlay,
     fetchBox,
+    setGameNotStarted,
     fetchSchedule,
     fetchTodaySchedule,
     resetLoadingStates,

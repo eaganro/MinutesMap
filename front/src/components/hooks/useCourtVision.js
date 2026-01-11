@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getNbaTodayString, sortGamesForSelection } from '../../helpers/gameSelectionUtils';
+import { getNbaTodayString, parseGameStatus, sortGamesForSelection } from '../../helpers/gameSelectionUtils';
 import { PREFIX } from '../../environment';
 
 import { useQueryParams } from './useQueryParams';
@@ -58,6 +58,7 @@ export function useCourtVision() {
     fetchBoth,
     fetchPlayByPlay,
     fetchBox,
+    setGameNotStarted,
     resetLoadingStates,
   } = useGameData();
 
@@ -204,12 +205,88 @@ export function useCourtVision() {
     }
   }, [date, gameId, updateQueryParams]);
 
+  const selectedScheduleGame = useMemo(() => {
+    if (!gameId) {
+      return null;
+    }
+    const scheduleMatch = (schedule || []).find(
+      (game) => String(game?.id) === String(gameId)
+    );
+    if (scheduleMatch) {
+      return scheduleMatch;
+    }
+    const todayMatch = (todaySchedule || []).find(
+      (game) => String(game?.id) === String(gameId)
+    );
+    return todayMatch || null;
+  }, [gameId, schedule, todaySchedule]);
+
+  const [cachedGameMeta, setCachedGameMeta] = useState(null);
+
+  useEffect(() => {
+    setCachedGameMeta(null);
+  }, [gameId]);
+
+  useEffect(() => {
+    if (!gameId || !selectedScheduleGame) {
+      return;
+    }
+    setCachedGameMeta({
+      id: String(gameId),
+      hometeam: selectedScheduleGame.hometeam ?? null,
+      awayteam: selectedScheduleGame.awayteam ?? null,
+      starttime: selectedScheduleGame.starttime ?? null,
+      status: selectedScheduleGame.status ?? null,
+    });
+  }, [gameId, selectedScheduleGame]);
+
+  const cachedMetaForGame = cachedGameMeta && String(cachedGameMeta.id) === String(gameId)
+    ? cachedGameMeta
+    : null;
+  const stableGameMeta = selectedScheduleGame || cachedMetaForGame;
+
+  const isSelectedGameUpcoming = useMemo(() => {
+    const status = selectedScheduleGame?.status;
+    if (!status || typeof status !== 'string') {
+      return false;
+    }
+    const parsed = parseGameStatus(status);
+    if (parsed.isUpcoming) {
+      return true;
+    }
+    const normalized = status.trim().toLowerCase();
+    return (
+      normalized === 'scheduled' ||
+      normalized.startsWith('scheduled') ||
+      normalized.includes('tbd')
+    );
+  }, [selectedScheduleGame?.status]);
+
+  const shouldWaitForSchedule = Boolean(gameId)
+    && !selectedScheduleGame
+    && (isScheduleLoading || isTodayScheduleLoading);
+
   // === GAME DATA FETCHING ===
   useEffect(() => {
-    if (gameId) {
-      fetchBoth(gameId);
+    if (!gameId) {
+      return;
     }
-  }, [gameId, fetchBoth]);
+    if (shouldWaitForSchedule) {
+      return;
+    }
+    if (selectedScheduleGame && isSelectedGameUpcoming) {
+      setGameNotStarted();
+      return;
+    }
+    fetchBoth(gameId);
+  }, [
+    gameId,
+    fetchBoth,
+    isSelectedGameUpcoming,
+    selectedScheduleGame,
+    setGameNotStarted,
+    shouldWaitForSchedule,
+  ]);
 
   // === LOADING DELAY (avoid flash) ===
   const isGlobalLoading = isInitLoading || isScheduleLoading;
@@ -246,11 +323,7 @@ export function useCourtVision() {
 
   // === COMPUTED VALUES ===
   const sortedGames = useMemo(() => sortGamesForSelection(schedule || []), [schedule]);
-  const currentScheduleGameStatus = useMemo(() => {
-    if (!gameId || !sortedGames?.length) return null;
-    const match = sortedGames.find((game) => String(game.id) === String(gameId));
-    return match?.status || null;
-  }, [sortedGames, gameId]);
+  const currentScheduleGameStatus = stableGameMeta?.status || null;
 
   const awayTeamName = useMemo(() => ({
     name: box?.awayTeam?.teamName || 'Away Team',
@@ -261,6 +334,10 @@ export function useCourtVision() {
     name: box?.homeTeam?.teamName || 'Home Team',
     abr: box?.homeTeam?.teamTricode || '',
   }), [box?.homeTeam]);
+
+  const scoreAwayTeam = box?.awayTeam?.teamTricode || stableGameMeta?.awayteam || null;
+  const scoreHomeTeam = box?.homeTeam?.teamTricode || stableGameMeta?.hometeam || null;
+  const scoreGameDate = box?.gameEt || stableGameMeta?.starttime || null;
 
   const isScheduleVisible = isGlobalLoading && showLoading;
   const isGameDataVisible = isBoxLoading || isPlayLoading;
@@ -278,10 +355,10 @@ export function useCourtVision() {
     isScheduleLoading: isScheduleVisible,
 
     // Score
-    homeTeam: box?.homeTeam?.teamTricode,
-    awayTeam: box?.awayTeam?.teamTricode,
+    homeTeam: scoreHomeTeam,
+    awayTeam: scoreAwayTeam,
     currentScore: scoreTimeline[scoreTimeline.length - 1],
-    gameDate: box?.gameEt,
+    gameDate: scoreGameDate,
     gameStatusMessage,
     isGameDataLoading: isGameDataVisible,
 
