@@ -13,7 +13,7 @@
 
 The app runs on a **serverless AWS architecture** and uses a **hybrid push/pull real-time pattern**:
 - WebSockets notify clients when new data is available.
-- Clients then fetch the latest game data through **CloudFront → S3**, benefiting from CDN caching.
+- Clients then fetch the latest game + schedule data through **CloudFront → S3**, benefiting from CDN caching.
 
 ## ☁️ Architecture & Data Flow
 
@@ -47,7 +47,7 @@ flowchart TD
         subgraph RealTime [Real-Time Backend]
             L_Event[Lambda<br/>S3 Trigger]:::aws
             L_WS[Lambda<br/>WS Handler]:::aws
-            DDB[("DynamoDB<br/>State & Schedule")]:::db
+            DDB[("DynamoDB<br/>Connection State")]:::db
             APIG[API Gateway<br/>WebSocket]:::aws
         end
     end
@@ -62,7 +62,6 @@ flowchart TD
     EB --> L_Poller
     L_Poller -- 1. Polls --> NBA
     L_Poller -- 2. Uploads JSON --> S3
-    L_Poller -. Updates Status .-> DDB
 
     %% 2. Notification Flow (Left Side)
     S3 -- 3. Trigger --> L_Event
@@ -85,10 +84,9 @@ flowchart TD
 ### High-Level Components
 
 * **Frontend:** React (Vite) static app served via **CloudFront** (origin: **S3**).
-* **Game data storage:** JSON files in **S3**, served through **CloudFront**.
+* **Game + schedule data storage:** JSON files in **S3** (`data/` payloads + `schedule/` daily schedule), served through **CloudFront**.
 * **Real-time signaling:** **API Gateway WebSocket API** with **Lambda** handlers.
 * **Connection/session state:** **DynamoDB** (stores connection IDs + current subscription info such as game/date).
-* **Schedule metadata:** **DynamoDB** table for schedule basics; schedule payload is pushed via WebSockets.
 * **Ingestion:** **AWS Lambda** (Poller) triggered by **EventBridge** (Cron/Rate) polls the NBA API and uploads new data to S3.
 
 ### 1) Client Subscription Model
@@ -102,7 +100,7 @@ Clients “subscribe” to a **game + date**:
 ### 2) Data Update Flow (Hybrid Push/Pull)
 
 1. **EventBridge** triggers the **Poller Lambda** during active games.
-2. The Lambda fetches data from NBA endpoints, updates **DynamoDB** (scores/status), and uploads compressed JSON to **S3**.
+2. The Lambda fetches data from NBA endpoints and uploads compressed JSON to **S3** (game payloads + daily schedule updates).
 3. **S3 event notification** triggers a **Lambda**.
 4. Lambda queries **DynamoDB** (via a GSI keyed by `gameId`) to find connections currently subscribed to that game/date.
 5. Lambda sends a **small WebSocket message** like “new data available.”
@@ -110,8 +108,9 @@ Clients “subscribe” to a **game + date**:
 
 ### 3) Schedule Updates
 
-* A DynamoDB table holds basic schedule metadata.
-* A Lambda can send the full schedule payload to clients directly via WebSocket (useful for navigation without extra fetches).
+* Daily schedule JSON is stored in **S3** under `schedule/YYYY-MM-DD.json.gz` and served via **CloudFront**.
+* An **S3 notification** triggers a Lambda that broadcasts a lightweight `date_update` message over WebSockets.
+* Clients fetch the updated schedule from **CloudFront → S3** when notified or when navigating dates.
 
 ## ⚡ Key Features
 
@@ -235,7 +234,7 @@ The entire AWS serverless architecture (S3, DynamoDB, Lambda, API Gateway, Event
 
 The configuration in `terraform/` handles:
 
-* **Storage:** S3 buckets (hosting & data) and DynamoDB tables (connection state & schedule).
+* **Storage:** S3 buckets (hosting, game data, schedule data) and DynamoDB tables (connection state).
 * **Compute:** Lambda functions for WebSocket handlers, data polling, and self-scheduling logic.
 * **Networking:** API Gateway (WebSocket API) and CloudFront CDN.
 * **Orchestration:** EventBridge Rules (Cron & Rate) and Scheduler Roles for automated data ingestion.
