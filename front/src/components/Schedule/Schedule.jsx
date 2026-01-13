@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { NavigateNext, NavigateBefore } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
-import { dateAdd, dateMinus } from '../../environment';
-import { PREFIX } from '../../environment';
+import { dateAdd, dateMinus, ASSET_PREFIX } from '../../environment';
 
 
 import './Schedule.scss';
+
+const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
+const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
 
 function TeamLogo({ team }) {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -33,8 +35,9 @@ function TeamLogo({ team }) {
         height="16"
         width="16"
         draggable={false}
+        loading="lazy"
         className='teamLogo'
-        src={`${PREFIX ? PREFIX : ''}/img/teams/${team}.png`}
+        src={buildLogoSrc(team)}
         alt={team}
         onLoad={() => setIsLoaded(true)}
         onError={() => setIsLoaded(false)}

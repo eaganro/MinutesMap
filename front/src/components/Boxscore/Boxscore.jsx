@@ -3,6 +3,8 @@ import './Boxscore.scss';
 import processTeamStats from './processTeamStats';
 import { useState, useEffect, useRef } from 'react';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
+import { useTheme } from '../hooks/useTheme';
+import { getMatchupColors } from '../../helpers/teamColors';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
@@ -13,6 +15,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const lastStableBoxRef = useRef(box);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+  const { isDarkMode } = useTheme();
   const awayTableRef = useRef(null);
   const homeTableRef = useRef(null);
   const isSyncingScrollRef = useRef(false);
@@ -56,6 +59,11 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     : box;
   const hasBoxData = displayBox && Object.keys(displayBox).length > 0;
   const isDataLoading = isBlurred && hasBoxData;
+  const matchupColors = getMatchupColors(
+    displayBox?.awayTeam?.teamTricode,
+    displayBox?.homeTeam?.teamTricode,
+    isDarkMode
+  );
 
   useEffect(() => {
     if (isLoading && hasBoxData) {
@@ -99,7 +107,8 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     setShowMore,
     awayTableRef,
     () => syncScroll(awayTableRef, homeTableRef),
-    isCompact
+    isCompact,
+    matchupColors?.away
   );
   const homeBox = processTeamStats(
     displayBox?.homeTeam,
@@ -108,7 +117,8 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     setShowMore,
     homeTableRef,
     () => syncScroll(homeTableRef, awayTableRef),
-    isCompact
+    isCompact,
+    matchupColors?.home
   );
 
   if (statusMessage && !isLoading) {

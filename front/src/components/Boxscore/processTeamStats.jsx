@@ -1,7 +1,5 @@
 import { UnfoldMore, UnfoldLess } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
-import { PREFIX } from '../../environment';
-
 const COMPACT_LAST_NAME_MAX = 12;
 const COMPACT_LAST_NAME_KEEP = 10;
 const DEFAULT_COLUMN_ORDER = [
@@ -66,7 +64,7 @@ const COLUMN_LABELS = {
 };
 const HIGHLIGHT_COLUMNS = new Set(['pts', 'reb', 'ast']);
 
-export default function(team, showButton, showMore, setShowMore, tableWrapperRef, onScroll, isCompact) {
+export default function(team, showButton, showMore, setShowMore, tableWrapperRef, onScroll, isCompact, teamColor) {
   const getDisplayName = (player) => {
     const firstName = (player.firstName || '').trim();
     const familyName = (player.familyName || '').trim();
@@ -299,15 +297,7 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
     <div>
       <div className="teamRow">
         <div className="team">
-          {team ? (
-            <img
-              height="30"
-              width="30"
-              src={`${PREFIX ? PREFIX : ''}/img/teams/${team?.teamTricode}.png`}
-              alt={`${team?.teamTricode}`}
-            />
-          ) : ''}
-          <span>{team?.teamName}</span>
+          <span style={teamColor ? { color: teamColor } : undefined}>{team?.teamName}</span>
           {showButton && (
             <div className='showMore'>
               <IconButton

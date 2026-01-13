@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import './Score.scss';
-import { PREFIX } from '../../environment';
+import { ASSET_PREFIX } from '../../environment';
 import { formatClock, formatPeriod } from '../../helpers/utils';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
+const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
+const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
 
 export default function Score({
   homeTeam,
@@ -164,7 +166,7 @@ export default function Score({
                 height="80"
                 width="80"
                 className='teamLogo awayImg'
-                src={`${PREFIX ? PREFIX : ''}/img/teams/${displayData.awayTeam}.png`}
+                src={buildLogoSrc(displayData.awayTeam)}
                 alt={displayData.awayTeam}
                 onLoad={() => setAwayLogoLoaded(true)}
                 onError={() => setAwayLogoLoaded(false)}
@@ -179,7 +181,7 @@ export default function Score({
                 height="80"
                 width="80"
                 className='teamLogo homeImg'
-                src={`${PREFIX ? PREFIX : ''}/img/teams/${displayData.homeTeam}.png`}
+                src={buildLogoSrc(displayData.homeTeam)}
                 alt={displayData.homeTeam}
                 onLoad={() => setHomeLogoLoaded(true)}
                 onError={() => setHomeLogoLoaded(false)}
