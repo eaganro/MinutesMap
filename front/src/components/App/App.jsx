@@ -45,7 +45,24 @@ export default function App() {
     <div className='topLevel'>
       <header className='appHeader'>
         <div className='appBranding'>
-          <img src="/logo.png" alt="CourtVision logo" className='appLogo' />
+          <picture>
+            <source
+              type="image/avif"
+              srcSet="/logo-70.avif 1x, /logo-140.avif 2x"
+            />
+            <source
+              type="image/webp"
+              srcSet="/logo-70.webp 1x, /logo-140.webp 2x"
+            />
+            <img
+              src="/logo-70.png"
+              srcSet="/logo-70.png 1x, /logo-140.png 2x"
+              width="70"
+              height="70"
+              alt="CourtVision logo"
+              className='appLogo'
+            />
+          </picture>
           <span className='appName'>CourtVision</span>
         </div>
         <DarkModeToggle />
