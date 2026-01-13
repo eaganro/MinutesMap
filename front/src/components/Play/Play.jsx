@@ -52,7 +52,19 @@ export default function Play({
   const playRef = useRef(null);
   const appliedGameIdRef = useRef(gameId);
   const pendingGameChangeRef = useRef(false);
-  const lastStableRef = useRef(null);
+  const lastStableRef = useRef({
+    awayTeamNames,
+    homeTeamNames,
+    awayPlayers,
+    homePlayers,
+    allActions,
+    scoreTimeline,
+    awayPlayerTimeline,
+    homePlayerTimeline,
+    numQs,
+    lastAction,
+  });
+  const lastStatusMessageRef = useRef(statusMessage);
   const touchStartRef = useRef({ x: 0, y: 0 });
   const touchAxisRef = useRef(null);
   const touchMovedRef = useRef(false);
@@ -63,10 +75,7 @@ export default function Play({
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-    if (isBlurred && hasPlayData(lastStableRef.current)) {
+    if (isLoading || isBlurred) {
       return;
     }
     lastStableRef.current = {
@@ -96,8 +105,14 @@ export default function Play({
     lastAction,
   ]);
 
-  const hasStableData = hasPlayData(lastStableRef.current);
-  const showStableData = (isLoading || (isBlurred && hasStableData)) && lastStableRef.current;
+  useEffect(() => {
+    if (isLoading || isBlurred) {
+      return;
+    }
+    lastStatusMessageRef.current = statusMessage;
+  }, [statusMessage, isLoading, isBlurred]);
+
+  const showStableData = (isLoading || isBlurred) && lastStableRef.current;
   const displayData = showStableData
     ? lastStableRef.current
     : {
@@ -128,7 +143,15 @@ export default function Play({
   } = displayData;
 
   const hasDisplayData = hasPlayData(displayData);
-  const isDataLoading = isBlurred && hasDisplayData;
+  const hasIncomingData = hasPlayData({
+    allActions,
+    scoreTimeline,
+    awayPlayers,
+    homePlayers,
+  });
+  const displayStatusMessage = (isLoading || isBlurred) ? lastStatusMessageRef.current : statusMessage;
+  const showStatusMessage = Boolean(displayStatusMessage) && !hasDisplayData;
+  const isDataLoading = isBlurred && (hasDisplayData || hasIncomingData || showStatusMessage);
 
   useEffect(() => {
     if (isLoading && hasDisplayData) {
@@ -458,8 +481,10 @@ export default function Play({
     </div>
   ) : null;
 
+  const showLoadingIndicator = isLoading && !hasDisplayData && !showStatusMessage;
+
   // --- Render Loading/Error States ---
-  if (isLoading && !hasDisplayData) {
+  if (showLoadingIndicator) {
     return (
       <div className="playWrapper">
         {quarterSwitcher}
@@ -473,12 +498,14 @@ export default function Play({
     );
   }
 
-  if (statusMessage && !isLoading) {
+  if (showStatusMessage) {
     return (
       <div className="playWrapper">
         {quarterSwitcher}
-        <div className='play'>
-          <div className='statusMessage'>{statusMessage}</div>
+        <div className={`play ${isDataLoading ? 'isLoading' : ''}`}>
+          <div className='playContent'>
+            <div className='statusMessage'>{displayStatusMessage}</div>
+          </div>
         </div>
       </div>
     );

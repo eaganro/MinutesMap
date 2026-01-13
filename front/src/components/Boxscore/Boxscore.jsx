@@ -13,6 +13,7 @@ const MIN_BLUR_MS = 300;
 export default function Boxscore({ box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);
   const lastStableBoxRef = useRef(box);
+  const lastStatusMessageRef = useRef(statusMessage);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
   const { isDarkMode } = useTheme();
@@ -43,22 +44,25 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   }, []);
 
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-    const hasStableBoxData = lastStableBoxRef.current && Object.keys(lastStableBoxRef.current).length > 0;
-    if (isBlurred && hasStableBoxData) {
+    if (isLoading || isBlurred) {
       return;
     }
     lastStableBoxRef.current = box;
   }, [box, isLoading, isBlurred]);
 
-  const hasStableBoxData = lastStableBoxRef.current && Object.keys(lastStableBoxRef.current).length > 0;
-  const displayBox = (isLoading || (isBlurred && hasStableBoxData)) && lastStableBoxRef.current
-    ? lastStableBoxRef.current
-    : box;
+  useEffect(() => {
+    if (isLoading || isBlurred) {
+      return;
+    }
+    lastStatusMessageRef.current = statusMessage;
+  }, [statusMessage, isLoading, isBlurred]);
+
+  const displayBox = (isLoading || isBlurred) ? lastStableBoxRef.current : box;
+  const displayStatusMessage = (isLoading || isBlurred) ? lastStatusMessageRef.current : statusMessage;
   const hasBoxData = displayBox && Object.keys(displayBox).length > 0;
-  const isDataLoading = isBlurred && hasBoxData;
+  const hasIncomingBoxData = box && Object.keys(box).length > 0;
+  const showStatusMessage = Boolean(displayStatusMessage) && !hasBoxData;
+  const isDataLoading = isBlurred && (hasBoxData || hasIncomingBoxData || showStatusMessage);
   const matchupColors = getMatchupColors(
     displayBox?.awayTeam?.teamTricode,
     displayBox?.homeTeam?.teamTricode,
@@ -121,13 +125,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     matchupColors?.home
   );
 
-  if (statusMessage && !isLoading) {
-    return (
-      <div className='box'>
-        <div className='statusMessage'>{statusMessage}</div>
-      </div>
-    );
-  }
+  const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
 
   return (
     <div className={`box ${isDataLoading ? 'isLoading' : ''}`}>
@@ -137,10 +135,14 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
           <span>Loading box score...</span>
         </div>
       )}
-      {isLoading && !hasBoxData ? (
+      {showLoadingIndicator ? (
         <div className='loadingIndicator'>
           <CircularProgress size={24} thickness={5} />
           <span>Loading box score...</span>
+        </div>
+      ) : showStatusMessage ? (
+        <div className='boxContent'>
+          <div className='statusMessage'>{displayStatusMessage}</div>
         </div>
       ) : (
         <div className='boxContent'>

@@ -37,21 +37,10 @@ export default function Score({
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading || isBlurred) {
       return;
     }
-    setDisplayData((prev) => {
-      const hasPrevData = Boolean(
-        prev?.homeTeam ||
-        prev?.awayTeam ||
-        prev?.score ||
-        prev?.date
-      );
-      if (isBlurred && hasPrevData) {
-        return prev;
-      }
-      return { homeTeam, awayTeam, score, date, lastAction, gameStatus };
-    });
+    setDisplayData({ homeTeam, awayTeam, score, date, lastAction, gameStatus });
   }, [homeTeam, awayTeam, score, date, lastAction, gameStatus, isLoading, isBlurred]);
 
   useEffect(() => {
@@ -79,9 +68,10 @@ export default function Score({
     displayData?.score ||
     displayData?.date
   );
+  const hasIncomingData = Boolean(homeTeam || awayTeam || score || date);
   const awayLogoPending = Boolean(displayData.awayTeam) && !awayLogoLoaded;
   const homeLogoPending = Boolean(displayData.homeTeam) && !homeLogoLoaded;
-  const isDataLoading = isBlurred && hasDisplayData;
+  const isDataLoading = isBlurred && (hasDisplayData || hasIncomingData);
 
   useEffect(() => {
     if (isLoading && hasDisplayData) {
