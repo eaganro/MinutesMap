@@ -1,5 +1,5 @@
 import { useRef, useLayoutEffect, useState } from 'react';
-import { getEventType, LegendShape } from '../../helpers/eventStyles.jsx';
+import { getEventType, isFreeThrowAction, LegendShape, renderFreeThrowRing } from '../../helpers/eventStyles.jsx';
 import { formatClock, formatPeriod } from '../../helpers/utils';
 
 export default function PlayTooltip({ 
@@ -111,17 +111,50 @@ export default function PlayTooltip({
 
   const ActionsComponent = () => (
     <div className="actions-container">
-      {sortedActions.map((a, index) => {
+      {(() => {
+        const freeThrowOneOfOnePattern = /free throw\s+1\s+of\s+1/i;
+        const pointActions = sortedActions.filter(action =>
+          !isFreeThrowAction(action.description, action.actionType)
+          && getEventType(action.description, action.actionType) === 'point'
+        );
+        const hasPoint = pointActions.length > 0;
+
+        return sortedActions.map((a, index) => {
         const eventType = getEventType(a.description, a.actionType);
+        const isFreeThrow = isFreeThrowAction(a.description, a.actionType);
         const is3PT = a.description.includes('3PT');
         const actionTeamColor = a.teamTricode === awayTeamNames.abr ? teamColors.away : teamColors.home;
+        const iconSize = 10;
+        const iconPadding = 2;
+        const iconViewSize = iconSize + iconPadding * 2;
+        const iconCenter = iconViewSize / 2;
         
+        const isOneOfOne = freeThrowOneOfOnePattern.test(`${a.subType || ''} ${a.description || ''}`);
+        const isAnd1 = isOneOfOne && hasPoint;
+
         return (
           <div key={index} className="action-item">
             <div className="jersey-tab" style={{ backgroundColor: actionTeamColor }} />
             <span className="action-symbol">
-              {eventType ? (
-                <LegendShape eventType={eventType} size={10} is3PT={is3PT} />
+              {isFreeThrow ? (
+                <svg
+                  width={iconViewSize}
+                  height={iconViewSize}
+                  viewBox={`0 0 ${iconViewSize} ${iconViewSize}`}
+                  style={{ display: 'inline-block', verticalAlign: 'middle' }}
+                >
+                  {renderFreeThrowRing({
+                    cx: iconCenter,
+                    cy: iconCenter,
+                    size: iconSize / 2,
+                    key: `ft-ring-${index}`,
+                    description: a.description,
+                    subType: a.subType,
+                    isAnd1
+                  })}
+                </svg>
+              ) : eventType ? (
+                <LegendShape eventType={eventType} size={iconSize} is3PT={is3PT} />
               ) : (
                 <span style={{ color: 'var(--line-color-light)', fontWeight: 'bold' }}>—</span>
               )}
@@ -129,7 +162,8 @@ export default function PlayTooltip({
             <div className="action-description">{a.description}</div>
           </div>
         );
-      })}
+        });
+      })()}
     </div>
   );
 

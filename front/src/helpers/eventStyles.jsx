@@ -82,6 +82,75 @@ export function getEventType(description, actionType = null) {
   return null;
 }
 
+const FREE_THROW_PATTERN = /free throw\s+(\d+)\s+of\s+(\d+)/i;
+
+export function isFreeThrowAction(description, actionType = null) {
+  const desc = (description || '').toString().toLowerCase();
+  const type = (actionType || '').toString().toLowerCase();
+  if (type.includes('foul')) return false;
+  if (type.includes('free throw')) return true;
+  return desc.includes('free throw');
+}
+
+const getFreeThrowAttempt = (description, subType) => {
+  const text = `${subType || ''} ${description || ''}`;
+  const match = text.match(FREE_THROW_PATTERN);
+  if (!match) {
+    return { attempt: 1, total: 1 };
+  }
+  return { attempt: Number(match[1]), total: Number(match[2]) };
+};
+
+const getFreeThrowRingRatio = (attempt, total) => {
+  if (total <= 1) return 0.8;
+  if (attempt === 1) return 0.6;
+  if (attempt === 2) return 0.8;
+  return 1.1;
+};
+
+export function renderFreeThrowRing({
+  cx,
+  cy,
+  size,
+  key,
+  description,
+  subType,
+  isAnd1 = false,
+  actionNumber = null
+}) {
+  const desc = (description || '').toString().toLowerCase();
+  const isMiss = desc.includes('miss');
+  const strokeWidth = Math.max(1, size * 0.2);
+  const { attempt, total } = getFreeThrowAttempt(description, subType);
+  const ringRatio = isAnd1 ? 1.15 : getFreeThrowRingRatio(attempt, total);
+  let ringRadius = size * ringRatio;
+  if (!isAnd1 && total > 1 && attempt === 1) {
+    ringRadius = Math.max(0.5, ringRadius - strokeWidth / 2);
+  }
+  const ringColor = isMiss
+    ? 'var(--event-miss, #475569)'
+    : 'var(--event-point, #F59E0B)';
+  const dataAttrs = actionNumber !== null ? {
+    'data-action-number': actionNumber,
+    'data-event-type': 'free-throw',
+    style: { cursor: 'pointer' }
+  } : {};
+
+  return (
+    <circle
+      key={key}
+      cx={cx}
+      cy={cy}
+      r={ringRadius}
+      fill="transparent"
+      stroke={ringColor}
+      strokeWidth={strokeWidth}
+      pointerEvents="all"
+      {...dataAttrs}
+    />
+  );
+}
+
 /**
  * Render SVG shape for an event type
  * @param {string} eventType - The event type key
@@ -92,7 +161,7 @@ export function getEventType(description, actionType = null) {
  * @param {boolean} is3PT - Whether this is a 3-point shot (adds inner marker)
  * @param {number} actionNumber - Optional action number for hover detection
  */
-export function renderEventShape(eventType, cx, cy, size, key, is3PT = false, actionNumber = null) {
+export function renderEventShape(eventType, cx, cy, size, key, is3PT = false, actionNumber = null, markerScaleOverride = null) {
   const config = EVENT_TYPES[eventType];
   if (!config) return null;
   
@@ -109,6 +178,7 @@ export function renderEventShape(eventType, cx, cy, size, key, is3PT = false, ac
   
   // 3PT marker color also uses CSS variable
   const markerColor = 'var(--event-3pt-marker, #DC2626)';
+  const markerRadius = s * (markerScaleOverride ?? 0.6);
   
   // Helper to create a group with optional 3PT marker
   const wrapWith3PT = (mainShape) => {
@@ -116,7 +186,7 @@ export function renderEventShape(eventType, cx, cy, size, key, is3PT = false, ac
     return (
       <g key={key} {...dataAttrs}>
         {mainShape}
-        <circle cx={cx} cy={cy} r={s * 0.6} fill={markerColor} style={{ pointerEvents: 'none' }} />
+        <circle cx={cx} cy={cy} r={markerRadius} fill={markerColor} style={{ pointerEvents: 'none' }} />
       </g>
     );
   };
