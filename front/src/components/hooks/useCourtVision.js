@@ -79,6 +79,7 @@ export function useCourtVision() {
   const gameIdRef = useRef(gameId);
   const wsCloseRef = useRef(() => {});
   const wsFollowDateRef = useRef(false);
+  const fetchStateRef = useRef({ gameId: null, status: null });
   useEffect(() => { gameIdRef.current = gameId; }, [gameId]);
 
   // === 1. BOOT SEQUENCE: FETCH INIT STATE ===
@@ -269,16 +270,26 @@ export function useCourtVision() {
   // === GAME DATA FETCHING ===
   useEffect(() => {
     if (!gameId) {
+      fetchStateRef.current = { gameId: null, status: null };
       return;
     }
     if (shouldWaitForSchedule) {
       return;
     }
+    const isSameGame = fetchStateRef.current.gameId === gameId;
+    const lastStatus = fetchStateRef.current.status;
     if (selectedScheduleGame && isSelectedGameUpcoming) {
-      setGameNotStarted();
+      if (!isSameGame || lastStatus !== 'upcoming') {
+        setGameNotStarted();
+        fetchStateRef.current = { gameId, status: 'upcoming' };
+      }
       return;
     }
-    fetchBoth(gameId);
+    if (isSameGame && lastStatus === 'fetched') {
+      return;
+    }
+    fetchStateRef.current = { gameId, status: 'fetched' };
+    fetchBoth(gameId, { showLoading: !isSameGame });
   }, [
     gameId,
     fetchBoth,

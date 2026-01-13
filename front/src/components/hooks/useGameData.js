@@ -89,14 +89,17 @@ export function useGameData() {
   /**
    * Fetch both box score and play-by-play data for a game
    */
-  const fetchBoth = useCallback(async (gameId) => {
+  const fetchBoth = useCallback(async (gameId, options = {}) => {
     if (!gameId) return;
+    const { showLoading = true } = options;
     
     const boxUrl = `${PREFIX}/data/boxData/${gameId}.json.gz`;
     const playUrl = `${PREFIX}/data/processed-data/playByPlayData/${gameId}.json.gz`;
 
-    setIsBoxLoading(true);
-    setIsPlayLoading(true);
+    if (showLoading) {
+      setIsBoxLoading(true);
+      setIsPlayLoading(true);
+    }
     setGameStatusMessage(null);
 
     try {
@@ -114,8 +117,10 @@ export function useGameData() {
         setPlayByPlay([]);
         setLastAction(null);
         setNumQs(4);
-        setIsBoxLoading(false);
-        setIsPlayLoading(false);
+        if (showLoading) {
+          setIsBoxLoading(false);
+          setIsPlayLoading(false);
+        }
         return;
       }
 
@@ -124,7 +129,9 @@ export function useGameData() {
       setBox(boxData);
       setAwayTeamId(boxData.awayTeamId ?? boxData.awayTeam.teamId);
       setHomeTeamId(boxData.homeTeamId ?? boxData.homeTeam.teamId);
-      setIsBoxLoading(false);
+      if (showLoading) {
+        setIsBoxLoading(false);
+      }
 
       // --- Handle Play-by-Play ---
       if (playResRaw.status === 403) {
@@ -132,7 +139,9 @@ export function useGameData() {
         setPlayByPlay([]);
         setLastAction(null);
         setNumQs(4);
-        setIsPlayLoading(false);
+        if (showLoading) {
+          setIsPlayLoading(false);
+        }
         return;
       }
 
@@ -140,7 +149,9 @@ export function useGameData() {
         setPlayByPlay([]);
         setLastAction(null);
         setNumQs(4);
-        setIsPlayLoading(false);
+        if (showLoading) {
+          setIsPlayLoading(false);
+        }
         return;
       }
 
@@ -152,11 +163,15 @@ export function useGameData() {
         setLastAction(last);
         setPlayByPlay(playData);
       }
-      setIsPlayLoading(false);
+      if (showLoading) {
+        setIsPlayLoading(false);
+      }
     } catch (err) {
       console.error('Error in fetchBoth:', err);
-      setIsBoxLoading(false);
-      setIsPlayLoading(false);
+      if (showLoading) {
+        setIsBoxLoading(false);
+        setIsPlayLoading(false);
+      }
     }
   }, []);
 
