@@ -346,8 +346,8 @@ export default function PlayTooltip({
 
       {infoLocked && (
         <div style={{fontSize: '0.85em', color: 'var(--text-tertiary)', marginTop: 6, lineHeight: 1.4}}>
-          <div>Click anywhere to unlock</div>
-          <div style={{marginTop: 2}}>← → to navigate events</div>
+          <div>{isMobileLayout ? 'Tap anywhere to unlock' : 'Click anywhere to unlock'}</div>
+          {!isMobileLayout && <div style={{marginTop: 2}}>← → to navigate events</div>}
         </div>
       )}
     </div>
