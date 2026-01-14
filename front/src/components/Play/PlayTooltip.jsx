@@ -42,14 +42,82 @@ export default function PlayTooltip({
     return 3;
   };
 
-  const sortedActions = [...descriptionArray].sort((a, b) => {
-    // Sort by Team first (Away vs Home)
-    const teamA = a.teamTricode === awayTeamNames.abr ? 0 : 1;
-    const teamB = b.teamTricode === awayTeamNames.abr ? 0 : 1;
-    if (teamA !== teamB) return teamA - teamB;
-    
-    // Then by Event Importance
-    return getEventPriority(a.description) - getEventPriority(b.description);
+  const isSubstitutionAction = (action) => {
+    const type = (action?.actionType || '').toString().toLowerCase();
+    if (type === 'substitution') return true;
+    const desc = (action?.description || '').toString().toLowerCase();
+    return desc.startsWith('sub');
+  };
+
+  const parseSubstitutionNames = (description) => {
+    const raw = (description || '').toString().trim();
+    if (!raw) return null;
+
+    const cleanName = (text) => (text || '')
+      .replace(/^[\s,:-]+|[\s,;.-]+$/g, '')
+      .trim();
+
+    const inMatch = raw.match(/sub\s*in\s*[:\-–]?\s*(.*)/i);
+    const outMatch = raw.match(/sub\s*out\s*[:\-–]?\s*(.*)/i);
+    if (inMatch || outMatch) {
+      const inPlayer = cleanName(inMatch ? inMatch[1] : '');
+      const outPlayer = cleanName(outMatch ? outMatch[1] : '');
+      if (!inPlayer && !outPlayer) return null;
+      return { inPlayer, outPlayer };
+    }
+
+    const fullMatch = raw.match(/sub\s*[:\-–]?\s*(.*?)\s*for\s*(.*)/i);
+    if (fullMatch) {
+      const inPlayer = cleanName(fullMatch[1]);
+      const outPlayer = cleanName(fullMatch[2]);
+      if (!inPlayer && !outPlayer) return null;
+      return { inPlayer, outPlayer };
+    }
+
+    const cleaned = raw.replace(/^sub\s*[:\-–]?\s*/i, '');
+    const parts = cleaned.split(/\s+for\s+/i);
+    if (parts.length > 1) {
+      const inPlayer = cleanName(parts[0]);
+      const outPlayer = cleanName(parts.slice(1).join(' for '));
+      if (!inPlayer && !outPlayer) return null;
+      return { inPlayer, outPlayer };
+    }
+
+    const inPlayer = cleanName(cleaned);
+    if (!inPlayer) return null;
+    return { inPlayer, outPlayer: '' };
+  };
+
+  const uniqueList = (items) => {
+    const seen = new Set();
+    const result = [];
+    (items || []).forEach((item) => {
+      const text = (item || '').trim();
+      if (!text || seen.has(text)) return;
+      seen.add(text);
+      result.push(text);
+    });
+    return result;
+  };
+
+  const actionsByTeam = { away: [], home: [] };
+  const subsByTeam = {
+    away: { in: [], out: [], misc: [] },
+    home: { in: [], out: [], misc: [] }
+  };
+
+  descriptionArray.forEach((action) => {
+    const teamKey = action.teamTricode === awayTeamNames.abr ? 'away' : 'home';
+    if (isSubstitutionAction(action)) {
+      const parsed = parseSubstitutionNames(action.description);
+      if (parsed?.inPlayer) subsByTeam[teamKey].in.push(parsed.inPlayer);
+      if (parsed?.outPlayer) subsByTeam[teamKey].out.push(parsed.outPlayer);
+      if (!parsed) {
+        subsByTeam[teamKey].misc.push(action.description);
+      }
+    } else {
+      actionsByTeam[teamKey].push(action);
+    }
   });
 
   // POSITIONING LOGIC
@@ -146,17 +214,72 @@ export default function PlayTooltip({
     <div className="actions-container">
       {(() => {
         const freeThrowOneOfOnePattern = /free throw\s+1\s+of\s+1/i;
-        const pointActions = sortedActions.filter(action =>
+        const nonSubActions = descriptionArray.filter((action) => !isSubstitutionAction(action));
+        const pointActions = nonSubActions.filter(action =>
           !isFreeThrowAction(action.description, action.actionType)
           && getEventType(action.description, action.actionType) === 'point'
         );
         const hasPoint = pointActions.length > 0;
 
-        return sortedActions.map((a, index) => {
-        const eventType = getEventType(a.description, a.actionType);
-        const isFreeThrow = isFreeThrowAction(a.description, a.actionType);
-        const is3PT = a.description.includes('3PT');
-        const actionTeamColor = a.teamTricode === awayTeamNames.abr ? teamColors.away : teamColors.home;
+        const buildSubSummary = (subs) => {
+          const lines = [];
+          const inPlayers = uniqueList(subs.in);
+          const outPlayers = uniqueList(subs.out);
+
+          if (inPlayers.length) {
+            lines.push(`SUB in: ${inPlayers.join(', ')}`);
+          }
+          if (outPlayers.length) {
+            lines.push(`SUB out: ${outPlayers.join(', ')}`);
+          }
+          return lines;
+        };
+
+        const renderItems = [
+          ...(() => {
+            const teamActions = [...actionsByTeam.away].sort(
+              (a, b) => getEventPriority(a.description) - getEventPriority(b.description)
+            );
+            const items = teamActions.map((action) => ({
+              action,
+              teamColor: teamColors.away,
+              isSubSummary: false
+            }));
+            buildSubSummary(subsByTeam.away).forEach((description) => {
+              items.push({
+                action: { description },
+                teamColor: teamColors.away,
+                isSubSummary: true
+              });
+            });
+            return items;
+          })(),
+          ...(() => {
+            const teamActions = [...actionsByTeam.home].sort(
+              (a, b) => getEventPriority(a.description) - getEventPriority(b.description)
+            );
+            const items = teamActions.map((action) => ({
+              action,
+              teamColor: teamColors.home,
+              isSubSummary: false
+            }));
+            buildSubSummary(subsByTeam.home).forEach((description) => {
+              items.push({
+                action: { description },
+                teamColor: teamColors.home,
+                isSubSummary: true
+              });
+            });
+            return items;
+          })()
+        ];
+
+        return renderItems.map((item, index) => {
+        const a = item.action;
+        const eventType = item.isSubSummary ? null : getEventType(a.description, a.actionType);
+        const isFreeThrow = item.isSubSummary ? false : isFreeThrowAction(a.description, a.actionType);
+        const is3PT = !item.isSubSummary && a.description.includes('3PT');
+        const actionTeamColor = item.teamColor || (a.teamTricode === awayTeamNames.abr ? teamColors.away : teamColors.home);
         const iconSize = 10;
         const iconPadding = 2;
         const iconViewSize = iconSize + iconPadding * 2;
