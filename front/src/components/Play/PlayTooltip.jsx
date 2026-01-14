@@ -174,17 +174,18 @@ export default function PlayTooltip({
     }
   }
 
-  // Calculate coordinates relative to container (if locked/absolute) or viewport (if fixed)
-  const stylePos = infoLocked && containerRect
-    ? { 
-        position: 'absolute', 
-        left: finalLeft - containerRect.left, 
-        top: finalTop - containerRect.top 
+  // On mobile, keep the tooltip anchored to the play container so it scrolls away with it.
+  const anchorToContainer = containerRect && (infoLocked || isMobileLayout);
+  const stylePos = anchorToContainer
+    ? {
+        position: 'absolute',
+        left: finalLeft - containerRect.left,
+        top: finalTop - containerRect.top
       }
-    : { 
-        position: 'fixed', 
-        left: finalLeft, 
-        top: finalTop 
+    : {
+        position: 'fixed',
+        left: finalLeft,
+        top: finalTop
       };
 
   const tooltipStyle = {
