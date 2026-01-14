@@ -2,6 +2,8 @@ import { useRef, useLayoutEffect, useState } from 'react';
 import { getEventType, isFreeThrowAction, LegendShape, renderFreeThrowRing } from '../../helpers/eventStyles.jsx';
 import { formatClock, formatPeriod } from '../../helpers/utils';
 
+const MOBILE_TOOLTIP_BREAKPOINT = 700;
+
 export default function PlayTooltip({ 
   descriptionArray, 
   mousePosition, 
@@ -52,25 +54,56 @@ export default function PlayTooltip({
 
   // POSITIONING LOGIC
   const containerRect = containerRef.current?.getBoundingClientRect();
-  const shouldPositionLeft = mousePosition.x > window.innerWidth / 2;
-  const shouldPositionBelow = mousePosition.y < window.innerHeight / 2;
+  const chartRect = containerRef.current?.querySelector('.playGrid')?.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const isMobileLayout = (containerRect?.width || viewportWidth) <= MOBILE_TOOLTIP_BREAKPOINT;
+  const chartTop = chartRect?.top ?? containerRect?.top ?? 0;
+  const chartBottom = chartRect?.bottom ?? containerRect?.bottom ?? viewportHeight;
+  const chartCenterY = (chartTop + chartBottom) / 2;
+  const shouldPositionLeft = !isMobileLayout && mousePosition.x > viewportWidth / 2;
+  const shouldPositionBelow = isMobileLayout
+    ? mousePosition.y < chartCenterY
+    : mousePosition.y < viewportHeight / 2;
 
-  let preferredLeft = shouldPositionLeft ? (mousePosition.x - dimensions.width - 10) : (mousePosition.x + 10);
-  let preferredTop = shouldPositionBelow ? (mousePosition.y + 10) : (mousePosition.y - dimensions.height - 10);
+  let preferredLeft = shouldPositionLeft
+    ? (mousePosition.x - dimensions.width - 10)
+    : (mousePosition.x + 10);
+  let preferredTop = shouldPositionBelow
+    ? (mousePosition.y + 10)
+    : (mousePosition.y - dimensions.height - 10);
+
+  if (isMobileLayout) {
+    preferredLeft = (viewportWidth - dimensions.width) / 2;
+    preferredTop = shouldPositionBelow
+      ? (chartBottom - dimensions.height - 10)
+      : (chartTop + 10);
+  }
 
   let finalLeft = preferredLeft;
   let finalTop = preferredTop;
 
   // Clamp to container bounds
   if (containerRect) {
-    const hoverPadding = 5;
-    const minLeft = containerRect.left + leftMargin - hoverPadding;
-    const maxLeft = containerRect.right - dimensions.width; 
-    const minTop = containerRect.top;
-    const maxTop = containerRect.bottom - dimensions.height;
+    if (isMobileLayout) {
+      const hoverPadding = 8;
+      const minLeft = hoverPadding;
+      const maxLeft = viewportWidth - dimensions.width - hoverPadding;
+      const minTop = chartTop + hoverPadding;
+      const maxTop = chartBottom - dimensions.height - hoverPadding;
 
-    finalLeft = Math.max(minLeft, Math.min(preferredLeft, maxLeft));
-    finalTop = Math.max(minTop, Math.min(preferredTop, maxTop));
+      finalLeft = Math.max(minLeft, Math.min(preferredLeft, maxLeft));
+      finalTop = Math.max(minTop, Math.min(preferredTop, maxTop));
+    } else {
+      const hoverPadding = 5;
+      const minLeft = containerRect.left + leftMargin - hoverPadding;
+      const maxLeft = containerRect.right - dimensions.width; 
+      const minTop = containerRect.top;
+      const maxTop = containerRect.bottom - dimensions.height;
+
+      finalLeft = Math.max(minLeft, Math.min(preferredLeft, maxLeft));
+      finalTop = Math.max(minTop, Math.min(preferredTop, maxTop));
+    }
   }
 
   // Calculate coordinates relative to container (if locked/absolute) or viewport (if fixed)
