@@ -64,6 +64,35 @@
     transition: all 0.15s ease;
     white-space: nowrap;
   }
+
+  &.subLegend {
+    .subLegendRow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .subLegendItem {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .subLegendLabel {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      // text-transform: uppercase;
+      color: var(--stat-label-color);
+    }
+  }
+
+  &.off.subLegend {
+    .subLegendLabel {
+      text-decoration: line-through;
+      color: var(--stat-label-off);
+    }
+  }
   
   &.scoreDiff {
     .scoreDiffIcon {
