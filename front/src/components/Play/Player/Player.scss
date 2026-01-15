@@ -13,4 +13,18 @@
   .line {
     position: absolute;
   }
+
+  .playerTimeline {
+    stroke: var(--line-color-light);
+    stroke-width: 1.5;
+    transition: stroke 0.2s ease, stroke-width 0.2s ease;
+  }
+
+  &:hover .playerTimeline {
+    stroke: var(--playline-hover);
+  }
+
+  &:hover .playerName {
+    color: var(--playline-hover);
+  }
 }

@@ -116,7 +116,16 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
     let x1 = getXPosition(t.period, t.start);
     let x2 = getXPosition(t.period, t.end);
     x2 = isNaN(x2) ? x1 : x2; 
-    return <line key={i} x1={x1} y1={14} x2={x2} y2={14} style={{ stroke: 'var(--line-color-light)', strokeWidth: 1.5 }} />
+    return (
+      <line
+        key={i}
+        x1={x1}
+        y1={14}
+        x2={x2}
+        y2={14}
+        className="playerTimeline"
+      />
+    );
   });
 
 
