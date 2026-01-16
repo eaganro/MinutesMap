@@ -1,5 +1,29 @@
 # frontend.tf
 
+resource "aws_cloudfront_function" "spa_rewrite" {
+  name    = "courtvision-spa-rewrite"
+  runtime = "cloudfront-js-1.0"
+  comment = "Rewrite SPA routes to /index.html"
+  publish = true
+  code    = <<EOF
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+
+  if (uri.startsWith('/data/') || uri.startsWith('/schedule/')) {
+    return request;
+  }
+
+  if (uri.indexOf('.') !== -1) {
+    return request;
+  }
+
+  request.uri = '/index.html';
+  return request;
+}
+EOF
+}
+
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -68,6 +92,11 @@ resource "aws_cloudfront_distribution" "main" {
     # Modern Policy IDs
     cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"
     origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
 
     compress               = true
     viewer_protocol_policy = "allow-all" # Matches your current settings
