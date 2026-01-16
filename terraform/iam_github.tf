@@ -319,6 +319,21 @@ data "aws_iam_policy_document" "github_shard_compute" {
     ]
     resources = ["arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/E27FQC8AKVWFV6"]
   }
+
+  statement {
+    sid    = "CloudFrontFunctionManage"
+    effect = "Allow"
+    actions = [
+      "cloudfront:CreateFunction",
+      "cloudfront:UpdateFunction",
+      "cloudfront:DeleteFunction",
+      "cloudfront:DescribeFunction",
+      "cloudfront:GetFunction",
+      "cloudfront:ListFunctions",
+      "cloudfront:PublishFunction"
+    ]
+    resources = ["arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:function/*"]
+  }
   
   statement {
     sid    = "CloudFrontCreate"

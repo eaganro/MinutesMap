@@ -91,12 +91,12 @@ test.describe('CourtVision App', () => {
     await expect(datePicker).toHaveValue(yesterdayStr);
   });
 
-  test('should update URL with date parameter', async ({ page }) => {
+  test('should update URL with date path', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    
-    // URL should contain date parameter
-    const url = page.url();
-    expect(url).toContain('date=');
+    await page.waitForURL(/\/\d{4}-\d{2}-\d{2}/);
+
+    const { pathname } = new URL(page.url());
+    expect(pathname).toMatch(/^\/\d{4}-\d{2}-\d{2}(\/\d+)?$/);
   });
 
   test('should display stat buttons section', async ({ page }) => {
@@ -125,19 +125,20 @@ test.describe('Navigation', () => {
   test('should load with query parameters', async ({ page }) => {
     // Navigate with specific date
     await page.goto('/?date=2024-01-15');
-    
+
     const datePicker = page.locator('input[type="date"]');
     await expect(datePicker).toHaveValue('2024-01-15');
+    await expect(page).toHaveURL(/\/2024-01-15$/);
   });
 
   test('should preserve game selection in URL', async ({ page }) => {
     // Navigate with gameid parameter
     await page.goto('/?date=2024-01-15&gameid=0022300123');
-    
+
     const datePicker = page.locator('input[type="date"]');
     await expect(datePicker).toHaveValue('2024-01-15');
 
-    await expect(page).toHaveURL(/gameid=0022300123/);
+    await expect(page).toHaveURL(/\/2024-01-15\/0022300123$/);
   });
 });
 
