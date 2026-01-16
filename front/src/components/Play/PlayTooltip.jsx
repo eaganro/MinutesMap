@@ -419,9 +419,13 @@ export default function PlayTooltip({
       {!shouldPositionBelow ? (
         // Mouse in Bottom Half: Actions on top, Header on bottom
         <>
+          {mobileNavControls && (
+            <div style={{ marginBottom: 6 }}>
+              {mobileNavControls}
+            </div>
+          )}
           <ActionsComponent />
           {lockedVideoLink}
-          {mobileNavControls}
           {primaryAction && <HeaderComponent />}
         </>
       ) : (
