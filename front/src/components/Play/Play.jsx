@@ -4,6 +4,7 @@ import { useTheme } from '../hooks/useTheme'; // Adjust path
 import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 import { getGameTotalSeconds, getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
+import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
 
 // Sub-components
 import Player from './Player/Player';
@@ -20,6 +21,18 @@ const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
 const TOUCH_AXIS_LOCK_PX = 8;
 const QUARTER_VIEW_BREAKPOINT = 700;
+
+const findActionNumberFromTarget = (targetEl, containerEl) => {
+  let checkEl = targetEl;
+  while (checkEl && checkEl !== containerEl) {
+    if (checkEl.dataset && checkEl.dataset.actionNumber) {
+      return checkEl.dataset.actionNumber;
+    }
+    if (checkEl.tagName === 'svg') break;
+    checkEl = checkEl.parentElement;
+  }
+  return null;
+};
 
 const hasPlayData = (data) => Boolean(
   data &&
@@ -71,6 +84,7 @@ export default function Play({
   const touchClickGuardUntilRef = useRef(0);
   const userSelectedPeriodRef = useRef(false);
   const [showLoadingText, setShowLoadingText] = useState(false);
+  const [isHoveringIcon, setIsHoveringIcon] = useState(false);
   const { isDarkMode } = useTheme();
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
@@ -386,12 +400,30 @@ export default function Play({
 
   // --- Event Handlers ---
   const handleMouseMove = (e) => {
+    const actionNumber = findActionNumberFromTarget(e.target, playRef.current);
+    setIsHoveringIcon(Boolean(actionNumber));
     updateHoverAt(e.clientX, e.clientY, e.target);
   };
 
   const handleClick = (e) => {
     if (Date.now() < touchClickGuardUntilRef.current) {
       return;
+    }
+    const actionNumber = findActionNumberFromTarget(e.target, playRef.current);
+    if (actionNumber) {
+    const action = (displayAllActions || []).find(
+      (entry) => String(entry.actionNumber) === String(actionNumber)
+    );
+      const targetAction = resolveVideoAction(action, displayAllActions);
+      const url = buildNbaEventUrl({
+        gameId,
+        actionNumber: targetAction?.actionNumber ?? actionNumber,
+        description: targetAction?.description ?? action?.description,
+      });
+      if (url && typeof window !== 'undefined') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
     }
     if (!infoLocked) {
       setInfoLocked(true);
@@ -520,7 +552,10 @@ export default function Play({
         className={`play ${isDataLoading ? 'isLoading' : ''}`}
         style={{ width: sectionWidth }} // Use full section width including margins
         onMouseMove={isDataLoading ? undefined : handleMouseMove}
-        onMouseLeave={isDataLoading ? undefined : resetInteraction}
+        onMouseLeave={isDataLoading ? undefined : () => {
+          setIsHoveringIcon(false);
+          resetInteraction();
+        }}
         onClick={isDataLoading ? undefined : handleClick}
         // Touch support
         onTouchStart={handleTouchStart}
@@ -534,6 +569,9 @@ export default function Play({
             descriptionArray={descriptionArray}
             mousePosition={mousePosition}
             infoLocked={infoLocked}
+            isHoveringIcon={isHoveringIcon}
+            gameId={gameId}
+            allActions={filteredAllActions}
             containerRef={playRef}
             awayTeamNames={displayAwayTeamNames}
             homeTeamNames={displayHomeTeamNames}

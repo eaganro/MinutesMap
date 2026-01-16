@@ -1,6 +1,7 @@
 import { useRef, useLayoutEffect, useState } from 'react';
 import { getEventType, isFreeThrowAction, LegendShape, renderFreeThrowRing } from '../../helpers/eventStyles.jsx';
 import { formatClock, formatPeriod } from '../../helpers/utils';
+import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
 
 const MOBILE_TOOLTIP_BREAKPOINT = 700;
 
@@ -8,6 +9,9 @@ export default function PlayTooltip({
   descriptionArray, 
   mousePosition, 
   infoLocked, 
+  isHoveringIcon,
+  gameId,
+  allActions,
   containerRef, 
   awayTeamNames, 
   homeTeamNames, 
@@ -191,9 +195,57 @@ export default function PlayTooltip({
   const tooltipStyle = {
     ...stylePos,
     zIndex: 1000,
-    width: dimensions.width
+    width: dimensions.width,
+    pointerEvents: infoLocked && !isMobileLayout ? 'auto' : 'none'
   };
 
+  const hasPlayableAction = descriptionArray.some((action) => !isSubstitutionAction(action));
+  const showVideoHint = !isMobileLayout && Boolean(isHoveringIcon) && hasPlayableAction;
+  const videoHintText = 'Click to open video on nba.com';
+  const baseVideoAction = descriptionArray.find((action) => !isSubstitutionAction(action)) || null;
+  const resolvedVideoAction = resolveVideoAction(baseVideoAction, allActions);
+  const videoUrl = buildNbaEventUrl({
+    gameId,
+    actionNumber: resolvedVideoAction?.actionNumber ?? baseVideoAction?.actionNumber,
+    description: resolvedVideoAction?.description ?? baseVideoAction?.description,
+  });
+  const showLockedVideoLink = infoLocked && !isMobileLayout && Boolean(videoUrl);
+  const lockedVideoLink = showLockedVideoLink ? (
+    <div style={{ fontSize: '0.85em', color: 'var(--text-tertiary)', marginTop: 6 }}>
+      <a
+        href={videoUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          color: 'var(--score-diff-icon-color, #2563EB)',
+          textDecoration: 'underline',
+          textUnderlineOffset: 2,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6
+        }}
+      >
+        <span>Open video on nba.com</span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M14 3h7v7" />
+          <path d="M10 14L21 3" />
+          <path d="M21 14v7a2 2 0 0 1-2 2h-7" />
+          <path d="M3 10v11a2 2 0 0 0 2 2h11" />
+        </svg>
+      </a>
+    </div>
+  ) : null;
 
   // RENDER HELPERS
   const primaryAction = descriptionArray[0];
@@ -334,6 +386,7 @@ export default function PlayTooltip({
         // Mouse in Bottom Half: Actions on top, Header on bottom
         <>
           <ActionsComponent />
+          {lockedVideoLink}
           {primaryAction && <HeaderComponent />}
         </>
       ) : (
@@ -341,7 +394,14 @@ export default function PlayTooltip({
         <>
           {primaryAction && <HeaderComponent />}
           <ActionsComponent />
+          {lockedVideoLink}
         </>
+      )}
+
+      {showVideoHint && (
+        <div style={{ fontSize: '0.85em', color: 'var(--text-tertiary)', marginTop: 6 }}>
+          {videoHintText}
+        </div>
       )}
 
       {infoLocked && (
