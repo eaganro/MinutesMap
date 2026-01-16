@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getNbaTodayString, parseGameStatus, sortGamesForSelection } from '../../helpers/gameSelectionUtils';
+import {
+  getNbaTodayString,
+  parseGameStatus,
+  scheduleMatchesDate,
+  sortGamesForSelection,
+} from '../../helpers/gameSelectionUtils';
 import { PREFIX } from '../../environment';
 
 import { useQueryParams } from './useQueryParams';
@@ -334,6 +339,20 @@ export function useCourtVision() {
 
   // === COMPUTED VALUES ===
   const sortedGames = useMemo(() => sortGamesForSelection(schedule || []), [schedule]);
+
+  useEffect(() => {
+    if (!date || gameId || isScheduleLoading) {
+      return;
+    }
+    if (!sortedGames.length || !scheduleMatchesDate(sortedGames, date)) {
+      return;
+    }
+    const defaultGame = sortedGames[0];
+    if (!defaultGame?.id) {
+      return;
+    }
+    setGameId(String(defaultGame.id));
+  }, [date, gameId, isScheduleLoading, sortedGames]);
   const currentScheduleGameStatus = stableGameMeta?.status || null;
 
   const awayTeamName = useMemo(() => ({

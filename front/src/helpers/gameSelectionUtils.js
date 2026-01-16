@@ -187,6 +187,20 @@ export function sortGamesForSelection(games = []) {
   return [...games].sort(compareGamesForSelection);
 }
 
+export function scheduleMatchesDate(games, dateValue) {
+  if (!games || games.length === 0 || !dateValue) {
+    return false;
+  }
+  return games.some((game) => {
+    const start = typeof game?.starttime === 'string' ? game.starttime.trim() : '';
+    if (!start) {
+      return false;
+    }
+    const match = start.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] === dateValue : false;
+  });
+}
+
 /**
  * Find the first game that has started or completed
  */
