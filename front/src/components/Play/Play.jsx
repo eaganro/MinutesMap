@@ -85,8 +85,29 @@ export default function Play({
   const userSelectedPeriodRef = useRef(false);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const [isHoveringIcon, setIsHoveringIcon] = useState(false);
+  const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
+      : true
+  ));
   const { isDarkMode } = useTheme();
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return undefined;
+    }
+    const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const handleChange = (event) => setCanOpenVideoOnClick(event.matches);
+
+    setCanOpenVideoOnClick(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
 
   useEffect(() => {
     if (isLoading || isBlurred) {
@@ -413,10 +434,10 @@ export default function Play({
       return;
     }
     const actionNumber = findActionNumberFromTarget(e.target, playRef.current);
-    if (actionNumber) {
-    const action = (displayAllActions || []).find(
-      (entry) => String(entry.actionNumber) === String(actionNumber)
-    );
+    if (actionNumber && canOpenVideoOnClick) {
+      const action = (displayAllActions || []).find(
+        (entry) => String(entry.actionNumber) === String(actionNumber)
+      );
       const targetAction = resolveVideoAction(action, displayAllActions);
       const url = buildNbaEventUrl({
         gameId,
