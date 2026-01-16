@@ -20,11 +20,13 @@
     transition: stroke 0.2s ease, stroke-width 0.2s ease;
   }
 
-  &:hover .playerTimeline {
-    stroke: var(--playline-hover);
-  }
+  @media (hover: hover) and (pointer: fine) {
+    &:hover .playerTimeline {
+      stroke: var(--playline-hover);
+    }
 
-  &:hover .playerName {
-    color: var(--playline-hover);
+    &:hover .playerName {
+      color: var(--playline-hover);
+    }
   }
 }
