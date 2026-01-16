@@ -114,8 +114,8 @@ export const usePlayInteraction = ({
   }, [infoLocked, playRef]);
 
   // LOGIC: Main Hover Handler
-  const updateHoverAt = useCallback((clientX, clientY, targetEl) => {
-    if (infoLocked || !playRef.current) return;
+  const updateHoverAt = useCallback((clientX, clientY, targetEl, force = false) => {
+    if ((infoLocked && !force) || !playRef.current) return;
 
     // Calculate position relative to the play container
     const rect = playRef.current.getBoundingClientRect();
@@ -218,8 +218,8 @@ export const usePlayInteraction = ({
   ]);
 
   // Exposed Reset Function
-  const resetInteraction = useCallback(() => {
-    if (!infoLocked) {
+  const resetInteraction = useCallback((force = false) => {
+    if (!infoLocked || force) {
       setMouseLinePos(null);
       setDescriptionArray([]);
       setHighlightActionIds([]);

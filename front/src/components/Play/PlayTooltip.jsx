@@ -32,7 +32,7 @@ export default function PlayTooltip({
         height: tooltipRef.current.offsetHeight
       });
     }
-  }, [descriptionArray]);
+  }, [descriptionArray, infoLocked]);
 
   if (!descriptionArray || descriptionArray.length === 0) return null;
 

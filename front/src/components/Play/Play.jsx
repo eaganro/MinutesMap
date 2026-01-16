@@ -454,7 +454,11 @@ export default function Play({
       setMousePosition({ x: e.clientX, y: e.clientY });
     } else {
       setInfoLocked(false);
-      resetInteraction();
+      if (!canOpenVideoOnClick) {
+        resetInteraction(true);
+      } else {
+        resetInteraction();
+      }
     }
   };
 
@@ -489,17 +493,26 @@ export default function Play({
       return;
     }
 
+    const wasLocked = infoLocked;
+    if (wasLocked) {
+      setInfoLocked(false);
+    }
     touchMovedRef.current = true;
     e.preventDefault();
-    updateHoverAt(touch.clientX, touch.clientY, e.target);
+    updateHoverAt(touch.clientX, touch.clientY, e.target, wasLocked);
   };
 
   const handleTouchEnd = () => {
     if (isDataLoading) return;
     if (touchMovedRef.current) {
-      touchClickGuardUntilRef.current = Date.now() + 700;
+      const shouldLock = touchAxisRef.current === 'horizontal' && descriptionArray.length > 0;
+      touchClickGuardUntilRef.current = Date.now() + 200;
       if (!infoLocked) {
-        resetInteraction();
+        if (shouldLock) {
+          setInfoLocked(true);
+        } else {
+          resetInteraction();
+        }
       }
     }
     touchAxisRef.current = null;
@@ -508,7 +521,7 @@ export default function Play({
 
   const handleTouchCancel = () => {
     if (isDataLoading) return;
-    touchClickGuardUntilRef.current = Date.now() + 700;
+    touchClickGuardUntilRef.current = Date.now() + 200;
     if (!infoLocked) {
       resetInteraction();
     }
