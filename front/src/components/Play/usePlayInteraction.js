@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSecondsElapsed } from '../../helpers/playTimeline';
 import { getEventType } from '../../helpers/eventStyles.jsx';
 
@@ -15,6 +15,14 @@ export const usePlayInteraction = ({
   const [infoLocked, setInfoLocked] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
+  const getCurrentActionIndex = useCallback(() => {
+    if (!allActions || allActions.length === 0) return -1;
+    const fallbackActionNumber = descriptionArray[0]?.actionNumber;
+    const currentId = highlightActionIds[0] ?? fallbackActionNumber;
+    if (currentId === null || currentId === undefined) return -1;
+    return allActions.findIndex((a) => String(a.actionNumber) === String(currentId));
+  }, [allActions, highlightActionIds, descriptionArray]);
+
   // HELPER: Calculate X Position on Timeline
   const calculateXPosition = useCallback((clock, period) => {
     if (!timelineWindow || timelineWindow.durationSeconds <= 0) {
@@ -27,6 +35,45 @@ export const usePlayInteraction = ({
     return rawPos + leftMargin;
   }, [timelineWindow, timelineWidth, leftMargin]);
 
+  const applyActionSelection = useCallback((action) => {
+    if (!action) return false;
+    const sameTimeActions = allActions.filter((a) =>
+      a.clock === action.clock && a.period === action.period
+    );
+    const newActionIds = sameTimeActions.map((a) => a.actionNumber);
+    const newX = calculateXPosition(action.clock, action.period);
+    setHighlightActionIds(newActionIds);
+    setDescriptionArray(sameTimeActions);
+    setMouseLinePos(newX);
+    return true;
+  }, [allActions, calculateXPosition]);
+
+  const getAdjacentAction = useCallback((direction) => {
+    if (!allActions || allActions.length === 0) return null;
+    const currentIndex = getCurrentActionIndex();
+    if (currentIndex < 0) return null;
+    const currentAction = allActions[currentIndex];
+    let newIndex = currentIndex + direction;
+    while (
+      newIndex >= 0 &&
+      newIndex < allActions.length &&
+      allActions[newIndex].clock === currentAction.clock &&
+      allActions[newIndex].period === currentAction.period
+    ) {
+      newIndex += direction;
+    }
+    if (newIndex < 0 || newIndex >= allActions.length) return null;
+    return allActions[newIndex];
+  }, [allActions, getCurrentActionIndex]);
+
+  const navigateAction = useCallback((direction) => {
+    const nextAction = getAdjacentAction(direction);
+    return applyActionSelection(nextAction);
+  }, [getAdjacentAction, applyActionSelection]);
+
+  const hasPrevAction = useMemo(() => Boolean(getAdjacentAction(-1)), [getAdjacentAction]);
+  const hasNextAction = useMemo(() => Boolean(getAdjacentAction(1)), [getAdjacentAction]);
+
   // LOGIC: Keyboard Navigation (Left/Right Arrows)
   useEffect(() => {
     if (!infoLocked || !allActions || allActions.length === 0) return;
@@ -34,49 +81,13 @@ export const usePlayInteraction = ({
     const handleKeyDown = (ev) => {
       if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
       ev.preventDefault();
-
-      // Find current action index based on the first highlighted ID
-      const currentActionId = highlightActionIds[0];
-      const currentIndex = allActions.findIndex(a => a.actionNumber === currentActionId);
-      if (currentIndex === -1) return;
-
-      const currentAction = allActions[currentIndex];
-      const { clock: currentClock, period: currentPeriod } = currentAction;
-
-      // Find next/prev action at a DIFFERENT time
-      let newIndex = ev.key === 'ArrowLeft' ? currentIndex - 1 : currentIndex + 1;
       const direction = ev.key === 'ArrowLeft' ? -1 : 1;
-
-      // Scan until we find a different timestamp or hit the ends
-      while (
-        newIndex >= 0 && 
-        newIndex < allActions.length && 
-        allActions[newIndex].clock === currentClock && 
-        allActions[newIndex].period === currentPeriod
-      ) {
-        newIndex += direction;
-      }
-
-      // Boundary check
-      if (newIndex < 0 || newIndex >= allActions.length) return;
-
-      const newAction = allActions[newIndex];
-      
-      // Group all actions at this new time
-      const sameTimeActions = allActions.filter(
-        a => a.clock === newAction.clock && a.period === newAction.period
-      );
-      const newActionIds = sameTimeActions.map(a => a.actionNumber);
-      const newX = calculateXPosition(newAction.clock, newAction.period);
-
-      setHighlightActionIds(newActionIds);
-      setDescriptionArray(sameTimeActions);
-      setMouseLinePos(newX);
+      navigateAction(direction);
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [infoLocked, highlightActionIds, allActions, calculateXPosition]);
+  }, [infoLocked, allActions, navigateAction]);
 
   // LOGIC: Click Outside to Close
   useEffect(() => {
@@ -220,6 +231,9 @@ export const usePlayInteraction = ({
     mouseLinePos,
     highlightActionIds,
     infoLocked,
+    hasPrevAction,
+    hasNextAction,
+    navigateAction,
     setInfoLocked,
     mousePosition,
     setMousePosition,

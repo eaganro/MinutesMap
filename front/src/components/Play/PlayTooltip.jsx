@@ -12,6 +12,9 @@ export default function PlayTooltip({
   isHoveringIcon,
   gameId,
   allActions,
+  hasPrevAction,
+  hasNextAction,
+  onNavigate,
   containerRef, 
   awayTeamNames, 
   homeTeamNames, 
@@ -196,7 +199,7 @@ export default function PlayTooltip({
     ...stylePos,
     zIndex: 1000,
     width: dimensions.width,
-    pointerEvents: infoLocked && !isMobileLayout ? 'auto' : 'none'
+    pointerEvents: infoLocked ? 'auto' : 'none'
   };
 
   const hasPlayableAction = descriptionArray.some((action) => !isSubstitutionAction(action));
@@ -209,7 +212,7 @@ export default function PlayTooltip({
     actionNumber: resolvedVideoAction?.actionNumber ?? baseVideoAction?.actionNumber,
     description: resolvedVideoAction?.description ?? baseVideoAction?.description,
   });
-  const showLockedVideoLink = infoLocked && !isMobileLayout && Boolean(videoUrl);
+  const showLockedVideoLink = infoLocked && Boolean(videoUrl);
   const lockedVideoLink = showLockedVideoLink ? (
     <div style={{ fontSize: '0.85em', color: 'var(--text-tertiary)', marginTop: 6 }}>
       <a
@@ -217,6 +220,7 @@ export default function PlayTooltip({
         target="_blank"
         rel="noopener noreferrer"
         onClick={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
         style={{
           color: 'var(--score-diff-icon-color, #2563EB)',
           textDecoration: 'underline',
@@ -244,6 +248,36 @@ export default function PlayTooltip({
           <path d="M3 10v11a2 2 0 0 0 2 2h11" />
         </svg>
       </a>
+    </div>
+  ) : null;
+
+  const showMobileNav = infoLocked && isMobileLayout && typeof onNavigate === 'function';
+  const mobileNavControls = showMobileNav ? (
+    <div className="tooltipNav">
+      <button
+        type="button"
+        className="tooltipNavButton"
+        onClick={(event) => {
+          event.stopPropagation();
+          onNavigate(-1);
+        }}
+        onTouchStart={(event) => event.stopPropagation()}
+        disabled={!hasPrevAction}
+      >
+        ← Prev
+      </button>
+      <button
+        type="button"
+        className="tooltipNavButton"
+        onClick={(event) => {
+          event.stopPropagation();
+          onNavigate(1);
+        }}
+        onTouchStart={(event) => event.stopPropagation()}
+        disabled={!hasNextAction}
+      >
+        Next →
+      </button>
     </div>
   ) : null;
 
@@ -387,6 +421,7 @@ export default function PlayTooltip({
         <>
           <ActionsComponent />
           {lockedVideoLink}
+          {mobileNavControls}
           {primaryAction && <HeaderComponent />}
         </>
       ) : (
@@ -395,6 +430,7 @@ export default function PlayTooltip({
           {primaryAction && <HeaderComponent />}
           <ActionsComponent />
           {lockedVideoLink}
+          {mobileNavControls}
         </>
       )}
 

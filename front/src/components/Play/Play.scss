@@ -166,6 +166,29 @@
         }
       }
     }
+
+    .tooltipNav {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .tooltipNavButton {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-light);
+      background: var(--bg-game);
+      color: var(--text-primary);
+      font-size: 0.9em;
+      font-weight: 600;
+      cursor: pointer;
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+    }
   }
   
   .teamName {

@@ -352,6 +352,9 @@ export default function Play({
     mouseLinePos,
     highlightActionIds,
     infoLocked,
+    hasPrevAction,
+    hasNextAction,
+    navigateAction,
     setInfoLocked,
     mousePosition,
     setMousePosition,
@@ -572,6 +575,9 @@ export default function Play({
             isHoveringIcon={isHoveringIcon}
             gameId={gameId}
             allActions={filteredAllActions}
+            hasPrevAction={hasPrevAction}
+            hasNextAction={hasNextAction}
+            onNavigate={navigateAction}
             containerRef={playRef}
             awayTeamNames={displayAwayTeamNames}
             homeTeamNames={displayHomeTeamNames}
