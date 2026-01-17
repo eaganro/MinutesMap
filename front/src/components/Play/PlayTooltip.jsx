@@ -5,6 +5,25 @@ import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
 
 const MOBILE_TOOLTIP_BREAKPOINT = 700;
 
+const ExternalLinkIcon = () => (
+  <svg
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M14 3h7v7" />
+    <path d="M10 14L21 3" />
+    <path d="M21 14v7a2 2 0 0 1-2 2h-7" />
+    <path d="M3 10v11a2 2 0 0 0 2 2h11" />
+  </svg>
+);
+
 export default function PlayTooltip({ 
   descriptionArray, 
   mousePosition, 
@@ -231,22 +250,7 @@ export default function PlayTooltip({
         }}
       >
         <span>Open video on nba.com</span>
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M14 3h7v7" />
-          <path d="M10 14L21 3" />
-          <path d="M21 14v7a2 2 0 0 1-2 2h-7" />
-          <path d="M3 10v11a2 2 0 0 0 2 2h11" />
-        </svg>
+        <ExternalLinkIcon />
       </a>
     </div>
   ) : null;
@@ -440,7 +444,12 @@ export default function PlayTooltip({
 
       {showVideoHint && (
         <div style={{ fontSize: '0.85em', color: 'var(--text-tertiary)', marginTop: 6 }}>
-          {videoHintText}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span>{videoHintText}</span>
+            <span style={{ color: 'var(--score-diff-icon-color, #2563EB)' }}>
+              <ExternalLinkIcon />
+            </span>
+          </span>
         </div>
       )}
 
