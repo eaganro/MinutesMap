@@ -66,24 +66,8 @@ resource "aws_cloudfront_cache_policy" "posthog_no_cache" {
       query_string_behavior = "none"
     }
 
-    enable_accept_encoding_brotli = true
-    enable_accept_encoding_gzip   = true
-  }
-}
-
-resource "aws_cloudfront_origin_request_policy" "posthog_all" {
-  name = "courtvision-posthog-all"
-
-  cookies_config {
-    cookie_behavior = "all"
-  }
-
-  headers_config {
-    header_behavior = "allViewer"
-  }
-
-  query_strings_config {
-    query_string_behavior = "all"
+    enable_accept_encoding_brotli = false
+    enable_accept_encoding_gzip   = false
   }
 }
 
@@ -135,7 +119,7 @@ resource "aws_cloudfront_distribution" "main" {
     target_origin_id = "PostHogOrigin"
 
     cache_policy_id          = aws_cloudfront_cache_policy.posthog_no_cache.id
-    origin_request_policy_id = aws_cloudfront_origin_request_policy.posthog_all.id
+    origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
 
     function_association {
       event_type   = "viewer-request"
