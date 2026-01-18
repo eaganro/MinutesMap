@@ -26,6 +26,7 @@ const ExternalLinkIcon = () => (
 
 export default function PlayTooltip({ 
   descriptionArray, 
+  focusActionMeta,
   mousePosition, 
   infoLocked, 
   isHoveringIcon,
@@ -51,7 +52,7 @@ export default function PlayTooltip({
         height: tooltipRef.current.offsetHeight
       });
     }
-  }, [descriptionArray, infoLocked]);
+  }, [descriptionArray, focusActionMeta, infoLocked]);
 
   if (!descriptionArray || descriptionArray.length === 0) return null;
 
@@ -74,6 +75,27 @@ export default function PlayTooltip({
     const desc = (action?.description || '').toString().toLowerCase();
     return desc.startsWith('sub');
   };
+
+  const getActionOrderValue = (action) => {
+    if (!action) return -Infinity;
+    const actionNumber = action.actionNumber;
+    if (actionNumber !== undefined && actionNumber !== null) {
+      const parsed = parseInt(actionNumber, 10);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    const actionId = action.actionId;
+    if (actionId !== undefined && actionId !== null) {
+      const parsed = parseInt(actionId, 10);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    return -Infinity;
+  };
+
+  const pickLatestAction = (actions) => (
+    (actions || []).reduce((best, current) => (
+      getActionOrderValue(current) > getActionOrderValue(best) ? current : best
+    ), actions[0])
+  );
 
   const parseSubstitutionNames = (description) => {
     const raw = (description || '').toString().trim();
@@ -286,7 +308,26 @@ export default function PlayTooltip({
   ) : null;
 
   // RENDER HELPERS
-  const primaryAction = descriptionArray[0];
+  const primaryAction = (() => {
+    if (!descriptionArray || descriptionArray.length === 0) return null;
+    if (focusActionMeta && (focusActionMeta.actionNumber != null || focusActionMeta.actionId != null)) {
+      const focusMatch = descriptionArray.find((action) => (
+        (focusActionMeta.actionNumber != null && String(action.actionNumber) === String(focusActionMeta.actionNumber)) ||
+        (focusActionMeta.actionId != null && String(action.actionId) === String(focusActionMeta.actionId))
+      ));
+      if (focusMatch) return focusMatch;
+    }
+
+    const scored = descriptionArray.filter((action) => {
+      const away = action?.scoreAway;
+      const home = action?.scoreHome;
+      return (away !== undefined && away !== null && String(away).trim() !== '') ||
+        (home !== undefined && home !== null && String(home).trim() !== '');
+    });
+
+    if (scored.length) return pickLatestAction(scored);
+    return descriptionArray[0];
+  })();
   
   const HeaderComponent = () => (
     <div className={`time-score-header ${shouldPositionBelow ? 'bottom' : 'top'}`}>

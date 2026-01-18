@@ -376,6 +376,7 @@ export default function Play({
     descriptionArray,
     mouseLinePos,
     highlightActionIds,
+    focusActionMeta,
     infoLocked,
     hasPrevAction,
     hasNextAction,
@@ -618,6 +619,7 @@ export default function Play({
         {!isDataLoading && (
           <PlayTooltip 
             descriptionArray={descriptionArray}
+            focusActionMeta={focusActionMeta}
             mousePosition={mousePosition}
             infoLocked={infoLocked}
             isHoveringIcon={isHoveringIcon}

@@ -14,6 +14,7 @@ export const usePlayInteraction = ({
   const [highlightActionIds, setHighlightActionIds] = useState([]);
   const [infoLocked, setInfoLocked] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [focusActionMeta, setFocusActionMeta] = useState(null);
 
   const getCurrentActionIndex = useCallback(() => {
     if (!allActions || allActions.length === 0) return -1;
@@ -45,6 +46,10 @@ export const usePlayInteraction = ({
     setHighlightActionIds(newActionIds);
     setDescriptionArray(sameTimeActions);
     setMouseLinePos(newX);
+    setFocusActionMeta({
+      actionNumber: action.actionNumber ?? null,
+      actionId: action.actionId ?? null,
+    });
     return true;
   }, [allActions, calculateXPosition]);
 
@@ -131,6 +136,7 @@ export const usePlayInteraction = ({
       setMouseLinePos(null);
       setDescriptionArray([]);
       setHighlightActionIds([]);
+      setFocusActionMeta(null);
       return;
     }
 
@@ -186,6 +192,10 @@ export const usePlayInteraction = ({
         setHighlightActionIds(hoverIds);
         setDescriptionArray(hoverActions);
         setMouseLinePos(actionX);
+        setFocusActionMeta({
+          actionNumber: hoveredAction.actionNumber ?? null,
+          actionId: hoveredAction.actionId ?? null,
+        });
         return; // Exit early if we found a direct target
       }
     }
@@ -219,6 +229,12 @@ export const usePlayInteraction = ({
         setHighlightActionIds(sameTimeIds);
         setDescriptionArray(sameTimeActions);
         setMouseLinePos(pos + leftMargin);
+        setFocusActionMeta({
+          actionNumber: matchedAction.actionNumber ?? null,
+          actionId: matchedAction.actionId ?? null,
+        });
+    } else {
+      setFocusActionMeta(null);
     }
   }, [
     infoLocked, 
@@ -235,6 +251,7 @@ export const usePlayInteraction = ({
       setMouseLinePos(null);
       setDescriptionArray([]);
       setHighlightActionIds([]);
+      setFocusActionMeta(null);
     }
   }, [infoLocked]);
 
@@ -242,6 +259,7 @@ export const usePlayInteraction = ({
     descriptionArray,
     mouseLinePos,
     highlightActionIds,
+    focusActionMeta,
     infoLocked,
     hasPrevAction,
     hasNextAction,
