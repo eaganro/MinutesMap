@@ -138,20 +138,32 @@ export const usePlayInteraction = ({
     let pos = Math.max(0, Math.min(rawPos, width));
 
     // Check for direct hover on a specific shape/icon
+    let hoveredActionNumber = null;
     let hoveredActionId = null;
     let checkEl = targetEl;
     
     // Traverse up to find data-action-number (handles SVG nesting)
-    while (checkEl && hoveredActionId === null && checkEl !== playRef.current) {
-      if (checkEl.dataset && checkEl.dataset.actionNumber) {
-        hoveredActionId = checkEl.dataset.actionNumber;
+    while (checkEl && (hoveredActionNumber === null && hoveredActionId === null) && checkEl !== playRef.current) {
+      if (checkEl.dataset) {
+        if (checkEl.dataset.actionNumber) {
+          hoveredActionNumber = checkEl.dataset.actionNumber;
+        }
+        if (checkEl.dataset.actionId) {
+          hoveredActionId = checkEl.dataset.actionId;
+        }
       }
       if (checkEl.tagName === 'svg') break; // Optimization boundary
       checkEl = checkEl.parentElement;
     }
 
-    if (hoveredActionId !== null) {
-      const hoveredAction = allActions.find(a => String(a.actionNumber) === String(hoveredActionId));
+    if (hoveredActionNumber !== null || hoveredActionId !== null) {
+      let hoveredAction = null;
+      if (hoveredActionId !== null) {
+        hoveredAction = allActions.find(a => String(a.actionId) === String(hoveredActionId));
+      }
+      if (!hoveredAction && hoveredActionNumber !== null) {
+        hoveredAction = allActions.find(a => String(a.actionNumber) === String(hoveredActionNumber));
+      }
       
       if (hoveredAction) {
         const eventType = getEventType(hoveredAction.description, hoveredAction.actionType);

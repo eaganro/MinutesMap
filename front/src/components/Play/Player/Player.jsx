@@ -64,7 +64,8 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
           description: a.description,
           subType: a.subType,
           isAnd1,
-          actionNumber: a.actionNumber
+          actionNumber: a.actionNumber,
+          actionId: a.actionId
         });
         if (ring) {
           freeThrowShapes.push(ring);
@@ -85,6 +86,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
         `action-${a.actionNumber}`,
         is3PT,
         a.actionNumber,
+        a.actionId,
         markerScaleOverride
       );
       if (shape) {

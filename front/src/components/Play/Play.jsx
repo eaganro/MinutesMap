@@ -22,11 +22,15 @@ const MIN_BLUR_MS = 300;
 const TOUCH_AXIS_LOCK_PX = 8;
 const QUARTER_VIEW_BREAKPOINT = 700;
 
-const findActionNumberFromTarget = (targetEl, containerEl) => {
+const findActionMetaFromTarget = (targetEl, containerEl) => {
   let checkEl = targetEl;
   while (checkEl && checkEl !== containerEl) {
-    if (checkEl.dataset && checkEl.dataset.actionNumber) {
-      return checkEl.dataset.actionNumber;
+    if (checkEl.dataset) {
+      const actionNumber = checkEl.dataset.actionNumber ?? null;
+      const actionId = checkEl.dataset.actionId ?? null;
+      if (actionNumber || actionId) {
+        return { actionNumber, actionId };
+      }
     }
     if (checkEl.tagName === 'svg') break;
     checkEl = checkEl.parentElement;
@@ -424,8 +428,8 @@ export default function Play({
 
   // --- Event Handlers ---
   const handleMouseMove = (e) => {
-    const actionNumber = findActionNumberFromTarget(e.target, playRef.current);
-    setIsHoveringIcon(Boolean(actionNumber));
+    const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
+    setIsHoveringIcon(Boolean(actionMeta?.actionNumber || actionMeta?.actionId));
     updateHoverAt(e.clientX, e.clientY, e.target);
   };
 
@@ -433,19 +437,29 @@ export default function Play({
     if (Date.now() < touchClickGuardUntilRef.current) {
       return;
     }
-    const actionNumber = findActionNumberFromTarget(e.target, playRef.current);
-    if (actionNumber && canOpenVideoOnClick) {
-      const action = (displayAllActions || []).find(
-        (entry) => String(entry.actionNumber) === String(actionNumber)
-      );
+    const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
+    const actionNumber = actionMeta?.actionNumber ?? null;
+    const actionId = actionMeta?.actionId ?? null;
+    if ((actionNumber || actionId) && canOpenVideoOnClick) {
+      let action = null;
+      if (actionId) {
+        action = (displayAllActions || []).find(
+          (entry) => String(entry.actionId) === String(actionId)
+        );
+      }
+      if (!action && actionNumber) {
+        action = (displayAllActions || []).find(
+          (entry) => String(entry.actionNumber) === String(actionNumber)
+        );
+      }
       const targetAction = resolveVideoAction(action, displayAllActions);
       const url = buildNbaEventUrl({
         gameId,
-        actionNumber: targetAction?.actionNumber ?? actionNumber,
+        actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber ?? actionId,
         description: targetAction?.description ?? action?.description,
       });
       if (url && typeof window !== 'undefined') {
-        window.open(url, '_blank', 'noopener,noreferrer');
+        window.open(url, '_blank', 'noopener');
         return;
       }
     }

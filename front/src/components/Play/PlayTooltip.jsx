@@ -237,7 +237,7 @@ export default function PlayTooltip({
       <a
         href={videoUrl}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         onClick={(event) => event.stopPropagation()}
         onTouchStart={(event) => event.stopPropagation()}
         style={{

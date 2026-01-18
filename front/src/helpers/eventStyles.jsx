@@ -116,7 +116,8 @@ export function renderFreeThrowRing({
   description,
   subType,
   isAnd1 = false,
-  actionNumber = null
+  actionNumber = null,
+  actionId = null
 }) {
   const desc = (description || '').toString().toLowerCase();
   const isMiss = desc.includes('miss');
@@ -130,8 +131,9 @@ export function renderFreeThrowRing({
   const ringColor = isMiss
     ? 'var(--event-miss, #475569)'
     : 'var(--event-point, #F59E0B)';
-  const dataAttrs = actionNumber !== null ? {
-    'data-action-number': actionNumber,
+  const dataAttrs = (actionNumber !== null || actionId !== null) ? {
+    ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
+    ...(actionId !== null ? { 'data-action-id': actionId } : {}),
     'data-event-type': 'free-throw',
     style: { cursor: 'pointer' }
   } : {};
@@ -161,7 +163,17 @@ export function renderFreeThrowRing({
  * @param {boolean} is3PT - Whether this is a 3-point shot (adds inner marker)
  * @param {number} actionNumber - Optional action number for hover detection
  */
-export function renderEventShape(eventType, cx, cy, size, key, is3PT = false, actionNumber = null, markerScaleOverride = null) {
+export function renderEventShape(
+  eventType,
+  cx,
+  cy,
+  size,
+  key,
+  is3PT = false,
+  actionNumber = null,
+  actionId = null,
+  markerScaleOverride = null
+) {
   const config = EVENT_TYPES[eventType];
   if (!config) return null;
   
@@ -170,8 +182,9 @@ export function renderEventShape(eventType, cx, cy, size, key, is3PT = false, ac
   const s = size; // shorthand
   
   // Data attributes for hover detection
-  const dataAttrs = actionNumber !== null ? {
-    'data-action-number': actionNumber,
+  const dataAttrs = (actionNumber !== null || actionId !== null) ? {
+    ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
+    ...(actionId !== null ? { 'data-action-id': actionId } : {}),
     'data-event-type': eventType,
     style: { cursor: 'pointer' }
   } : {};
