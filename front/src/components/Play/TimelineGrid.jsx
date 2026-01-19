@@ -42,25 +42,26 @@ export default function TimelineGrid({
 
   // 3. Labels (Q1... Q4, O1...)
   const labelStyle = { fontSize: '10px', fill: 'var(--quarter-label-color)', fontWeight: 500 };
+  const labelY = 12;
   const otWidth = (5/12) * qWidth;
 
   if (isQuarterView) {
     if (activePeriodLabel) {
       timelineElements.push(
-        <text key="label-active" x={leftMargin + width / 2} y={8} textAnchor="middle" style={labelStyle}>{activePeriodLabel}</text>
+        <text key="label-active" x={leftMargin + width / 2} y={labelY} textAnchor="middle" style={labelStyle}>{activePeriodLabel}</text>
       );
     }
   } else {
     ['Q1', 'Q2', 'Q3', 'Q4'].forEach((label, i) => {
       timelineElements.push(
-        <text key={`label-${label}`} x={leftMargin + qWidth * (i + 0.5)} y={8} textAnchor="middle" style={labelStyle}>{label}</text>
+        <text key={`label-${label}`} x={leftMargin + qWidth * (i + 0.5)} y={labelY} textAnchor="middle" style={labelStyle}>{label}</text>
       );
     });
 
     for (let ot = 1; ot <= numQs - 4; ot += 1) {
       const otCenterX = leftMargin + qWidth * 4 + otWidth * (ot - 0.5);
       timelineElements.push(
-        <text key={`label-o${ot}`} x={otCenterX} y={8} textAnchor="middle" style={labelStyle}>O{ot}</text>
+        <text key={`label-o${ot}`} x={otCenterX} y={labelY} textAnchor="middle" style={labelStyle}>O{ot}</text>
       );
     }
   }

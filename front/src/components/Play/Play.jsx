@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
+import html2canvas from 'html2canvas';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme'; // Adjust path
 import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
@@ -48,6 +49,54 @@ const hasPlayData = (data) => Boolean(
   )
 );
 
+const sanitizeFilePart = (value) => (
+  String(value || '')
+    .trim()
+    .replace(/[^a-z0-9-_]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+);
+
+const isTransparentColor = (value) => (
+  value === 'transparent' || value === 'rgba(0, 0, 0, 0)'
+);
+
+const resolveExportBackground = (element) => {
+  let current = element;
+  while (current && current.nodeType === 1) {
+    const bg = window.getComputedStyle(current).backgroundColor;
+    if (bg && !isTransparentColor(bg)) {
+      return bg;
+    }
+    current = current.parentElement;
+  }
+  return '#ffffff';
+};
+
+const EXPORT_PADDING_PX = {
+  top: 24,
+  right: 24,
+  bottom: 28,
+  left: 24
+};
+
+const buildPaddedCanvas = (sourceCanvas, padding, backgroundColor, scale) => {
+  const padLeft = Math.round((padding.left || 0) * scale);
+  const padRight = Math.round((padding.right || 0) * scale);
+  const padTop = Math.round((padding.top || 0) * scale);
+  const padBottom = Math.round((padding.bottom || 0) * scale);
+  const output = document.createElement('canvas');
+  output.width = sourceCanvas.width + padLeft + padRight;
+  output.height = sourceCanvas.height + padTop + padBottom;
+  const ctx = output.getContext('2d');
+  if (!ctx) {
+    return sourceCanvas;
+  }
+  ctx.fillStyle = backgroundColor;
+  ctx.fillRect(0, 0, output.width, output.height);
+  ctx.drawImage(sourceCanvas, padLeft, padTop);
+  return output;
+};
+
 export default function Play({ 
   gameId,
   gameStatus,
@@ -89,6 +138,7 @@ export default function Play({
   const userSelectedPeriodRef = useRef(false);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const [isHoveringIcon, setIsHoveringIcon] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
@@ -565,7 +615,130 @@ export default function Play({
     </div>
   ) : null;
 
+  const buildExportFileName = () => {
+    const away = displayAwayTeamNames?.abr || 'Away';
+    const home = displayHomeTeamNames?.abr || 'Home';
+    const periodLabel = isQuarterFocus
+      ? (activePeriodLabel || `P${activePeriod}`)
+      : 'Game';
+    const base = `${away}-vs-${home}-${periodLabel}`;
+    const safeBase = sanitizeFilePart(base) || 'play-by-play';
+    const suffix = gameId ? `-${sanitizeFilePart(gameId)}` : '';
+    return `${safeBase}${suffix}.png`;
+  };
+
+  const handleExportImage = async () => {
+    if (!playRef.current || isExporting) return;
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    setIsExporting(true);
+    try {
+      setInfoLocked(false);
+      setIsHoveringIcon(false);
+      resetInteraction(true);
+
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+
+      const exportTarget = playRef.current.closest('.playByPlaySection') || playRef.current;
+      const backgroundColor = resolveExportBackground(exportTarget);
+      const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
+
+      const canvas = await html2canvas(exportTarget, {
+        backgroundColor,
+        scale,
+        logging: false,
+        useCORS: true,
+        onclone: (doc) => {
+          const clonedExportRow = doc.querySelector('.playExportRow');
+          if (clonedExportRow) {
+            clonedExportRow.style.display = 'none';
+          }
+          const clonedPlayers = doc.querySelectorAll('.play .player');
+          clonedPlayers.forEach((player) => {
+            player.style.display = 'grid';
+            player.style.gridTemplateColumns = `${leftMargin}px 1fr`;
+            player.style.alignItems = 'center';
+
+            const name = player.querySelector('.playerName');
+            if (name) {
+              name.style.position = 'static';
+              name.style.width = `${leftMargin}px`;
+              name.style.gridColumn = '1';
+            }
+            const line = player.querySelector('svg.line');
+            if (line) {
+              line.style.position = 'static';
+              line.style.left = '0px';
+              line.style.marginLeft = '0px';
+              line.style.gridColumn = '2';
+              line.style.display = 'block';
+            }
+          });
+        }
+      });
+
+      const outputCanvas = buildPaddedCanvas(canvas, EXPORT_PADDING_PX, backgroundColor, scale);
+      const blob = await new Promise((resolve) => {
+        outputCanvas.toBlob(resolve, 'image/png');
+      });
+
+      if (!blob) {
+        console.error('Play export failed: image blob was empty.');
+        return;
+      }
+
+      const fileName = buildExportFileName();
+      const file = new File([blob], fileName, { type: 'image/png' });
+      let shared = false;
+
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        const canShare = !navigator.canShare || navigator.canShare({ files: [file] });
+        if (canShare) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: 'Play-by-play chart'
+            });
+            shared = true;
+          } catch (err) {
+            if (err?.name !== 'AbortError') {
+              console.error('Play export share failed.', err);
+            }
+          }
+        }
+      }
+
+      if (!shared) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    } catch (err) {
+      console.error('Play export failed.', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const showLoadingIndicator = isLoading && !hasDisplayData && !showStatusMessage;
+  const exportDisabled = !hasDisplayData || isDataLoading || isExporting;
+  const exportButton = hasDisplayData ? (
+    <div className="playExportRow" style={{ width: sectionWidth }}>
+      <button
+        type="button"
+        className="playExportButton"
+        onClick={handleExportImage}
+        disabled={exportDisabled}
+        aria-disabled={exportDisabled}
+      >
+        {isExporting ? 'Preparing...' : 'Share Image'}
+      </button>
+    </div>
+  ) : null;
 
   // --- Render Loading/Error States ---
   if (showLoadingIndicator) {
@@ -599,6 +772,7 @@ export default function Play({
   return (
     <div className="playWrapper">
       {quarterSwitcher}
+      {exportButton}
       <div
         ref={playRef}
         className={`play ${isDataLoading ? 'isLoading' : ''}`}
