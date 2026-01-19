@@ -6,6 +6,7 @@ import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; 
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 import { getGameTotalSeconds, getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
 import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
+import { EVENT_TYPES, getEventType, isFreeThrowAction } from '../../helpers/eventStyles.jsx';
 
 // Sub-components
 import Player from './Player/Player';
@@ -129,6 +130,217 @@ const dataUrlToBlob = (dataUrl) => {
   return new Blob([buffer], { type: mime });
 };
 
+const getCssVar = (computedStyle, varName, fallback) => {
+  if (!computedStyle) return fallback;
+  const value = computedStyle.getPropertyValue(varName);
+  return value ? value.trim() : fallback;
+};
+
+const truncateText = (ctx, text, maxWidth) => {
+  if (!ctx || !text) return '';
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let trimmed = text;
+  while (trimmed && ctx.measureText(`${trimmed}...`).width > maxWidth) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed ? `${trimmed}...` : text;
+};
+
+const FREE_THROW_PATTERN = /free throw\s+(\d+)\s+of\s+(\d+)/i;
+
+const getFreeThrowAttempt = (description, subType) => {
+  const text = `${subType || ''} ${description || ''}`;
+  const match = text.match(FREE_THROW_PATTERN);
+  if (!match) {
+    return { attempt: 1, total: 1 };
+  }
+  return { attempt: Number(match[1]), total: Number(match[2]) };
+};
+
+const getFreeThrowRingRatio = (attempt, total) => {
+  if (total <= 1) return 0.8;
+  if (attempt === 1) return 0.6;
+  if (attempt === 2) return 0.8;
+  return 1.1;
+};
+
+const drawPolygon = (ctx, points) => {
+  if (!ctx || !points.length) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.closePath();
+  ctx.fill();
+};
+
+const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
+  const config = EVENT_TYPES[eventType];
+  if (!config) return;
+  const color = getCssVar(computedStyle, config.colorVar, config.fallback);
+  const markerColor = getCssVar(computedStyle, '--event-3pt-marker', '#DC2626');
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+
+  switch (config.shape) {
+    case 'circle': {
+      ctx.beginPath();
+      ctx.arc(cx, cy, size, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'cross': {
+      ctx.lineWidth = Math.max(1, size * 0.6);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx - size, cy - size);
+      ctx.lineTo(cx + size, cy + size);
+      ctx.moveTo(cx + size, cy - size);
+      ctx.lineTo(cx - size, cy + size);
+      ctx.stroke();
+      break;
+    }
+    case 'diamond': {
+      drawPolygon(ctx, [
+        { x: cx, y: cy - size },
+        { x: cx + size, y: cy },
+        { x: cx, y: cy + size },
+        { x: cx - size, y: cy }
+      ]);
+      break;
+    }
+    case 'chevron': {
+      drawPolygon(ctx, [
+        { x: cx - size * 0.6, y: cy - size },
+        { x: cx + size, y: cy },
+        { x: cx - size * 0.6, y: cy + size }
+      ]);
+      break;
+    }
+    case 'triangleDown': {
+      drawPolygon(ctx, [
+        { x: cx, y: cy + size },
+        { x: cx - size, y: cy - size * 0.7 },
+        { x: cx + size, y: cy - size * 0.7 }
+      ]);
+      break;
+    }
+    case 'triangleUp': {
+      drawPolygon(ctx, [
+        { x: cx, y: cy - size },
+        { x: cx - size, y: cy + size * 0.7 },
+        { x: cx + size, y: cy + size * 0.7 }
+      ]);
+      break;
+    }
+    case 'square': {
+      const edge = size * 1.6;
+      ctx.fillRect(cx - edge / 2, cy - edge / 2, edge, edge);
+      break;
+    }
+    case 'hexagon': {
+      const points = [];
+      for (let i = 0; i < 6; i += 1) {
+        const angle = (i * 60 - 90) * (Math.PI / 180);
+        points.push({ x: cx + size * Math.cos(angle), y: cy + size * Math.sin(angle) });
+      }
+      drawPolygon(ctx, points);
+      break;
+    }
+    default: {
+      ctx.beginPath();
+      ctx.arc(cx, cy, size, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+
+  if (is3PT) {
+    ctx.fillStyle = markerColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+const drawFreeThrowRing = (ctx, cx, cy, size, description, subType, computedStyle) => {
+  if (!ctx) return;
+  const desc = (description || '').toString().toLowerCase();
+  const isMiss = desc.includes('miss');
+  const { attempt, total } = getFreeThrowAttempt(description, subType);
+  const ringRatio = getFreeThrowRingRatio(attempt, total);
+  const ringRadius = size * ringRatio;
+  const ringColor = isMiss
+    ? getCssVar(computedStyle, '--event-miss', '#475569')
+    : getCssVar(computedStyle, '--event-point', '#F59E0B');
+  ctx.strokeStyle = ringColor;
+  ctx.lineWidth = Math.max(1, size * 0.3);
+  ctx.beginPath();
+  ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+  ctx.stroke();
+};
+
+const drawStepScoreDiff = ({
+  ctx,
+  baselineY,
+  chartLeft,
+  chartWidth,
+  chartHeight,
+  maxY,
+  startScoreDiff,
+  timelineWindow,
+  scoreTimeline,
+  awayColor,
+  homeColor,
+}) => {
+  if (!ctx || !scoreTimeline || !chartWidth || maxY <= 0) return;
+  const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
+  const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
+  if (windowDurationSeconds <= 0) return;
+
+  const endX = chartLeft + chartWidth;
+  const diffToY = (diff) => baselineY - (diff / maxY) * (chartHeight / 2);
+  const steps = [];
+
+  scoreTimeline.forEach((entry) => {
+    const elapsed = getSecondsElapsed(entry.period, entry.clock);
+    if (elapsed < windowStartSeconds || elapsed > windowStartSeconds + windowDurationSeconds) {
+      return;
+    }
+    const ratio = (elapsed - windowStartSeconds) / windowDurationSeconds;
+    const x = chartLeft + ratio * chartWidth;
+    steps.push({
+      x,
+      diff: Number(entry.away) - Number(entry.home),
+    });
+  });
+
+  let currentDiff = startScoreDiff;
+  let currentX = chartLeft;
+
+  const drawSegment = (nextX) => {
+    if (nextX <= currentX || currentDiff === 0) {
+      currentX = nextX;
+      return;
+    }
+    const y = diffToY(currentDiff);
+    ctx.fillStyle = currentDiff > 0 ? awayColor : homeColor;
+    const top = Math.min(y, baselineY);
+    const height = Math.abs(baselineY - y);
+    ctx.fillRect(currentX, top, nextX - currentX, height);
+    currentX = nextX;
+  };
+
+  steps.forEach((step) => {
+    const nextX = Math.min(endX, Math.max(chartLeft, step.x));
+    drawSegment(nextX);
+    currentDiff = step.diff;
+  });
+
+  drawSegment(endX);
+};
+
 const canvasToBlob = (canvas) => {
   if (!canvas) return Promise.resolve(null);
   if (canvas.toBlob) {
@@ -145,11 +357,14 @@ const getExportScale = (target, shouldForceDesktopLayout, isMobileViewport) => {
   if (!target) return 1;
   const rect = target.getBoundingClientRect();
   const baseScale = Math.min(3, window.devicePixelRatio || 1);
-  const maxPixels = shouldForceDesktopLayout ? 3_000_000 : 6_000_000;
+  const maxPixels = isMobileViewport
+    ? 2_500_000
+    : (shouldForceDesktopLayout ? 3_000_000 : 6_000_000);
   const area = Math.max(1, rect.width * rect.height);
   const scaleByArea = Math.sqrt(maxPixels / area);
   const maxScale = isMobileViewport ? 1 : 2;
-  return Math.max(1, Math.min(baseScale, scaleByArea, maxScale));
+  const minScale = isMobileViewport ? 0.75 : 1;
+  return Math.max(minScale, Math.min(baseScale, scaleByArea, maxScale));
 };
 
 export default function Play({ 
@@ -689,6 +904,381 @@ export default function Play({
     </div>
   ) : null;
 
+  const buildLiteExportCanvas = () => {
+    if (typeof window === 'undefined') return null;
+    const baseWidth = DESKTOP_EXPORT_WIDTH;
+    const leftPad = leftMargin;
+    const rightPad = rightMargin;
+    const headerHeight = 54;
+    const footerHeight = 32;
+    const chartHeight = 360;
+    const chartTop = headerHeight + 8;
+    const chartLeft = leftPad;
+    const chartWidth = Math.max(1, baseWidth - chartLeft - rightPad);
+    const baseHeight = chartTop + chartHeight + footerHeight;
+    const scale = Math.min(2, window.devicePixelRatio || 1);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(baseWidth * scale);
+    canvas.height = Math.round(baseHeight * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+
+    const backgroundColor = resolveExportBackground(playRef.current);
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, baseWidth, baseHeight);
+
+    const styleSource = playRef.current || document.documentElement;
+    const computed = window.getComputedStyle(styleSource);
+    const getVar = (name, fallback) => {
+      const value = computed.getPropertyValue(name);
+      return value ? value.trim() : fallback;
+    };
+    const textPrimary = getVar('--text-primary', '#111111');
+    const textSecondary = getVar('--text-secondary', '#666666');
+    const lineColor = getVar('--line-color', '#cccccc');
+
+    const awayLabel = displayAwayTeamNames?.abr || 'Away';
+    const homeLabel = displayHomeTeamNames?.abr || 'Home';
+    const periodLabel = isQuarterFocus
+      ? (activePeriodLabel || `P${activePeriod}`)
+      : 'Game';
+
+    ctx.fillStyle = textPrimary;
+    ctx.font = '600 18px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${awayLabel} vs ${homeLabel}`, chartLeft, 24);
+    ctx.fillStyle = textSecondary;
+    ctx.font = '12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(periodLabel, chartLeft, 42);
+
+    const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
+      ? filteredScoreTimeline
+      : (displayScoreTimeline || []);
+    const lastScoreEntry = scoreTimelineSource.length
+      ? scoreTimelineSource[scoreTimelineSource.length - 1]
+      : null;
+    if (lastScoreEntry) {
+      const scoreText = `${awayLabel} ${lastScoreEntry.away} - ${lastScoreEntry.home} ${homeLabel}`;
+      ctx.fillStyle = textPrimary;
+      ctx.font = '600 14px system-ui, -apple-system, sans-serif';
+      const textWidth = ctx.measureText(scoreText).width;
+      ctx.fillText(scoreText, baseWidth - 20 - textWidth, 24);
+    }
+
+    const baselineY = chartTop + chartHeight / 2;
+    ctx.strokeStyle = lineColor;
+    ctx.beginPath();
+    ctx.moveTo(chartLeft, baselineY);
+    ctx.lineTo(chartLeft + chartWidth, baselineY);
+    ctx.stroke();
+
+    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = awayColor || textSecondary;
+    ctx.fillText(`${awayLabel} lead`, chartLeft + 4, chartTop + 14);
+    ctx.fillStyle = homeColor || textSecondary;
+    ctx.fillText(`${homeLabel} lead`, chartLeft + 4, chartTop + chartHeight - 4);
+
+    if (!showScoreDiff) {
+      ctx.fillStyle = textSecondary;
+      ctx.font = '12px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Score diff hidden', chartLeft + 6, baselineY - 6);
+      return canvas;
+    }
+
+    const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
+    if (windowDurationSeconds <= 0) {
+      ctx.fillStyle = textSecondary;
+      ctx.font = '12px system-ui, -apple-system, sans-serif';
+      ctx.fillText('No timeline data', chartLeft + 6, baselineY - 6);
+      return canvas;
+    }
+
+    drawStepScoreDiff({
+      ctx,
+      baselineY,
+      chartLeft,
+      chartWidth,
+      chartHeight,
+      maxY: maxY || 1,
+      startScoreDiff,
+      timelineWindow,
+      scoreTimeline: scoreTimelineSource,
+      awayColor: awayColor || lineColor,
+      homeColor: homeColor || lineColor,
+    });
+
+    return canvas;
+  };
+
+  const buildFullExportCanvas = () => {
+    if (typeof window === 'undefined') return null;
+    const baseWidth = DESKTOP_EXPORT_WIDTH;
+    const leftPad = leftMargin;
+    const rightPad = rightMargin;
+    const headerHeight = 32;
+    const playAreaTop = headerHeight + 8;
+    const teamLabelHeight = 18;
+    const teamSectionHeight = 275;
+    const playAreaHeight = 600;
+    const chartHeight = playAreaHeight;
+    const chartTop = playAreaTop;
+    const chartLeft = leftPad;
+    const chartWidth = Math.max(1, baseWidth - chartLeft - rightPad);
+
+    const awayNames = Object.keys(filteredAwayPlayers || {});
+    const homeNames = Object.keys(filteredHomePlayers || {});
+    const awayRowHeight = teamSectionHeight / Math.max(1, awayNames.length);
+    const homeRowHeight = teamSectionHeight / Math.max(1, homeNames.length);
+    const awaySectionHeight = teamSectionHeight;
+    const homeSectionHeight = teamSectionHeight;
+
+    const baseHeight = playAreaTop + playAreaHeight + 16;
+
+    const scale = Math.min(2, window.devicePixelRatio || 1);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(baseWidth * scale);
+    canvas.height = Math.round(baseHeight * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+
+    const backgroundColor = resolveExportBackground(playRef.current);
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, baseWidth, baseHeight);
+
+    const styleSource = playRef.current || document.documentElement;
+    const computed = window.getComputedStyle(styleSource);
+    const textPrimary = getCssVar(computed, '--text-primary', '#111111');
+    const textSecondary = getCssVar(computed, '--text-secondary', '#6b7280');
+    const lineColor = getCssVar(computed, '--line-color', '#cbd5f5');
+    const lineLight = getCssVar(computed, '--line-color-light', '#94a3b8');
+    const quarterLabelColor = getCssVar(computed, '--quarter-label-color', '#6b7280');
+    const awayLabel = displayAwayTeamNames?.abr || 'Away';
+    const homeLabel = displayHomeTeamNames?.abr || 'Home';
+    const periodLabel = isQuarterFocus
+      ? (activePeriodLabel || `P${activePeriod}`)
+      : 'Game';
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = textPrimary;
+    ctx.font = '600 16px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`${awayLabel} vs ${homeLabel}`, chartLeft, 22);
+    ctx.fillStyle = textSecondary;
+    ctx.font = '12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(periodLabel, chartLeft, 38);
+
+    const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
+      ? filteredScoreTimeline
+      : (displayScoreTimeline || []);
+    const lastScoreEntry = scoreTimelineSource.length
+      ? scoreTimelineSource[scoreTimelineSource.length - 1]
+      : null;
+    if (lastScoreEntry) {
+      const scoreText = `${awayLabel} ${lastScoreEntry.away} - ${lastScoreEntry.home} ${homeLabel}`;
+      ctx.fillStyle = textPrimary;
+      ctx.font = '600 14px system-ui, -apple-system, sans-serif';
+      const textWidth = ctx.measureText(scoreText).width;
+      ctx.fillText(scoreText, baseWidth - rightPad - textWidth, 22);
+    }
+
+    const baselineY = chartTop + chartHeight / 2;
+    ctx.strokeStyle = lineColor;
+    ctx.beginPath();
+    ctx.moveTo(chartLeft, baselineY);
+    ctx.lineTo(chartLeft + chartWidth, baselineY);
+    ctx.stroke();
+
+    const exportNumPeriods = Number(displayNumQs) || 0;
+    const timelineBottom = playAreaTop + playAreaHeight;
+    if (!isQuarterFocus && exportNumPeriods > 0) {
+      const exportQWidth = exportNumPeriods > 4
+        ? chartWidth * (12 / (12 * 4 + 5 * (exportNumPeriods - 4)))
+        : chartWidth / 4;
+      ctx.strokeStyle = lineColor;
+      for (let i = 1; i <= 3; i += 1) {
+        const x = chartLeft + exportQWidth * i;
+        ctx.beginPath();
+        ctx.moveTo(x, chartTop);
+        ctx.lineTo(x, timelineBottom);
+        ctx.stroke();
+      }
+      for (let q = 4; q < exportNumPeriods; q += 1) {
+        const x = chartLeft + exportQWidth * 4 + (5 / 12) * exportQWidth * (q - 4);
+        ctx.beginPath();
+        ctx.moveTo(x, chartTop);
+        ctx.lineTo(x, timelineBottom);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = quarterLabelColor;
+      ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+      const labelY = chartTop + 10;
+      ['Q1', 'Q2', 'Q3', 'Q4'].forEach((label, idx) => {
+        const x = chartLeft + exportQWidth * (idx + 0.5);
+        ctx.fillText(label, x - ctx.measureText(label).width / 2, labelY);
+      });
+      const otWidth = (5 / 12) * exportQWidth;
+      for (let ot = 1; ot <= exportNumPeriods - 4; ot += 1) {
+        const label = `O${ot}`;
+        const x = chartLeft + exportQWidth * 4 + otWidth * (ot - 0.5);
+        ctx.fillText(label, x - ctx.measureText(label).width / 2, labelY);
+      }
+    }
+
+    if (isQuarterFocus && activePeriodLabel) {
+      ctx.fillStyle = quarterLabelColor;
+      ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+      const x = chartLeft + chartWidth / 2;
+      ctx.fillText(activePeriodLabel, x - ctx.measureText(activePeriodLabel).width / 2, chartTop + 10);
+    }
+
+    if (showScoreDiff && maxLead > 0) {
+      let numLines = 0;
+      let lineJump = 0;
+      if ((maxLead / 5) < 5) {
+        numLines = Math.floor(maxLead / 5);
+        lineJump = 5;
+      } else if ((maxLead / 10) < 5) {
+        numLines = Math.floor(maxLead / 10);
+        lineJump = 10;
+      } else if ((maxLead / 15) < 5) {
+        numLines = Math.floor(maxLead / 15);
+        lineJump = 15;
+      } else {
+        numLines = Math.floor(maxLead / 20);
+        lineJump = 20;
+      }
+      ctx.setLineDash([5, 12]);
+      ctx.lineWidth = 1;
+      for (let i = 0; i < numLines; i += 1) {
+        const value = (i + 1) * lineJump;
+        const yOffset = value * (chartHeight / 2) / maxY;
+        const posy = baselineY - yOffset;
+        const negy = baselineY + yOffset;
+
+        ctx.strokeStyle = teamColors.away;
+        ctx.beginPath();
+        ctx.moveTo(chartLeft, posy);
+        ctx.lineTo(chartLeft + chartWidth, posy);
+        ctx.stroke();
+        ctx.fillStyle = teamColors.away;
+        ctx.fillText(`${value}`, chartLeft + chartWidth + 4, posy + 3);
+
+        ctx.strokeStyle = teamColors.home;
+        ctx.beginPath();
+        ctx.moveTo(chartLeft, negy);
+        ctx.lineTo(chartLeft + chartWidth, negy);
+        ctx.stroke();
+        ctx.fillStyle = teamColors.home;
+        ctx.fillText(`${value}`, chartLeft + chartWidth + 4, negy + 3);
+      }
+      ctx.setLineDash([]);
+    }
+
+    if (showScoreDiff && chartWidth > 0) {
+      drawStepScoreDiff({
+        ctx,
+        baselineY,
+        chartLeft,
+        chartWidth,
+        chartHeight,
+        maxY,
+        startScoreDiff,
+        timelineWindow,
+        scoreTimeline: scoreTimelineSource,
+        awayColor: awayColor || lineColor,
+        homeColor: homeColor || lineColor,
+      });
+    }
+
+    const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
+    const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
+    const getXForTime = (period, clock) => {
+      if (windowDurationSeconds <= 0) return chartLeft;
+      const elapsed = getSecondsElapsed(period, clock);
+      const ratio = (elapsed - windowStartSeconds) / windowDurationSeconds;
+      return chartLeft + Math.max(0, Math.min(chartWidth, ratio * chartWidth));
+    };
+
+    const drawTeamSection = (teamLabel, teamColor, names, players, timelines, startY, rowHeight) => {
+      ctx.fillStyle = teamColor || textPrimary;
+      ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.fillText(teamLabel, 6, startY);
+
+      const nameAreaWidth = Math.max(40, chartLeft - 12);
+      let rowTop = startY + teamLabelHeight + 4;
+      ctx.textBaseline = 'middle';
+      names.forEach((name) => {
+        const centerY = rowTop + rowHeight / 2;
+        const fontSize = Math.max(9, Math.min(12, rowHeight * 0.6));
+        ctx.font = `500 ${fontSize}px system-ui, -apple-system, sans-serif`;
+        ctx.fillStyle = lineLight;
+        const clippedName = truncateText(ctx, name, nameAreaWidth);
+        ctx.fillText(clippedName, 6, centerY);
+
+        const timeline = timelines?.[name] || [];
+        ctx.strokeStyle = lineLight;
+        ctx.lineWidth = 1;
+        timeline.forEach((entry) => {
+          if (!entry?.end) return;
+          const x1 = getXForTime(entry.period, entry.start);
+          const x2 = getXForTime(entry.period, entry.end);
+          ctx.beginPath();
+          ctx.moveTo(x1, centerY);
+          ctx.lineTo(x2, centerY);
+          ctx.stroke();
+        });
+
+        const actions = (players?.[name] || []).filter((action) => (
+          action.actionType !== 'Substitution'
+          && action.actionType !== 'Jump Ball'
+          && action.actionType !== 'Violation'
+        ));
+        const size = Math.max(3, Math.min(5, rowHeight * 0.28));
+        actions.forEach((action) => {
+          const x = getXForTime(action.period, action.clock);
+          const isFreeThrow = isFreeThrowAction(action.description, action.actionType);
+          if (isFreeThrow) {
+            drawFreeThrowRing(ctx, x, centerY, size * 1.1, action.description, action.subType, computed);
+            return;
+          }
+          const eventType = getEventType(action.description, action.actionType);
+          if (!eventType) return;
+          const is3PT = (action.description || '').includes('3PT');
+          drawEventShape(ctx, eventType, x, centerY, size, computed, is3PT);
+        });
+
+        rowTop += rowHeight;
+      });
+      return rowTop;
+    };
+
+    let cursorY = playAreaTop + 4;
+    cursorY = drawTeamSection(
+      displayAwayTeamNames?.name || awayLabel,
+      teamColors.away,
+      awayNames,
+      filteredAwayPlayers,
+      filteredAwayPlayerTimeline,
+      cursorY,
+      awayRowHeight
+    );
+
+    drawTeamSection(
+      displayHomeTeamNames?.name || homeLabel,
+      teamColors.home,
+      homeNames,
+      filteredHomePlayers,
+      filteredHomePlayerTimeline,
+      cursorY,
+      homeRowHeight
+    );
+
+    return canvas;
+  };
+
   const buildExportFileName = () => {
     const away = displayAwayTeamNames?.abr || 'Away';
     const home = displayHomeTeamNames?.abr || 'Home';
@@ -707,32 +1297,37 @@ export default function Play({
     setIsExporting(true);
     setExportPreviewState(null);
     setExportError(null);
-    const exportTarget = playRef.current.closest('.playByPlaySection') || playRef.current;
     const isMobileViewport = Boolean(
       typeof window !== 'undefined' &&
       window.matchMedia &&
       window.matchMedia(`(max-width: ${QUARTER_VIEW_BREAKPOINT}px)`).matches
     );
+    const exportTarget = isMobileViewport
+      ? playRef.current
+      : (playRef.current.closest('.playByPlaySection') || playRef.current);
     const isTouchDevice = Boolean(
       typeof window !== 'undefined' &&
       window.matchMedia &&
       window.matchMedia('(hover: none) and (pointer: coarse)').matches
     );
+    const useDataExport = isMobileViewport || isTouchDevice;
     const shouldShowPreview = isTouchDevice || isMobileViewport;
     const exportDesktopWidth = isMobileViewport ? MOBILE_EXPORT_MAX_WIDTH : DESKTOP_EXPORT_WIDTH;
     const shouldForceDesktopLayout = Boolean(
+      !isMobileViewport &&
       exportTarget &&
       activePeriod === 0 &&
       sectionWidth > 0 &&
       sectionWidth < exportDesktopWidth
     );
+    const exportTimeoutMs = isMobileViewport ? 30000 : EXPORT_TIMEOUT_MS;
     let restoreBodyOverflow = null;
     try {
       setInfoLocked(false);
       setIsHoveringIcon(false);
       resetInteraction(true);
 
-      if (shouldForceDesktopLayout) {
+      if (!useDataExport && shouldForceDesktopLayout) {
         exportTarget.classList.add('isDesktopExport');
         restoreBodyOverflow = document.body.style.overflowX;
         document.body.style.overflowX = 'hidden';
@@ -741,57 +1336,66 @@ export default function Play({
         for (let i = 0; i < 4; i += 1) {
           await waitForNextFrame();
         }
-      } else {
+      } else if (!useDataExport) {
         await waitForNextFrame();
       }
 
-      const backgroundColor = resolveExportBackground(exportTarget);
-      const scale = getExportScale(exportTarget, shouldForceDesktopLayout, isMobileViewport);
-
-      const canvas = await withTimeout(html2canvas(exportTarget, {
-        backgroundColor,
-        scale,
-        logging: false,
-        useCORS: true,
-        onclone: (doc) => {
-          const clonedExportButton = doc.querySelector('.playExportButton');
-          if (clonedExportButton) {
-            clonedExportButton.style.display = 'none';
-          }
-          const clonedExportPreview = doc.querySelector('.playExportPreview');
-          if (clonedExportPreview) {
-            clonedExportPreview.style.display = 'none';
-          }
-          const clonedExportError = doc.querySelector('.playExportError');
-          if (clonedExportError) {
-            clonedExportError.style.display = 'none';
-          }
-          const clonedPlayers = doc.querySelectorAll('.play .player');
-          clonedPlayers.forEach((player) => {
-            player.style.display = 'grid';
-            player.style.gridTemplateColumns = `${leftMargin}px 1fr`;
-            player.style.alignItems = 'center';
-
-            const name = player.querySelector('.playerName');
-            if (name) {
-              name.style.position = 'static';
-              name.style.width = `${leftMargin}px`;
-              name.style.gridColumn = '1';
+      let outputCanvas = null;
+      if (useDataExport) {
+        outputCanvas = buildFullExportCanvas() || buildLiteExportCanvas();
+      } else {
+        const backgroundColor = resolveExportBackground(exportTarget);
+        const scale = getExportScale(exportTarget, shouldForceDesktopLayout, isMobileViewport);
+        const canvas = await withTimeout(html2canvas(exportTarget, {
+          backgroundColor,
+          scale,
+          logging: false,
+          useCORS: true,
+          onclone: (doc) => {
+            const clonedExportButton = doc.querySelector('.playExportButton');
+            if (clonedExportButton) {
+              clonedExportButton.style.display = 'none';
             }
-            const line = player.querySelector('svg.line');
-            if (line) {
-              line.style.position = 'static';
-              line.style.left = '0px';
-              line.style.marginLeft = '0px';
-              line.style.gridColumn = '2';
-              line.style.display = 'block';
+            const clonedExportPreview = doc.querySelector('.playExportPreview');
+            if (clonedExportPreview) {
+              clonedExportPreview.style.display = 'none';
             }
-          });
-        }
-      }), EXPORT_TIMEOUT_MS, 'Play export');
+            const clonedExportError = doc.querySelector('.playExportError');
+            if (clonedExportError) {
+              clonedExportError.style.display = 'none';
+            }
+            const clonedPlayers = doc.querySelectorAll('.play .player');
+            clonedPlayers.forEach((player) => {
+              player.style.display = 'grid';
+              player.style.gridTemplateColumns = `${leftMargin}px 1fr`;
+              player.style.alignItems = 'center';
 
-      const outputCanvas = buildPaddedCanvas(canvas, EXPORT_PADDING_PX, backgroundColor, scale);
-      let blob = await withTimeout(canvasToBlob(outputCanvas), EXPORT_TIMEOUT_MS, 'Play export image');
+              const name = player.querySelector('.playerName');
+              if (name) {
+                name.style.position = 'static';
+                name.style.width = `${leftMargin}px`;
+                name.style.gridColumn = '1';
+              }
+              const line = player.querySelector('svg.line');
+              if (line) {
+                line.style.position = 'static';
+                line.style.left = '0px';
+                line.style.marginLeft = '0px';
+                line.style.gridColumn = '2';
+                line.style.display = 'block';
+              }
+            });
+          }
+        }), exportTimeoutMs, 'Play export');
+
+        outputCanvas = buildPaddedCanvas(canvas, EXPORT_PADDING_PX, backgroundColor, scale);
+      }
+
+      if (!outputCanvas) {
+        throw new Error('Export failed: unable to build image.');
+      }
+
+      let blob = await withTimeout(canvasToBlob(outputCanvas), exportTimeoutMs, 'Play export image');
       if (!blob && outputCanvas.toDataURL) {
         blob = dataUrlToBlob(outputCanvas.toDataURL('image/png'));
       }
