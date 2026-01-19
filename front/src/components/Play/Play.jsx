@@ -78,6 +78,7 @@ const EXPORT_PADDING_PX = {
   bottom: 28,
   left: 24
 };
+const DESKTOP_EXPORT_WIDTH = 1235;
 
 const buildPaddedCanvas = (sourceCanvas, padding, backgroundColor, scale) => {
   const padLeft = Math.round((padding.left || 0) * scale);
@@ -96,6 +97,8 @@ const buildPaddedCanvas = (sourceCanvas, padding, backgroundColor, scale) => {
   ctx.drawImage(sourceCanvas, padLeft, padTop);
   return output;
 };
+
+const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
 export default function Play({ 
   gameId,
@@ -631,14 +634,30 @@ export default function Play({
     if (!playRef.current || isExporting) return;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     setIsExporting(true);
+    const exportTarget = playRef.current.closest('.playByPlaySection') || playRef.current;
+    const shouldForceDesktopLayout = Boolean(
+      exportTarget &&
+      activePeriod === 0 &&
+      sectionWidth > 0 &&
+      sectionWidth < DESKTOP_EXPORT_WIDTH
+    );
+    let restoreBodyOverflow = null;
     try {
       setInfoLocked(false);
       setIsHoveringIcon(false);
       resetInteraction(true);
 
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      if (shouldForceDesktopLayout) {
+        exportTarget.classList.add('isDesktopExport');
+        restoreBodyOverflow = document.body.style.overflowX;
+        document.body.style.overflowX = 'hidden';
+        for (let i = 0; i < 4; i += 1) {
+          await waitForNextFrame();
+        }
+      } else {
+        await waitForNextFrame();
+      }
 
-      const exportTarget = playRef.current.closest('.playByPlaySection') || playRef.current;
       const backgroundColor = resolveExportBackground(exportTarget);
       const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
 
@@ -720,6 +739,12 @@ export default function Play({
     } catch (err) {
       console.error('Play export failed.', err);
     } finally {
+      if (shouldForceDesktopLayout && exportTarget) {
+        exportTarget.classList.remove('isDesktopExport');
+        if (restoreBodyOverflow !== null) {
+          document.body.style.overflowX = restoreBodyOverflow;
+        }
+      }
       setIsExporting(false);
     }
   };

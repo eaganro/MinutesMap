@@ -65,6 +65,11 @@
   height: auto;
 }
 
+.playByPlaySection.isDesktopExport {
+  width: 1235px;
+  max-width: none;
+}
+
 .dataRefresh {
   position: absolute;
   top: 16px;
