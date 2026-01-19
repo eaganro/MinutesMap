@@ -667,9 +667,9 @@ export default function Play({
         logging: false,
         useCORS: true,
         onclone: (doc) => {
-          const clonedExportRow = doc.querySelector('.playExportRow');
-          if (clonedExportRow) {
-            clonedExportRow.style.display = 'none';
+          const clonedExportButton = doc.querySelector('.playExportButton');
+          if (clonedExportButton) {
+            clonedExportButton.style.display = 'none';
           }
           const clonedPlayers = doc.querySelectorAll('.play .player');
           clonedPlayers.forEach((player) => {
@@ -752,17 +752,30 @@ export default function Play({
   const showLoadingIndicator = isLoading && !hasDisplayData && !showStatusMessage;
   const exportDisabled = !hasDisplayData || isDataLoading || isExporting;
   const exportButton = hasDisplayData ? (
-    <div className="playExportRow" style={{ width: sectionWidth }}>
-      <button
-        type="button"
-        className="playExportButton"
-        onClick={handleExportImage}
-        disabled={exportDisabled}
-        aria-disabled={exportDisabled}
+    <button
+      type="button"
+      className="playExportButton"
+      onClick={handleExportImage}
+      disabled={exportDisabled}
+      aria-label={isExporting ? 'Preparing image export' : 'Share image'}
+      title={isExporting ? 'Preparing image...' : 'Share image'}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
       >
-        {isExporting ? 'Preparing...' : 'Share Image'}
-      </button>
-    </div>
+        <path d="M12 3v12" />
+        <path d="M8 7l4-4 4 4" />
+        <path d="M4 14v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6" />
+      </svg>
+    </button>
   ) : null;
 
   // --- Render Loading/Error States ---
