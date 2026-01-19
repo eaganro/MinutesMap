@@ -195,6 +195,7 @@ export default function Play({
   const [isHoveringIcon, setIsHoveringIcon] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportPreview, setExportPreview] = useState(null);
+  const [exportError, setExportError] = useState(null);
   const exportPreviewUrlRef = useRef(null);
   const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia
@@ -381,6 +382,7 @@ export default function Play({
     pendingGameChangeRef.current = true;
     userSelectedPeriodRef.current = false;
     setExportPreviewState(null);
+    setExportError(null);
   }, [gameId]);
 
   useEffect(() => {
@@ -704,6 +706,7 @@ export default function Play({
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     setIsExporting(true);
     setExportPreviewState(null);
+    setExportError(null);
     const exportTarget = playRef.current.closest('.playByPlaySection') || playRef.current;
     const isMobileViewport = Boolean(
       typeof window !== 'undefined' &&
@@ -759,6 +762,10 @@ export default function Play({
           if (clonedExportPreview) {
             clonedExportPreview.style.display = 'none';
           }
+          const clonedExportError = doc.querySelector('.playExportError');
+          if (clonedExportError) {
+            clonedExportError.style.display = 'none';
+          }
           const clonedPlayers = doc.querySelectorAll('.play .player');
           clonedPlayers.forEach((player) => {
             player.style.display = 'grid';
@@ -790,17 +797,30 @@ export default function Play({
       }
 
       if (!blob) {
-        console.error('Play export failed: image blob was empty.');
-        return;
+        throw new Error('Export failed: image blob was empty.');
       }
 
       const fileName = buildExportFileName();
-      const file = new File([blob], fileName, { type: 'image/png' });
-      const canShareFiles = Boolean(
-        typeof navigator !== 'undefined' &&
-        navigator.share &&
-        (!navigator.canShare || navigator.canShare({ files: [file] }))
-      );
+      let file = null;
+      try {
+        file = new File([blob], fileName, { type: 'image/png' });
+      } catch (err) {
+        setExportError('Share unavailable: File constructor failed on this device.');
+      }
+      let canShareFiles = false;
+      if (file && typeof navigator !== 'undefined' && navigator.share) {
+        if (!navigator.canShare) {
+          canShareFiles = true;
+        } else {
+          try {
+            canShareFiles = navigator.canShare({ files: [file] });
+          } catch (err) {
+            canShareFiles = false;
+            setExportError('Share unavailable: browser rejected file sharing.');
+          }
+        }
+      }
+
       if (shouldShowPreview) {
         const url = URL.createObjectURL(blob);
         setExportPreviewState({
@@ -811,6 +831,7 @@ export default function Play({
         });
         return;
       }
+
       let shared = false;
 
       if (typeof navigator !== 'undefined' && navigator.share) {
@@ -840,7 +861,9 @@ export default function Play({
         setTimeout(() => URL.revokeObjectURL(url), 15000);
       }
     } catch (err) {
+      const message = err?.message || 'Play export failed.';
       console.error('Play export failed.', err);
+      setExportError(message);
     } finally {
       if (shouldForceDesktopLayout && exportTarget) {
         exportTarget.classList.remove('isDesktopExport');
@@ -897,6 +920,19 @@ export default function Play({
         <path d="M4 14v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6" />
       </svg>
     </button>
+  ) : null;
+  const exportErrorPanel = exportError ? (
+    <div className="playExportError" role="status" aria-live="polite">
+      <span>{exportError}</span>
+      <button
+        type="button"
+        className="playExportErrorDismiss"
+        onClick={() => setExportError(null)}
+        aria-label="Dismiss export error"
+      >
+        Dismiss
+      </button>
+    </div>
   ) : null;
   const exportPreviewPanel = exportPreview ? (
     <div className="playExportPreview" role="dialog" aria-label="Play-by-play image preview">
@@ -970,6 +1006,7 @@ export default function Play({
     <div className="playWrapper">
       {quarterSwitcher}
       {exportButton}
+      {exportErrorPanel}
       {exportPreviewPanel}
       <div
         ref={playRef}

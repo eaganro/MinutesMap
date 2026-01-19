@@ -144,10 +144,58 @@
   justify-content: center;
 }
 
+.playExportError {
+  position: fixed;
+  right: 12px;
+  bottom: 88px;
+  z-index: 5;
+  width: min(360px, calc(100vw - 24px));
+  background: var(--bg-tooltip);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: 0 8px 18px var(--tooltip-shadow);
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.playExportErrorDismiss {
+  margin-left: auto;
+  border: 1px solid var(--border-light);
+  background: var(--bg-game);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--text-primary);
+    color: var(--bg-card);
+    border-color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--text-primary);
+    outline-offset: 2px;
+  }
+}
+
 @media (max-width: 700px) {
   .playExportPreview {
     left: 12px;
     right: 12px;
+    width: auto;
+  }
+
+  .playExportError {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    bottom: auto;
     width: auto;
   }
 }
