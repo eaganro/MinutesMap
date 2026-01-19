@@ -1,5 +1,4 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
-import html2canvas from 'html2canvas';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme'; // Adjust path
 import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
@@ -73,35 +72,9 @@ const resolveExportBackground = (element) => {
   return '#ffffff';
 };
 
-const EXPORT_PADDING_PX = {
-  top: 24,
-  right: 24,
-  bottom: 28,
-  left: 24
-};
 const DESKTOP_EXPORT_WIDTH = 1235;
 const EXPORT_TIMEOUT_MS = 15000;
 const MOBILE_EXPORT_MAX_WIDTH = 1024;
-
-const buildPaddedCanvas = (sourceCanvas, padding, backgroundColor, scale) => {
-  const padLeft = Math.round((padding.left || 0) * scale);
-  const padRight = Math.round((padding.right || 0) * scale);
-  const padTop = Math.round((padding.top || 0) * scale);
-  const padBottom = Math.round((padding.bottom || 0) * scale);
-  const output = document.createElement('canvas');
-  output.width = sourceCanvas.width + padLeft + padRight;
-  output.height = sourceCanvas.height + padTop + padBottom;
-  const ctx = output.getContext('2d');
-  if (!ctx) {
-    return sourceCanvas;
-  }
-  ctx.fillStyle = backgroundColor;
-  ctx.fillRect(0, 0, output.width, output.height);
-  ctx.drawImage(sourceCanvas, padLeft, padTop);
-  return output;
-};
-
-const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
 const withTimeout = (promise, ms, label) => {
   let timeoutId;
@@ -559,20 +532,6 @@ const canvasToBlob = (canvas) => {
   } catch (err) {
     return Promise.resolve(null);
   }
-};
-
-const getExportScale = (target, shouldForceDesktopLayout, isMobileViewport) => {
-  if (!target) return 1;
-  const rect = target.getBoundingClientRect();
-  const baseScale = Math.min(3, window.devicePixelRatio || 1);
-  const maxPixels = isMobileViewport
-    ? 2_500_000
-    : (shouldForceDesktopLayout ? 3_000_000 : 6_000_000);
-  const area = Math.max(1, rect.width * rect.height);
-  const scaleByArea = Math.sqrt(maxPixels / area);
-  const maxScale = isMobileViewport ? 1 : 2;
-  const minScale = isMobileViewport ? 0.75 : 1;
-  return Math.max(minScale, Math.min(baseScale, scaleByArea, maxScale));
 };
 
 export default function Play({ 
@@ -1114,7 +1073,9 @@ export default function Play({
 
   const buildLiteExportCanvas = (exportWidth) => {
     if (typeof window === 'undefined') return null;
-    const baseWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
+    const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
+    const outerPadding = 12;
+    const baseWidth = contentWidth + outerPadding * 2;
     const leftPad = leftMargin;
     const rightPad = rightMargin;
     const headerHeight = 54;
@@ -1123,8 +1084,9 @@ export default function Play({
     const chartHeight = 360;
     const chartTop = headerHeight + 8;
     const chartLeft = leftPad;
-    const chartWidth = Math.max(1, baseWidth - chartLeft - rightPad);
-    const baseHeight = chartTop + chartHeight + footerHeight + legendHeight;
+    const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
+    const contentHeight = chartTop + chartHeight + footerHeight + legendHeight;
+    const baseHeight = contentHeight + outerPadding * 2;
     const scale = Math.min(2, window.devicePixelRatio || 1);
 
     const canvas = document.createElement('canvas');
@@ -1137,6 +1099,7 @@ export default function Play({
     const backgroundColor = resolveExportBackground(playRef.current);
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, baseWidth, baseHeight);
+    ctx.translate(outerPadding, outerPadding);
 
     const styleSource = playRef.current || document.documentElement;
     const computed = window.getComputedStyle(styleSource);
@@ -1156,11 +1119,13 @@ export default function Play({
 
     ctx.fillStyle = textPrimary;
     ctx.font = '600 18px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${awayLabel} vs ${homeLabel}`, 6, 24);
-    if (isQuarterFocus && periodLabel) {
+    const titleText = `${awayLabel} vs ${homeLabel}`;
+    ctx.fillText(titleText, 6, 24);
+    if (isQuarterFocus && activePeriodLabel) {
+      const titleWidth = ctx.measureText(titleText).width;
       ctx.fillStyle = textSecondary;
-      ctx.font = '12px system-ui, -apple-system, sans-serif';
-      ctx.fillText(periodLabel, 6, 42);
+      ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+      ctx.fillText(activePeriodLabel, 6 + titleWidth + 8, 24);
     }
 
     const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
@@ -1174,7 +1139,7 @@ export default function Play({
       ctx.fillStyle = textPrimary;
       ctx.font = '600 14px system-ui, -apple-system, sans-serif';
       const textWidth = ctx.measureText(scoreText).width;
-      ctx.fillText(scoreText, baseWidth - 20 - textWidth, 24);
+      ctx.fillText(scoreText, contentWidth - 20 - textWidth, 24);
     }
 
     const baselineY = chartTop + chartHeight / 2;
@@ -1220,14 +1185,16 @@ export default function Play({
     });
 
     const legendTop = chartTop + chartHeight + 12;
-    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24, isQuarterFocus);
+    drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, isQuarterFocus);
 
     return canvas;
   };
 
   const buildFullExportCanvas = (exportWidth) => {
     if (typeof window === 'undefined') return null;
-    const baseWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
+    const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
+    const outerPadding = 12;
+    const baseWidth = contentWidth + outerPadding * 2;
     const leftPad = leftMargin;
     const rightPad = rightMargin;
     const headerHeight = 32;
@@ -1239,7 +1206,7 @@ export default function Play({
     const chartHeight = playAreaHeight;
     const chartTop = playAreaTop;
     const chartLeft = leftPad;
-    const chartWidth = Math.max(1, baseWidth - chartLeft - rightPad);
+    const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
 
     const awayNames = Object.keys(filteredAwayPlayers || {});
     const homeNames = Object.keys(filteredHomePlayers || {});
@@ -1248,7 +1215,8 @@ export default function Play({
     const awaySectionHeight = teamSectionHeight;
     const homeSectionHeight = teamSectionHeight;
 
-    const baseHeight = playAreaTop + playAreaHeight + legendHeight + 16;
+    const contentHeight = playAreaTop + playAreaHeight + legendHeight + 16;
+    const baseHeight = contentHeight + outerPadding * 2;
 
     const scale = Math.min(2, window.devicePixelRatio || 1);
     const canvas = document.createElement('canvas');
@@ -1261,6 +1229,7 @@ export default function Play({
     const backgroundColor = resolveExportBackground(playRef.current);
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, baseWidth, baseHeight);
+    ctx.translate(outerPadding, outerPadding);
 
     const styleSource = playRef.current || document.documentElement;
     const computed = window.getComputedStyle(styleSource);
@@ -1278,11 +1247,13 @@ export default function Play({
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = textPrimary;
     ctx.font = '600 16px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${awayLabel} vs ${homeLabel}`, 6, 22);
-    if (isQuarterFocus && periodLabel) {
+    const titleText = `${awayLabel} vs ${homeLabel}`;
+    ctx.fillText(titleText, 6, 22);
+    if (isQuarterFocus && activePeriodLabel) {
+      const titleWidth = ctx.measureText(titleText).width;
       ctx.fillStyle = textSecondary;
-      ctx.font = '12px system-ui, -apple-system, sans-serif';
-      ctx.fillText(periodLabel, 6, 38);
+      ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+      ctx.fillText(activePeriodLabel, 6 + titleWidth + 8, 22);
     }
 
     const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
@@ -1296,7 +1267,7 @@ export default function Play({
       ctx.fillStyle = textPrimary;
       ctx.font = '600 14px system-ui, -apple-system, sans-serif';
       const textWidth = ctx.measureText(scoreText).width;
-      ctx.fillText(scoreText, baseWidth - rightPad - textWidth, 22);
+      ctx.fillText(scoreText, contentWidth - rightPad - textWidth, 22);
     }
 
     const baselineY = chartTop + chartHeight / 2;
@@ -1343,12 +1314,6 @@ export default function Play({
       }
     }
 
-    if (isQuarterFocus && activePeriodLabel) {
-      ctx.fillStyle = quarterLabelColor;
-      ctx.font = '600 10px system-ui, -apple-system, sans-serif';
-      const x = chartLeft + chartWidth / 2;
-      ctx.fillText(activePeriodLabel, x - ctx.measureText(activePeriodLabel).width / 2, chartTop + 10);
-    }
 
     if (showScoreDiff && maxLead > 0) {
       let numLines = 0;
@@ -1369,7 +1334,7 @@ export default function Play({
       const drawDiffLabel = (value, y, color) => {
         const text = `${value}`;
         ctx.fillStyle = color;
-        const x = chartLeft + chartWidth;
+        const x = chartLeft + chartWidth + 5
         ctx.fillText(text, x, y + 3);
       };
       ctx.setLineDash([5, 12]);
@@ -1498,7 +1463,7 @@ export default function Play({
     );
 
     const legendTop = playAreaTop + playAreaHeight + 10;
-    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24, isQuarterFocus);
+    drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, isQuarterFocus);
 
     return canvas;
   };
@@ -1526,24 +1491,12 @@ export default function Play({
       window.matchMedia &&
       window.matchMedia(`(max-width: ${QUARTER_VIEW_BREAKPOINT}px)`).matches
     );
-    const exportTarget = isMobileViewport
-      ? playRef.current
-      : (playRef.current.closest('.playByPlaySection') || playRef.current);
     const isTouchDevice = Boolean(
       typeof window !== 'undefined' &&
       window.matchMedia &&
       window.matchMedia('(hover: none) and (pointer: coarse)').matches
     );
-    const useDataExport = isMobileViewport || isTouchDevice;
-    const shouldShowPreview = isTouchDevice || isMobileViewport;
-    const exportDesktopWidth = isMobileViewport ? MOBILE_EXPORT_MAX_WIDTH : DESKTOP_EXPORT_WIDTH;
-    const shouldForceDesktopLayout = Boolean(
-      !isMobileViewport &&
-      exportTarget &&
-      activePeriod === 0 &&
-      sectionWidth > 0 &&
-      sectionWidth < exportDesktopWidth
-    );
+    const shouldShowPreview = true;
     const exportTimeoutMs = isMobileViewport ? 30000 : EXPORT_TIMEOUT_MS;
     const resolveExportWidth = () => {
       if (!isQuarterFocus) {
@@ -1555,75 +1508,13 @@ export default function Play({
       return Math.max(360, Math.min(safeWidth, MOBILE_EXPORT_MAX_WIDTH));
     };
     const dataExportWidth = resolveExportWidth();
-    let restoreBodyOverflow = null;
     try {
       setInfoLocked(false);
       setIsHoveringIcon(false);
       resetInteraction(true);
 
-      if (!useDataExport && shouldForceDesktopLayout) {
-        exportTarget.classList.add('isDesktopExport');
-        restoreBodyOverflow = document.body.style.overflowX;
-        document.body.style.overflowX = 'hidden';
-        exportTarget.style.width = `${exportDesktopWidth}px`;
-        exportTarget.style.maxWidth = 'none';
-        for (let i = 0; i < 4; i += 1) {
-          await waitForNextFrame();
-        }
-      } else if (!useDataExport) {
-        await waitForNextFrame();
-      }
-
       let outputCanvas = null;
-      if (useDataExport) {
-        outputCanvas = buildFullExportCanvas(dataExportWidth) || buildLiteExportCanvas(dataExportWidth);
-      } else {
-        const backgroundColor = resolveExportBackground(exportTarget);
-        const scale = getExportScale(exportTarget, shouldForceDesktopLayout, isMobileViewport);
-        const canvas = await withTimeout(html2canvas(exportTarget, {
-          backgroundColor,
-          scale,
-          logging: false,
-          useCORS: true,
-          onclone: (doc) => {
-            const clonedExportButton = doc.querySelector('.playExportButton');
-            if (clonedExportButton) {
-              clonedExportButton.style.display = 'none';
-            }
-            const clonedExportPreview = doc.querySelector('.playExportPreview');
-            if (clonedExportPreview) {
-              clonedExportPreview.style.display = 'none';
-            }
-            const clonedExportError = doc.querySelector('.playExportError');
-            if (clonedExportError) {
-              clonedExportError.style.display = 'none';
-            }
-            const clonedPlayers = doc.querySelectorAll('.play .player');
-            clonedPlayers.forEach((player) => {
-              player.style.display = 'grid';
-              player.style.gridTemplateColumns = `${leftMargin}px 1fr`;
-              player.style.alignItems = 'center';
-
-              const name = player.querySelector('.playerName');
-              if (name) {
-                name.style.position = 'static';
-                name.style.width = `${leftMargin}px`;
-                name.style.gridColumn = '1';
-              }
-              const line = player.querySelector('svg.line');
-              if (line) {
-                line.style.position = 'static';
-                line.style.left = '0px';
-                line.style.marginLeft = '0px';
-                line.style.gridColumn = '2';
-                line.style.display = 'block';
-              }
-            });
-          }
-        }), exportTimeoutMs, 'Play export');
-
-        outputCanvas = buildPaddedCanvas(canvas, EXPORT_PADDING_PX, backgroundColor, scale);
-      }
+      outputCanvas = buildFullExportCanvas(dataExportWidth) || buildLiteExportCanvas(dataExportWidth);
 
       if (!outputCanvas) {
         throw new Error('Export failed: unable to build image.');
@@ -1703,14 +1594,6 @@ export default function Play({
       console.error('Play export failed.', err);
       setExportError(message);
     } finally {
-      if (shouldForceDesktopLayout && exportTarget) {
-        exportTarget.classList.remove('isDesktopExport');
-        exportTarget.style.width = '';
-        exportTarget.style.maxWidth = '';
-        if (restoreBodyOverflow !== null) {
-          document.body.style.overflowX = restoreBodyOverflow;
-        }
-      }
       setIsExporting(false);
     }
   };
