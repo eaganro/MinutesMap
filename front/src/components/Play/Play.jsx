@@ -112,6 +112,35 @@ const withTimeout = (promise, ms, label) => {
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
 };
 
+const dataUrlToBlob = (dataUrl) => {
+  if (!dataUrl) return null;
+  if (typeof atob === 'undefined') return null;
+  const parts = dataUrl.split(',');
+  if (parts.length < 2) return null;
+  const header = parts[0];
+  const data = parts[1];
+  const match = header.match(/data:(.*?);base64/);
+  const mime = match ? match[1] : 'image/png';
+  const binary = atob(data);
+  const buffer = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    buffer[i] = binary.charCodeAt(i);
+  }
+  return new Blob([buffer], { type: mime });
+};
+
+const canvasToBlob = (canvas) => {
+  if (!canvas) return Promise.resolve(null);
+  if (canvas.toBlob) {
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  }
+  try {
+    return Promise.resolve(dataUrlToBlob(canvas.toDataURL('image/png')));
+  } catch (err) {
+    return Promise.resolve(null);
+  }
+};
+
 const getExportScale = (target, shouldForceDesktopLayout, isMobileViewport) => {
   if (!target) return 1;
   const rect = target.getBoundingClientRect();
@@ -165,6 +194,8 @@ export default function Play({
   const [showLoadingText, setShowLoadingText] = useState(false);
   const [isHoveringIcon, setIsHoveringIcon] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportPreview, setExportPreview] = useState(null);
+  const exportPreviewUrlRef = useRef(null);
   const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
@@ -187,6 +218,20 @@ export default function Play({
     }
     mediaQuery.addListener(handleChange);
     return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  const setExportPreviewState = (next) => {
+    if (exportPreviewUrlRef.current && typeof URL !== 'undefined') {
+      URL.revokeObjectURL(exportPreviewUrlRef.current);
+    }
+    exportPreviewUrlRef.current = next?.url || null;
+    setExportPreview(next);
+  };
+
+  useEffect(() => () => {
+    if (exportPreviewUrlRef.current && typeof URL !== 'undefined') {
+      URL.revokeObjectURL(exportPreviewUrlRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -335,6 +380,7 @@ export default function Play({
     appliedGameIdRef.current = gameId;
     pendingGameChangeRef.current = true;
     userSelectedPeriodRef.current = false;
+    setExportPreviewState(null);
   }, [gameId]);
 
   useEffect(() => {
@@ -657,12 +703,19 @@ export default function Play({
     if (!playRef.current || isExporting) return;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     setIsExporting(true);
+    setExportPreviewState(null);
     const exportTarget = playRef.current.closest('.playByPlaySection') || playRef.current;
     const isMobileViewport = Boolean(
       typeof window !== 'undefined' &&
       window.matchMedia &&
       window.matchMedia(`(max-width: ${QUARTER_VIEW_BREAKPOINT}px)`).matches
     );
+    const isTouchDevice = Boolean(
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(hover: none) and (pointer: coarse)').matches
+    );
+    const shouldShowPreview = isTouchDevice || isMobileViewport;
     const exportDesktopWidth = isMobileViewport ? MOBILE_EXPORT_MAX_WIDTH : DESKTOP_EXPORT_WIDTH;
     const shouldForceDesktopLayout = Boolean(
       exportTarget &&
@@ -670,25 +723,6 @@ export default function Play({
       sectionWidth > 0 &&
       sectionWidth < exportDesktopWidth
     );
-    let previewWindow = null;
-    let canShareFiles = false;
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        const testFile = new File([new Blob()], 'courtvision.png', { type: 'image/png' });
-        canShareFiles = !navigator.canShare || navigator.canShare({ files: [testFile] });
-      } catch (err) {
-        canShareFiles = false;
-      }
-    }
-    if (isMobileViewport && (!navigator?.share || !canShareFiles)) {
-      previewWindow = window.open('', '_blank', 'noopener');
-      if (previewWindow?.document) {
-        previewWindow.document.title = 'Preparing image...';
-        previewWindow.document.body.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-        previewWindow.document.body.style.padding = '16px';
-        previewWindow.document.body.textContent = 'Preparing image...';
-      }
-    }
     let restoreBodyOverflow = null;
     try {
       setInfoLocked(false);
@@ -721,6 +755,10 @@ export default function Play({
           if (clonedExportButton) {
             clonedExportButton.style.display = 'none';
           }
+          const clonedExportPreview = doc.querySelector('.playExportPreview');
+          if (clonedExportPreview) {
+            clonedExportPreview.style.display = 'none';
+          }
           const clonedPlayers = doc.querySelectorAll('.play .player');
           clonedPlayers.forEach((player) => {
             player.style.display = 'grid';
@@ -746,9 +784,10 @@ export default function Play({
       }), EXPORT_TIMEOUT_MS, 'Play export');
 
       const outputCanvas = buildPaddedCanvas(canvas, EXPORT_PADDING_PX, backgroundColor, scale);
-      const blob = await withTimeout(new Promise((resolve) => {
-        outputCanvas.toBlob(resolve, 'image/png');
-      }), EXPORT_TIMEOUT_MS, 'Play export image');
+      let blob = await withTimeout(canvasToBlob(outputCanvas), EXPORT_TIMEOUT_MS, 'Play export image');
+      if (!blob && outputCanvas.toDataURL) {
+        blob = dataUrlToBlob(outputCanvas.toDataURL('image/png'));
+      }
 
       if (!blob) {
         console.error('Play export failed: image blob was empty.');
@@ -757,11 +796,25 @@ export default function Play({
 
       const fileName = buildExportFileName();
       const file = new File([blob], fileName, { type: 'image/png' });
+      const canShareFiles = Boolean(
+        typeof navigator !== 'undefined' &&
+        navigator.share &&
+        (!navigator.canShare || navigator.canShare({ files: [file] }))
+      );
+      if (shouldShowPreview) {
+        const url = URL.createObjectURL(blob);
+        setExportPreviewState({
+          url,
+          fileName,
+          file,
+          canShare: canShareFiles
+        });
+        return;
+      }
       let shared = false;
 
       if (typeof navigator !== 'undefined' && navigator.share) {
-        const canShare = !navigator.canShare || navigator.canShare({ files: [file] });
-        if (canShare) {
+        if (canShareFiles) {
           try {
             await navigator.share({
               files: [file],
@@ -778,19 +831,13 @@ export default function Play({
 
       if (!shared) {
         const url = URL.createObjectURL(blob);
-        if (previewWindow && !previewWindow.closed) {
-          previewWindow.location.href = url;
-        } else if (isMobileViewport) {
-          window.location.href = url;
-        } else {
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-        }
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 15000);
       }
     } catch (err) {
       console.error('Play export failed.', err);
@@ -803,10 +850,23 @@ export default function Play({
           document.body.style.overflowX = restoreBodyOverflow;
         }
       }
-      if (previewWindow && !previewWindow.closed) {
-        previewWindow.focus();
-      }
       setIsExporting(false);
+    }
+  };
+
+  const handleSharePreview = async () => {
+    if (!exportPreview?.file || !exportPreview?.canShare) return;
+    if (typeof navigator === 'undefined' || !navigator.share) return;
+    try {
+      await navigator.share({
+        files: [exportPreview.file],
+        title: 'Play-by-play chart'
+      });
+      setExportPreviewState(null);
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error('Play export share failed.', err);
+      }
     }
   };
 
@@ -818,8 +878,8 @@ export default function Play({
       className="playExportButton"
       onClick={handleExportImage}
       disabled={exportDisabled}
-      aria-label={isExporting ? 'Preparing image export' : 'Share image'}
-      title={isExporting ? 'Preparing image...' : 'Share image'}
+      aria-label={isExporting ? 'Preparing image export' : 'Export image'}
+      title={isExporting ? 'Preparing image...' : 'Export image'}
     >
       <svg
         width="18"
@@ -837,6 +897,44 @@ export default function Play({
         <path d="M4 14v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6" />
       </svg>
     </button>
+  ) : null;
+  const exportPreviewPanel = exportPreview ? (
+    <div className="playExportPreview" role="dialog" aria-label="Play-by-play image preview">
+      <div className="playExportPreviewHeader">
+        <span>Image ready</span>
+        <button
+          type="button"
+          className="playExportPreviewClose"
+          onClick={() => setExportPreviewState(null)}
+          aria-label="Close image preview"
+        >
+          Close
+        </button>
+      </div>
+      <div className="playExportPreviewBody">
+        <img src={exportPreview.url} alt="Play-by-play export preview" />
+      </div>
+      <div className="playExportPreviewActions">
+        {exportPreview.canShare && (
+          <button
+            type="button"
+            className="playExportActionButton"
+            onClick={handleSharePreview}
+          >
+            Share
+          </button>
+        )}
+        <a
+          className="playExportActionButton isLink"
+          href={exportPreview.url}
+          download={exportPreview.fileName}
+          target="_blank"
+          rel="noopener"
+        >
+          Open image
+        </a>
+      </div>
+    </div>
   ) : null;
 
   // --- Render Loading/Error States ---
@@ -872,6 +970,7 @@ export default function Play({
     <div className="playWrapper">
       {quarterSwitcher}
       {exportButton}
+      {exportPreviewPanel}
       <div
         ref={playRef}
         className={`play ${isDataLoading ? 'isLoading' : ''}`}
