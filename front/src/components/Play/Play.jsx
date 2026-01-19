@@ -80,6 +80,7 @@ const EXPORT_PADDING_PX = {
 };
 const DESKTOP_EXPORT_WIDTH = 1235;
 const EXPORT_TIMEOUT_MS = 15000;
+const MOBILE_EXPORT_MAX_WIDTH = 1024;
 
 const buildPaddedCanvas = (sourceCanvas, padding, backgroundColor, scale) => {
   const padLeft = Math.round((padding.left || 0) * scale);
@@ -111,14 +112,15 @@ const withTimeout = (promise, ms, label) => {
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
 };
 
-const getExportScale = (target, shouldForceDesktopLayout) => {
+const getExportScale = (target, shouldForceDesktopLayout, isMobileViewport) => {
   if (!target) return 1;
   const rect = target.getBoundingClientRect();
   const baseScale = Math.min(3, window.devicePixelRatio || 1);
-  const maxPixels = shouldForceDesktopLayout ? 4_000_000 : 8_000_000;
+  const maxPixels = shouldForceDesktopLayout ? 3_000_000 : 6_000_000;
   const area = Math.max(1, rect.width * rect.height);
   const scaleByArea = Math.sqrt(maxPixels / area);
-  return Math.max(1, Math.min(baseScale, scaleByArea, 2));
+  const maxScale = isMobileViewport ? 1 : 2;
+  return Math.max(1, Math.min(baseScale, scaleByArea, maxScale));
 };
 
 export default function Play({ 
@@ -656,12 +658,37 @@ export default function Play({
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     setIsExporting(true);
     const exportTarget = playRef.current.closest('.playByPlaySection') || playRef.current;
+    const isMobileViewport = Boolean(
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia(`(max-width: ${QUARTER_VIEW_BREAKPOINT}px)`).matches
+    );
+    const exportDesktopWidth = isMobileViewport ? MOBILE_EXPORT_MAX_WIDTH : DESKTOP_EXPORT_WIDTH;
     const shouldForceDesktopLayout = Boolean(
       exportTarget &&
       activePeriod === 0 &&
       sectionWidth > 0 &&
-      sectionWidth < DESKTOP_EXPORT_WIDTH
+      sectionWidth < exportDesktopWidth
     );
+    let previewWindow = null;
+    let canShareFiles = false;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        const testFile = new File([new Blob()], 'courtvision.png', { type: 'image/png' });
+        canShareFiles = !navigator.canShare || navigator.canShare({ files: [testFile] });
+      } catch (err) {
+        canShareFiles = false;
+      }
+    }
+    if (isMobileViewport && (!navigator?.share || !canShareFiles)) {
+      previewWindow = window.open('', '_blank', 'noopener');
+      if (previewWindow?.document) {
+        previewWindow.document.title = 'Preparing image...';
+        previewWindow.document.body.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        previewWindow.document.body.style.padding = '16px';
+        previewWindow.document.body.textContent = 'Preparing image...';
+      }
+    }
     let restoreBodyOverflow = null;
     try {
       setInfoLocked(false);
@@ -672,6 +699,8 @@ export default function Play({
         exportTarget.classList.add('isDesktopExport');
         restoreBodyOverflow = document.body.style.overflowX;
         document.body.style.overflowX = 'hidden';
+        exportTarget.style.width = `${exportDesktopWidth}px`;
+        exportTarget.style.maxWidth = 'none';
         for (let i = 0; i < 4; i += 1) {
           await waitForNextFrame();
         }
@@ -680,7 +709,7 @@ export default function Play({
       }
 
       const backgroundColor = resolveExportBackground(exportTarget);
-      const scale = getExportScale(exportTarget, shouldForceDesktopLayout);
+      const scale = getExportScale(exportTarget, shouldForceDesktopLayout, isMobileViewport);
 
       const canvas = await withTimeout(html2canvas(exportTarget, {
         backgroundColor,
@@ -749,22 +778,33 @@ export default function Play({
 
       if (!shared) {
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        if (previewWindow && !previewWindow.closed) {
+          previewWindow.location.href = url;
+        } else if (isMobileViewport) {
+          window.location.href = url;
+        } else {
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 3000);
       }
     } catch (err) {
       console.error('Play export failed.', err);
     } finally {
       if (shouldForceDesktopLayout && exportTarget) {
         exportTarget.classList.remove('isDesktopExport');
+        exportTarget.style.width = '';
+        exportTarget.style.maxWidth = '';
         if (restoreBodyOverflow !== null) {
           document.body.style.overflowX = restoreBodyOverflow;
         }
+      }
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.focus();
       }
       setIsExporting(false);
     }
