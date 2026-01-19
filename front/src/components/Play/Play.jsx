@@ -331,9 +331,10 @@ const drawScoreLeadIcon = (ctx, cx, cy, size, computedStyle) => {
   ctx.restore();
 };
 
-const drawLegend = (ctx, computedStyle, startX, startY, maxWidth) => {
+const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = false) => {
   if (!ctx) return startY;
   const rowHeight = 18;
+  const rowGap = 8;
   const textColor = getCssVar(computedStyle, '--text-secondary', '#6b7280');
   ctx.textBaseline = 'middle';
 
@@ -424,7 +425,7 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth) => {
     itemGap: 10,
     groupGap: 16
   });
-  if (rowConfig.rowWidth > maxWidth) {
+  if (rowConfig.rowWidth > maxWidth && !allowWrap) {
     rowConfig = buildRow({
       iconSize: 5,
       fontSize: 10,
@@ -434,6 +435,36 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth) => {
   }
 
   const rowY = startY + rowHeight / 2;
+
+  if (allowWrap) {
+    const rows = [[]];
+    const rowWidths = [0];
+    rowConfig.groups.forEach((group) => {
+      const rowIndex = rows.length - 1;
+      const addWidth = group.width + (rows[rowIndex].length ? rowConfig.groupGap : 0);
+      if (rows[rowIndex].length && rowWidths[rowIndex] + addWidth > maxWidth) {
+        rows.push([group]);
+        rowWidths.push(group.width);
+      } else {
+        rows[rowIndex].push(group);
+        rowWidths[rowIndex] += addWidth;
+      }
+    });
+
+    rows.forEach((row, index) => {
+      const width = rowWidths[index];
+      const rowStart = startX + Math.max(0, (maxWidth - width) / 2);
+      let cursor = rowStart;
+      const y = rowY + index * (rowHeight + rowGap);
+      row.forEach((group, groupIndex) => {
+        rowConfig.drawGroup(group, cursor, y);
+        cursor += group.width + (groupIndex < row.length - 1 ? rowConfig.groupGap : 0);
+      });
+    });
+
+    return rowY + (rows.length - 1) * (rowHeight + rowGap) + rowHeight / 2;
+  }
+
   const rowStart = startX + Math.max(0, (maxWidth - rowConfig.rowWidth) / 2);
   const scale = rowConfig.rowWidth > maxWidth ? maxWidth / rowConfig.rowWidth : 1;
 
@@ -1081,14 +1112,14 @@ export default function Play({
     </div>
   ) : null;
 
-  const buildLiteExportCanvas = () => {
+  const buildLiteExportCanvas = (exportWidth) => {
     if (typeof window === 'undefined') return null;
-    const baseWidth = DESKTOP_EXPORT_WIDTH;
+    const baseWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
     const leftPad = leftMargin;
     const rightPad = rightMargin;
     const headerHeight = 54;
     const footerHeight = 32;
-    const legendHeight = 44;
+    const legendHeight = isQuarterFocus ? 72 : 44;
     const chartHeight = 360;
     const chartTop = headerHeight + 8;
     const chartLeft = leftPad;
@@ -1125,10 +1156,12 @@ export default function Play({
 
     ctx.fillStyle = textPrimary;
     ctx.font = '600 18px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${awayLabel} vs ${homeLabel}`, chartLeft, 24);
-    ctx.fillStyle = textSecondary;
-    ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(periodLabel, chartLeft, 42);
+    ctx.fillText(`${awayLabel} vs ${homeLabel}`, 6, 24);
+    if (isQuarterFocus && periodLabel) {
+      ctx.fillStyle = textSecondary;
+      ctx.font = '12px system-ui, -apple-system, sans-serif';
+      ctx.fillText(periodLabel, 6, 42);
+    }
 
     const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
       ? filteredScoreTimeline
@@ -1187,14 +1220,14 @@ export default function Play({
     });
 
     const legendTop = chartTop + chartHeight + 12;
-    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24);
+    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24, isQuarterFocus);
 
     return canvas;
   };
 
-  const buildFullExportCanvas = () => {
+  const buildFullExportCanvas = (exportWidth) => {
     if (typeof window === 'undefined') return null;
-    const baseWidth = DESKTOP_EXPORT_WIDTH;
+    const baseWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
     const leftPad = leftMargin;
     const rightPad = rightMargin;
     const headerHeight = 32;
@@ -1202,7 +1235,7 @@ export default function Play({
     const teamLabelHeight = 18;
     const teamSectionHeight = 275;
     const playAreaHeight = 600;
-    const legendHeight = 44;
+    const legendHeight = isQuarterFocus ? 72 : 44;
     const chartHeight = playAreaHeight;
     const chartTop = playAreaTop;
     const chartLeft = leftPad;
@@ -1245,11 +1278,11 @@ export default function Play({
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = textPrimary;
     ctx.font = '600 16px system-ui, -apple-system, sans-serif';
-    ctx.fillText(`${awayLabel} vs ${homeLabel}`, chartLeft, 22);
+    ctx.fillText(`${awayLabel} vs ${homeLabel}`, 6, 22);
     if (isQuarterFocus && periodLabel) {
       ctx.fillStyle = textSecondary;
       ctx.font = '12px system-ui, -apple-system, sans-serif';
-      ctx.fillText(periodLabel, chartLeft, 38);
+      ctx.fillText(periodLabel, 6, 38);
     }
 
     const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
@@ -1465,7 +1498,7 @@ export default function Play({
     );
 
     const legendTop = playAreaTop + playAreaHeight + 10;
-    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24);
+    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24, isQuarterFocus);
 
     return canvas;
   };
@@ -1512,6 +1545,16 @@ export default function Play({
       sectionWidth < exportDesktopWidth
     );
     const exportTimeoutMs = isMobileViewport ? 30000 : EXPORT_TIMEOUT_MS;
+    const resolveExportWidth = () => {
+      if (!isQuarterFocus) {
+        return DESKTOP_EXPORT_WIDTH;
+      }
+      const measuredWidth = playRef.current?.getBoundingClientRect?.().width;
+      const candidate = Number(measuredWidth || sectionWidth || 0);
+      const safeWidth = candidate > 0 ? candidate : MOBILE_EXPORT_MAX_WIDTH;
+      return Math.max(360, Math.min(safeWidth, MOBILE_EXPORT_MAX_WIDTH));
+    };
+    const dataExportWidth = resolveExportWidth();
     let restoreBodyOverflow = null;
     try {
       setInfoLocked(false);
@@ -1533,7 +1576,7 @@ export default function Play({
 
       let outputCanvas = null;
       if (useDataExport) {
-        outputCanvas = buildFullExportCanvas() || buildLiteExportCanvas();
+        outputCanvas = buildFullExportCanvas(dataExportWidth) || buildLiteExportCanvas(dataExportWidth);
       } else {
         const backgroundColor = resolveExportBackground(exportTarget);
         const scale = getExportScale(exportTarget, shouldForceDesktopLayout, isMobileViewport);
