@@ -281,6 +281,183 @@ const drawFreeThrowRing = (ctx, cx, cy, size, description, subType, computedStyl
   ctx.stroke();
 };
 
+const drawFreeThrowLegendRing = (ctx, cx, cy, size, computedStyle, isMiss) => {
+  if (!ctx) return;
+  const ringColor = isMiss
+    ? getCssVar(computedStyle, '--event-miss', '#475569')
+    : getCssVar(computedStyle, '--event-point', '#F59E0B');
+  ctx.strokeStyle = ringColor;
+  ctx.lineWidth = Math.max(1, size * 0.35);
+  ctx.beginPath();
+  ctx.arc(cx, cy, size, 0, Math.PI * 2);
+  ctx.stroke();
+};
+
+const drawScoreLeadIcon = (ctx, cx, cy, size, computedStyle) => {
+  if (!ctx) return;
+  const color = getCssVar(computedStyle, '--text-secondary', '#6b7280');
+  const left = cx - size;
+  const top = cy - size;
+  const width = size * 2;
+  const height = size * 2;
+  const px = (value) => left + value * width;
+  const py = (value) => top + value * height;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, size * 0.2);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(px(0.05), py(0.55));
+  ctx.lineTo(px(0.28), py(0.3));
+  ctx.lineTo(px(0.5), py(0.55));
+  ctx.lineTo(px(0.73), py(0.2));
+  ctx.lineTo(px(0.95), py(0.42));
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(px(0.05), py(0.55));
+  ctx.lineTo(px(0.28), py(0.3));
+  ctx.lineTo(px(0.5), py(0.55));
+  ctx.lineTo(px(0.73), py(0.2));
+  ctx.lineTo(px(0.95), py(0.42));
+  ctx.lineTo(px(0.95), py(0.9));
+  ctx.lineTo(px(0.05), py(0.9));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+};
+
+const drawLegend = (ctx, computedStyle, startX, startY, maxWidth) => {
+  if (!ctx) return startY;
+  const rowHeight = 18;
+  const textColor = getCssVar(computedStyle, '--text-secondary', '#6b7280');
+  ctx.textBaseline = 'middle';
+
+  const buildRow = ({ iconSize, fontSize, itemGap, groupGap }) => {
+    const iconBox = iconSize * 2;
+    ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
+
+    const createItem = (label, drawIcon) => {
+      const labelWidth = ctx.measureText(label).width;
+      return {
+        label,
+        drawIcon,
+        width: iconBox + 4 + labelWidth,
+      };
+    };
+
+    const buildGroup = (items) => {
+      const total = items.reduce((sum, item) => sum + item.width, 0);
+      return {
+        items,
+        width: total + itemGap * Math.max(0, items.length - 1),
+      };
+    };
+
+    const drawGroup = (group, x, y) => {
+      let cursor = x;
+      group.items.forEach((item) => {
+        item.drawIcon(cursor + iconSize, y - 1);
+        ctx.fillStyle = textColor;
+        ctx.fillText(item.label, cursor + iconBox + 4, y);
+        cursor += item.width + itemGap;
+      });
+    };
+
+    const pointGroup = buildGroup([
+      createItem('2PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, false)),
+      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, true)),
+      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, false)),
+    ]);
+    const missGroup = buildGroup([
+      createItem('Miss', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, false)),
+      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, true)),
+      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, true)),
+    ]);
+    const reboundGroup = buildGroup([
+      createItem('Rebound', (cx, cy) => drawEventShape(ctx, 'rebound', cx, cy, iconSize, computedStyle, false)),
+    ]);
+    const assistGroup = buildGroup([
+      createItem('Assist', (cx, cy) => drawEventShape(ctx, 'assist', cx, cy, iconSize, computedStyle, false)),
+    ]);
+    const turnoverGroup = buildGroup([
+      createItem('Turnover', (cx, cy) => drawEventShape(ctx, 'turnover', cx, cy, iconSize, computedStyle, false)),
+    ]);
+    const blockGroup = buildGroup([
+      createItem('Block', (cx, cy) => drawEventShape(ctx, 'block', cx, cy, iconSize, computedStyle, false)),
+    ]);
+    const stealGroup = buildGroup([
+      createItem('Steal', (cx, cy) => drawEventShape(ctx, 'steal', cx, cy, iconSize, computedStyle, false)),
+    ]);
+    const foulGroup = buildGroup([
+      createItem('Foul', (cx, cy) => drawEventShape(ctx, 'foul', cx, cy, iconSize, computedStyle, false)),
+    ]);
+    const scoreLeadGroup = buildGroup([
+      createItem('Score Lead', (cx, cy) => drawScoreLeadIcon(ctx, cx, cy, iconSize)),
+    ]);
+
+    const groups = [
+      pointGroup,
+      missGroup,
+      reboundGroup,
+      assistGroup,
+      turnoverGroup,
+      blockGroup,
+      stealGroup,
+      foulGroup,
+      scoreLeadGroup
+    ];
+
+    const rowWidth = groups.reduce((sum, group) => sum + group.width, 0)
+      + groupGap * Math.max(0, groups.length - 1);
+
+    return { groups, rowWidth, drawGroup, groupGap };
+  };
+
+  let rowConfig = buildRow({
+    iconSize: 6,
+    fontSize: 11,
+    itemGap: 10,
+    groupGap: 16
+  });
+  if (rowConfig.rowWidth > maxWidth) {
+    rowConfig = buildRow({
+      iconSize: 5,
+      fontSize: 10,
+      itemGap: 8,
+      groupGap: 12
+    });
+  }
+
+  const rowY = startY + rowHeight / 2;
+  const rowStart = startX + Math.max(0, (maxWidth - rowConfig.rowWidth) / 2);
+  const scale = rowConfig.rowWidth > maxWidth ? maxWidth / rowConfig.rowWidth : 1;
+
+  ctx.save();
+  if (scale !== 1) {
+    ctx.translate(rowStart, 0);
+    ctx.scale(scale, 1);
+    let cursor = 0;
+    rowConfig.groups.forEach((group, index) => {
+      rowConfig.drawGroup(group, cursor, rowY);
+      cursor += group.width + (index < rowConfig.groups.length - 1 ? rowConfig.groupGap : 0);
+    });
+  } else {
+    let cursor = rowStart;
+    rowConfig.groups.forEach((group, index) => {
+      rowConfig.drawGroup(group, cursor, rowY);
+      cursor += group.width + (index < rowConfig.groups.length - 1 ? rowConfig.groupGap : 0);
+    });
+  }
+  ctx.restore();
+
+  return rowY + rowHeight / 2;
+};
+
 const drawStepScoreDiff = ({
   ctx,
   baselineY,
@@ -911,11 +1088,12 @@ export default function Play({
     const rightPad = rightMargin;
     const headerHeight = 54;
     const footerHeight = 32;
+    const legendHeight = 44;
     const chartHeight = 360;
     const chartTop = headerHeight + 8;
     const chartLeft = leftPad;
     const chartWidth = Math.max(1, baseWidth - chartLeft - rightPad);
-    const baseHeight = chartTop + chartHeight + footerHeight;
+    const baseHeight = chartTop + chartHeight + footerHeight + legendHeight;
     const scale = Math.min(2, window.devicePixelRatio || 1);
 
     const canvas = document.createElement('canvas');
@@ -1008,6 +1186,9 @@ export default function Play({
       homeColor: homeColor || lineColor,
     });
 
+    const legendTop = chartTop + chartHeight + 12;
+    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24);
+
     return canvas;
   };
 
@@ -1021,6 +1202,7 @@ export default function Play({
     const teamLabelHeight = 18;
     const teamSectionHeight = 275;
     const playAreaHeight = 600;
+    const legendHeight = 44;
     const chartHeight = playAreaHeight;
     const chartTop = playAreaTop;
     const chartLeft = leftPad;
@@ -1033,7 +1215,7 @@ export default function Play({
     const awaySectionHeight = teamSectionHeight;
     const homeSectionHeight = teamSectionHeight;
 
-    const baseHeight = playAreaTop + playAreaHeight + 16;
+    const baseHeight = playAreaTop + playAreaHeight + legendHeight + 16;
 
     const scale = Math.min(2, window.devicePixelRatio || 1);
     const canvas = document.createElement('canvas');
@@ -1064,9 +1246,11 @@ export default function Play({
     ctx.fillStyle = textPrimary;
     ctx.font = '600 16px system-ui, -apple-system, sans-serif';
     ctx.fillText(`${awayLabel} vs ${homeLabel}`, chartLeft, 22);
-    ctx.fillStyle = textSecondary;
-    ctx.font = '12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(periodLabel, chartLeft, 38);
+    if (isQuarterFocus && periodLabel) {
+      ctx.fillStyle = textSecondary;
+      ctx.font = '12px system-ui, -apple-system, sans-serif';
+      ctx.fillText(periodLabel, chartLeft, 38);
+    }
 
     const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
       ? filteredScoreTimeline
@@ -1149,6 +1333,12 @@ export default function Play({
         numLines = Math.floor(maxLead / 20);
         lineJump = 20;
       }
+      const drawDiffLabel = (value, y, color) => {
+        const text = `${value}`;
+        ctx.fillStyle = color;
+        const x = chartLeft + chartWidth;
+        ctx.fillText(text, x, y + 3);
+      };
       ctx.setLineDash([5, 12]);
       ctx.lineWidth = 1;
       for (let i = 0; i < numLines; i += 1) {
@@ -1162,16 +1352,14 @@ export default function Play({
         ctx.moveTo(chartLeft, posy);
         ctx.lineTo(chartLeft + chartWidth, posy);
         ctx.stroke();
-        ctx.fillStyle = teamColors.away;
-        ctx.fillText(`${value}`, chartLeft + chartWidth + 4, posy + 3);
+        drawDiffLabel(value, posy, teamColors.away);
 
         ctx.strokeStyle = teamColors.home;
         ctx.beginPath();
         ctx.moveTo(chartLeft, negy);
         ctx.lineTo(chartLeft + chartWidth, negy);
         ctx.stroke();
-        ctx.fillStyle = teamColors.home;
-        ctx.fillText(`${value}`, chartLeft + chartWidth + 4, negy + 3);
+        drawDiffLabel(value, negy, teamColors.home);
       }
       ctx.setLineDash([]);
     }
@@ -1275,6 +1463,9 @@ export default function Play({
       cursorY,
       homeRowHeight
     );
+
+    const legendTop = playAreaTop + playAreaHeight + 10;
+    drawLegend(ctx, computed, 12, legendTop, baseWidth - 24);
 
     return canvas;
   };
