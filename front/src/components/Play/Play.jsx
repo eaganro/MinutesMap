@@ -79,6 +79,7 @@ const EXPORT_PADDING_PX = {
   left: 24
 };
 const DESKTOP_EXPORT_WIDTH = 1235;
+const EXPORT_TIMEOUT_MS = 15000;
 
 const buildPaddedCanvas = (sourceCanvas, padding, backgroundColor, scale) => {
   const padLeft = Math.round((padding.left || 0) * scale);
@@ -99,6 +100,26 @@ const buildPaddedCanvas = (sourceCanvas, padding, backgroundColor, scale) => {
 };
 
 const waitForNextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+
+const withTimeout = (promise, ms, label) => {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+};
+
+const getExportScale = (target, shouldForceDesktopLayout) => {
+  if (!target) return 1;
+  const rect = target.getBoundingClientRect();
+  const baseScale = Math.min(3, window.devicePixelRatio || 1);
+  const maxPixels = shouldForceDesktopLayout ? 4_000_000 : 8_000_000;
+  const area = Math.max(1, rect.width * rect.height);
+  const scaleByArea = Math.sqrt(maxPixels / area);
+  return Math.max(1, Math.min(baseScale, scaleByArea, 2));
+};
 
 export default function Play({ 
   gameId,
@@ -659,9 +680,9 @@ export default function Play({
       }
 
       const backgroundColor = resolveExportBackground(exportTarget);
-      const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
+      const scale = getExportScale(exportTarget, shouldForceDesktopLayout);
 
-      const canvas = await html2canvas(exportTarget, {
+      const canvas = await withTimeout(html2canvas(exportTarget, {
         backgroundColor,
         scale,
         logging: false,
@@ -693,12 +714,12 @@ export default function Play({
             }
           });
         }
-      });
+      }), EXPORT_TIMEOUT_MS, 'Play export');
 
       const outputCanvas = buildPaddedCanvas(canvas, EXPORT_PADDING_PX, backgroundColor, scale);
-      const blob = await new Promise((resolve) => {
+      const blob = await withTimeout(new Promise((resolve) => {
         outputCanvas.toBlob(resolve, 'image/png');
-      });
+      }), EXPORT_TIMEOUT_MS, 'Play export image');
 
       if (!blob) {
         console.error('Play export failed: image blob was empty.');
