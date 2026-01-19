@@ -140,10 +140,10 @@ function getSafeBackground(hexColor, darkMode = false) {
     // Dark mode: use higher opacity and brighten dark colors
     if (color.isDark()) {
       // Lighten very dark colors and use higher opacity
-      return color.lighten(20).setAlpha(0.5).toRgbString();
+      return color.lighten(20).setAlpha(0.25).toRgbString();
     }
     // For bright colors in dark mode, just increase opacity
-    return color.setAlpha(0.45).toRgbString();
+    return color.setAlpha(0.2).toRgbString();
   }
   
   // Light mode (original behavior)
