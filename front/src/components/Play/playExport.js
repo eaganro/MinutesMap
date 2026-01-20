@@ -4,6 +4,7 @@ import { EVENT_TYPES, getEventType, isFreeThrowAction } from '../../helpers/even
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;
 const TIMELINE_ICON_SCALE = 0.8;
+const WATERMARK_TEXT = 'CourtVision.roryeagan.com';
 const EXPORT_RENDER_SCALE = 2.5;
 const EXPORT_MAX_SCALE = 3;
 
@@ -300,6 +301,18 @@ const drawScoreLeadIcon = (ctx, cx, cy, size, computedStyle) => {
   ctx.lineTo(px(0.05), py(0.9));
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+};
+
+const drawWatermark = (ctx, computedStyle, x, y) => {
+  if (!ctx) return;
+  const baseColor = getCssVar(computedStyle, '--text-secondary', '#6b7280');
+  ctx.save();
+  ctx.fillStyle = baseColor;
+  ctx.globalAlpha = 0.6;
+  ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(WATERMARK_TEXT, x, y);
   ctx.restore();
 };
 
@@ -707,6 +720,7 @@ const buildLiteExportCanvas = ({
 
   const legendTop = chartTop + chartHeight + 12;
   drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff);
+  drawWatermark(ctx, computed, 6, contentHeight - 6);
 
   return canvas;
 };
@@ -1045,6 +1059,7 @@ const buildFullExportCanvas = ({
 
   const legendTop = playAreaTop + playAreaHeight + 10;
   drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff);
+  drawWatermark(ctx, computed, 6, contentHeight - 6);
 
   return canvas;
 };
