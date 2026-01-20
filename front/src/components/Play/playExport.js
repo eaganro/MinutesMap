@@ -4,6 +4,12 @@ import { EVENT_TYPES, getEventType, isFreeThrowAction } from '../../helpers/even
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;
 const TIMELINE_ICON_SCALE = 0.8;
+const EXPORT_RENDER_SCALE = 2.5;
+const EXPORT_MAX_SCALE = 3;
+
+const getExportScale = () => (
+  Math.min(EXPORT_MAX_SCALE, (window.devicePixelRatio || 1) * EXPORT_RENDER_SCALE)
+);
 
 const sanitizeFilePart = (value) => (
   String(value || '')
@@ -591,7 +597,7 @@ const buildLiteExportCanvas = ({
   const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
   const contentHeight = chartTop + chartHeight + footerHeight + legendHeight;
   const baseHeight = contentHeight + outerPadding * 2;
-  const scale = Math.min(2, window.devicePixelRatio || 1);
+  const scale = getExportScale();
 
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(baseWidth * scale);
@@ -760,7 +766,7 @@ const buildFullExportCanvas = ({
   const contentHeight = playAreaTop + playAreaHeight + legendHeight + 16;
   const baseHeight = contentHeight + outerPadding * 2;
 
-  const scale = Math.min(2, window.devicePixelRatio || 1);
+  const scale = getExportScale();
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(baseWidth * scale);
   canvas.height = Math.round(baseHeight * scale);
