@@ -93,6 +93,7 @@ export default function App() {
           <Play
             gameId={gameId}
             gameStatus={gameStatus}
+            gameDate={gameDate}
             awayTeamNames={awayTeamName}
             homeTeamNames={homeTeamName}
             awayPlayers={awayActions}
@@ -107,6 +108,7 @@ export default function App() {
             isLoading={isPlayLoading}
             statusMessage={gameStatusMessage}
             showScoreDiff={showScoreDiff}
+            statOn={statOn}
           />
           <StatButtons
             statOn={statOn}

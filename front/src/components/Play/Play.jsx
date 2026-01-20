@@ -13,6 +13,8 @@ import {
   DESKTOP_EXPORT_WIDTH,
   MOBILE_EXPORT_MAX_WIDTH,
 } from './playExport';
+import { buildExportRangeData, buildRangeLabel, formatPeriodLabel } from './playExportRange';
+import { useExportRange } from './useExportRange';
 
 // Sub-components
 import Player from './Player/Player';
@@ -71,6 +73,7 @@ const withTimeout = (promise, ms, label) => {
 export default function Play({ 
   gameId,
   gameStatus,
+  gameDate,
   awayTeamNames, 
   homeTeamNames, 
   awayPlayers, 
@@ -84,7 +87,8 @@ export default function Play({
   lastAction, 
   isLoading, 
   statusMessage, 
-  showScoreDiff = true 
+  showScoreDiff = true,
+  statOn
 }) {
   const playRef = useRef(null);
   const appliedGameIdRef = useRef(gameId);
@@ -100,6 +104,7 @@ export default function Play({
     homePlayerTimeline,
     numQs,
     lastAction,
+    gameDate,
   });
   const lastStatusMessageRef = useRef(statusMessage);
   const touchStartRef = useRef({ x: 0, y: 0 });
@@ -113,6 +118,8 @@ export default function Play({
   const [exportPreview, setExportPreview] = useState(null);
   const [exportError, setExportError] = useState(null);
   const exportPreviewUrlRef = useRef(null);
+  const exportRangeKeyRef = useRef('1-1');
+  const exportPreviewRef = useRef(null);
   const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
@@ -138,11 +145,19 @@ export default function Play({
   }, []);
 
   const setExportPreviewState = (next) => {
-    if (exportPreviewUrlRef.current && typeof URL !== 'undefined') {
-      URL.revokeObjectURL(exportPreviewUrlRef.current);
-    }
-    exportPreviewUrlRef.current = next?.url || null;
-    setExportPreview(next);
+    setExportPreview((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      const nextUrl = resolved?.url || null;
+      if (
+        exportPreviewUrlRef.current &&
+        exportPreviewUrlRef.current !== nextUrl &&
+        typeof URL !== 'undefined'
+      ) {
+        URL.revokeObjectURL(exportPreviewUrlRef.current);
+      }
+      exportPreviewUrlRef.current = nextUrl;
+      return resolved;
+    });
   };
 
   useEffect(() => () => {
@@ -150,6 +165,27 @@ export default function Play({
       URL.revokeObjectURL(exportPreviewUrlRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!exportPreview) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setExportPreviewState(null);
+      }
+    };
+    const handlePointerDown = (event) => {
+      if (!exportPreviewRef.current) return;
+      if (!exportPreviewRef.current.contains(event.target)) {
+        setExportPreviewState(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [exportPreview]);
 
   useEffect(() => {
     if (isLoading || isBlurred) {
@@ -166,6 +202,7 @@ export default function Play({
       homePlayerTimeline,
       numQs,
       lastAction,
+      gameDate,
     };
   }, [
     isLoading,
@@ -180,6 +217,7 @@ export default function Play({
     homePlayerTimeline,
     numQs,
     lastAction,
+    gameDate,
   ]);
 
   useEffect(() => {
@@ -203,6 +241,7 @@ export default function Play({
       homePlayerTimeline,
       numQs,
       lastAction,
+      gameDate,
     };
   const isShowingStableData = Boolean(showStableData);
 
@@ -217,6 +256,7 @@ export default function Play({
     homePlayerTimeline: displayHomePlayerTimeline,
     numQs: displayNumQs,
     lastAction: displayLastAction,
+    gameDate: displayGameDate,
   } = displayData;
 
   const hasDisplayData = hasPlayData(displayData);
@@ -264,11 +304,16 @@ export default function Play({
       const period = i + 1;
       options.push({
         period,
-        label: period <= 4 ? `Q${period}` : `O${period - 4}`,
+        label: formatPeriodLabel(period),
       });
     }
     return options;
   }, [numPeriods]);
+
+  const exportPeriodOptions = useMemo(
+    () => periodOptions.filter((option) => option.period > 0),
+    [periodOptions]
+  );
 
   const isFinal = useMemo(() => {
     if (typeof gameStatus === 'string' && gameStatus.trim().startsWith('Final')) {
@@ -291,6 +336,13 @@ export default function Play({
   }, [displayLastAction?.period]);
 
   const [selectedPeriod, setSelectedPeriod] = useState(null);
+
+  const {
+    resolvedExportRange,
+    handleExportRangeStartChange,
+    handleExportRangeEndChange,
+  } = useExportRange({ gameId, numPeriods });
+  const exportRangeKey = `${resolvedExportRange.start}-${resolvedExportRange.end}`;
 
   useEffect(() => {
     if (gameId === appliedGameIdRef.current) return;
@@ -325,9 +377,7 @@ export default function Play({
     : selectedPeriod;
   const activePeriod = isQuarterView ? (resolvedSelectedPeriod !== null ? resolvedSelectedPeriod : defaultPeriod) : null;
   const isQuarterFocus = isQuarterView && activePeriod !== 0;
-  const activePeriodLabel = isQuarterFocus
-    ? (activePeriod <= 4 ? `Q${activePeriod}` : `O${activePeriod - 4}`)
-    : '';
+  const activePeriodLabel = isQuarterFocus ? formatPeriodLabel(activePeriod) : '';
 
   const timelineWindow = useMemo(() => {
     const totalSeconds = getGameTotalSeconds(numPeriods);
@@ -605,11 +655,15 @@ export default function Play({
     </div>
   ) : null;
 
-  const handleExportImage = async () => {
+  const handleExportImage = async ({ keepPreviewOpen = false } = {}) => {
     if (!playRef.current || isExporting) return;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     setIsExporting(true);
-    setExportPreviewState(null);
+    setExportPreviewState((prev) => {
+      if (!keepPreviewOpen) return null;
+      if (!prev) return prev;
+      return { ...prev, isUpdating: true };
+    });
     setExportError(null);
     const isMobileViewport = Boolean(
       typeof window !== 'undefined' &&
@@ -618,42 +672,73 @@ export default function Play({
     );
     const shouldShowPreview = true;
     const exportTimeoutMs = isMobileViewport ? 30000 : EXPORT_TIMEOUT_MS;
-    const resolveExportWidth = () => {
-      if (!isQuarterFocus) {
-        return DESKTOP_EXPORT_WIDTH;
-      }
-      const measuredWidth = playRef.current?.getBoundingClientRect?.().width;
-      const candidate = Number(measuredWidth || sectionWidth || 0);
-      const safeWidth = candidate > 0 ? candidate : MOBILE_EXPORT_MAX_WIDTH;
-      return Math.max(360, Math.min(safeWidth, MOBILE_EXPORT_MAX_WIDTH));
-    };
-    const dataExportWidth = resolveExportWidth();
+    const exportRangeSnapshot = resolvedExportRange;
+    exportRangeKeyRef.current = `${exportRangeSnapshot.start}-${exportRangeSnapshot.end}`;
+    const exportIsFullGameRange = exportRangeSnapshot.isFullGame;
+    const exportRangeLabel = buildRangeLabel(exportRangeSnapshot);
+    const legendShouldWrap = !exportIsFullGameRange;
+    const endAtLastScore = !isFinal;
     try {
       setInfoLocked(false);
       setIsHoveringIcon(false);
       resetInteraction(true);
 
+      const {
+        durationRatio,
+        exportAwayPlayers,
+        exportAwayPlayerTimeline,
+        exportEndAtSeconds,
+        exportHomePlayers,
+        exportHomePlayerTimeline,
+        exportScoreStats,
+        exportScoreTimeline,
+        exportStartScoreDiff,
+        exportStatusLabel,
+        exportTimelineWindow,
+      } = buildExportRangeData({
+        displayAwayPlayers,
+        displayAwayPlayerTimeline,
+        displayHomePlayers,
+        displayHomePlayerTimeline,
+        displayLastAction,
+        displayScoreTimeline,
+        exportRangeSnapshot,
+        gameStatus,
+        isFinal,
+        numPeriods,
+        timelineWindow,
+      });
+      const scaledWidth = DESKTOP_EXPORT_WIDTH * durationRatio;
+      const dataExportWidth = exportIsFullGameRange
+        ? DESKTOP_EXPORT_WIDTH
+        : Math.max(360, Math.min(MOBILE_EXPORT_MAX_WIDTH, scaledWidth));
+
       const outputCanvas = buildPlayExportCanvas({
         exportWidth: dataExportWidth,
-        isQuarterFocus,
-        activePeriodLabel,
+        legendShouldWrap,
+        rangeLabel: exportRangeLabel,
+        periodRange: exportRangeSnapshot,
         leftMargin,
         rightMargin,
         playRef,
+        gameDate: displayGameDate,
         displayAwayTeamNames,
         displayHomeTeamNames,
-        filteredAwayPlayers,
-        filteredHomePlayers,
-        filteredAwayPlayerTimeline,
-        filteredHomePlayerTimeline,
-        filteredScoreTimeline,
+        filteredAwayPlayers: exportAwayPlayers,
+        filteredHomePlayers: exportHomePlayers,
+        filteredAwayPlayerTimeline: exportAwayPlayerTimeline,
+        filteredHomePlayerTimeline: exportHomePlayerTimeline,
+        filteredScoreTimeline: exportScoreTimeline,
         displayScoreTimeline,
-        displayNumQs,
-        startScoreDiff,
-        timelineWindow,
-        maxY,
-        maxLead,
+        statusLabel: exportStatusLabel,
+        endAtLastScore,
+        endAtSeconds: exportEndAtSeconds,
+        startScoreDiff: exportStartScoreDiff,
+        timelineWindow: exportTimelineWindow,
+        maxY: exportScoreStats.maxY,
+        maxLead: exportScoreStats.maxLead,
         showScoreDiff,
+        statOn,
         teamColors,
         awayColor,
         homeColor,
@@ -675,9 +760,8 @@ export default function Play({
       const fileName = buildPlayExportFileName({
         awayTeamNames: displayAwayTeamNames,
         homeTeamNames: displayHomeTeamNames,
-        isQuarterFocus,
-        activePeriodLabel,
-        activePeriod,
+        rangeLabel: exportRangeLabel,
+        isFullGameRange: exportIsFullGameRange,
         gameId,
       });
       let file = null;
@@ -706,7 +790,8 @@ export default function Play({
           url,
           fileName,
           file,
-          canShare: canShareFiles
+          canShare: canShareFiles,
+          isUpdating: false
         });
         return;
       }
@@ -744,6 +829,9 @@ export default function Play({
       console.error('Play export failed.', err);
       setExportError(message);
     } finally {
+      if (keepPreviewOpen) {
+        setExportPreviewState((prev) => (prev ? { ...prev, isUpdating: false } : prev));
+      }
       setIsExporting(false);
     }
   };
@@ -763,6 +851,13 @@ export default function Play({
       }
     }
   };
+
+  useEffect(() => {
+    if (!exportPreview) return;
+    if (exportRangeKeyRef.current === exportRangeKey) return;
+    exportRangeKeyRef.current = exportRangeKey;
+    handleExportImage({ keepPreviewOpen: true });
+  }, [exportPreview, exportRangeKey, handleExportImage]);
 
   const showLoadingIndicator = isLoading && !hasDisplayData && !showStatusMessage;
   const exportDisabled = !hasDisplayData || isDataLoading || isExporting;
@@ -805,10 +900,19 @@ export default function Play({
       </button>
     </div>
   ) : null;
+  const exportRangeEndOptions = exportPeriodOptions.filter(
+    (option) => option.period >= resolvedExportRange.start
+  );
+  const previewIsUpdating = Boolean(exportPreview?.isUpdating);
   const exportPreviewPanel = exportPreview ? (
-    <div className="playExportPreview" role="dialog" aria-label="Play-by-play image preview">
+    <div
+      className="playExportPreview"
+      role="dialog"
+      aria-label="Play-by-play image preview"
+      ref={exportPreviewRef}
+    >
       <div className="playExportPreviewHeader">
-        <span>Image ready</span>
+        <span>Image builder</span>
         <button
           type="button"
           className="playExportPreviewClose"
@@ -818,6 +922,38 @@ export default function Play({
           Close
         </button>
       </div>
+      {exportPeriodOptions.length > 0 && (
+        <div className="playExportPreviewOptions">
+          <label className="playExportOption">
+            <span>Start</span>
+            <select
+              value={resolvedExportRange.start}
+              onChange={handleExportRangeStartChange}
+              disabled={isExporting || previewIsUpdating}
+            >
+              {exportPeriodOptions.map(({ period, label }) => (
+                <option key={period} value={period}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="playExportOption">
+            <span>End</span>
+            <select
+              value={resolvedExportRange.end}
+              onChange={handleExportRangeEndChange}
+              disabled={isExporting || previewIsUpdating}
+            >
+              {exportRangeEndOptions.map(({ period, label }) => (
+                <option key={period} value={period}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       <div className="playExportPreviewBody">
         <img src={exportPreview.url} alt="Play-by-play export preview" />
       </div>
@@ -834,7 +970,6 @@ export default function Play({
         <a
           className="playExportActionButton isLink"
           href={exportPreview.url}
-          download={exportPreview.fileName}
           target="_blank"
           rel="noopener"
         >

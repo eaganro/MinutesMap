@@ -1,8 +1,9 @@
-import { getSecondsElapsed } from '../../helpers/playTimeline';
+import { getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
 import { EVENT_TYPES, getEventType, isFreeThrowAction } from '../../helpers/eventStyles.jsx';
 
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;
+const TIMELINE_ICON_SCALE = 0.8;
 
 const sanitizeFilePart = (value) => (
   String(value || '')
@@ -30,17 +31,14 @@ const resolveExportBackground = (element) => {
 export const buildPlayExportFileName = ({
   awayTeamNames,
   homeTeamNames,
-  isQuarterFocus,
-  activePeriodLabel,
-  activePeriod,
+  rangeLabel,
+  isFullGameRange,
   gameId
 }) => {
   const away = awayTeamNames?.abr || 'Away';
   const home = homeTeamNames?.abr || 'Home';
-  const periodLabel = isQuarterFocus
-    ? (activePeriodLabel || `P${activePeriod}`)
-    : 'Game';
-  const base = `${away}-vs-${home}-${periodLabel}`;
+  const periodLabel = rangeLabel || (isFullGameRange ? 'Game' : 'Range');
+  const base = periodLabel ? `${away}-vs-${home}-${periodLabel}` : `${away}-vs-${home}`;
   const safeBase = sanitizeFilePart(base) || 'play-by-play';
   const suffix = gameId ? `-${sanitizeFilePart(gameId)}` : '';
   return `${safeBase}${suffix}.png`;
@@ -91,7 +89,21 @@ const truncateText = (ctx, text, maxWidth) => {
   return trimmed ? `${trimmed}...` : text;
 };
 
+const formatPeriodLabel = (period) => {
+  const value = Number(period);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  return value <= 4 ? `Q${value}` : `O${value - 4}`;
+};
+
+const formatGameDate = (value) => {
+  if (!value) return '';
+  const dateObj = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(dateObj.getTime())) return '';
+  return dateObj.toDateString().slice(4);
+};
+
 const FREE_THROW_PATTERN = /free throw\s+(\d+)\s+of\s+(\d+)/i;
+const FREE_THROW_ONE_OF_ONE_PATTERN = /free throw\s+1\s+of\s+1/i;
 
 const getFreeThrowAttempt = (description, subType) => {
   const text = `${subType || ''} ${description || ''}`;
@@ -107,6 +119,11 @@ const getFreeThrowRingRatio = (attempt, total) => {
   if (attempt === 1) return 0.6;
   if (attempt === 2) return 0.8;
   return 1.1;
+};
+
+const isOneOfOneFreeThrow = (action) => {
+  const text = `${action?.subType || ''} ${action?.description || ''}`;
+  return FREE_THROW_ONE_OF_ONE_PATTERN.test(text);
 };
 
 const drawPolygon = (ctx, points) => {
@@ -209,18 +226,22 @@ const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
   }
 };
 
-const drawFreeThrowRing = (ctx, cx, cy, size, description, subType, computedStyle) => {
+const drawFreeThrowRing = (ctx, cx, cy, size, description, subType, computedStyle, isAnd1 = false) => {
   if (!ctx) return;
   const desc = (description || '').toString().toLowerCase();
   const isMiss = desc.includes('miss');
   const { attempt, total } = getFreeThrowAttempt(description, subType);
-  const ringRatio = getFreeThrowRingRatio(attempt, total);
-  const ringRadius = size * ringRatio;
+  const ringRatio = isAnd1 ? 1.15 : getFreeThrowRingRatio(attempt, total);
+  const strokeWidth = Math.max(1, size * 0.2);
+  let ringRadius = size * ringRatio;
+  if (!isAnd1 && total > 1 && attempt === 1) {
+    ringRadius = Math.max(0.5, ringRadius - strokeWidth / 2);
+  }
   const ringColor = isMiss
     ? getCssVar(computedStyle, '--event-miss', '#475569')
     : getCssVar(computedStyle, '--event-point', '#F59E0B');
   ctx.strokeStyle = ringColor;
-  ctx.lineWidth = Math.max(1, size * 0.3);
+  ctx.lineWidth = strokeWidth;
   ctx.beginPath();
   ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
   ctx.stroke();
@@ -276,22 +297,28 @@ const drawScoreLeadIcon = (ctx, cx, cy, size, computedStyle) => {
   ctx.restore();
 };
 
-const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = false) => {
+const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = false, statOn, showScoreDiff) => {
   if (!ctx) return startY;
   const rowHeight = 18;
   const rowGap = 8;
   const textColor = getCssVar(computedStyle, '--text-secondary', '#6b7280');
+  const labelColor = getCssVar(computedStyle, '--stat-label-color', textColor);
+  const labelOffColor = getCssVar(computedStyle, '--stat-label-off', '#94a3b8');
+  const isStatOn = (index) => (Array.isArray(statOn) ? statOn[index] !== false : true);
+  const isScoreLeadOn = showScoreDiff !== false;
   ctx.textBaseline = 'middle';
 
   const buildRow = ({ iconSize, fontSize, itemGap, groupGap }) => {
     const iconBox = iconSize * 2;
     ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
 
-    const createItem = (label, drawIcon) => {
+    const createItem = (label, drawIcon, isOff = false) => {
       const labelWidth = ctx.measureText(label).width;
       return {
         label,
+        labelWidth,
         drawIcon,
+        isOff,
         width: iconBox + 4 + labelWidth,
       };
     };
@@ -307,43 +334,57 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
     const drawGroup = (group, x, y) => {
       let cursor = x;
       group.items.forEach((item) => {
+        const labelX = cursor + iconBox + 4;
+        if (item.isOff) {
+          ctx.save();
+          ctx.globalAlpha = 0.35;
+        }
         item.drawIcon(cursor + iconSize, y - 1);
-        ctx.fillStyle = textColor;
-        ctx.fillText(item.label, cursor + iconBox + 4, y + 1);
+        ctx.fillStyle = item.isOff ? labelOffColor : labelColor;
+        ctx.fillText(item.label, labelX, y + 1);
+        if (item.isOff) {
+          ctx.restore();
+          ctx.strokeStyle = labelOffColor;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(labelX, y + 1);
+          ctx.lineTo(labelX + item.labelWidth, y + 1);
+          ctx.stroke();
+        }
         cursor += item.width + itemGap;
       });
     };
 
     const pointGroup = buildGroup([
-      createItem('2PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, false)),
-      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, true)),
-      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, false)),
+      createItem('2PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, false), !isStatOn(0)),
+      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, true), !isStatOn(0)),
+      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, false), !isStatOn(0)),
     ]);
     const missGroup = buildGroup([
-      createItem('Miss', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, false)),
-      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, true)),
-      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, true)),
+      createItem('Miss', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, false), !isStatOn(1)),
+      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, true), !isStatOn(1)),
+      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, true), !isStatOn(1)),
     ]);
     const reboundGroup = buildGroup([
-      createItem('Rebound', (cx, cy) => drawEventShape(ctx, 'rebound', cx, cy, iconSize, computedStyle, false)),
+      createItem('Rebound', (cx, cy) => drawEventShape(ctx, 'rebound', cx, cy, iconSize, computedStyle, false), !isStatOn(2)),
     ]);
     const assistGroup = buildGroup([
-      createItem('Assist', (cx, cy) => drawEventShape(ctx, 'assist', cx, cy, iconSize, computedStyle, false)),
+      createItem('Assist', (cx, cy) => drawEventShape(ctx, 'assist', cx, cy, iconSize, computedStyle, false), !isStatOn(3)),
     ]);
     const turnoverGroup = buildGroup([
-      createItem('Turnover', (cx, cy) => drawEventShape(ctx, 'turnover', cx, cy, iconSize, computedStyle, false)),
+      createItem('Turnover', (cx, cy) => drawEventShape(ctx, 'turnover', cx, cy, iconSize, computedStyle, false), !isStatOn(4)),
     ]);
     const blockGroup = buildGroup([
-      createItem('Block', (cx, cy) => drawEventShape(ctx, 'block', cx, cy, iconSize, computedStyle, false)),
+      createItem('Block', (cx, cy) => drawEventShape(ctx, 'block', cx, cy, iconSize, computedStyle, false), !isStatOn(5)),
     ]);
     const stealGroup = buildGroup([
-      createItem('Steal', (cx, cy) => drawEventShape(ctx, 'steal', cx, cy, iconSize, computedStyle, false)),
+      createItem('Steal', (cx, cy) => drawEventShape(ctx, 'steal', cx, cy, iconSize, computedStyle, false), !isStatOn(6)),
     ]);
     const foulGroup = buildGroup([
-      createItem('Foul', (cx, cy) => drawEventShape(ctx, 'foul', cx, cy, iconSize, computedStyle, false)),
+      createItem('Foul', (cx, cy) => drawEventShape(ctx, 'foul', cx, cy, iconSize, computedStyle, false), !isStatOn(7)),
     ]);
     const scoreLeadGroup = buildGroup([
-      createItem('Score Lead', (cx, cy) => drawScoreLeadIcon(ctx, cx, cy, iconSize, computedStyle)),
+      createItem('Score Lead', (cx, cy) => drawScoreLeadIcon(ctx, cx, cy, iconSize, computedStyle), !isScoreLeadOn),
     ]);
 
     const groups = [
@@ -446,6 +487,8 @@ const drawStepScoreDiff = ({
   scoreTimeline,
   awayColor,
   homeColor,
+  endAtLastScore,
+  endAtSeconds,
 }) => {
   if (!ctx || !scoreTimeline || !chartWidth || maxY <= 0) return;
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
@@ -491,24 +534,45 @@ const drawStepScoreDiff = ({
     currentDiff = step.diff;
   });
 
-  drawSegment(endX);
+  const hasSteps = steps.length > 0;
+  const lastStepX = hasSteps ? Math.min(endX, Math.max(chartLeft, steps[steps.length - 1].x)) : endX;
+  let finalFillEndX = endX;
+  let shouldDropToZero = false;
+  if (Number.isFinite(endAtSeconds)) {
+    const ratio = (endAtSeconds - windowStartSeconds) / windowDurationSeconds;
+    finalFillEndX = chartLeft + Math.max(0, Math.min(chartWidth, ratio * chartWidth));
+    shouldDropToZero = true;
+  } else if (endAtLastScore && hasSteps) {
+    finalFillEndX = lastStepX;
+    shouldDropToZero = true;
+  }
+  drawSegment(finalFillEndX);
+  if (shouldDropToZero) {
+    currentDiff = 0;
+    drawSegment(endX);
+  }
 };
 
 const buildLiteExportCanvas = ({
   exportWidth,
-  isQuarterFocus,
-  activePeriodLabel,
+  legendShouldWrap,
+  rangeLabel,
   leftMargin,
   rightMargin,
   playRef,
+  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredScoreTimeline,
   displayScoreTimeline,
+  statusLabel,
+  endAtLastScore,
+  endAtSeconds,
   startScoreDiff,
   timelineWindow,
   maxY,
   showScoreDiff,
+  statOn,
   awayColor,
   homeColor,
 }) => {
@@ -520,7 +584,7 @@ const buildLiteExportCanvas = ({
   const rightPad = rightMargin;
   const headerHeight = 54;
   const footerHeight = 32;
-  const legendHeight = isQuarterFocus ? 72 : 44;
+  const legendHeight = legendShouldWrap ? 72 : 44;
   const chartHeight = 360;
   const chartTop = headerHeight + 8;
   const chartLeft = leftPad;
@@ -558,11 +622,17 @@ const buildLiteExportCanvas = ({
   ctx.font = '600 18px system-ui, -apple-system, sans-serif';
   const titleText = `${awayLabel} vs ${homeLabel}`;
   ctx.fillText(titleText, 6, 24);
-  if (isQuarterFocus && activePeriodLabel) {
+  if (rangeLabel) {
     const titleWidth = ctx.measureText(titleText).width;
     ctx.fillStyle = textSecondary;
     ctx.font = '600 12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(activePeriodLabel, 6 + titleWidth + 8, 24);
+    ctx.fillText(rangeLabel, 6 + titleWidth + 8, 24);
+  }
+  const formattedGameDate = formatGameDate(gameDate);
+  if (formattedGameDate) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(formattedGameDate, 6, 40);
   }
 
   const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
@@ -577,6 +647,12 @@ const buildLiteExportCanvas = ({
     ctx.font = '600 14px system-ui, -apple-system, sans-serif';
     const textWidth = ctx.measureText(scoreText).width;
     ctx.fillText(scoreText, contentWidth - 20 - textWidth, 24);
+  }
+  if (statusLabel) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    const statusWidth = ctx.measureText(statusLabel).width;
+    ctx.fillText(statusLabel, contentWidth - 20 - statusWidth, 40);
   }
 
   const baselineY = chartTop + chartHeight / 2;
@@ -619,21 +695,25 @@ const buildLiteExportCanvas = ({
     scoreTimeline: scoreTimelineSource,
     awayColor: awayColor || lineColor,
     homeColor: homeColor || lineColor,
+    endAtLastScore,
+    endAtSeconds,
   });
 
   const legendTop = chartTop + chartHeight + 12;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, isQuarterFocus);
+  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff);
 
   return canvas;
 };
 
 const buildFullExportCanvas = ({
   exportWidth,
-  isQuarterFocus,
-  activePeriodLabel,
+  legendShouldWrap,
+  rangeLabel,
+  periodRange,
   leftMargin,
   rightMargin,
   playRef,
+  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredAwayPlayers,
@@ -642,12 +722,15 @@ const buildFullExportCanvas = ({
   filteredHomePlayerTimeline,
   filteredScoreTimeline,
   displayScoreTimeline,
-  displayNumQs,
+  endAtLastScore,
+  endAtSeconds,
+  statusLabel,
   startScoreDiff,
   timelineWindow,
   maxY,
   maxLead,
   showScoreDiff,
+  statOn,
   teamColors,
   awayColor,
   homeColor,
@@ -658,12 +741,12 @@ const buildFullExportCanvas = ({
   const baseWidth = contentWidth + outerPadding * 2;
   const leftPad = leftMargin;
   const rightPad = rightMargin;
-  const headerHeight = 32;
+  const headerHeight = 44;
   const playAreaTop = headerHeight + 8;
   const teamLabelHeight = 18;
   const teamSectionHeight = 275;
   const playAreaHeight = 600;
-  const legendHeight = isQuarterFocus ? 72 : 44;
+  const legendHeight = legendShouldWrap ? 72 : 44;
   const chartHeight = playAreaHeight;
   const chartTop = playAreaTop;
   const chartLeft = leftPad;
@@ -705,11 +788,17 @@ const buildFullExportCanvas = ({
   ctx.font = '600 16px system-ui, -apple-system, sans-serif';
   const titleText = `${awayLabel} vs ${homeLabel}`;
   ctx.fillText(titleText, 6, 22);
-  if (isQuarterFocus && activePeriodLabel) {
+  if (rangeLabel) {
     const titleWidth = ctx.measureText(titleText).width;
     ctx.fillStyle = textSecondary;
     ctx.font = '600 12px system-ui, -apple-system, sans-serif';
-    ctx.fillText(activePeriodLabel, 6 + titleWidth + 8, 22);
+    ctx.fillText(rangeLabel, 6 + titleWidth + 8, 22);
+  }
+  const formattedGameDate = formatGameDate(gameDate);
+  if (formattedGameDate) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(formattedGameDate, 6, 38);
   }
 
   const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
@@ -725,6 +814,12 @@ const buildFullExportCanvas = ({
     const textWidth = ctx.measureText(scoreText).width;
     ctx.fillText(scoreText, contentWidth - rightPad - textWidth, 22);
   }
+  if (statusLabel) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    const statusWidth = ctx.measureText(statusLabel).width;
+    ctx.fillText(statusLabel, contentWidth - rightPad - statusWidth, 38);
+  }
 
   const baselineY = chartTop + chartHeight / 2;
   ctx.strokeStyle = lineColor;
@@ -733,40 +828,42 @@ const buildFullExportCanvas = ({
   ctx.lineTo(chartLeft + chartWidth, baselineY);
   ctx.stroke();
 
-  const exportNumPeriods = Number(displayNumQs) || 0;
+  const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
+  const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
+  const getXForSeconds = (seconds) => {
+    if (windowDurationSeconds <= 0) return chartLeft;
+    const ratio = (seconds - windowStartSeconds) / windowDurationSeconds;
+    return chartLeft + Math.max(0, Math.min(chartWidth, ratio * chartWidth));
+  };
   const timelineBottom = playAreaTop + playAreaHeight;
-  if (!isQuarterFocus && exportNumPeriods > 0) {
-    const exportQWidth = exportNumPeriods > 4
-      ? chartWidth * (12 / (12 * 4 + 5 * (exportNumPeriods - 4)))
-      : chartWidth / 4;
+  const rangeStart = Number(periodRange?.start);
+  const rangeEnd = Number(periodRange?.end);
+  if (
+    windowDurationSeconds > 0 &&
+    Number.isFinite(rangeStart) &&
+    Number.isFinite(rangeEnd) &&
+    rangeEnd >= rangeStart
+  ) {
     ctx.strokeStyle = lineColor;
-    for (let i = 1; i <= 3; i += 1) {
-      const x = chartLeft + exportQWidth * i;
-      ctx.beginPath();
-      ctx.moveTo(x, chartTop);
-      ctx.lineTo(x, timelineBottom);
-      ctx.stroke();
-    }
-    for (let q = 4; q < exportNumPeriods; q += 1) {
-      const x = chartLeft + exportQWidth * 4 + (5 / 12) * exportQWidth * (q - 4);
+    for (let period = rangeStart + 1; period <= rangeEnd; period += 1) {
+      const x = getXForSeconds(getPeriodStartSeconds(period));
       ctx.beginPath();
       ctx.moveTo(x, chartTop);
       ctx.lineTo(x, timelineBottom);
       ctx.stroke();
     }
 
-    ctx.fillStyle = quarterLabelColor;
-    ctx.font = '600 10px system-ui, -apple-system, sans-serif';
-    const labelY = chartTop + 10;
-    ['Q1', 'Q2', 'Q3', 'Q4'].forEach((label, idx) => {
-      const x = chartLeft + exportQWidth * (idx + 0.5);
-      ctx.fillText(label, x - ctx.measureText(label).width / 2, labelY);
-    });
-    const otWidth = (5 / 12) * exportQWidth;
-    for (let ot = 1; ot <= exportNumPeriods - 4; ot += 1) {
-      const label = `O${ot}`;
-      const x = chartLeft + exportQWidth * 4 + otWidth * (ot - 0.5);
-      ctx.fillText(label, x - ctx.measureText(label).width / 2, labelY);
+    if (rangeEnd > rangeStart) {
+      ctx.fillStyle = quarterLabelColor;
+      ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+      const labelY = chartTop + 10;
+      for (let period = rangeStart; period <= rangeEnd; period += 1) {
+        const label = formatPeriodLabel(period);
+        if (!label) continue;
+        const centerSeconds = getPeriodStartSeconds(period) + getPeriodDurationSeconds(period) / 2;
+        const x = getXForSeconds(centerSeconds);
+        ctx.fillText(label, x - ctx.measureText(label).width / 2, labelY);
+      }
     }
   }
 
@@ -789,9 +886,7 @@ const buildFullExportCanvas = ({
     const drawDiffLabel = (value, y, color) => {
       const text = `${value}`;
       ctx.fillStyle = color;
-      const textWidth = ctx.measureText(text).width;
-      const maxX = contentWidth - rightPad - 2 - textWidth;
-      const x = Math.min(chartLeft + chartWidth + 4, maxX);
+      const x = chartLeft + chartWidth + 4;
       ctx.fillText(text, x, y + 3);
     };
     ctx.setLineDash([5, 12]);
@@ -832,16 +927,14 @@ const buildFullExportCanvas = ({
       scoreTimeline: scoreTimelineSource,
       awayColor: awayColor || lineColor,
       homeColor: homeColor || lineColor,
+      endAtLastScore,
+      endAtSeconds,
     });
   }
 
-  const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
-  const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
   const getXForTime = (period, clock) => {
-    if (windowDurationSeconds <= 0) return chartLeft;
     const elapsed = getSecondsElapsed(period, clock);
-    const ratio = (elapsed - windowStartSeconds) / windowDurationSeconds;
-    return chartLeft + Math.max(0, Math.min(chartWidth, ratio * chartWidth));
+    return getXForSeconds(elapsed);
   };
 
   const drawTeamSection = (teamLabel, teamColor, names, players, timelines, startY, rowHeight) => {
@@ -879,12 +972,37 @@ const buildFullExportCanvas = ({
         && action.actionType !== 'Jump Ball'
         && action.actionType !== 'Violation'
       ));
-      const size = Math.max(3, Math.min(5, rowHeight * 0.28));
+      const pointAtTime = new Set();
+      const freeThrowOneAtTime = new Set();
+      actions.forEach((action) => {
+        const timeKey = `${action.period}|${action.clock}`;
+        if (isFreeThrowAction(action.description, action.actionType)) {
+          if (isOneOfOneFreeThrow(action)) {
+            freeThrowOneAtTime.add(timeKey);
+          }
+          return;
+        }
+        if (getEventType(action.description, action.actionType) === 'point') {
+          pointAtTime.add(timeKey);
+        }
+      });
+      const size = Math.max(3, Math.min(5, rowHeight * 0.28)) * TIMELINE_ICON_SCALE;
       actions.forEach((action) => {
         const x = getXForTime(action.period, action.clock);
         const isFreeThrow = isFreeThrowAction(action.description, action.actionType);
+        const timeKey = `${action.period}|${action.clock}`;
         if (isFreeThrow) {
-          drawFreeThrowRing(ctx, x, centerY, size * 1.1, action.description, action.subType, computed);
+          const isAnd1 = freeThrowOneAtTime.has(timeKey) && pointAtTime.has(timeKey);
+          drawFreeThrowRing(
+            ctx,
+            x,
+            centerY,
+            size * 1.1,
+            action.description,
+            action.subType,
+            computed,
+            isAnd1
+          );
           return;
         }
         const eventType = getEventType(action.description, action.actionType);
@@ -920,7 +1038,7 @@ const buildFullExportCanvas = ({
   );
 
   const legendTop = playAreaTop + playAreaHeight + 10;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, isQuarterFocus);
+  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff);
 
   return canvas;
 };
