@@ -24,7 +24,7 @@ type HandlerDependencies = {
 
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_MAX_CONCURRENCY = 10;
-const BOX_PATTERN = /^data\/boxData\/(.+?)\.json/;
+const BOX_PATTERN = /^data\/gameStats\/(.+?)\.json/;
 const PBP_PATTERN =
   /^data\/processed-data\/playByPlayData\/(.+?)\.json/;
 

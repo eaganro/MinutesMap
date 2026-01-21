@@ -355,19 +355,22 @@ export function useCourtVision() {
   }, [date, gameId, isScheduleLoading, sortedGames]);
   const currentScheduleGameStatus = stableGameMeta?.status || null;
 
+  const awayTeam = box?.teams?.away;
+  const homeTeam = box?.teams?.home;
+
   const awayTeamName = useMemo(() => ({
-    name: box?.awayTeam?.teamName || 'Away Team',
-    abr: box?.awayTeam?.teamTricode || '',
-  }), [box?.awayTeam]);
+    name: awayTeam?.name || 'Away Team',
+    abr: awayTeam?.abbr || '',
+  }), [awayTeam?.name, awayTeam?.abbr]);
 
   const homeTeamName = useMemo(() => ({
-    name: box?.homeTeam?.teamName || 'Home Team',
-    abr: box?.homeTeam?.teamTricode || '',
-  }), [box?.homeTeam]);
+    name: homeTeam?.name || 'Home Team',
+    abr: homeTeam?.abbr || '',
+  }), [homeTeam?.name, homeTeam?.abbr]);
 
-  const scoreAwayTeam = box?.awayTeam?.teamTricode || stableGameMeta?.awayteam || null;
-  const scoreHomeTeam = box?.homeTeam?.teamTricode || stableGameMeta?.hometeam || null;
-  const scoreGameDate = box?.gameEt || stableGameMeta?.starttime || null;
+  const scoreAwayTeam = awayTeam?.abbr || stableGameMeta?.awayteam || null;
+  const scoreHomeTeam = homeTeam?.abbr || stableGameMeta?.hometeam || null;
+  const scoreGameDate = box?.start || stableGameMeta?.starttime || null;
 
   const isScheduleVisible = isGlobalLoading && showLoading;
   const isGameDataVisible = isBoxLoading || isPlayLoading;

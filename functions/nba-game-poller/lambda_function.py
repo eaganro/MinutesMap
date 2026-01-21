@@ -418,12 +418,13 @@ def process_game(game_item, user_agent=None, date_str=None):
         status_text = box_game.get('gameStatusText', '').strip()
         is_game_final = status_text.startswith('Final')
 
+        slim_box = build_box_payload(game_id, box_game)
         upload_json_to_s3(
             s3_client=s3_client,
             bucket=BUCKET,
             prefix=PREFIX,
-            key=f"boxData/{game_id}.json",
-            data=box_game,
+            key=f"gameStats/{game_id}.json",
+            data=slim_box,
             is_final=is_game_final,
         )
 
@@ -445,6 +446,93 @@ def process_game(game_item, user_agent=None, date_str=None):
         })
 
     return is_game_final, updates
+
+def build_box_payload(game_id, box_game):
+    if not isinstance(box_game, dict):
+        return None
+    return {
+        "id": game_id,
+        "start": (
+            box_game.get("gameEt")
+            or box_game.get("gameTimeUTC")
+            or box_game.get("gameDateTimeUTC")
+        ),
+        "teams": {
+            "away": build_team_payload(box_game.get("awayTeam")),
+            "home": build_team_payload(box_game.get("homeTeam")),
+        },
+    }
+
+def build_team_payload(team):
+    if not isinstance(team, dict):
+        return None
+    players = []
+    for player in team.get("players") or []:
+        if not isinstance(player, dict):
+            continue
+        person_id = player.get("personId")
+        if person_id is None:
+            continue
+        stats = player.get("statistics") or {}
+        players.append({
+            "id": person_id,
+            "first": (player.get("firstName") or "").strip(),
+            "last": (player.get("familyName") or "").strip(),
+            "stats": {
+                "min": normalize_minutes(stats.get("minutes")),
+                "pts": safe_int(stats.get("points")),
+                "fgm": safe_int(stats.get("fieldGoalsMade")),
+                "fga": safe_int(stats.get("fieldGoalsAttempted")),
+                "tpm": safe_int(stats.get("threePointersMade")),
+                "tpa": safe_int(stats.get("threePointersAttempted")),
+                "ftm": safe_int(stats.get("freeThrowsMade")),
+                "fta": safe_int(stats.get("freeThrowsAttempted")),
+                "oreb": safe_int(stats.get("reboundsOffensive")),
+                "dreb": safe_int(stats.get("reboundsDefensive")),
+                "ast": safe_int(stats.get("assists")),
+                "stl": safe_int(stats.get("steals")),
+                "blk": safe_int(stats.get("blocks")),
+                "to": safe_int(stats.get("turnovers")),
+                "pf": safe_int(stats.get("foulsPersonal")),
+                "pm": safe_int(stats.get("plusMinusPoints")),
+            },
+        })
+    return {
+        "id": team.get("teamId"),
+        "abbr": team.get("teamTricode"),
+        "name": team.get("teamName"),
+        "players": players,
+    }
+
+def normalize_minutes(raw_minutes):
+    if not raw_minutes:
+        return "00:00"
+    if isinstance(raw_minutes, str):
+        minutes = raw_minutes.strip()
+        if minutes.startswith("PT") and minutes.endswith("S"):
+            stripped = minutes[2:-1]
+            if "M" in stripped:
+                mins_part, sec_part = stripped.split("M", 1)
+                mins = safe_int(mins_part)
+                secs = int(float(sec_part)) if sec_part else 0
+            else:
+                mins = 0
+                secs = int(float(stripped)) if stripped else 0
+            return f"{mins:02d}:{secs:02d}"
+        if ":" in minutes:
+            return minutes
+    return "00:00"
+
+def safe_int(value):
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return 0
 
 def get_nba_date():
     """

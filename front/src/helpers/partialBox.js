@@ -18,23 +18,22 @@ export function elapsedSecondsFromStart(ev) {
 
 function emptyStats() {
   return {
-    minutes: '00:00',
-    fieldGoalsMade: 0,
-    fieldGoalsAttempted: 0,
-    threePointersMade: 0,
-    threePointersAttempted: 0,
-    freeThrowsMade: 0,
-    freeThrowsAttempted: 0,
-    reboundsOffensive: 0,
-    reboundsDefensive: 0,
-    reboundsTotal: 0,
-    assists: 0,
-    steals: 0,
-    blocks: 0,
-    turnovers: 0,
-    foulsPersonal: 0,
-    points: 0,
-    plusMinusPoints: 0,
+    min: '00:00',
+    pts: 0,
+    fgm: 0,
+    fga: 0,
+    tpm: 0,
+    tpa: 0,
+    ftm: 0,
+    fta: 0,
+    oreb: 0,
+    dreb: 0,
+    ast: 0,
+    stl: 0,
+    blk: 0,
+    to: 0,
+    pf: 0,
+    pm: 0,
   };
 }
 
@@ -57,31 +56,45 @@ export function buildPartialBox({ box, playByPlay, range, awayTeamId, homeTeamId
   const start = Math.min(range.start, range.end);
   const end = Math.max(range.start, range.end);
 
+  const awayTeam = box?.teams?.away;
+  const homeTeam = box?.teams?.home;
+  const awayId = awayTeam?.id ?? awayTeamId;
+  const homeId = homeTeam?.id ?? homeTeamId;
+
   // Prepare per-team and per-player maps
-  const teams = {
-    [box.awayTeam?.teamId || box.awayTeamId]: {
-      team: box.awayTeam,
+  const teams = {};
+  if (awayId != null) {
+    teams[awayId] = {
+      team: awayTeam,
       players: new Map(),
-      teamId: box.awayTeam?.teamId || box.awayTeamId,
-    },
-    [box.homeTeam?.teamId || box.homeTeamId]: {
-      team: box.homeTeam,
+      teamId: awayId,
+    };
+  }
+  if (homeId != null) {
+    teams[homeId] = {
+      team: homeTeam,
       players: new Map(),
-      teamId: box.homeTeam?.teamId || box.homeTeamId,
-    },
-  };
+      teamId: homeId,
+    };
+  }
 
   const seedTeamPlayers = (teamObj, originalPlayers) => {
+    if (!teamObj) {
+      return;
+    }
     (originalPlayers || []).forEach(p => {
-      teamObj.players.set(p.personId, {
+      if (p?.id == null) {
+        return;
+      }
+      teamObj.players.set(p.id, {
         ...p,
-        statistics: emptyStats(),
+        stats: emptyStats(),
       });
     });
   };
 
-  seedTeamPlayers(teams[box.awayTeam?.teamId || box.awayTeamId], box.awayTeam?.players || []);
-  seedTeamPlayers(teams[box.homeTeam?.teamId || box.homeTeamId], box.homeTeam?.players || []);
+  seedTeamPlayers(teams[awayId], awayTeam?.players || []);
+  seedTeamPlayers(teams[homeId], homeTeam?.players || []);
 
   // Build name->personId mapping per team from play-by-play
   const normalize = s => (s || '')
@@ -122,7 +135,7 @@ export function buildPartialBox({ box, playByPlay, range, awayTeamId, homeTeamId
 
     const pid = ev.personId;
     const entry = pid && team.players.get(pid);
-    const addStat = (mutator) => { if (entry) mutator(entry.statistics); };
+    const addStat = (mutator) => { if (entry) mutator(entry.stats); };
     const made = (ev.shotResult || '').toString().toLowerCase() === 'made';
     const type = (ev.actionType || '').toString().toLowerCase();
 
@@ -130,18 +143,18 @@ export function buildPartialBox({ box, playByPlay, range, awayTeamId, homeTeamId
       case '2pt':
       case '3pt': {
         addStat(s => {
-          s.fieldGoalsAttempted += 1;
-          if (type === '3pt') s.threePointersAttempted += 1;
+          s.fga += 1;
+          if (type === '3pt') s.tpa += 1;
           if (made) {
-            s.fieldGoalsMade += 1;
-            if (type === '3pt') s.threePointersMade += 1;
-            s.points += (type === '3pt') ? 3 : 2; // ignore ev.pointsTotal to avoid double-count via cumulative totals
+            s.fgm += 1;
+            if (type === '3pt') s.tpm += 1;
+            s.pts += (type === '3pt') ? 3 : 2; // ignore ev.pointsTotal to avoid double-count via cumulative totals
           }
         });
         // Assist credit lives on scoring play
         if (made && ev.assistPersonId && team.players.has(ev.assistPersonId)) {
           const a = team.players.get(ev.assistPersonId);
-          a.statistics.assists += 1;
+          a.stats.ast += 1;
         }
         break;
       }
@@ -154,42 +167,50 @@ export function buildPartialBox({ box, playByPlay, range, awayTeamId, homeTeamId
       case 'freethrows':
       case 'freeThrow': {
         addStat(s => {
-          s.freeThrowsAttempted += 1;
+          s.fta += 1;
           if (made) {
-            s.freeThrowsMade += 1;
-            s.points += 1;
+            s.ftm += 1;
+            s.pts += 1;
           }
         });
         break;
       }
       case 'rebound': {
         addStat(s => {
-          if (ev.subType === 'offensive') s.reboundsOffensive += 1;
-          else s.reboundsDefensive += 1;
-          s.reboundsTotal += 1;
+          if (ev.subType === 'offensive') s.oreb += 1;
+          else s.dreb += 1;
         });
         break;
       }
       case 'turnover': {
-        addStat(s => { s.turnovers += 1; });
+        addStat(s => { s.to += 1; });
         break;
       }
       case 'steal': {
-        addStat(s => { s.steals += 1; });
+        addStat(s => { s.stl += 1; });
         break;
       }
       case 'block': {
-        addStat(s => { s.blocks += 1; });
+        addStat(s => { s.blk += 1; });
         break;
       }
       case 'foul': {
-        addStat(s => { s.foulsPersonal += 1; });
+        addStat(s => { s.pf += 1; });
         break;
       }
       default:
         break;
     }
   });
+
+  const buildInitialName = (player) => {
+    const first = (player?.first || '').trim();
+    const last = (player?.last || '').trim();
+    if (!first || !last) {
+      return '';
+    }
+    return `${first.charAt(0)}. ${last}`;
+  };
 
   // Compute minutes from overlap of playtime segments
   const computeMinutesForTeam = (teamId, timelines) => {
@@ -205,7 +226,11 @@ export function buildPartialBox({ box, playByPlay, range, awayTeamId, homeTeamId
       } else {
         // Fallback by last name comparison
         const last = nrm.split(' ').slice(-1)[0];
-        entry = Array.from(team.players.values()).find(p => normalize(p.familyName) === last || normalize(`${p.firstName} ${p.familyName}`) === nrm || normalize(p.nameI || '') === nrm);
+        entry = Array.from(team.players.values()).find(p => (
+          normalize(p.last) === last
+          || normalize(`${p.first} ${p.last}`) === nrm
+          || normalize(buildInitialName(p)) === nrm
+        ));
       }
       if (!entry) return;
       // Sum overlap seconds across segments
@@ -219,55 +244,30 @@ export function buildPartialBox({ box, playByPlay, range, awayTeamId, homeTeamId
         const e = Math.max(segStart, segEnd);
         total += overlapSeconds(s, e, start, end);
       });
-      entry.statistics.minutes = formatMinutesFromSeconds(total);
+      entry.stats.min = formatMinutesFromSeconds(total);
     });
   };
 
-  computeMinutesForTeam(awayTeamId, awayPlayerTimeline);
-  computeMinutesForTeam(homeTeamId, homePlayerTimeline);
-
-  // Derive per-player percentages after counting
-  const derivePercents = (map) => {
-    Array.from(map.values()).forEach(p => {
-      const s = p.statistics;
-      s.fieldGoalsPercentage = s.fieldGoalsAttempted ? (s.fieldGoalsMade / s.fieldGoalsAttempted) : 0;
-      s.threePointersPercentage = s.threePointersAttempted ? (s.threePointersMade / s.threePointersAttempted) : 0;
-      s.freeThrowsPercentage = s.freeThrowsAttempted ? (s.freeThrowsMade / s.freeThrowsAttempted) : 0;
-    });
-  }
-
-  derivePercents(teams[box.awayTeam?.teamId || box.awayTeamId].players);
-  derivePercents(teams[box.homeTeam?.teamId || box.homeTeamId].players);
+  computeMinutesForTeam(awayId, awayPlayerTimeline);
+  computeMinutesForTeam(homeId, homePlayerTimeline);
 
   // Build final box-like object with filtered stats
   const buildTeamOut = (origTeam, map) => {
-    const players = (origTeam?.players || []).map(p => map.get(p.personId) || { ...p, statistics: emptyStats() });
-    // Sum totals for team row
-    const totals = emptyStats();
-    players.forEach(p => {
-      const s = p.statistics;
-      totals.fieldGoalsMade += s.fieldGoalsMade;
-      totals.fieldGoalsAttempted += s.fieldGoalsAttempted;
-      totals.threePointersMade += s.threePointersMade;
-      totals.threePointersAttempted += s.threePointersAttempted;
-      totals.freeThrowsMade += s.freeThrowsMade;
-      totals.freeThrowsAttempted += s.freeThrowsAttempted;
-      totals.reboundsOffensive += s.reboundsOffensive;
-      totals.reboundsDefensive += s.reboundsDefensive;
-      totals.reboundsTotal += s.reboundsTotal;
-      totals.assists += s.assists;
-      totals.steals += s.steals;
-      totals.blocks += s.blocks;
-      totals.turnovers += s.turnovers;
-      totals.foulsPersonal += s.foulsPersonal;
-      totals.points += s.points;
-      // plusMinus not computed for partial; leave 0
-    });
-    return { ...origTeam, players, totals };
+    const safeMap = map || new Map();
+    const players = (origTeam?.players || []).map(p => safeMap.get(p.id) || { ...p, stats: emptyStats() });
+    const base = origTeam ? { ...origTeam } : {};
+    return { ...base, players };
   };
 
-  const awayOut = buildTeamOut(box.awayTeam, teams[box.awayTeam?.teamId || box.awayTeamId].players);
-  const homeOut = buildTeamOut(box.homeTeam, teams[box.homeTeam?.teamId || box.homeTeamId].players);
+  const awayOut = buildTeamOut(awayTeam, teams[awayId]?.players);
+  const homeOut = buildTeamOut(homeTeam, teams[homeId]?.players);
 
-  return { awayTeam: awayOut, homeTeam: homeOut };
+  return {
+    id: box.id,
+    start: box.start,
+    teams: {
+      away: awayOut,
+      home: homeOut,
+    },
+  };
 }

@@ -93,7 +93,7 @@ export function useGameData() {
     if (!gameId) return;
     const { showLoading = true } = options;
     
-    const boxUrl = `${PREFIX}/data/boxData/${gameId}.json.gz`;
+    const boxUrl = `${PREFIX}/data/gameStats/${gameId}.json.gz`;
     const playUrl = `${PREFIX}/data/processed-data/playByPlayData/${gameId}.json.gz`;
 
     if (showLoading) {
@@ -127,8 +127,8 @@ export function useGameData() {
       if (!boxRes.ok) throw new Error(`S3 fetch failed: ${boxRes.status}`);
       const boxData = await boxRes.json();
       setBox(boxData);
-      setAwayTeamId(boxData.awayTeamId ?? boxData.awayTeam.teamId);
-      setHomeTeamId(boxData.homeTeamId ?? boxData.homeTeam.teamId);
+      setAwayTeamId(boxData?.teams?.away?.id ?? null);
+      setHomeTeamId(boxData?.teams?.home?.id ?? null);
       if (showLoading) {
         setIsBoxLoading(false);
       }
@@ -208,7 +208,7 @@ export function useGameData() {
       setLastAction(last);
 
       if (last?.status?.trim().startsWith('Final')) {
-        await fetchBox(`${PREFIX}/data/boxData/${gameId}.json.gz`);
+        await fetchBox(`${PREFIX}/data/gameStats/${gameId}.json.gz`);
         onGameEnd?.();
       }
       setPlayByPlay(playData);
@@ -240,8 +240,8 @@ export function useGameData() {
       const boxData = await res.json();
       setGameStatusMessage(null);
       setBox(boxData);
-      setAwayTeamId(boxData.awayTeamId ?? boxData.awayTeam.teamId);
-      setHomeTeamId(boxData.homeTeamId ?? boxData.homeTeam.teamId);
+      setAwayTeamId(boxData?.teams?.away?.id ?? null);
+      setHomeTeamId(boxData?.teams?.home?.id ?? null);
     } catch (err) {
       console.error('Error in fetchBox:', err);
     } finally {

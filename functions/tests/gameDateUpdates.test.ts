@@ -196,7 +196,7 @@ describe("gameDateUpdates", () => {
           eventSource: "aws:s3",
           s3: {
             object: {
-              key: "data/boxData/123.json",
+              key: "data/gameStats/123.json",
             },
           },
         },

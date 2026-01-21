@@ -66,8 +66,8 @@ const HIGHLIGHT_COLUMNS = new Set(['pts', 'reb', 'ast']);
 
 export default function(team, showButton, showMore, setShowMore, tableWrapperRef, onScroll, isCompact, teamColor) {
   const getDisplayName = (player) => {
-    const firstName = (player.firstName || '').trim();
-    const familyName = (player.familyName || '').trim();
+    const firstName = (player.first || '').trim();
+    const familyName = (player.last || '').trim();
     if (!isCompact) {
       return [firstName, familyName].filter(Boolean).join(' ');
     }
@@ -90,47 +90,91 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
     return classes.join(' ');
   };
 
-  const formatPercentage = (value) => {
-    if (value === 1) {
-      return 100;
+  const normalizeMinutes = (value) => {
+    if (!value) {
+      return '00:00';
     }
-    return (Math.round(value * 100 * 10) / 10).toFixed(1);
+    const raw = String(value).trim();
+    if (raw.startsWith('PT') && raw.endsWith('S')) {
+      const stripped = raw.slice(2, -1);
+      if (stripped.includes('M')) {
+        const [mins, secs] = stripped.split('M');
+        const seconds = secs ? Math.floor(Number.parseFloat(secs)) : 0;
+        return `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+      const seconds = Math.floor(Number.parseFloat(stripped));
+      return `00:${String(seconds).padStart(2, '0')}`;
+    }
+    return raw;
   };
 
-  if (!team) return ''
-  const teamTotals = { fieldGoalsMade: 0, fieldGoalsAttempted: 0, threePointersMade: 0, threePointersAttempted: 0,
-    freeThrowsMade: 0, freeThrowsAttempted: 0, reboundsOffensive: 0, reboundsDefensive: 0, reboundsTotal: 0,
-    assists: 0, steals: 0, blocks: 0, turnovers: 0, foulsPersonal: 0, points: 0, plusMinusPoints:0 };
+  const minutesToSeconds = (value) => {
+    const [mins, secs] = normalizeMinutes(value).split(':');
+    return (Number(mins) || 0) * 60 + (Number(secs) || 0);
+  };
+
+  const formatPercentage = (made, attempted) => {
+    if (!attempted) {
+      return 0;
+    }
+    if (made === attempted) {
+      return 100;
+    }
+    return (Math.round((made / attempted) * 100 * 10) / 10).toFixed(1);
+  };
+
+  if (!team) return '';
+  const teamTotals = {
+    fgm: 0,
+    fga: 0,
+    tpm: 0,
+    tpa: 0,
+    ftm: 0,
+    fta: 0,
+    oreb: 0,
+    dreb: 0,
+    ast: 0,
+    stl: 0,
+    blk: 0,
+    to: 0,
+    pf: 0,
+    pts: 0,
+    pm: 0,
+  };
 
   const columnOrder = isCompact ? COMPACT_COLUMN_ORDER : DEFAULT_COLUMN_ORDER;
 
-  let playerRows = team.players.filter(p => {
-    let minutes = p.statistics.minutes;
-    if (!minutes) return false;
-    if (minutes.includes('PT')) {
-      minutes = minutes.slice(2, -4).replace('M', ':');
-    }
-    return minutes !== '00:00';
-  }).sort((a,b) => {
-    let minutesA = a.statistics.minutes;
-    if (minutesA.includes('PT')) {
-      minutesA = minutesA.slice(2, -4).replace('M', ':');
-    }
-    let minutesB = b.statistics.minutes;
-    if (minutesB.includes('PT')) {
-      minutesB = minutesB.slice(2, -4).replace('M', ':');
-    }
-    let [amin, asec] = minutesA.split(':');
-    let [bmin, bsec] = minutesB.split(':');
-    return (bmin * 100 + bsec) - (amin * 100 + asec);
-  }).map((p, i) => {
-    Object.keys(teamTotals).forEach(k => {
-      teamTotals[k] += p.statistics[k];
-    });
-    let minutes = p.statistics.minutes;
-    if (minutes.includes('PT')) {
-      minutes = minutes.slice(2, -4).replace('M', ':');
-    }
+  const playersWithMinutes = (team.players || []).map((player) => {
+    const stats = player?.stats || {};
+    const minutes = normalizeMinutes(stats.min);
+    return {
+      player,
+      stats,
+      minutes,
+      seconds: minutesToSeconds(minutes),
+    };
+  }).filter((item) => item.seconds > 0).sort((a, b) => b.seconds - a.seconds);
+
+  let playerRows = playersWithMinutes.map((item, i) => {
+    const p = item.player;
+    const stats = item.stats;
+    const getStat = (key) => Number(stats[key] ?? 0);
+    teamTotals.fgm += getStat('fgm');
+    teamTotals.fga += getStat('fga');
+    teamTotals.tpm += getStat('tpm');
+    teamTotals.tpa += getStat('tpa');
+    teamTotals.ftm += getStat('ftm');
+    teamTotals.fta += getStat('fta');
+    teamTotals.oreb += getStat('oreb');
+    teamTotals.dreb += getStat('dreb');
+    teamTotals.ast += getStat('ast');
+    teamTotals.stl += getStat('stl');
+    teamTotals.blk += getStat('blk');
+    teamTotals.to += getStat('to');
+    teamTotals.pf += getStat('pf');
+    teamTotals.pts += getStat('pts');
+    teamTotals.pm += getStat('pm');
+    const minutes = item.minutes;
     const getPlayerValue = (key) => {
       switch (key) {
       case 'player':
@@ -138,82 +182,58 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
       case 'min':
         return minutes;
       case 'pts':
-        return p.statistics.points;
+        return getStat('pts');
       case 'fgm-a':
-        return `${p.statistics.fieldGoalsMade}-${p.statistics.fieldGoalsAttempted}`;
+        return `${getStat('fgm')}-${getStat('fga')}`;
       case 'fg%':
-        return formatPercentage(p.statistics.fieldGoalsPercentage);
+        return formatPercentage(getStat('fgm'), getStat('fga'));
       case '3pm-a':
-        return `${p.statistics.threePointersMade}-${p.statistics.threePointersAttempted}`;
+        return `${getStat('tpm')}-${getStat('tpa')}`;
       case '3p%':
-        return formatPercentage(p.statistics.threePointersPercentage);
+        return formatPercentage(getStat('tpm'), getStat('tpa'));
       case 'ftm-a':
-        return `${p.statistics.freeThrowsMade}-${p.statistics.freeThrowsAttempted}`;
+        return `${getStat('ftm')}-${getStat('fta')}`;
       case 'ft%':
-        return formatPercentage(p.statistics.freeThrowsPercentage);
+        return formatPercentage(getStat('ftm'), getStat('fta'));
       case 'reb':
-        return p.statistics.reboundsTotal;
+        return getStat('oreb') + getStat('dreb');
       case 'oreb':
-        return p.statistics.reboundsOffensive;
+        return getStat('oreb');
       case 'dreb':
-        return p.statistics.reboundsDefensive;
+        return getStat('dreb');
       case 'ast':
-        return p.statistics.assists;
+        return getStat('ast');
       case 'stl':
-        return p.statistics.steals;
+        return getStat('stl');
       case 'blk':
-        return p.statistics.blocks;
+        return getStat('blk');
       case 'to':
-        return p.statistics.turnovers;
+        return getStat('to');
       case 'pf':
-        return p.statistics.foulsPersonal;
+        return getStat('pf');
       case 'pm':
-        return `${p.statistics.plusMinusPoints > 0 ? '+' : ''}${p.statistics.plusMinusPoints}`;
+        return `${getStat('pm') > 0 ? '+' : ''}${getStat('pm')}`;
       default:
         return '';
       }
     };
     return (
-      <div key={p.personId} className={ "rowGrid stat " + (i % 2 === 0 ? "even" : "odd") }>
+      <div key={p.id} className={ "rowGrid stat " + (i % 2 === 0 ? "even" : "odd") }>
         {columnOrder.map((key) => (
-          <span key={`${p.personId}-${key}`} className={getCellClassName(key)}>
+          <span key={`${p.id}-${key}`} className={getCellClassName(key)}>
             {getPlayerValue(key)}
           </span>
         ))}
       </div>
-    )
+    );
   });
   if (!showMore) {
     playerRows = playerRows.slice(0, 5);
   }
 
-  let fg;
-  if ((teamTotals.fieldGoalsMade / teamTotals.fieldGoalsAttempted) === 1) {
-    fg = 100;
-  } else {
-    fg = (Math.round((teamTotals.fieldGoalsMade / teamTotals.fieldGoalsAttempted) * 100 * 10) / 10).toFixed(1)
-  }
-  if (fg === 'NaN') {
-    fg = 0;
-  }
-  let pt3;
-  if ((teamTotals.threePointersMade / teamTotals.threePointersAttempted) === 1) {
-    pt3 = 100;
-  } else {
-    pt3 = (Math.round((teamTotals.threePointersMade / teamTotals.threePointersAttempted) * 100 * 10) / 10).toFixed(1)
-  }
-  if (pt3 === 'NaN') {
-    pt3 = 0;
-  }
-  let ft;
-  if ((teamTotals.freeThrowsMade / teamTotals.freeThrowsAttempted) === 1) {
-    ft = 100;
-  } else {
-    ft = (Math.round((teamTotals.freeThrowsMade / teamTotals.freeThrowsAttempted) * 100 * 10) / 10).toFixed(1)
-  }
-  if (ft === 'NaN') {
-    ft = 0;
-  }
+  const fg = formatPercentage(teamTotals.fgm, teamTotals.fga);
+  const pt3 = formatPercentage(teamTotals.tpm, teamTotals.tpa);
+  const ft = formatPercentage(teamTotals.ftm, teamTotals.fta);
   const totalRow = playerRows && (
     <div key="team-total-row" className={ "rowGrid stat " + (playerRows.length % 2 === 0 ? 'even' : 'odd')}>
       {columnOrder.map((key) => {
@@ -223,49 +243,49 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
           value = 'TEAM';
           break;
         case 'pts':
-          value = teamTotals.points;
+          value = teamTotals.pts;
           break;
         case 'fgm-a':
-          value = `${teamTotals.fieldGoalsMade}-${teamTotals.fieldGoalsAttempted}`;
+          value = `${teamTotals.fgm}-${teamTotals.fga}`;
           break;
         case 'fg%':
           value = fg;
           break;
         case '3pm-a':
-          value = `${teamTotals.threePointersMade}-${teamTotals.threePointersAttempted}`;
+          value = `${teamTotals.tpm}-${teamTotals.tpa}`;
           break;
         case '3p%':
           value = pt3;
           break;
         case 'ftm-a':
-          value = `${teamTotals.freeThrowsMade}-${teamTotals.freeThrowsAttempted}`;
+          value = `${teamTotals.ftm}-${teamTotals.fta}`;
           break;
         case 'ft%':
           value = ft;
           break;
         case 'reb':
-          value = teamTotals.reboundsTotal;
+          value = teamTotals.oreb + teamTotals.dreb;
           break;
         case 'oreb':
-          value = teamTotals.reboundsOffensive;
+          value = teamTotals.oreb;
           break;
         case 'dreb':
-          value = teamTotals.reboundsDefensive;
+          value = teamTotals.dreb;
           break;
         case 'ast':
-          value = teamTotals.assists;
+          value = teamTotals.ast;
           break;
         case 'stl':
-          value = teamTotals.steals;
+          value = teamTotals.stl;
           break;
         case 'blk':
-          value = teamTotals.blocks;
+          value = teamTotals.blk;
           break;
         case 'to':
-          value = teamTotals.turnovers;
+          value = teamTotals.to;
           break;
         case 'pf':
-          value = teamTotals.foulsPersonal;
+          value = teamTotals.pf;
           break;
         default:
           value = '';
@@ -297,7 +317,7 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
     <div>
       <div className="teamRow">
         <div className="team">
-          <span style={teamColor ? { color: teamColor } : undefined}>{team?.teamName}</span>
+          <span style={teamColor ? { color: teamColor } : undefined}>{team?.name}</span>
           {showButton && (
             <div className='showMore'>
               <IconButton

@@ -170,7 +170,7 @@ describe("ws-sendGameUpdate-handler", () => {
         {
           s3: {
             object: {
-              key: "data/boxData/999.json",
+              key: "data/gameStats/999.json",
               eTag: "\"etag999\"",
             },
           },
@@ -190,7 +190,7 @@ describe("ws-sendGameUpdate-handler", () => {
         : Buffer.from(dataValue as Uint8Array).toString();
     expect(JSON.parse(payload)).toEqual({
       gameId: "999",
-      key: "data/boxData/999.json",
+      key: "data/gameStats/999.json",
       version: "etag999",
     });
   });

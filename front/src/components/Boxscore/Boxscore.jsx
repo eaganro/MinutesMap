@@ -64,8 +64,8 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const showStatusMessage = Boolean(displayStatusMessage) && !hasBoxData;
   const isDataLoading = isBlurred && (hasBoxData || hasIncomingBoxData || showStatusMessage);
   const matchupColors = getMatchupColors(
-    displayBox?.awayTeam?.teamTricode,
-    displayBox?.homeTeam?.teamTricode,
+    displayBox?.teams?.away?.abbr,
+    displayBox?.teams?.home?.abbr,
     isDarkMode
   );
 
@@ -105,7 +105,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   };
 
   const awayBox = processTeamStats(
-    displayBox?.awayTeam,
+    displayBox?.teams?.away,
     false,
     showMore,
     setShowMore,
@@ -115,7 +115,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     matchupColors?.away
   );
   const homeBox = processTeamStats(
-    displayBox?.homeTeam,
+    displayBox?.teams?.home,
     true,
     showMore,
     setShowMore,
