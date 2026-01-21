@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSecondsElapsed } from '../../helpers/playTimeline';
-import { getEventType } from '../../helpers/eventStyles.jsx';
+import { getEventType, isFreeThrowAction } from '../../helpers/eventStyles.jsx';
 
 export const usePlayInteraction = ({
   allActions,
@@ -48,7 +48,6 @@ export const usePlayInteraction = ({
     setMouseLinePos(newX);
     setFocusActionMeta({
       actionNumber: action.actionNumber ?? null,
-      actionId: action.actionId ?? null,
     });
     return true;
   }, [allActions, calculateXPosition]);
@@ -145,35 +144,32 @@ export const usePlayInteraction = ({
 
     // Check for direct hover on a specific shape/icon
     let hoveredActionNumber = null;
-    let hoveredActionId = null;
     let checkEl = targetEl;
     
     // Traverse up to find data-action-number (handles SVG nesting)
-    while (checkEl && (hoveredActionNumber === null && hoveredActionId === null) && checkEl !== playRef.current) {
+    while (checkEl && hoveredActionNumber === null && checkEl !== playRef.current) {
       if (checkEl.dataset) {
         if (checkEl.dataset.actionNumber) {
           hoveredActionNumber = checkEl.dataset.actionNumber;
-        }
-        if (checkEl.dataset.actionId) {
-          hoveredActionId = checkEl.dataset.actionId;
         }
       }
       if (checkEl.tagName === 'svg') break; // Optimization boundary
       checkEl = checkEl.parentElement;
     }
 
-    if (hoveredActionNumber !== null || hoveredActionId !== null) {
+    if (hoveredActionNumber !== null) {
       let hoveredAction = null;
-      if (hoveredActionId !== null) {
-        hoveredAction = allActions.find(a => String(a.actionId) === String(hoveredActionId));
-      }
-      if (!hoveredAction && hoveredActionNumber !== null) {
+      if (hoveredActionNumber !== null) {
         hoveredAction = allActions.find(a => String(a.actionNumber) === String(hoveredActionNumber));
       }
       
       if (hoveredAction) {
-        const eventType = getEventType(hoveredAction.description, hoveredAction.actionType);
-        const isFreeThrow = hoveredAction.description.includes('Free Throw') || hoveredAction.description.includes('FT');
+        const eventType = getEventType(
+          hoveredAction.description,
+          hoveredAction.actionType,
+          hoveredAction.result
+        );
+        const isFreeThrow = isFreeThrowAction(hoveredAction.description, hoveredAction.actionType);
 
         let hoverActions = [hoveredAction];
         
@@ -182,7 +178,10 @@ export const usePlayInteraction = ({
           hoverActions = allActions.filter(a => 
             a.clock === hoveredAction.clock && 
             a.period === hoveredAction.period &&
-            (getEventType(a.description, a.actionType) === 'point' || a.description.includes('Free Throw') || a.description.includes('FT'))
+            (
+              getEventType(a.description, a.actionType, a.result) === 'point'
+              || isFreeThrowAction(a.description, a.actionType)
+            )
           );
         }
 
@@ -194,7 +193,6 @@ export const usePlayInteraction = ({
         setMouseLinePos(actionX);
         setFocusActionMeta({
           actionNumber: hoveredAction.actionNumber ?? null,
-          actionId: hoveredAction.actionId ?? null,
         });
         return; // Exit early if we found a direct target
       }
@@ -231,7 +229,6 @@ export const usePlayInteraction = ({
         setMouseLinePos(pos + leftMargin);
         setFocusActionMeta({
           actionNumber: matchedAction.actionNumber ?? null,
-          actionId: matchedAction.actionId ?? null,
         });
     } else {
       setFocusActionMeta(null);

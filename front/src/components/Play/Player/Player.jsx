@@ -1,5 +1,5 @@
 import { getSecondsElapsed } from '../../../helpers/playTimeline';
-import { getEventType, isFreeThrowAction, renderEventShape, renderFreeThrowRing } from '../../../helpers/eventStyles.jsx';
+import { getEventType, isFreeThrowAction, isThreePointAction, renderEventShape, renderFreeThrowRing } from '../../../helpers/eventStyles.jsx';
 
 import './Player.scss';
 
@@ -17,9 +17,12 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
   };
 
   const filteredActions = actions
-    .filter(a => a.actionType !== 'Substitution' && a.actionType !== 'Jump Ball' && a.actionType !== 'Violation');
+    .filter((a) => {
+      const type = (a?.actionType || '').toString().toLowerCase();
+      return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
+    });
 
-  const freeThrowOneOfOnePattern = /free throw\s+1\s+of\s+1/i;
+  const freeThrowOneOfOnePattern = /\b(?:ft|free throw)\b\s*1\s*(?:of|\/)\s*1/i;
   const and1PointScale = 0.88;
   const and1MarkerScale = 0.5;
   const isOneOfOneFreeThrow = (action) => {
@@ -37,7 +40,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
       }
       return;
     }
-    if (getEventType(action.description, action.actionType) === 'point') {
+    if (getEventType(action.description, action.actionType, action.result) === 'point') {
       pointAtTime.add(timeKey);
     }
   });
@@ -64,8 +67,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
           description: a.description,
           subType: a.subType,
           isAnd1,
-          actionNumber: a.actionNumber,
-          actionId: a.actionId
+          actionNumber: a.actionNumber
         });
         if (ring) {
           freeThrowShapes.push(ring);
@@ -73,8 +75,8 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
         return;
       }
 
-      const eventType = getEventType(a.description, a.actionType);
-      const is3PT = a.description.includes('3PT');
+      const eventType = getEventType(a.description, a.actionType, a.result);
+      const is3PT = isThreePointAction(a.description, a.actionType);
       const isAnd1Point = eventType === 'point' && and1AtTime.has(timeKey);
       const shapeSize = isAnd1Point ? size * and1PointScale : size;
       const markerScaleOverride = (isAnd1Point && is3PT) ? and1MarkerScale : null;
@@ -86,7 +88,6 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
         `action-${a.actionNumber}`,
         is3PT,
         a.actionNumber,
-        a.actionId,
         markerScaleOverride
       );
       if (shape) {

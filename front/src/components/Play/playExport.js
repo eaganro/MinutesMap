@@ -109,8 +109,8 @@ const formatGameDate = (value) => {
   return dateObj.toDateString().slice(4);
 };
 
-const FREE_THROW_PATTERN = /free throw\s+(\d+)\s+of\s+(\d+)/i;
-const FREE_THROW_ONE_OF_ONE_PATTERN = /free throw\s+1\s+of\s+1/i;
+const FREE_THROW_PATTERN = /\b(?:ft|free throw)\b\s*(\d+)\s*(?:of|\/)\s*(\d+)/i;
+const FREE_THROW_ONE_OF_ONE_PATTERN = /\b(?:ft|free throw)\b\s*1\s*(?:of|\/)\s*1/i;
 
 const getFreeThrowAttempt = (description, subType) => {
   const text = `${subType || ''} ${description || ''}`;
@@ -987,11 +987,10 @@ const buildFullExportCanvas = ({
         ctx.stroke();
       });
 
-      const actions = (players?.[name] || []).filter((action) => (
-        action.actionType !== 'Substitution'
-        && action.actionType !== 'Jump Ball'
-        && action.actionType !== 'Violation'
-      ));
+      const actions = (players?.[name] || []).filter((action) => {
+        const type = (action?.actionType || '').toString().toLowerCase();
+        return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
+      });
       const pointAtTime = new Set();
       const freeThrowOneAtTime = new Set();
       actions.forEach((action) => {
@@ -1002,7 +1001,7 @@ const buildFullExportCanvas = ({
           }
           return;
         }
-        if (getEventType(action.description, action.actionType) === 'point') {
+        if (getEventType(action.description, action.actionType, action.result) === 'point') {
           pointAtTime.add(timeKey);
         }
       });
@@ -1025,9 +1024,11 @@ const buildFullExportCanvas = ({
           );
           return;
         }
-        const eventType = getEventType(action.description, action.actionType);
+        const eventType = getEventType(action.description, action.actionType, action.result);
         if (!eventType) return;
-        const is3PT = (action.description || '').includes('3PT');
+        const type = (action.actionType || '').toString().toLowerCase();
+        const desc = (action.description || '').toString().toLowerCase();
+        const is3PT = type === '3pt' || desc.includes('3pt');
         drawEventShape(ctx, eventType, x, centerY, size, computed, is3PT);
       });
 

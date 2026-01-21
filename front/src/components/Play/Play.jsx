@@ -37,9 +37,8 @@ const findActionMetaFromTarget = (targetEl, containerEl) => {
   while (checkEl && checkEl !== containerEl) {
     if (checkEl.dataset) {
       const actionNumber = checkEl.dataset.actionNumber ?? null;
-      const actionId = checkEl.dataset.actionId ?? null;
-      if (actionNumber || actionId) {
-        return { actionNumber, actionId };
+      if (actionNumber) {
+        return { actionNumber };
       }
     }
     if (checkEl.tagName === 'svg') break;
@@ -520,7 +519,7 @@ export default function Play({
   // --- Event Handlers ---
   const handleMouseMove = (e) => {
     const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
-    setIsHoveringIcon(Boolean(actionMeta?.actionNumber || actionMeta?.actionId));
+    setIsHoveringIcon(Boolean(actionMeta?.actionNumber));
     updateHoverAt(e.clientX, e.clientY, e.target);
   };
 
@@ -530,15 +529,9 @@ export default function Play({
     }
     const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
     const actionNumber = actionMeta?.actionNumber ?? null;
-    const actionId = actionMeta?.actionId ?? null;
-    if ((actionNumber || actionId) && canOpenVideoOnClick) {
+    if (actionNumber && canOpenVideoOnClick) {
       let action = null;
-      if (actionId) {
-        action = (displayAllActions || []).find(
-          (entry) => String(entry.actionId) === String(actionId)
-        );
-      }
-      if (!action && actionNumber) {
+      if (actionNumber) {
         action = (displayAllActions || []).find(
           (entry) => String(entry.actionNumber) === String(actionNumber)
         );
@@ -546,7 +539,7 @@ export default function Play({
       const targetAction = resolveVideoAction(action, displayAllActions);
       const url = buildNbaEventUrl({
         gameId,
-        actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber ?? actionId,
+        actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber,
         description: targetAction?.description ?? action?.description,
       });
       if (url && typeof window !== 'undefined') {

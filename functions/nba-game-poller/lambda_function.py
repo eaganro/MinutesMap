@@ -25,6 +25,7 @@ PREFIX = 'data/'
 MANIFEST_KEY = f'{PREFIX}manifest.json'
 KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
 SCHEDULE_PREFIX = 'schedule/'
+GAMEPACK_PREFIX = 'gamepack/'
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
 SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
 
@@ -351,6 +352,9 @@ def process_game(game_item, user_agent=None, date_str=None):
 
     updates = {}
     is_game_final = False
+    is_play_final = False
+    processed = None
+    slim_box = None
 
     # Best-effort team IDs for play-by-play processing (used when box is a 304).
     home_team_id = None
@@ -376,7 +380,7 @@ def process_game(game_item, user_agent=None, date_str=None):
             last_desc = actions[-1].get('description', '').strip()
             is_play_final = last_desc.startswith('Game End')
 
-            # Upload slim processed payload to the compact gameflow location.
+            # Build slim processed payload for the compact gamepack.
             if not (home_team_id and away_team_id):
                 inferred_away, inferred_home = infer_team_ids_from_actions(actions)
                 away_team_id = away_team_id or inferred_away
@@ -391,14 +395,6 @@ def process_game(game_item, user_agent=None, date_str=None):
                     include_actions=False,
                     include_all_actions=False,
                 )
-                upload_json_to_s3(
-                    s3_client=s3_client,
-                    bucket=BUCKET,
-                    prefix=PREFIX,
-                    key=f"gameflow/{game_id}.json",
-                    data=processed,
-                    is_final=is_play_final,
-                )
 
             updates['play_etag'] = play_etag
 
@@ -408,14 +404,6 @@ def process_game(game_item, user_agent=None, date_str=None):
         is_game_final = status_text.startswith('Final')
 
         slim_box = build_box_payload(game_id, box_game)
-        upload_json_to_s3(
-            s3_client=s3_client,
-            bucket=BUCKET,
-            prefix=PREFIX,
-            key=f"gameStats/{game_id}.json",
-            data=slim_box,
-            is_final=is_game_final,
-        )
 
         # Cache stable IDs so play-by-play processing can run even if boxscore is a 304 later.
         home_team_id = box_game.get("homeTeam", {}).get("teamId") or box_game.get("homeTeamId")
@@ -434,7 +422,47 @@ def process_game(game_item, user_agent=None, date_str=None):
             'awayTeamId': away_team_id,
         })
 
+    if processed is not None or slim_box is not None:
+        if processed is None or slim_box is None:
+            existing = load_gamepack(game_id)
+            if processed is None:
+                processed = (existing or {}).get("flow")
+            if slim_box is None:
+                slim_box = (existing or {}).get("box")
+
+        if processed is not None and slim_box is not None:
+            gamepack = {
+                "v": 1,
+                "id": game_id,
+                "box": slim_box,
+                "flow": processed,
+            }
+            upload_json_to_s3(
+                s3_client=s3_client,
+                bucket=BUCKET,
+                prefix=PREFIX,
+                key=f"{GAMEPACK_PREFIX}{game_id}.json",
+                data=gamepack,
+                is_final=is_game_final or is_play_final,
+            )
+        else:
+            print(f"Poller: Skipping gamepack upload for {game_id}, missing data.")
+
     return is_game_final, updates
+
+
+def load_gamepack(game_id):
+    key = f"{PREFIX}{GAMEPACK_PREFIX}{game_id}.json.gz"
+    try:
+        resp = s3_client.get_object(Bucket=BUCKET, Key=key)
+        body = resp["Body"].read()
+        if body.startswith(b"\x1f\x8b"):
+            body = gzip.decompress(body)
+        return json.loads(body)
+    except Exception as e:
+        print(f"Poller: Failed to load gamepack {game_id}: {e}")
+        return None
+
 
 def build_box_payload(game_id, box_game):
     if not isinstance(box_game, dict):

@@ -115,7 +115,7 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
 
   const formatPercentage = (made, attempted) => {
     if (!attempted) {
-      return 0;
+      return '0.0';
     }
     if (made === attempted) {
       return 100;

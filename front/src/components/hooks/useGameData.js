@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { PREFIX } from '../../environment';
 import { GAME_NOT_STARTED_MESSAGE } from '../../helpers/gameSelectionUtils';
 
@@ -25,19 +25,14 @@ export function useGameData() {
   const [isBoxLoading, setIsBoxLoading] = useState(true);
   const [isPlayLoading, setIsPlayLoading] = useState(true);
   
-  const latestBoxRef = useRef(box);
-
-  // Keep refs in sync
-  latestBoxRef.current = box;
-
   const readPlayMeta = useCallback((payload) => {
     if (payload?.v === 2) {
       const last = payload.last;
       return {
         lastAction: last
           ? {
-              period: last.period,
-              clock: last.clock,
+              period: last.quarter ?? last.period,
+              clock: last.time ?? last.clock,
               scoreAway: last.awayScore,
               scoreHome: last.homeScore,
             }
@@ -53,6 +48,40 @@ export function useGameData() {
     }
     return { lastAction: null, numPeriods: 4 };
   }, []);
+
+  const unpackGamePack = useCallback((payload) => {
+    if (!payload || typeof payload !== 'object') {
+      return { boxData: null, playData: null };
+    }
+    if (payload.box || payload.flow) {
+      return {
+        boxData: payload.box ?? null,
+        playData: payload.flow ?? null,
+      };
+    }
+    if (payload.teams && payload.id) {
+      return { boxData: payload, playData: null };
+    }
+    if (payload.v === 2 || payload.schemaVersion === 1) {
+      return { boxData: null, playData: payload };
+    }
+    return { boxData: null, playData: null };
+  }, []);
+
+  const applyGamePack = useCallback((payload) => {
+    const { boxData, playData } = unpackGamePack(payload);
+    if (boxData) {
+      setBox(boxData);
+      setAwayTeamId(boxData?.teams?.away?.id ?? null);
+      setHomeTeamId(boxData?.teams?.home?.id ?? null);
+    }
+    if (playData) {
+      const { lastAction: last, numPeriods } = readPlayMeta(playData);
+      setNumQs(numPeriods);
+      setLastAction(last);
+      setPlayByPlay(playData);
+    }
+  }, [readPlayMeta, unpackGamePack]);
 
   /**
    * Fetch daily schedule from S3
@@ -111,14 +140,11 @@ export function useGameData() {
   }, []);
 
   /**
-   * Fetch both box score and play-by-play data for a game
+   * Fetch combined game pack data for a game (box + play-by-play)
    */
-  const fetchBoth = useCallback(async (gameId, options = {}) => {
-    if (!gameId) return;
-    const { showLoading = true } = options;
-    
-    const boxUrl = `${PREFIX}/data/gameStats/${gameId}.json.gz`;
-    const playUrl = `${PREFIX}/data/gameflow/${gameId}.json.gz`;
+  const fetchGamePack = useCallback(async ({ gameId, url, showLoading = true } = {}) => {
+    if (!gameId && !url) return;
+    const requestUrl = url || `${PREFIX}/data/gamepack/${gameId}.json.gz`;
 
     if (showLoading) {
       setIsBoxLoading(true);
@@ -127,13 +153,8 @@ export function useGameData() {
     setGameStatusMessage(null);
 
     try {
-      const [boxRes, playResRaw] = await Promise.all([
-        fetch(boxUrl),
-        fetch(playUrl),
-      ]);
-
-      // --- Handle Box Score ---
-      if (boxRes.status === 403 || boxRes.status === 404) {
+      const res = await fetch(requestUrl);
+      if (res.status === 403 || res.status === 404) {
         setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
         setBox({});
         setAwayTeamId(null);
@@ -148,129 +169,18 @@ export function useGameData() {
         return;
       }
 
-      if (!boxRes.ok) throw new Error(`S3 fetch failed: ${boxRes.status}`);
-      const boxData = await boxRes.json();
-      setBox(boxData);
-      setAwayTeamId(boxData?.teams?.away?.id ?? null);
-      setHomeTeamId(boxData?.teams?.home?.id ?? null);
-      if (showLoading) {
-        setIsBoxLoading(false);
-      }
-
-      // --- Handle Play-by-Play ---
-      if (playResRaw.status === 403) {
-        setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
-        setPlayByPlay([]);
-        setLastAction(null);
-        setNumQs(4);
-        if (showLoading) {
-          setIsPlayLoading(false);
-        }
-        return;
-      }
-
-      if (playResRaw.status === 404) {
-        setPlayByPlay([]);
-        setLastAction(null);
-        setNumQs(4);
-        if (showLoading) {
-          setIsPlayLoading(false);
-        }
-        return;
-      }
-
-      if (!playResRaw.ok) throw new Error(`S3 fetch failed: ${playResRaw.status}`);
-      const playData = await playResRaw.json();
-      if (playData) {
-        const { lastAction: last, numPeriods } = readPlayMeta(playData);
-        setNumQs(numPeriods);
-        setLastAction(last);
-        setPlayByPlay(playData);
-      }
-      if (showLoading) {
-        setIsPlayLoading(false);
-      }
-    } catch (err) {
-      console.error('Error in fetchBoth:', err);
-      if (showLoading) {
-        setIsBoxLoading(false);
-        setIsPlayLoading(false);
-      }
-    }
-  }, []);
-
-  /**
-   * Fetch play-by-play data from a specific URL
-   */
-  const fetchPlayByPlay = useCallback(async (url, gameId, onGameEnd) => {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) {
-        if (res.status === 403) {
-          setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
-          setPlayByPlay([]);
-          setLastAction(null);
-          setNumQs(4);
-          return;
-        }
-        if (res.status === 404) {
-          setPlayByPlay([]);
-          setLastAction(null);
-          setNumQs(4);
-          return;
-        }
-        throw new Error(`S3 fetch failed: ${res.status}`);
-      }
-      const playData = await res.json();
-
+      if (!res.ok) throw new Error(`S3 fetch failed: ${res.status}`);
+      const payload = await res.json();
       setGameStatusMessage(null);
-
-      const { lastAction: last, numPeriods } = readPlayMeta(playData);
-      
-      setNumQs(numPeriods);
-      setLastAction(last);
-
-      if (last?.status?.trim().startsWith('Final')) {
-        await fetchBox(`${PREFIX}/data/gameStats/${gameId}.json.gz`);
-        onGameEnd?.();
-      }
-      setPlayByPlay(playData);
+      applyGamePack(payload);
     } catch (err) {
-      console.error('Error in fetchPlayByPlay:', err);
-    } finally {
+      console.error('Error in fetchGamePack:', err);
+    }
+    if (showLoading) {
+      setIsBoxLoading(false);
       setIsPlayLoading(false);
     }
-  }, [readPlayMeta]);
-
-  /**
-   * Fetch box score data from a specific URL
-   */
-  const fetchBox = useCallback(async (url) => {
-    if (!latestBoxRef.current || Object.keys(latestBoxRef.current).length === 0) {
-      setIsBoxLoading(true);
-    }
-
-    try {
-      const res = await fetch(url);
-      if (res.status === 403 || res.status === 404) {
-        setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
-        setBox({});
-        setAwayTeamId(null);
-        setHomeTeamId(null);
-        return;
-      }
-      if (!res.ok) throw new Error(`S3 fetch failed: ${res.status}`);
-      const boxData = await res.json();
-      setGameStatusMessage(null);
-      setBox(boxData);
-      setAwayTeamId(boxData?.teams?.away?.id ?? null);
-      setHomeTeamId(boxData?.teams?.home?.id ?? null);
-    } catch (err) {
-      console.error('Error in fetchBox:', err);
-    } finally {
-      setIsBoxLoading(false);
-    }
-  }, []);
+  }, [applyGamePack]);
 
   const setGameNotStarted = useCallback(() => {
     setGameStatusMessage(GAME_NOT_STARTED_MESSAGE);
@@ -312,9 +222,7 @@ export function useGameData() {
     todaySchedule,
     
     // Actions
-    fetchBoth,
-    fetchPlayByPlay,
-    fetchBox,
+    fetchGamePack,
     setGameNotStarted,
     fetchSchedule,
     fetchTodaySchedule,

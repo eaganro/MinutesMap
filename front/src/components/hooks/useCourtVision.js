@@ -60,9 +60,7 @@ export function useCourtVision() {
     gameStatusMessage,
     isBoxLoading,
     isPlayLoading,
-    fetchBoth,
-    fetchPlayByPlay,
-    fetchBox,
+    fetchGamePack,
     setGameNotStarted,
     resetLoadingStates,
   } = useGameData();
@@ -81,11 +79,7 @@ export function useCourtVision() {
   const [playByPlaySectionRef, playByPlaySectionWidth] = useElementWidth();
 
   // === REFS FOR CALLBACKS ===
-  const gameIdRef = useRef(gameId);
-  const wsCloseRef = useRef(() => {});
-  const wsFollowDateRef = useRef(false);
   const fetchStateRef = useRef({ gameId: null, status: null });
-  useEffect(() => { gameIdRef.current = gameId; }, [gameId]);
 
   // === 1. BOOT SEQUENCE: FETCH INIT STATE ===
   // If the user didn't provide a date in the URL, fetch init.json
@@ -145,19 +139,10 @@ export function useCourtVision() {
   }, [gameId, date, schedule, todaySchedule, fetchTodaySchedule, isTodayScheduleLoading]);
 
   // === WEBSOCKET HANDLERS ===
-  const handlePlayByPlayUpdate = useCallback((key, version) => {
+  const handleGameUpdate = useCallback((key, version) => {
     const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
-    fetchPlayByPlay(url, gameIdRef.current, () => {
-      if (!wsFollowDateRef.current) {
-        wsCloseRef.current();
-      }
-    });
-  }, [fetchPlayByPlay]);
-
-  const handleBoxUpdate = useCallback((key, version) => {
-    const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
-    fetchBox(url);
-  }, [fetchBox]);
+    fetchGamePack({ url, showLoading: false });
+  }, [fetchGamePack]);
 
   const handleDateUpdate = useCallback((updatedDate) => {
     // If we receive a signal that the date we are viewing changed, refresh it
@@ -190,19 +175,16 @@ export function useCourtVision() {
   });
 
   // === WEBSOCKET CONNECTION ===
-  const { close: wsClose } = useWebSocket({
+  useWebSocket({
     gameId,
     date,
     enabled: wsEnabled,
     followDate: wsFollowDate,
     followGame: wsFollowGame,
-    onPlayByPlayUpdate: handlePlayByPlayUpdate,
-    onBoxUpdate: handleBoxUpdate,
+    onPlayByPlayUpdate: handleGameUpdate,
+    onBoxUpdate: handleGameUpdate,
     onDateUpdate: handleDateUpdate,
   });
-
-  useEffect(() => { wsCloseRef.current = wsClose; }, [wsClose]);
-  useEffect(() => { wsFollowDateRef.current = wsFollowDate; }, [wsFollowDate]);
 
   // === URL SYNC ===
   useEffect(() => {
@@ -294,10 +276,10 @@ export function useCourtVision() {
       return;
     }
     fetchStateRef.current = { gameId, status: 'fetched' };
-    fetchBoth(gameId, { showLoading: !isSameGame });
+    fetchGamePack({ gameId, showLoading: !isSameGame });
   }, [
     gameId,
-    fetchBoth,
+    fetchGamePack,
     isSelectedGameUpcoming,
     selectedScheduleGame,
     setGameNotStarted,

@@ -28,15 +28,34 @@ function isCompactPlayByPlayPayload(data) {
 }
 
 function filterActions(a, statOn) {
-  const desc = a?.description || '';
-  if (desc.includes('PTS') && statOn[0]) return true;
-  if (desc.includes('MISS') && statOn[1]) return true;
-  if (desc.includes('REBOUND') && statOn[2]) return true;
-  if (a?.actionType === 'Assist' && statOn[3]) return true;
-  if (desc.includes('TO)') && statOn[4]) return true;
-  if (desc.includes('BLK') && statOn[5]) return true;
-  if (desc.includes('STL') && statOn[6]) return true;
-  if (desc.includes('PF)') && statOn[7]) return true;
+  const type = (a?.actionType || '').toString().toLowerCase();
+  const desc = (a?.description || '').toString().toLowerCase();
+  const result = (a?.result || a?.r || '').toString().toLowerCase();
+
+  const isShotType =
+    type === '2pt' ||
+    type === '3pt' ||
+    type === 'freethrow' ||
+    type === 'free throw' ||
+    type.includes('shot') ||
+    desc.includes('free throw');
+
+  const isMiss =
+    result === 'x' ||
+    result === 'miss' ||
+    type.includes('miss') ||
+    desc.includes('miss');
+
+  const isMake = result === 'm' || result === 'make' || (isShotType && !isMiss);
+
+  if (statOn[0] && isShotType && isMake) return true;
+  if (statOn[1] && isShotType && isMiss) return true;
+  if (statOn[2] && type.includes('rebound')) return true;
+  if (statOn[3] && type.includes('assist')) return true;
+  if (statOn[4] && type.includes('turnover')) return true;
+  if (statOn[5] && type.includes('block')) return true;
+  if (statOn[6] && type.includes('steal')) return true;
+  if (statOn[7] && type.includes('foul')) return true;
   return false;
 }
 
@@ -80,13 +99,13 @@ function filterPlayerActions(playerMap, statOn) {
 function normalizeCompactAction(action, side) {
   if (!action || typeof action !== 'object') return null;
   return {
-    period: action.period,
-    clock: action.clock,
+    period: action.quarter ?? action.period,
+    clock: action.time ?? action.clock,
     actionType: action.type,
     description: action.text,
+    result: action.r ?? action.result,
     subType: action.detail,
     actionNumber: action.seq,
-    actionId: action.id,
     scoreAway: action.awayScore,
     scoreHome: action.homeScore,
     side,
@@ -107,11 +126,25 @@ function normalizeCompactActionMap(playerMap, side) {
 
 function normalizeCompactScoreTimeline(scoreTimeline) {
   return (scoreTimeline || []).map((entry) => ({
-    period: entry?.period,
-    clock: entry?.clock,
+    period: entry?.quarter ?? entry?.period,
+    clock: entry?.time ?? entry?.clock,
     away: entry?.awayScore,
     home: entry?.homeScore,
   }));
+}
+
+function normalizeCompactTimeline(timelineMap) {
+  if (!timelineMap || typeof timelineMap !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(timelineMap).map(([name, segments]) => [
+      name,
+      (segments || []).map((segment) => ({
+        period: segment?.quarter ?? segment?.period,
+        start: segment?.start,
+        end: segment?.end,
+      })),
+    ])
+  );
 }
 
 /**
@@ -144,8 +177,8 @@ export function useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, 
       const allActions = buildAllActionsFromPlayers(awayActions, homeActions);
       return {
         scoreTimeline: normalizeCompactScoreTimeline(playByPlay.score),
-        homePlayerTimeline: playByPlay.segments?.home || {},
-        awayPlayerTimeline: playByPlay.segments?.away || {},
+        homePlayerTimeline: normalizeCompactTimeline(playByPlay.segments?.home),
+        awayPlayerTimeline: normalizeCompactTimeline(playByPlay.segments?.away),
         allActions,
         awayActions: filterPlayerActions(awayActions, statOn),
         homeActions: filterPlayerActions(homeActions, statOn),

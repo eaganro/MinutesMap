@@ -1,5 +1,5 @@
 import { useRef, useLayoutEffect, useState } from 'react';
-import { getEventType, isFreeThrowAction, LegendShape, renderFreeThrowRing } from '../../helpers/eventStyles.jsx';
+import { getEventType, isFreeThrowAction, isThreePointAction, LegendShape, renderFreeThrowRing } from '../../helpers/eventStyles.jsx';
 import { formatClock, formatPeriod } from '../../helpers/utils';
 import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
 
@@ -57,15 +57,11 @@ export default function PlayTooltip({
   if (!descriptionArray || descriptionArray.length === 0) return null;
 
   // SORTING LOGIC
-  const getEventPriority = (description) => {
-    const desc = description.toLowerCase();
-    // Points (made shots, free throws made)
-    if (desc.includes('pts') || (desc.includes('free throw') && !desc.includes('miss'))) return 0;
-    // Assists
-    if (desc.includes('ast')) return 1;
-    // Rebounds
-    if (desc.includes('reb')) return 2;
-    // Everything else
+  const getEventPriority = (action) => {
+    const eventType = getEventType(action?.description, action?.actionType, action?.result);
+    if (eventType === 'point') return 0;
+    if (eventType === 'assist') return 1;
+    if (eventType === 'rebound') return 2;
     return 3;
   };
 
@@ -81,11 +77,6 @@ export default function PlayTooltip({
     const actionNumber = action.actionNumber;
     if (actionNumber !== undefined && actionNumber !== null) {
       const parsed = parseInt(actionNumber, 10);
-      if (!Number.isNaN(parsed)) return parsed;
-    }
-    const actionId = action.actionId;
-    if (actionId !== undefined && actionId !== null) {
-      const parsed = parseInt(actionId, 10);
       if (!Number.isNaN(parsed)) return parsed;
     }
     return -Infinity;
@@ -312,10 +303,9 @@ export default function PlayTooltip({
   // RENDER HELPERS
   const primaryAction = (() => {
     if (!descriptionArray || descriptionArray.length === 0) return null;
-    if (focusActionMeta && (focusActionMeta.actionNumber != null || focusActionMeta.actionId != null)) {
+    if (focusActionMeta && focusActionMeta.actionNumber != null) {
       const focusMatch = descriptionArray.find((action) => (
-        (focusActionMeta.actionNumber != null && String(action.actionNumber) === String(focusActionMeta.actionNumber)) ||
-        (focusActionMeta.actionId != null && String(action.actionId) === String(focusActionMeta.actionId))
+        (focusActionMeta.actionNumber != null && String(action.actionNumber) === String(focusActionMeta.actionNumber))
       ));
       if (focusMatch) return focusMatch;
     }
@@ -347,11 +337,11 @@ export default function PlayTooltip({
   const ActionsComponent = () => (
     <div className="actions-container">
       {(() => {
-        const freeThrowOneOfOnePattern = /free throw\s+1\s+of\s+1/i;
+        const freeThrowOneOfOnePattern = /\b(?:ft|free throw)\b\s*1\s*(?:of|\/)\s*1/i;
         const nonSubActions = descriptionArray.filter((action) => !isSubstitutionAction(action));
         const pointActions = nonSubActions.filter(action =>
           !isFreeThrowAction(action.description, action.actionType)
-          && getEventType(action.description, action.actionType) === 'point'
+          && getEventType(action.description, action.actionType, action.result) === 'point'
         );
         const hasPoint = pointActions.length > 0;
 
@@ -372,7 +362,7 @@ export default function PlayTooltip({
         const renderItems = [
           ...(() => {
             const teamActions = [...actionsByTeam.away].sort(
-              (a, b) => getEventPriority(a.description) - getEventPriority(b.description)
+              (a, b) => getEventPriority(a) - getEventPriority(b)
             );
             const items = teamActions.map((action) => ({
               action,
@@ -390,7 +380,7 @@ export default function PlayTooltip({
           })(),
           ...(() => {
             const teamActions = [...actionsByTeam.home].sort(
-              (a, b) => getEventPriority(a.description) - getEventPriority(b.description)
+              (a, b) => getEventPriority(a) - getEventPriority(b)
             );
             const items = teamActions.map((action) => ({
               action,
@@ -410,9 +400,9 @@ export default function PlayTooltip({
 
         return renderItems.map((item, index) => {
         const a = item.action;
-        const eventType = item.isSubSummary ? null : getEventType(a.description, a.actionType);
+        const eventType = item.isSubSummary ? null : getEventType(a.description, a.actionType, a.result);
         const isFreeThrow = item.isSubSummary ? false : isFreeThrowAction(a.description, a.actionType);
-        const is3PT = !item.isSubSummary && a.description.includes('3PT');
+        const is3PT = !item.isSubSummary && isThreePointAction(a.description, a.actionType);
         const actionSide = a.side === 'away' || a.side === 'home'
           ? a.side
           : (a.teamTricode === awayTeamNames.abr ? 'away' : 'home');

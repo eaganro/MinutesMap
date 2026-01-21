@@ -64,32 +64,57 @@ function getColor(config) {
   return `var(${config.colorVar}, ${config.fallback})`;
 }
 
+const FT_TOKEN = /\bft\b/i;
+const FREE_THROW_PATTERN = /\b(?:ft|free throw)\b\s*(\d+)\s*(?:of|\/)\s*(\d+)/i;
+
+const normalize = (value) => (value || '').toString().toLowerCase();
+
+const isShotAction = (type, desc) => (
+  type === '2pt'
+  || type === '3pt'
+  || type === 'freethrow'
+  || type === 'free throw'
+  || type.includes('shot')
+  || desc.includes('free throw')
+  || FT_TOKEN.test(desc)
+);
+
 /**
  * Detect event type from action description
  */
-export function getEventType(description, actionType = null) {
-  if (!description) return null;
-  
-  if (description.includes('MISS')) return 'miss';
-  if (description.includes('PTS')) return 'point';
-  if (description.includes('REBOUND')) return 'rebound';
-  if (description.includes('AST')) return 'assist';
-  if (description.includes('TO)')) return 'turnover';
-  if (description.includes('BLK')) return 'block';
-  if (description.includes('STL')) return 'steal';
-  if (description.includes('PF)') || actionType?.toLowerCase() === 'foul') return 'foul';
-  
+export function getEventType(description, actionType = null, result = null) {
+  const desc = normalize(description);
+  const type = normalize(actionType);
+  const res = normalize(result);
+
+  const isMiss = res === 'x' || res === 'miss' || desc.includes('miss') || type.includes('miss');
+  const isShot = isShotAction(type, desc);
+
+  if (isMiss) return 'miss';
+  if (isShot) return 'point';
+  if (type.includes('rebound') || desc.includes('reb')) return 'rebound';
+  if (type.includes('assist') || desc.includes('assist')) return 'assist';
+  if (type.includes('turnover') || desc.includes('turnover')) return 'turnover';
+  if (type.includes('block') || desc.includes('block')) return 'block';
+  if (type.includes('steal') || desc.includes('steal')) return 'steal';
+  if (type.includes('foul') || desc.includes('foul')) return 'foul';
+
   return null;
 }
 
-const FREE_THROW_PATTERN = /free throw\s+(\d+)\s+of\s+(\d+)/i;
-
 export function isFreeThrowAction(description, actionType = null) {
-  const desc = (description || '').toString().toLowerCase();
-  const type = (actionType || '').toString().toLowerCase();
+  const desc = normalize(description);
+  const type = normalize(actionType);
   if (type.includes('foul')) return false;
-  if (type.includes('free throw')) return true;
-  return desc.includes('free throw');
+  if (type === 'freethrow' || type.includes('free throw')) return true;
+  return desc.includes('free throw') || FT_TOKEN.test(desc);
+}
+
+export function isThreePointAction(description, actionType = null) {
+  const desc = normalize(description);
+  const type = normalize(actionType);
+  if (type === '3pt') return true;
+  return desc.includes('3pt');
 }
 
 const getFreeThrowAttempt = (description, subType) => {
@@ -116,8 +141,7 @@ export function renderFreeThrowRing({
   description,
   subType,
   isAnd1 = false,
-  actionNumber = null,
-  actionId = null
+  actionNumber = null
 }) {
   const desc = (description || '').toString().toLowerCase();
   const isMiss = desc.includes('miss');
@@ -131,9 +155,8 @@ export function renderFreeThrowRing({
   const ringColor = isMiss
     ? 'var(--event-miss, #475569)'
     : 'var(--event-point, #F59E0B)';
-  const dataAttrs = (actionNumber !== null || actionId !== null) ? {
+  const dataAttrs = (actionNumber !== null) ? {
     ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
-    ...(actionId !== null ? { 'data-action-id': actionId } : {}),
     'data-event-type': 'free-throw',
     style: { cursor: 'pointer' }
   } : {};
@@ -171,7 +194,6 @@ export function renderEventShape(
   key,
   is3PT = false,
   actionNumber = null,
-  actionId = null,
   markerScaleOverride = null
 ) {
   const config = EVENT_TYPES[eventType];
@@ -182,9 +204,8 @@ export function renderEventShape(
   const s = size; // shorthand
   
   // Data attributes for hover detection
-  const dataAttrs = (actionNumber !== null || actionId !== null) ? {
+  const dataAttrs = (actionNumber !== null) ? {
     ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
-    ...(actionId !== null ? { 'data-action-id': actionId } : {}),
     'data-event-type': eventType,
     style: { cursor: 'pointer' }
   } : {};

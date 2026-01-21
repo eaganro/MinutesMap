@@ -1,19 +1,258 @@
 import re
 
 
-_CLOCK_RE = re.compile(r"PT(\d+)M(\d+)\.(\d+)S")
+_CLOCK_RE = re.compile(r"^(?:PT)?(\d+)M(\d+)(?:\.(\d+))?S?$")
+_CLOCK_COMPACT_RE = re.compile(r"^(\d+)(\d{2})(?:\.(\d+))?$")
+_CLOCK_COLON_RE = re.compile(r"^(\d+):(\d+)(?:\.(\d+))?$")
+_DISTANCE_RE = re.compile(r"(\d+)'")
+_FT_ATTEMPT_RE = re.compile(r"(\d+)\s*of\s*(\d+)", re.IGNORECASE)
+_JUMPBALL_RE = re.compile(
+    r"Jump Ball\s+(.+?)\s+vs\.\s+(.+?)(?:\s*:\s*Tip to\s+(.+))?$",
+    re.IGNORECASE,
+)
+_SUB_IN_OUT_RE = re.compile(r"SUB\s+(in|out):\s*(.+)", re.IGNORECASE)
+_SUB_FOR_RE = re.compile(r"SUB:\s*(.+?)\s+FOR\s+(.+)", re.IGNORECASE)
 
 
 def time_to_seconds(clock):
     if not clock or not isinstance(clock, str):
         return 0.0
     m = _CLOCK_RE.match(clock)
-    if not m:
-        return 0.0
-    minutes = int(m.group(1) or 0)
-    seconds = int(m.group(2) or 0)
-    milliseconds = int(m.group(3) or 0)
-    return minutes * 60 + seconds + milliseconds / 100.0
+    if m:
+        minutes = int(m.group(1) or 0)
+        seconds = int(m.group(2) or 0)
+        milliseconds = int(m.group(3) or 0)
+        return minutes * 60 + seconds + milliseconds / 100.0
+    m = _CLOCK_COMPACT_RE.match(clock)
+    if m:
+        minutes = int(m.group(1) or 0)
+        seconds = int(m.group(2) or 0)
+        milliseconds = int(m.group(3) or 0)
+        return minutes * 60 + seconds + milliseconds / 100.0
+    m = _CLOCK_COLON_RE.match(clock)
+    if m:
+        minutes = int(m.group(1) or 0)
+        seconds = int(m.group(2) or 0)
+        milliseconds = int(m.group(3) or 0)
+        return minutes * 60 + seconds + milliseconds / 100.0
+    return 0.0
+
+
+def _trim_clock(clock):
+    if not clock or not isinstance(clock, str):
+        return clock
+    trimmed = clock.strip()
+    if trimmed.startswith("PT"):
+        trimmed = trimmed[2:]
+    if trimmed.endswith("S"):
+        trimmed = trimmed[:-1]
+    if "M" in trimmed:
+        trimmed = trimmed.replace("M", "")
+    return trimmed
+
+
+def _normalize_name(action):
+    return (action.get("playerNameI") or action.get("playerName") or "").strip()
+
+
+def _clean_phrase(value):
+    if not value or not isinstance(value, str):
+        return ""
+    cleaned = value.strip().lower()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned
+
+
+def _normalize_shot_detail(sub_type):
+    detail = _clean_phrase(sub_type)
+    if not detail:
+        return ""
+    detail = re.sub(r"\bshot\b", "", detail).strip()
+    detail = re.sub(r"\s+", " ", detail)
+    if detail == "jump":
+        detail = "jumper"
+    return detail
+
+
+def _extract_shot_distance(action):
+    distance = action.get("shotDistance")
+    if distance is None:
+        desc = action.get("description") or ""
+        m = _DISTANCE_RE.search(desc)
+        if m:
+            distance = m.group(1)
+    try:
+        return int(distance)
+    except Exception:
+        return None
+
+
+def _is_shot_action(action_type, desc):
+    if action_type in ("2pt", "3pt", "freethrow", "free throw"):
+        return True
+    if "shot" in action_type:
+        return True
+    if "free throw" in desc:
+        return True
+    return False
+
+
+def _shot_points(action_type, desc):
+    if "freethrow" in action_type or "free throw" in action_type:
+        return 1
+    if "3pt" in action_type:
+        return 3
+    if "2pt" in action_type:
+        return 2
+    if "3pt" in desc:
+        return 3
+    if "shot" in action_type:
+        return 2
+    return None
+
+
+def _shot_result(action, action_type, desc):
+    shot_result = (action.get("shotResult") or "").strip().lower()
+    if shot_result.startswith("made"):
+        return "m"
+    if shot_result.startswith("miss"):
+        return "x"
+    if "miss" in action_type:
+        return "x"
+    if "made" in action_type:
+        return "m"
+    if "miss" in desc:
+        return "x"
+    if _is_shot_action(action_type, desc):
+        return "m"
+    return None
+
+
+def _free_throw_attempt(action, desc):
+    source = action.get("subType") or desc
+    if not source:
+        return None, None
+    match = _FT_ATTEMPT_RE.search(source)
+    if not match:
+        return None, None
+    return match.group(1), match.group(2)
+
+
+def _rebound_side(action, desc):
+    detail = _clean_phrase(action.get("subType"))
+    if "offensive" in detail:
+        return "off"
+    if "defensive" in detail:
+        return "def"
+    if "off:" in desc:
+        return "off"
+    if "def:" in desc:
+        return "def"
+    return ""
+
+
+def _format_jumpball(desc):
+    match = _JUMPBALL_RE.match(desc or "")
+    if not match:
+        return "jump ball"
+    left = match.group(1).strip()
+    right = match.group(2).strip()
+    tip = match.group(3).strip() if match.group(3) else ""
+    if tip:
+        return f"jump {left} vs {right}, tip {tip}"
+    return f"jump {left} vs {right}"
+
+
+def _format_substitution(desc):
+    match = _SUB_IN_OUT_RE.match(desc or "")
+    if match:
+        direction = match.group(1).lower()
+        name = match.group(2).strip()
+        return f"sub {direction} {name}" if name else f"sub {direction}"
+
+    match = _SUB_FOR_RE.match(desc or "")
+    if match:
+        incoming = match.group(1).strip()
+        outgoing = match.group(2).strip()
+        if incoming and outgoing:
+            return f"sub in {incoming}, out {outgoing}"
+        if incoming:
+            return f"sub in {incoming}"
+        if outgoing:
+            return f"sub out {outgoing}"
+    return ""
+
+
+def _format_action_text(action):
+    action_type = _clean_phrase(action.get("actionType"))
+    desc = _clean_phrase(action.get("description"))
+    name = _normalize_name(action)
+
+    if _is_shot_action(action_type, desc):
+        result = _shot_result(action, action_type, desc)
+        verb = "make" if result == "m" else "miss" if result == "x" else "shot"
+        if "freethrow" in action_type or "free throw" in action_type:
+            att, total = _free_throw_attempt(action, desc)
+            parts = [name, "ft"]
+            if att and total:
+                parts.append(f"{att}/{total}")
+            parts.append(verb)
+            return " ".join(p for p in parts if p)
+
+        points = _shot_points(action_type, desc)
+        detail = _normalize_shot_detail(action.get("subType"))
+        distance = _extract_shot_distance(action)
+        assist = parse_assist_name(action)
+        parts = [name, verb]
+        if points is not None:
+            parts.append(f"{points}pt")
+        if detail:
+            parts.append(detail)
+        if distance is not None:
+            parts.append(f"{distance}ft")
+        if "blocked" in desc:
+            parts.append("blk")
+        if assist:
+            parts.append(f"ast {assist}")
+        return " ".join(p for p in parts if p)
+
+    if "rebound" in action_type:
+        side = _rebound_side(action, desc)
+        base = f"{name} reb" if name else "reb"
+        return f"{base} {side}".strip()
+
+    if "assist" in action_type:
+        return f"{name} assist".strip()
+
+    if "steal" in action_type:
+        return f"{name} steal".strip()
+
+    if "block" in action_type:
+        return f"{name} block".strip()
+
+    if "turnover" in action_type:
+        detail = _clean_phrase(action.get("subType"))
+        detail = re.sub(r"turnover", "", detail).strip()
+        return f"{name} turnover {detail}".strip()
+
+    if "foul" in action_type:
+        detail = _clean_phrase(action.get("subType"))
+        return f"{name} foul {detail}".strip()
+
+    if "violation" in action_type:
+        detail = _clean_phrase(action.get("subType"))
+        return f"{name} violation {detail}".strip()
+
+    if "jump" in action_type:
+        return _format_jumpball(action.get("description"))
+
+    if "substitution" in action_type:
+        formatted = _format_substitution(action.get("description"))
+        if formatted:
+            return formatted
+        return f"sub {name}".strip()
+
+    return f"{name} {action_type}".strip()
 
 
 def fix_player_name(action):
@@ -260,12 +499,13 @@ def end_playtimes(playtimes, last_action):
 
 def sort_actions(actions):
     def sort_key(a):
-        period = a.get("period") or 0
+        period = a.get("period") or a.get("quarter") or 0
         try:
             period = int(period)
         except Exception:
             period = 0
-        return (period, -time_to_seconds(a.get("clock")))
+        clock = a.get("clock") or a.get("time")
+        return (period, -time_to_seconds(clock))
 
     return sorted(list(actions or []), key=sort_key)
 
@@ -273,17 +513,22 @@ def sort_actions(actions):
 def _trim_action(action):
     if not isinstance(action, dict):
         return None
-    return {
-        "period": action.get("period"),
-        "clock": action.get("clock"),
+    action_type = _clean_phrase(action.get("actionType"))
+    desc = _clean_phrase(action.get("description"))
+    result = _shot_result(action, action_type, desc) if _is_shot_action(action_type, desc) else None
+    payload = {
+        "quarter": action.get("period"),
+        "time": _trim_clock(action.get("clock")),
         "type": action.get("actionType"),
-        "text": action.get("description"),
+        "text": _format_action_text(action),
         "detail": action.get("subType"),
         "seq": action.get("actionNumber"),
-        "id": action.get("actionId"),
         "awayScore": action.get("scoreAway"),
         "homeScore": action.get("scoreHome"),
     }
+    if result is not None:
+        payload["r"] = result
+    return payload
 
 
 def _trim_action_map(players):
@@ -307,12 +552,28 @@ def _trim_score_timeline(score_timeline):
     for entry in score_timeline or []:
         trimmed.append(
             {
-                "period": entry.get("period"),
-                "clock": entry.get("clock"),
+                "quarter": entry.get("period"),
+                "time": _trim_clock(entry.get("clock")),
                 "awayScore": entry.get("away"),
                 "homeScore": entry.get("home"),
             }
         )
+    return trimmed
+
+
+def _trim_segments(segments):
+    trimmed = {}
+    for name, segs in (segments or {}).items():
+        normalized = []
+        for seg in segs or []:
+            normalized.append(
+                {
+                    "quarter": seg.get("period"),
+                    "start": _trim_clock(seg.get("start")),
+                    "end": _trim_clock(seg.get("end")),
+                }
+            )
+        trimmed[name] = normalized
     return trimmed
 
 
@@ -410,8 +671,8 @@ def process_playbyplay_payload(
     last_payload = None
     if last_action:
         last_payload = {
-            "period": last_action.get("period"),
-            "clock": last_action.get("clock"),
+            "quarter": last_action.get("period"),
+            "time": _trim_clock(last_action.get("clock")),
             "awayScore": last_action.get("scoreAway"),
             "homeScore": last_action.get("scoreHome"),
         }
@@ -427,8 +688,8 @@ def process_playbyplay_payload(
             "home": trimmed_home_players,
         },
         "segments": {
-            "away": away_playtimes,
-            "home": home_playtimes,
+            "away": _trim_segments(away_playtimes),
+            "home": _trim_segments(home_playtimes),
         },
     }
 

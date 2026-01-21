@@ -45,14 +45,14 @@ export function buildNbaEventUrl({ gameId, actionNumber, description, season }) 
 export function resolveVideoAction(action, allActions) {
   if (!action) return null;
   const actions = allActions || [];
-  const eventType = getEventType(action.description, action.actionType);
+  const eventType = getEventType(action.description, action.actionType, action.result);
   const isFreeThrow = isFreeThrowAction(action.description, action.actionType);
 
   if (isFreeThrow) {
     const pointAction = actions.find((entry) =>
       entry.clock === action.clock
       && entry.period === action.period
-      && getEventType(entry.description, entry.actionType) === 'point'
+      && getEventType(entry.description, entry.actionType, entry.result) === 'point'
     );
     if (pointAction) return pointAction;
   }
@@ -61,7 +61,7 @@ export function resolveVideoAction(action, allActions) {
     const missAction = actions.find((entry) =>
       entry.clock === action.clock
       && entry.period === action.period
-      && getEventType(entry.description, entry.actionType) === 'miss'
+      && getEventType(entry.description, entry.actionType, entry.result) === 'miss'
     );
     if (missAction) return missAction;
   }
@@ -70,7 +70,7 @@ export function resolveVideoAction(action, allActions) {
     const turnoverAction = actions.find((entry) =>
       entry.clock === action.clock
       && entry.period === action.period
-      && getEventType(entry.description, entry.actionType) === 'turnover'
+      && getEventType(entry.description, entry.actionType, entry.result) === 'turnover'
     );
     if (turnoverAction) return turnoverAction;
   }

@@ -24,8 +24,8 @@ type HandlerDependencies = {
 
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_MAX_CONCURRENCY = 10;
+const GAMEPACK_PATTERN = /^data\/gamepack\/(.+?)\.json/;
 const BOX_PATTERN = /^data\/gameStats\/(.+?)\.json/;
-const PBP_PATTERN = /^data\/gameflow\/(.+?)\.json/;
 
 export const handler = createHandler();
 
@@ -134,10 +134,10 @@ function parseGameUpdate(
   const rawEtag = record.s3?.object?.eTag ?? "";
   const version = rawEtag.replace(/"/g, "");
 
-  const pbpMatch = decodedKey.match(PBP_PATTERN);
-  if (pbpMatch) {
+  const packMatch = decodedKey.match(GAMEPACK_PATTERN);
+  if (packMatch) {
     return {
-      gameId: pbpMatch[1],
+      gameId: packMatch[1],
       key: decodedKey,
       version,
     };

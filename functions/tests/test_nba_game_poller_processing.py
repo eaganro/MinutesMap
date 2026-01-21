@@ -46,7 +46,7 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         last = processed["score"][-1]
         self.assertEqual(last["awayScore"], "111")
         self.assertEqual(last["homeScore"], "97")
-        self.assertEqual(last["period"], 4)
+        self.assertEqual(last["quarter"], 4)
 
     def test_assist_actions_are_injected(self):
         processed = process_playbyplay_payload(
@@ -91,8 +91,8 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         helper_timeline = processed["segments"]["away"].get("A. Helper")
         self.assertIsNotNone(helper_timeline)
         self.assertGreater(len(helper_timeline), 0)
-        self.assertEqual(helper_timeline[0]["start"], "PT12M00.00S")
-        self.assertEqual(helper_timeline[0]["end"], "PT11M10.00S")
+        self.assertEqual(helper_timeline[0]["start"], "1200.00")
+        self.assertEqual(helper_timeline[0]["end"], "1110.00")
 
     def test_all_actions_sorted_period_then_clock_desc(self):
         processed = process_playbyplay_payload(
@@ -105,7 +105,7 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertGreater(len(all_actions), 0)
 
         def key(a):
-            return (int(a.get("period") or 0), -time_to_seconds(a.get("clock")))
+            return (int(a.get("quarter") or 0), -time_to_seconds(a.get("time")))
 
         for prev, cur in zip(all_actions, all_actions[1:]):
             self.assertLessEqual(key(prev), key(cur))
