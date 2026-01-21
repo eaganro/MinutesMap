@@ -1,5 +1,5 @@
 # [CourtVision](https://courtvision.roryeagan.com) 🏀
-**Serverless Real-Time NBA Analytics & Play-by-Play Visualization**
+**Serverless Real-Time Basketball Analytics & Play-by-Play Visualization**
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-blue) ![DynamoDB](https://img.shields.io/badge/Database-DynamoDB-blueviolet) ![License](https://img.shields.io/badge/License-MIT-green)
 ![Backend Build](https://github.com/eaganro/courtvision/actions/workflows/infra.yml/badge.svg) ![Frontend Build](https://github.com/eaganro/courtvision/actions/workflows/frontend.yml/badge.svg)
@@ -9,7 +9,7 @@
 ![CourtVision Dashboard](docs/images/overview-desktop-dark.png)
 
 ## 📖 Introduction
-**CourtVision** is a web dashboard for visualizing NBA games with high-density, interactive play-by-play views (beyond a standard scoreboard). I built it because I wanted a specific way to follow games live while watching, and I use it regularly.
+**CourtVision** is a web dashboard for visualizing live basketball games with high-density, interactive play-by-play views (beyond a standard scoreboard). I built it because I wanted a specific way to follow games live while watching, and I use it regularly.
 
 The app runs on a **serverless AWS architecture** and uses a **hybrid push/pull real-time pattern**:
 - WebSockets notify clients when new data is available.
@@ -28,7 +28,7 @@ flowchart TD
 
     %% --- Nodes ---
     subgraph External [External Source]
-        NBA[("🏀 NBA API")]:::ext
+        DataAPI[("🏀 Basketball Data API")]:::ext
     end
 
     subgraph Ingestion [Ingestion Layer]
@@ -60,7 +60,7 @@ flowchart TD
 
     %% 1. Ingestion Flow (Top to Bottom)
     EB --> L_Poller
-    L_Poller -- 1. Polls --> NBA
+    L_Poller -- 1. Polls --> DataAPI
     L_Poller -- 2. Uploads JSON --> S3
 
     %% 2. Notification Flow (Left Side)
@@ -87,7 +87,7 @@ flowchart TD
 * **Game + schedule data storage:** JSON files in **S3** (`data/` payloads + `schedule/` daily schedule), served through **CloudFront**.
 * **Real-time signaling:** **API Gateway WebSocket API** with **Lambda** handlers.
 * **Connection/session state:** **DynamoDB** (stores connection IDs + current subscription info such as game/date).
-* **Ingestion:** **AWS Lambda** (Poller) triggered by **EventBridge** (Cron/Rate) polls the NBA API and uploads new data to S3.
+* **Ingestion:** **AWS Lambda** (Poller) triggered by **EventBridge** (Cron/Rate) polls a basketball data API and uploads new data to S3.
 
 ### 1) Client Subscription Model
 
@@ -100,7 +100,7 @@ Clients “subscribe” to a **game + date**:
 ### 2) Data Update Flow (Hybrid Push/Pull)
 
 1. **EventBridge** triggers the **Poller Lambda** during active games.
-2. The Lambda fetches data from NBA endpoints and uploads compressed JSON to **S3** (game payloads + daily schedule updates).
+2. The Lambda fetches data from basketball data endpoints and uploads compressed JSON to **S3** (game payloads + daily schedule updates).
 3. **S3 event notification** triggers a **Lambda**.
 4. Lambda queries **DynamoDB** (via a GSI keyed by `gameId`) to find connections currently subscribed to that game/date.
 5. Lambda sends a **small WebSocket message** like “new data available.”
@@ -136,7 +136,7 @@ The codebase is organized into three distinct logical units:
 | Directory | Description |
 | --- | --- |
 | **`front/`** | **Frontend Client.** A Vite + React application. Contains the WebSocket connection manager, visualization components, and global state management logic. |
-| **`functions/`** | **Serverless Backend.** AWS Lambda functions written in **Python + TypeScript**. Handles WebSocket lifecycle events, polls external NBA APIs (Ingestion), and broadcasts updates via API Gateway. |
+| **`functions/`** | **Serverless Backend.** AWS Lambda functions written in **Python + TypeScript**. Handles WebSocket lifecycle events, polls external basketball data APIs (Ingestion), and broadcasts updates via API Gateway. |
 | **`terraform/`** | **Infrastructure as Code.** Contains all AWS resource definitions (S3, DynamoDB, Lambda, IAM, EventBridge) to deploy the stack automatically. |
 
 ## 🛠️ Local Development & Setup
