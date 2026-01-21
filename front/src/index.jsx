@@ -21,6 +21,7 @@ if (posthogKey) {
     api_host: import.meta.env.VITE_POSTHOG_HOST,
     capture_pageview: false,
   });
+  window.posthog = posthog;
   posthog.capture('$pageview');
 }
 
