@@ -102,7 +102,7 @@ export function useWebSocket({
       }
     
       try {
-        if (msg.key?.includes("playByPlayData")) {
+        if (msg.key?.includes("gameflow") || msg.key?.includes("playByPlayData")) {
           onPlayByPlayUpdate?.(msg.key, msg.version);
         } else if (msg.key?.includes("gameStats")) {
           onBoxUpdate?.(msg.key, msg.version);

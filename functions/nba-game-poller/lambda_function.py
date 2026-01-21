@@ -376,18 +376,7 @@ def process_game(game_item, user_agent=None, date_str=None):
             last_desc = actions[-1].get('description', '').strip()
             is_play_final = last_desc.startswith('Game End')
 
-            # 1) Upload raw actions only once when the game is final.
-            if is_play_final:
-                upload_json_to_s3(
-                    s3_client=s3_client,
-                    bucket=BUCKET,
-                    prefix=PREFIX,
-                    key=f"playByPlayData/{game_id}.json",
-                    data=actions,
-                    is_final=is_play_final,
-                )
-
-            # 2) Upload slim processed payload to the new processed-data location.
+            # Upload slim processed payload to the compact gameflow location.
             if not (home_team_id and away_team_id):
                 inferred_away, inferred_home = infer_team_ids_from_actions(actions)
                 away_team_id = away_team_id or inferred_away
@@ -406,7 +395,7 @@ def process_game(game_item, user_agent=None, date_str=None):
                     s3_client=s3_client,
                     bucket=BUCKET,
                     prefix=PREFIX,
-                    key=f"processed-data/playByPlayData/{game_id}.json",
+                    key=f"gameflow/{game_id}.json",
                     data=processed,
                     is_final=is_play_final,
                 )

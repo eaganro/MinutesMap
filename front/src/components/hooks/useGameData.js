@@ -30,6 +30,30 @@ export function useGameData() {
   // Keep refs in sync
   latestBoxRef.current = box;
 
+  const readPlayMeta = useCallback((payload) => {
+    if (payload?.v === 2) {
+      const last = payload.last;
+      return {
+        lastAction: last
+          ? {
+              period: last.period,
+              clock: last.clock,
+              scoreAway: last.awayScore,
+              scoreHome: last.homeScore,
+            }
+          : null,
+        numPeriods: payload.periods ?? 4,
+      };
+    }
+    if (payload?.schemaVersion === 1) {
+      return {
+        lastAction: payload.lastAction ?? null,
+        numPeriods: payload.numPeriods ?? 4,
+      };
+    }
+    return { lastAction: null, numPeriods: 4 };
+  }, []);
+
   /**
    * Fetch daily schedule from S3
    * @param {string} dateString - Format 'YYYY-MM-DD'
@@ -94,7 +118,7 @@ export function useGameData() {
     const { showLoading = true } = options;
     
     const boxUrl = `${PREFIX}/data/gameStats/${gameId}.json.gz`;
-    const playUrl = `${PREFIX}/data/processed-data/playByPlayData/${gameId}.json.gz`;
+    const playUrl = `${PREFIX}/data/gameflow/${gameId}.json.gz`;
 
     if (showLoading) {
       setIsBoxLoading(true);
@@ -158,8 +182,8 @@ export function useGameData() {
       if (!playResRaw.ok) throw new Error(`S3 fetch failed: ${playResRaw.status}`);
       const playData = await playResRaw.json();
       if (playData) {
-        const last = playData?.lastAction ?? null;
-        setNumQs(playData?.numPeriods ?? 4);
+        const { lastAction: last, numPeriods } = readPlayMeta(playData);
+        setNumQs(numPeriods);
         setLastAction(last);
         setPlayByPlay(playData);
       }
@@ -201,8 +225,7 @@ export function useGameData() {
 
       setGameStatusMessage(null);
 
-      const last = playData?.lastAction ?? null;
-      const numPeriods = playData?.numPeriods ?? 4;
+      const { lastAction: last, numPeriods } = readPlayMeta(playData);
       
       setNumQs(numPeriods);
       setLastAction(last);
@@ -217,7 +240,7 @@ export function useGameData() {
     } finally {
       setIsPlayLoading(false);
     }
-  }, []);
+  }, [readPlayMeta]);
 
   /**
    * Fetch box score data from a specific URL

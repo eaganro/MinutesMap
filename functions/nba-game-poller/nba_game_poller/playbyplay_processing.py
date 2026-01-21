@@ -1,5 +1,4 @@
 import re
-from datetime import datetime, timezone
 
 
 _CLOCK_RE = re.compile(r"PT(\d+)M(\d+)\.(\d+)S")
@@ -271,6 +270,52 @@ def sort_actions(actions):
     return sorted(list(actions or []), key=sort_key)
 
 
+def _trim_action(action):
+    if not isinstance(action, dict):
+        return None
+    return {
+        "period": action.get("period"),
+        "clock": action.get("clock"),
+        "type": action.get("actionType"),
+        "text": action.get("description"),
+        "detail": action.get("subType"),
+        "seq": action.get("actionNumber"),
+        "id": action.get("actionId"),
+        "awayScore": action.get("scoreAway"),
+        "homeScore": action.get("scoreHome"),
+    }
+
+
+def _trim_action_map(players):
+    trimmed = {}
+    for name, acts in (players or {}).items():
+        filtered = []
+        for action in acts or []:
+            compact = _trim_action(action)
+            if compact is not None:
+                filtered.append(compact)
+        trimmed[name] = filtered
+    return trimmed
+
+
+def _trim_action_list(actions):
+    return [a for a in (_trim_action(action) for action in (actions or [])) if a is not None]
+
+
+def _trim_score_timeline(score_timeline):
+    trimmed = []
+    for entry in score_timeline or []:
+        trimmed.append(
+            {
+                "period": entry.get("period"),
+                "clock": entry.get("clock"),
+                "awayScore": entry.get("away"),
+                "homeScore": entry.get("home"),
+            }
+        )
+    return trimmed
+
+
 def infer_team_ids_from_actions(actions):
     """
     Best-effort inference of (away_team_id, home_team_id) from raw NBA PBP actions.
@@ -315,8 +360,7 @@ def process_playbyplay_payload(
     include_all_actions=True,
 ):
     """
-    Produces the same derived structures as the frontend hook `useGameTimeline`,
-    so the UI can render play-by-play without doing heavy transforms client-side.
+    Produces a compact play-by-play payload with trimmed field names.
     """
     try:
         away_team_id = int(away_team_id) if away_team_id is not None else None
@@ -360,30 +404,43 @@ def process_playbyplay_payload(
     away_playtimes = end_playtimes(away_playtimes, last_action)
     home_playtimes = end_playtimes(home_playtimes, last_action)
 
+    trimmed_away_players = _trim_action_map(away_players)
+    trimmed_home_players = _trim_action_map(home_players)
+
+    last_payload = None
+    if last_action:
+        last_payload = {
+            "period": last_action.get("period"),
+            "clock": last_action.get("clock"),
+            "awayScore": last_action.get("scoreAway"),
+            "homeScore": last_action.get("scoreHome"),
+        }
+
     payload = {
-        "schemaVersion": 1,
-        "gameId": game_id,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "awayTeamId": away_team_id,
-        "homeTeamId": home_team_id,
-        "numPeriods": num_periods,
-        "lastAction": last_action,
-        "scoreTimeline": score_timeline,
-        "awayActions": away_players,
-        "homeActions": home_players,
-        "awayPlayerTimeline": away_playtimes,
-        "homePlayerTimeline": home_playtimes,
+        "v": 2,
+        "game": game_id,
+        "periods": num_periods,
+        "last": last_payload,
+        "score": _trim_score_timeline(score_timeline),
+        "players": {
+            "away": trimmed_away_players,
+            "home": trimmed_home_players,
+        },
+        "segments": {
+            "away": away_playtimes,
+            "home": home_playtimes,
+        },
     }
 
     if include_all_actions:
         all_actions = []
-        for _, acts in away_players.items():
+        for _, acts in trimmed_away_players.items():
             all_actions.extend(acts)
-        for _, acts in home_players.items():
+        for _, acts in trimmed_home_players.items():
             all_actions.extend(acts)
-        payload["allActions"] = sort_actions(all_actions)
+        payload["events"] = sort_actions(all_actions)
 
     if include_actions:
-        payload["actions"] = actions
+        payload["feed"] = _trim_action_list(actions)
 
     return payload

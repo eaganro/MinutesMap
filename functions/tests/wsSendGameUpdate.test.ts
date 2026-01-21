@@ -89,7 +89,7 @@ describe("ws-sendGameUpdate-handler", () => {
         {
           s3: {
             object: {
-              key: "data/processed-data/playByPlayData/12345.json",
+              key: "data/gameflow/12345.json",
               eTag: "\"etag123\"",
             },
           },
@@ -117,7 +117,7 @@ describe("ws-sendGameUpdate-handler", () => {
         : Buffer.from(dataValue as Uint8Array).toString();
     expect(JSON.parse(payload)).toEqual({
       gameId: "12345",
-      key: "data/processed-data/playByPlayData/12345.json",
+      key: "data/gameflow/12345.json",
       version: "etag123",
     });
   });

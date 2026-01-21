@@ -1,7 +1,6 @@
 import json
 import os
 import unittest
-from datetime import datetime
 from nba_game_poller.playbyplay_processing import process_playbyplay_payload, time_to_seconds
 
 class TestPlayByPlayProcessing(unittest.TestCase):
@@ -23,24 +22,17 @@ class TestPlayByPlayProcessing(unittest.TestCase):
             home_team_id=self.home_team_id,
         )
 
-        self.assertEqual(processed["schemaVersion"], 1)
-        self.assertEqual(processed["gameId"], "0012200039")
-        self.assertIsInstance(processed["generatedAt"], str)
-        datetime.fromisoformat(processed["generatedAt"].replace("Z", "+00:00"))
+        self.assertEqual(processed["v"], 2)
+        self.assertEqual(processed["game"], "0012200039")
+        self.assertEqual(processed["periods"], 4)
 
-        self.assertEqual(processed["awayTeamId"], int(self.away_team_id))
-        self.assertEqual(processed["homeTeamId"], int(self.home_team_id))
-        self.assertEqual(processed["numPeriods"], 4)
+        self.assertIsInstance(processed["feed"], list)
+        self.assertEqual(len(processed["feed"]), len(self.actions))
 
-        self.assertIsInstance(processed["actions"], list)
-        self.assertEqual(len(processed["actions"]), len(self.actions))
-
-        self.assertIsInstance(processed["scoreTimeline"], list)
-        self.assertIsInstance(processed["awayActions"], dict)
-        self.assertIsInstance(processed["homeActions"], dict)
-        self.assertIsInstance(processed["awayPlayerTimeline"], dict)
-        self.assertIsInstance(processed["homePlayerTimeline"], dict)
-        self.assertIsInstance(processed["allActions"], list)
+        self.assertIsInstance(processed["score"], list)
+        self.assertIsInstance(processed["players"], dict)
+        self.assertIsInstance(processed["segments"], dict)
+        self.assertIsInstance(processed["events"], list)
 
     def test_score_timeline_final_score_present(self):
         processed = process_playbyplay_payload(
@@ -49,11 +41,11 @@ class TestPlayByPlayProcessing(unittest.TestCase):
             away_team_id=self.away_team_id,
             home_team_id=self.home_team_id,
         )
-        self.assertGreater(len(processed["scoreTimeline"]), 0)
+        self.assertGreater(len(processed["score"]), 0)
 
-        last = processed["scoreTimeline"][-1]
-        self.assertEqual(last["away"], "111")
-        self.assertEqual(last["home"], "97")
+        last = processed["score"][-1]
+        self.assertEqual(last["awayScore"], "111")
+        self.assertEqual(last["homeScore"], "97")
         self.assertEqual(last["period"], 4)
 
     def test_assist_actions_are_injected(self):
@@ -65,9 +57,9 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         )
 
         # In the fixture: "Murphy III ... (Jones 1 AST)" at actionNumber 11, NOP.
-        away_jones = processed["awayActions"].get("Jones") or []
+        away_jones = processed["players"]["away"].get("Jones") or []
         self.assertTrue(
-            any(a.get("actionType") == "Assist" and a.get("actionNumber") == "11a" for a in away_jones),
+            any(a.get("type") == "Assist" and a.get("seq") == "11a" for a in away_jones),
             "Expected injected assist action '11a' under away player 'Jones'",
         )
 
@@ -96,7 +88,7 @@ class TestPlayByPlayProcessing(unittest.TestCase):
             away_team_id=self.away_team_id,
             home_team_id=self.home_team_id,
         )
-        helper_timeline = processed["awayPlayerTimeline"].get("A. Helper")
+        helper_timeline = processed["segments"]["away"].get("A. Helper")
         self.assertIsNotNone(helper_timeline)
         self.assertGreater(len(helper_timeline), 0)
         self.assertEqual(helper_timeline[0]["start"], "PT12M00.00S")
@@ -109,7 +101,7 @@ class TestPlayByPlayProcessing(unittest.TestCase):
             away_team_id=self.away_team_id,
             home_team_id=self.home_team_id,
         )
-        all_actions = processed["allActions"]
+        all_actions = processed["events"]
         self.assertGreater(len(all_actions), 0)
 
         def key(a):
@@ -126,7 +118,7 @@ class TestPlayByPlayProcessing(unittest.TestCase):
             home_team_id=self.home_team_id,
         )
 
-        timelines = [processed["awayPlayerTimeline"], processed["homePlayerTimeline"]]
+        timelines = [processed["segments"]["away"], processed["segments"]["home"]]
         checked = 0
         for team_tl in timelines:
             for _, segments in team_tl.items():

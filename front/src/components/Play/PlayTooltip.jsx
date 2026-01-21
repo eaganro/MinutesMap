@@ -155,7 +155,9 @@ export default function PlayTooltip({
   };
 
   descriptionArray.forEach((action) => {
-    const teamKey = action.teamTricode === awayTeamNames.abr ? 'away' : 'home';
+    const teamKey = action.side === 'away' || action.side === 'home'
+      ? action.side
+      : (action.teamTricode === awayTeamNames.abr ? 'away' : 'home');
     if (isSubstitutionAction(action)) {
       const parsed = parseSubstitutionNames(action.description);
       if (parsed?.inPlayer) subsByTeam[teamKey].in.push(parsed.inPlayer);
@@ -411,7 +413,10 @@ export default function PlayTooltip({
         const eventType = item.isSubSummary ? null : getEventType(a.description, a.actionType);
         const isFreeThrow = item.isSubSummary ? false : isFreeThrowAction(a.description, a.actionType);
         const is3PT = !item.isSubSummary && a.description.includes('3PT');
-        const actionTeamColor = item.teamColor || (a.teamTricode === awayTeamNames.abr ? teamColors.away : teamColors.home);
+        const actionSide = a.side === 'away' || a.side === 'home'
+          ? a.side
+          : (a.teamTricode === awayTeamNames.abr ? 'away' : 'home');
+        const actionTeamColor = item.teamColor || (actionSide === 'away' ? teamColors.away : teamColors.home);
         const iconSize = 10;
         const iconPadding = 2;
         const iconViewSize = iconSize + iconPadding * 2;

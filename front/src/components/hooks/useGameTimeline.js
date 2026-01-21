@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { timeToSeconds } from '../../helpers/utils';
 
-function isProcessedPlayByPlayPayload(data) {
+function isLegacyPlayByPlayPayload(data) {
   return (
     data &&
     typeof data === 'object' &&
@@ -12,6 +12,18 @@ function isProcessedPlayByPlayPayload(data) {
     data.homeActions &&
     data.awayPlayerTimeline &&
     data.homePlayerTimeline
+  );
+}
+
+function isCompactPlayByPlayPayload(data) {
+  return (
+    data &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    data.v === 2 &&
+    data.score &&
+    data.players &&
+    data.segments
   );
 }
 
@@ -39,11 +51,18 @@ function sortActions(actions) {
 
 function buildAllActionsFromPlayers(awayActions, homeActions) {
   const allAct = [];
+  const withSide = (action, side) => {
+    if (!action) return action;
+    if (action.side) return action;
+    return { ...action, side };
+  };
   Object.values(awayActions || {}).forEach((actions) => {
-    if (actions && actions.length) allAct.push(...actions);
+    if (!actions || !actions.length) return;
+    actions.forEach((action) => allAct.push(withSide(action, 'away')));
   });
   Object.values(homeActions || {}).forEach((actions) => {
-    if (actions && actions.length) allAct.push(...actions);
+    if (!actions || !actions.length) return;
+    actions.forEach((action) => allAct.push(withSide(action, 'home')));
   });
   return sortActions(allAct);
 }
@@ -56,6 +75,43 @@ function filterPlayerActions(playerMap, statOn) {
       (actions || []).filter((a) => filterActions(a, statOn)),
     ])
   );
+}
+
+function normalizeCompactAction(action, side) {
+  if (!action || typeof action !== 'object') return null;
+  return {
+    period: action.period,
+    clock: action.clock,
+    actionType: action.type,
+    description: action.text,
+    subType: action.detail,
+    actionNumber: action.seq,
+    actionId: action.id,
+    scoreAway: action.awayScore,
+    scoreHome: action.homeScore,
+    side,
+  };
+}
+
+function normalizeCompactActionMap(playerMap, side) {
+  if (!playerMap || typeof playerMap !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(playerMap).map(([name, actions]) => [
+      name,
+      (actions || [])
+        .map((action) => normalizeCompactAction(action, side))
+        .filter(Boolean),
+    ])
+  );
+}
+
+function normalizeCompactScoreTimeline(scoreTimeline) {
+  return (scoreTimeline || []).map((entry) => ({
+    period: entry?.period,
+    clock: entry?.clock,
+    away: entry?.awayScore,
+    home: entry?.homeScore,
+  }));
 }
 
 /**
@@ -71,7 +127,7 @@ function filterPlayerActions(playerMap, statOn) {
  */
 export function useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, statOn) {
   return useMemo(() => {
-    if (!isProcessedPlayByPlayPayload(playByPlay)) {
+    if (!isLegacyPlayByPlayPayload(playByPlay) && !isCompactPlayByPlayPayload(playByPlay)) {
       return {
         scoreTimeline: [],
         homePlayerTimeline: {},
@@ -82,7 +138,21 @@ export function useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, 
       };
     }
 
-    const allActions = playByPlay.allActions || buildAllActionsFromPlayers(playByPlay.awayActions, playByPlay.homeActions);
+    if (isCompactPlayByPlayPayload(playByPlay)) {
+      const awayActions = normalizeCompactActionMap(playByPlay.players?.away, 'away');
+      const homeActions = normalizeCompactActionMap(playByPlay.players?.home, 'home');
+      const allActions = buildAllActionsFromPlayers(awayActions, homeActions);
+      return {
+        scoreTimeline: normalizeCompactScoreTimeline(playByPlay.score),
+        homePlayerTimeline: playByPlay.segments?.home || {},
+        awayPlayerTimeline: playByPlay.segments?.away || {},
+        allActions,
+        awayActions: filterPlayerActions(awayActions, statOn),
+        homeActions: filterPlayerActions(homeActions, statOn),
+      };
+    }
+
+    const allActions = buildAllActionsFromPlayers(playByPlay.awayActions, playByPlay.homeActions);
     return {
       scoreTimeline: playByPlay.scoreTimeline || [],
       homePlayerTimeline: playByPlay.homePlayerTimeline || {},
