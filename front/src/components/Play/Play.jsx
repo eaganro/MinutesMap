@@ -69,6 +69,49 @@ const withTimeout = (promise, ms, label) => {
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
 };
 
+const resolveTeamLabel = (team) => {
+  if (!team) return null;
+  return team.name || team.abr || null;
+};
+
+const buildShareTitle = ({ awayTeamNames, homeTeamNames, rangeLabel }) => {
+  const away = resolveTeamLabel(awayTeamNames);
+  const home = resolveTeamLabel(homeTeamNames);
+  const matchup = away && home ? `${away} vs ${home}` : 'Play-by-play chart';
+  const rangeSuffix = rangeLabel ? ` (${rangeLabel})` : '';
+  return `${matchup}${rangeSuffix}`;
+};
+
+const buildShareText = ({ awayTeamNames, homeTeamNames, rangeLabel }) => {
+  const away = resolveTeamLabel(awayTeamNames);
+  const home = resolveTeamLabel(homeTeamNames);
+  const matchup = away && home ? `${away} vs ${home}` : null;
+  if (matchup && rangeLabel) {
+    return `Play-by-play chart for ${matchup} (${rangeLabel}).`;
+  }
+  if (matchup) {
+    return `Play-by-play chart for ${matchup}.`;
+  }
+  return rangeLabel ? `Play-by-play chart (${rangeLabel}).` : 'Play-by-play chart.';
+};
+
+const buildGameShareUrl = (gameId) => {
+  if (typeof window === 'undefined') return null;
+  const trimmed = String(gameId || '').trim();
+  if (!trimmed) return null;
+  const origin = window.location?.origin || '';
+  const pathname = `/${encodeURIComponent(trimmed)}`;
+  return origin ? `${origin}${pathname}` : pathname;
+};
+
+const buildSharePayload = ({ file, title, text, url }) => {
+  const payload = { files: [file] };
+  if (title) payload.title = title;
+  if (text) payload.text = text;
+  if (url) payload.url = url;
+  return payload;
+};
+
 export default function Play({ 
   gameId,
   nbaGameId,
@@ -778,6 +821,18 @@ export default function Play({
         }
       }
 
+      const shareTitle = buildShareTitle({
+        awayTeamNames: displayAwayTeamNames,
+        homeTeamNames: displayHomeTeamNames,
+        rangeLabel: exportRangeLabel,
+      });
+      const shareText = buildShareText({
+        awayTeamNames: displayAwayTeamNames,
+        homeTeamNames: displayHomeTeamNames,
+        rangeLabel: exportRangeLabel,
+      });
+      const shareUrl = buildGameShareUrl(gameId);
+
       if (shouldShowPreview) {
         const url = URL.createObjectURL(blob);
         setExportPreviewState({
@@ -785,6 +840,9 @@ export default function Play({
           fileName,
           file,
           canShare: canShareFiles,
+          shareTitle,
+          shareText,
+          shareUrl,
           isUpdating: false
         });
         return;
@@ -795,10 +853,12 @@ export default function Play({
       if (typeof navigator !== 'undefined' && navigator.share) {
         if (canShareFiles) {
           try {
-            await navigator.share({
-              files: [file],
-              title: 'Play-by-play chart'
-            });
+            await navigator.share(buildSharePayload({
+              file,
+              title: shareTitle,
+              text: shareText,
+              url: shareUrl,
+            }));
             shared = true;
           } catch (err) {
             if (err?.name !== 'AbortError') {
@@ -834,10 +894,12 @@ export default function Play({
     if (!exportPreview?.file || !exportPreview?.canShare) return;
     if (typeof navigator === 'undefined' || !navigator.share) return;
     try {
-      await navigator.share({
-        files: [exportPreview.file],
-        title: 'Play-by-play chart'
-      });
+      await navigator.share(buildSharePayload({
+        file: exportPreview.file,
+        title: exportPreview.shareTitle,
+        text: exportPreview.shareText,
+        url: exportPreview.shareUrl,
+      }));
       setExportPreviewState(null);
     } catch (err) {
       if (err?.name !== 'AbortError') {
