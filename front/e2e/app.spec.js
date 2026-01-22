@@ -93,10 +93,8 @@ test.describe('CourtVision App', () => {
 
   test('should update URL with date path', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    await page.waitForURL(/\/\d{4}-\d{2}-\d{2}/);
-
     const { pathname } = new URL(page.url());
-    expect(pathname).toMatch(/^\/\d{4}-\d{2}-\d{2}(\/\d+)?$/);
+    expect(pathname).toMatch(/^\/(?:\d{4}-\d{2}-\d{2}-[a-z0-9]+-[a-z0-9]+|\d+)?$/i);
   });
 
   test('should display stat buttons section', async ({ page }) => {

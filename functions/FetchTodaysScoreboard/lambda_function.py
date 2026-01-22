@@ -83,7 +83,7 @@ def handler(event, context):
             if game_id_maps.get(date_str):
                 upload_game_id_map(date_str, game_id_maps[date_str])
 
-    print(f"Uploaded {sum(len(g) for g in games_by_date.values())} games to S3")
+        print(f"Uploaded {sum(len(g) for g in games_by_date.values())} games to S3")
 
     except Exception as e:
         print(f"Error: {str(e)}")
