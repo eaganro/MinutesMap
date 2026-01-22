@@ -390,13 +390,9 @@ def build_team_payload(team):
     for player in team.get("players") or []:
         if not isinstance(player, dict):
             continue
-        person_id = player.get("personId")
-        if person_id is None:
-            continue
         stats = player.get("statistics") or {}
         players.append(
             {
-                "id": person_id,
                 "first": (player.get("firstName") or "").strip(),
                 "last": (player.get("familyName") or "").strip(),
                 "stats": {

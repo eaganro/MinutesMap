@@ -158,6 +158,7 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
   let playerRows = playersWithMinutes.map((item, i) => {
     const p = item.player;
     const stats = item.stats;
+    const rowKey = `${team?.abbr || team?.id || 'team'}-${p?.first || ''}-${p?.last || ''}-${i}`;
     const getStat = (key) => Number(stats[key] ?? 0);
     teamTotals.fgm += getStat('fgm');
     teamTotals.fga += getStat('fga');
@@ -218,9 +219,9 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
       }
     };
     return (
-      <div key={p.id} className={ "rowGrid stat " + (i % 2 === 0 ? "even" : "odd") }>
+      <div key={rowKey} className={ "rowGrid stat " + (i % 2 === 0 ? "even" : "odd") }>
         {columnOrder.map((key) => (
-          <span key={`${p.id}-${key}`} className={getCellClassName(key)}>
+          <span key={`${rowKey}-${key}`} className={getCellClassName(key)}>
             {getPlayerValue(key)}
           </span>
         ))}
