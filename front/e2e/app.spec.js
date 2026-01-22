@@ -128,17 +128,17 @@ test.describe('Navigation', () => {
 
     const datePicker = page.locator('input[type="date"]');
     await expect(datePicker).toHaveValue('2024-01-15');
-    await expect(page).toHaveURL(/\/2024-01-15(\/\d+)?$/);
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test('should preserve game selection in URL', async ({ page }) => {
-    // Navigate with gameid parameter
-    await page.goto('/?date=2024-01-15&gameid=0022300123');
+    // Navigate with game slug
+    await page.goto('/2024-01-15-phi-cle');
 
     const datePicker = page.locator('input[type="date"]');
     await expect(datePicker).toHaveValue('2024-01-15');
 
-    await expect(page).toHaveURL(/\/2024-01-15\/0022300123$/);
+    await expect(page).toHaveURL(/\/2024-01-15-phi-cle$/);
   });
 });
 

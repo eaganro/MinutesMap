@@ -26,6 +26,9 @@ MANIFEST_KEY = f'{PREFIX}manifest.json'
 KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
 SCHEDULE_PREFIX = 'schedule/'
 GAMEPACK_PREFIX = 'gamepack/'
+GAME_ID_MAP_PREFIX = os.environ.get("GAME_ID_MAP_PREFIX", "private/gameIdMap/")
+if GAME_ID_MAP_PREFIX and not GAME_ID_MAP_PREFIX.endswith('/'):
+    GAME_ID_MAP_PREFIX += '/'
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
 SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
 
@@ -140,12 +143,25 @@ def poller_logic(context):
         disable_self()
         return
 
+    game_id_map = load_game_id_map(today_str)
+    if game_id_map is None:
+        feed = fetch_schedule_feed()
+        if feed:
+            game_id_map = build_game_id_map_from_feed(feed, today_str)
+            if game_id_map:
+                upload_game_id_map(today_str, game_id_map)
+        else:
+            game_id_map = {}
+
     now_et = datetime.now(ET_ZONE)
 
     active_games = []
     remaining_games = 0
 
     for game in games:
+        game_key = game.get("id")
+        if game_id_map and game_key and game_key in game_id_map:
+            game["nbaGameId"] = game_id_map[game_key]
         status_text = (game.get('status') or '').strip()
         if is_terminal_status(status_text):
             continue
@@ -180,7 +196,7 @@ def poller_logic(context):
     schedule_dirty = False
 
     for i, game in enumerate(active_games):
-        game_id = game['id']
+        game_key = game.get('id')
         
         try:
             # Pass the SESSION user agent down
@@ -191,12 +207,12 @@ def poller_logic(context):
             )
             
             if is_final:
-                print(f"Poller: Game {game_id} went Final.")
+                print(f"Poller: Game {game_key} went Final.")
                 update_manifest(
                     s3_client=s3_client,
                     bucket=BUCKET,
                     manifest_key=MANIFEST_KEY,
-                    game_id=game_id,
+                    game_id=game_key,
                 )
             
             # --- UPDATE SCHEDULE FILE ---
@@ -213,7 +229,7 @@ def poller_logic(context):
                     time.sleep(sleep_duration)
 
         except Exception as e:
-            print(f"Poller Error on game {game_id}: {e}")
+            print(f"Poller Error on game {game_key}: {e}")
     if schedule_dirty:
         print("Poller: Updates found, refreshing schedule file.")
         upload_schedule_s3(
@@ -331,15 +347,21 @@ def process_game(game_item, user_agent=None, date_str=None):
     """
     Returns (is_final, updates_dict)
     """
-    game_id = game_item['id']
+    game_key = game_item.get('id') or ""
+    nba_game_id = coerce_nba_game_id(game_item.get('nbaGameId')) or coerce_nba_game_id(game_key)
+    if not game_key:
+        game_key = str(nba_game_id or "")
+    if not nba_game_id:
+        print(f"Poller: Missing nbaGameId for {game_key}, skipping.")
+        return False, {}
     
     # Get stored ETags
     last_play_etag = game_item.get('play_etag')
     last_box_etag = game_item.get('box_etag')
 
     urls = {
-        'play': f"https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{game_id}.json",
-        'box': f"https://cdn.nba.com/static/json/liveData/boxscore/boxscore_{game_id}.json"
+        'play': f"https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{nba_game_id}.json",
+        'box': f"https://cdn.nba.com/static/json/liveData/boxscore/boxscore_{nba_game_id}.json"
     }
 
     # Fetch Data
@@ -388,7 +410,7 @@ def process_game(game_item, user_agent=None, date_str=None):
 
             if home_team_id and away_team_id:
                 processed = process_playbyplay_payload(
-                    game_id=game_id,
+                    game_id=nba_game_id,
                     actions=actions,
                     away_team_id=away_team_id,
                     home_team_id=home_team_id,
@@ -403,7 +425,7 @@ def process_game(game_item, user_agent=None, date_str=None):
         status_text = box_game.get('gameStatusText', '').strip()
         is_game_final = status_text.startswith('Final')
 
-        slim_box = build_box_payload(game_id, box_game)
+        slim_box = build_box_payload(nba_game_id, box_game)
 
         # Cache stable IDs so play-by-play processing can run even if boxscore is a 304 later.
         home_team_id = box_game.get("homeTeam", {}).get("teamId") or box_game.get("homeTeamId")
@@ -413,7 +435,7 @@ def process_game(game_item, user_agent=None, date_str=None):
         updates.update({
             'box_etag': box_etag,
             'status': status_text,
-            'clock': box_game.get('gameClock', ''),
+            'time': trim_clock_value(box_game.get('gameClock', '')) or '',
             'homescore': box_game.get('homeTeam', {}).get('score', 0),
             'awayscore': box_game.get('awayTeam', {}).get('score', 0),
             'homerecord': f"{box_game.get('homeTeam', {}).get('wins','0')}-{box_game.get('homeTeam', {}).get('losses','0')}",
@@ -424,7 +446,7 @@ def process_game(game_item, user_agent=None, date_str=None):
 
     if processed is not None or slim_box is not None:
         if processed is None or slim_box is None:
-            existing = load_gamepack(game_id)
+            existing = load_gamepack(game_key)
             if processed is None:
                 processed = (existing or {}).get("flow")
             if slim_box is None:
@@ -433,7 +455,8 @@ def process_game(game_item, user_agent=None, date_str=None):
         if processed is not None and slim_box is not None:
             gamepack = {
                 "v": 1,
-                "id": game_id,
+                "id": nba_game_id,
+                "publicId": game_key,
                 "box": slim_box,
                 "flow": processed,
             }
@@ -441,18 +464,18 @@ def process_game(game_item, user_agent=None, date_str=None):
                 s3_client=s3_client,
                 bucket=BUCKET,
                 prefix=PREFIX,
-                key=f"{GAMEPACK_PREFIX}{game_id}.json",
+                key=f"{GAMEPACK_PREFIX}{game_key}.json",
                 data=gamepack,
                 is_final=is_game_final or is_play_final,
             )
         else:
-            print(f"Poller: Skipping gamepack upload for {game_id}, missing data.")
+            print(f"Poller: Skipping gamepack upload for {game_key}, missing data.")
 
     return is_game_final, updates
 
 
-def load_gamepack(game_id):
-    key = f"{PREFIX}{GAMEPACK_PREFIX}{game_id}.json.gz"
+def load_gamepack(game_key):
+    key = f"{PREFIX}{GAMEPACK_PREFIX}{game_key}.json.gz"
     try:
         resp = s3_client.get_object(Bucket=BUCKET, Key=key)
         body = resp["Body"].read()
@@ -460,7 +483,7 @@ def load_gamepack(game_id):
             body = gzip.decompress(body)
         return json.loads(body)
     except Exception as e:
-        print(f"Poller: Failed to load gamepack {game_id}: {e}")
+        print(f"Poller: Failed to load gamepack {game_key}: {e}")
         return None
 
 
@@ -468,7 +491,6 @@ def build_box_payload(game_id, box_game):
     if not isinstance(box_game, dict):
         return None
     return {
-        "id": game_id,
         "start": (
             box_game.get("gameEt")
             or box_game.get("gameTimeUTC")
@@ -602,7 +624,7 @@ def status_indicates_live(game):
         or ' et' in status
     ):
         return False
-    if game.get('clock'):
+    if game.get('time') or game.get('clock'):
         return True
     if any(token in status for token in (
         'qtr',
@@ -708,6 +730,9 @@ def reconcile_recent_schedule():
         feed_games = feed_map.get(date_str, {})
         if reconcile_schedule_date(date_str, feed_games):
             updated += 1
+        map_for_date = build_game_id_map_from_feed(feed, date_str)
+        if map_for_date:
+            upload_game_id_map(date_str, map_for_date)
 
     if updated:
         print(f"Reconcile: Updated {updated} schedule file(s).")
@@ -729,6 +754,10 @@ def reconcile_schedule_date(date_str, feed_games):
                 merged_game["status"] = feed_game.get("status")
         else:
             merged_game = feed_game
+        merged_game.pop("nbaGameId", None)
+        if "time" not in merged_game and merged_game.get("clock"):
+            merged_game["time"] = trim_clock_value(merged_game.get("clock"))
+        merged_game.pop("clock", None)
         merged_game["date"] = date_str
         merged.append(merged_game)
 
@@ -778,12 +807,19 @@ def build_schedule_feed_map(league_schedule):
                 date_str = extract_feed_date(game_date)
             if not date_str:
                 continue
-            feed_map[date_str][str(game_id)] = build_schedule_item_from_feed(
+            item = build_schedule_item_from_feed(
                 game=game,
                 game_id=game_id,
                 date_str=date_str,
                 starttime=starttime,
             )
+            game_key = item.get("id") if isinstance(item, dict) else None
+            if not game_key:
+                continue
+            if "time" not in item and item.get("clock"):
+                item["time"] = trim_clock_value(item.get("clock"))
+                item.pop("clock", None)
+            feed_map[date_str][str(game_key)] = item
     return feed_map
 
 def extract_feed_starttime(game, game_date):
@@ -821,16 +857,20 @@ def build_schedule_item_from_feed(*, game, game_id, date_str, starttime):
     if not status_text and game.get("gameStatus") == 1:
         status_text = "Scheduled"
 
+    away_tricode = away.get("teamTricode")
+    home_tricode = home.get("teamTricode")
+    game_key = build_game_slug(date_str, away_tricode, home_tricode, fallback_id=game_id)
+
     item = {
-        "id": game_id,
+        "id": game_key,
         "date": date_str,
         "starttime": starttime,
-        "hometeam": home.get("teamTricode"),
-        "awayteam": away.get("teamTricode"),
+        "hometeam": home_tricode,
+        "awayteam": away_tricode,
         "homescore": home.get("score") or 0,
         "awayscore": away.get("score") or 0,
         "status": status_text,
-        "clock": game.get("gameClock", "") or "",
+        "time": trim_clock_value(game.get("gameClock", "") or ""),
         "homerecord": f"{home.get('wins') or 0}-{home.get('losses') or 0}",
         "awayrecord": f"{away.get('wins') or 0}-{away.get('losses') or 0}",
     }
@@ -842,6 +882,106 @@ def build_schedule_item_from_feed(*, game, game_id, date_str, starttime):
     if away_team_id:
         item["awayTeamId"] = away_team_id
     return item
+
+def normalize_team_slug(value):
+    if not value:
+        return None
+    return "".join(ch for ch in str(value).strip().lower() if ch.isalnum()) or None
+
+def build_game_slug(date_str, away_team, home_team, fallback_id=None):
+    away = normalize_team_slug(away_team)
+    home = normalize_team_slug(home_team)
+    if date_str and away and home:
+        return f"{date_str}-{away}-{home}"
+    if fallback_id is not None:
+        return str(fallback_id)
+    return None
+
+def trim_clock_value(clock):
+    if not clock or not isinstance(clock, str):
+        return clock
+    trimmed = clock.strip()
+    if trimmed.startswith("PT"):
+        trimmed = trimmed[2:]
+    if trimmed.endswith("S"):
+        trimmed = trimmed[:-1]
+    if "M" in trimmed:
+        trimmed = trimmed.replace("M", "")
+    return trimmed
+
+def coerce_nba_game_id(value):
+    if value is None:
+        return None
+    raw = str(value).strip()
+    return raw if raw.isdigit() else None
+
+def build_game_id_map_from_feed(league_schedule, date_str):
+    if not date_str or not league_schedule:
+        return {}
+    mapping = {}
+    for game_date in league_schedule.get("gameDates", []):
+        games = game_date.get("games", [])
+        if not isinstance(games, list):
+            continue
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            game_id = game.get("gameId")
+            if not game_id:
+                continue
+            starttime = extract_feed_starttime(game, game_date)
+            feed_date = None
+            if starttime and "T" in starttime:
+                feed_date = starttime.split("T")[0]
+            if not feed_date:
+                feed_date = extract_feed_date(game_date)
+            if feed_date != date_str:
+                continue
+            home = game.get("homeTeam") or {}
+            away = game.get("awayTeam") or {}
+            game_key = build_game_slug(
+                feed_date,
+                away.get("teamTricode"),
+                home.get("teamTricode"),
+                fallback_id=game_id,
+            )
+            if not game_key:
+                continue
+            mapping[str(game_key)] = str(game_id)
+    return mapping
+
+def load_game_id_map(date_str):
+    key = f"{GAME_ID_MAP_PREFIX}{date_str}.json"
+    try:
+        resp = s3_client.get_object(Bucket=BUCKET, Key=key)
+        payload = resp["Body"].read()
+        data = json.loads(payload.decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404", "NotFound"):
+            return None
+        print(f"S3 GameIdMap Error: {e}")
+        return None
+    except Exception as e:
+        print(f"S3 GameIdMap Error: {e}")
+        return None
+
+def upload_game_id_map(date_str, mapping):
+    if not mapping:
+        return
+    key = f"{GAME_ID_MAP_PREFIX}{date_str}.json"
+    try:
+        s3_client.put_object(
+            Bucket=BUCKET,
+            Key=key,
+            Body=json.dumps(mapping),
+            ContentType="application/json",
+            CacheControl="s-maxage=0, max-age=0, must-revalidate",
+        )
+        print(f"Uploaded gameId map -> {key} ({len(mapping)} games)")
+    except Exception as e:
+        print(f"GameIdMap Upload Error: {e}")
 
 def normalize_schedule_list(games):
     cleaned = [g for g in games if isinstance(g, dict)]

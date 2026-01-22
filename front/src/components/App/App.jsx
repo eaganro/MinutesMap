@@ -33,6 +33,7 @@ export default function App() {
     isPlayLoading,
     showScoreDiff,
     gameStatus,
+    nbaGameId,
 
     // Stat controls
     statOn, changeStatOn, setShowScoreDiff,
@@ -92,6 +93,7 @@ export default function App() {
         <div className='playByPlaySection' ref={playByPlaySectionRef}>
           <Play
             gameId={gameId}
+            nbaGameId={nbaGameId}
             gameStatus={gameStatus}
             gameDate={gameDate}
             awayTeamNames={awayTeamName}

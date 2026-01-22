@@ -25,7 +25,7 @@ def upload_json_to_s3(*, s3_client, bucket, prefix, key, data, is_final=False):
 
 
 def update_manifest(*, s3_client, bucket, manifest_key, game_id):
-    """Loads manifest.json from S3, adds game_id, uploads it back."""
+    """Loads manifest.json from S3, adds the game key, uploads it back."""
     try:
         try:
             resp = s3_client.get_object(Bucket=bucket, Key=manifest_key)

@@ -11,6 +11,7 @@ export function useGameData() {
   const [playByPlay, setPlayByPlay] = useState([]);
   const [awayTeamId, setAwayTeamId] = useState(null);
   const [homeTeamId, setHomeTeamId] = useState(null);
+  const [nbaGameId, setNbaGameId] = useState(null);
   const [numQs, setNumQs] = useState(4);
   const [lastAction, setLastAction] = useState(null);
   const [gameStatusMessage, setGameStatusMessage] = useState(null);
@@ -49,6 +50,14 @@ export function useGameData() {
     return { lastAction: null, numPeriods: 4 };
   }, []);
 
+  const coerceNbaGameId = useCallback((value) => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const raw = String(value).trim();
+    return /^\d+$/.test(raw) ? raw : null;
+  }, []);
+
   const unpackGamePack = useCallback((payload) => {
     if (!payload || typeof payload !== 'object') {
       return { boxData: null, playData: null };
@@ -70,6 +79,10 @@ export function useGameData() {
 
   const applyGamePack = useCallback((payload) => {
     const { boxData, playData } = unpackGamePack(payload);
+    const resolvedNbaGameId =
+      coerceNbaGameId(payload?.nbaGameId)
+      || coerceNbaGameId(payload?.id);
+    setNbaGameId(resolvedNbaGameId);
     if (boxData) {
       setBox(boxData);
       setAwayTeamId(boxData?.teams?.away?.id ?? null);
@@ -81,7 +94,7 @@ export function useGameData() {
       setLastAction(last);
       setPlayByPlay(playData);
     }
-  }, [readPlayMeta, unpackGamePack]);
+  }, [coerceNbaGameId, readPlayMeta, unpackGamePack]);
 
   /**
    * Fetch daily schedule from S3
@@ -159,6 +172,7 @@ export function useGameData() {
         setBox({});
         setAwayTeamId(null);
         setHomeTeamId(null);
+        setNbaGameId(null);
         setPlayByPlay([]);
         setLastAction(null);
         setNumQs(4);
@@ -187,6 +201,7 @@ export function useGameData() {
     setBox({});
     setAwayTeamId(null);
     setHomeTeamId(null);
+    setNbaGameId(null);
     setPlayByPlay([]);
     setLastAction(null);
     setNumQs(4);
@@ -201,6 +216,7 @@ export function useGameData() {
     setIsBoxLoading(true);
     setIsPlayLoading(true);
     setGameStatusMessage(null);
+    setNbaGameId(null);
   }, []);
 
   return {
@@ -210,6 +226,7 @@ export function useGameData() {
     schedule,
     awayTeamId,
     homeTeamId,
+    nbaGameId,
     numQs,
     lastAction,
     gameStatusMessage,

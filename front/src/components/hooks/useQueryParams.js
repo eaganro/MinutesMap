@@ -1,7 +1,17 @@
 import { useCallback } from 'react';
 
 const DATE_PATH_RE = /^\d{4}-\d{2}-\d{2}$/;
-const GAME_ID_RE = /^\d+$/;
+const GAME_SLUG_RE = /^\d{4}-\d{2}-\d{2}-[a-z0-9]{2,}-[a-z0-9]{2,}$/i;
+const LEGACY_GAME_ID_RE = /^\d+$/;
+
+function parseGameSlug(value) {
+  if (!value || !GAME_SLUG_RE.test(value)) {
+    return null;
+  }
+  const normalized = value.toLowerCase();
+  const date = normalized.slice(0, 10);
+  return { date, gameId: normalized };
+}
 
 function parsePathParams(pathname) {
   const trimmed = pathname.replace(/^\/+|\/+$/g, '');
@@ -9,16 +19,34 @@ function parsePathParams(pathname) {
     return { date: null, gameId: null };
   }
 
-  const [dateSegment, gameSegment] = trimmed.split('/');
-  if (!dateSegment || !DATE_PATH_RE.test(dateSegment)) {
+  const segments = trimmed.split('/').filter(Boolean);
+  if (segments.length === 1) {
+    const slugParams = parseGameSlug(segments[0]);
+    if (slugParams) {
+      return slugParams;
+    }
+    if (LEGACY_GAME_ID_RE.test(segments[0])) {
+      return { date: null, gameId: segments[0] };
+    }
+    if (DATE_PATH_RE.test(segments[0])) {
+      return { date: segments[0], gameId: null };
+    }
     return { date: null, gameId: null };
   }
 
-  const gameId = gameSegment && GAME_ID_RE.test(gameSegment)
-    ? gameSegment
-    : null;
+  const [dateSegment, gameSegment] = segments;
+  const slugParams = parseGameSlug(gameSegment) || parseGameSlug(dateSegment);
+  if (slugParams) {
+    return slugParams;
+  }
+  if (DATE_PATH_RE.test(dateSegment)) {
+    const gameId = gameSegment && LEGACY_GAME_ID_RE.test(gameSegment)
+      ? gameSegment
+      : null;
+    return { date: dateSegment, gameId };
+  }
 
-  return { date: dateSegment, gameId };
+  return { date: null, gameId: null };
 }
 
 /**
@@ -35,9 +63,11 @@ export function useQueryParams() {
     }
 
     const params = new URLSearchParams(window.location.search);
+    const rawGameId = params.get('gameid');
+    const slugParams = parseGameSlug(rawGameId);
     return {
-      date: params.get('date'),
-      gameId: params.get('gameid'),
+      date: slugParams?.date ?? params.get('date'),
+      gameId: slugParams?.gameId ?? rawGameId,
     };
   }, []);
 
@@ -49,17 +79,7 @@ export function useQueryParams() {
     params.delete('date');
     params.delete('gameid');
 
-    const pathSegments = [];
-    if (newDate) {
-      pathSegments.push(encodeURIComponent(newDate));
-    }
-    if (newGameId) {
-      pathSegments.push(encodeURIComponent(newGameId));
-    }
-
-    const pathname = pathSegments.length > 0
-      ? `/${pathSegments.join('/')}`
-      : '/';
+    const pathname = newGameId ? `/${encodeURIComponent(newGameId)}` : '/';
     const query = params.toString();
     const newUrl = `${pathname}${query ? `?${query}` : ''}${window.location.hash}`;
     window.history.replaceState({}, '', newUrl);

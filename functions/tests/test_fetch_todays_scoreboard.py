@@ -55,9 +55,16 @@ class TestFetchTodaysScoreboard:
         payload = gzip.decompress(resp["Body"].read())
         items = json.loads(payload.decode("utf-8"))
         assert len(items) == 1
-        assert items[0]["id"] == "12345"
+        assert items[0]["id"] == "2023-10-25-bos-nyk"
         assert items[0]["hometeam"] == "NYK"
         assert items[0]["awayscore"] == 104
+
+        map_resp = self.s3.get_object(
+            Bucket=self.bucket_name,
+            Key="private/gameIdMap/2023-10-25.json",
+        )
+        mapping = json.loads(map_resp["Body"].read().decode("utf-8"))
+        assert mapping["2023-10-25-bos-nyk"] == "12345"
 
     @patch("urllib.request.urlopen")
     def test_handler_no_games_array(self, mock_urlopen):

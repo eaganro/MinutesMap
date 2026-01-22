@@ -58,7 +58,7 @@ def migrate_data():
             "hometeam": item.get('hometeam'),
             "awayteam": item.get('awayteam'),
             "starttime": item.get('starttime'),
-            "clock": item.get('clock'),
+            "time": item.get('time') or item.get('clock'),
             "status": item.get('status'),
             "date": date
         }

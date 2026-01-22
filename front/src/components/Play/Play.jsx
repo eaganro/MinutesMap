@@ -71,6 +71,7 @@ const withTimeout = (promise, ms, label) => {
 
 export default function Play({ 
   gameId,
+  nbaGameId,
   gameStatus,
   gameDate,
   awayTeamNames, 
@@ -538,7 +539,7 @@ export default function Play({
       }
       const targetAction = resolveVideoAction(action, displayAllActions);
       const url = buildNbaEventUrl({
-        gameId,
+        gameId: nbaGameId,
         actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber,
         description: targetAction?.description ?? action?.description,
       });
@@ -1031,7 +1032,7 @@ export default function Play({
             mousePosition={mousePosition}
             infoLocked={infoLocked}
             isHoveringIcon={isHoveringIcon}
-            gameId={gameId}
+            nbaGameId={nbaGameId}
             allActions={filteredAllActions}
             hasPrevAction={hasPrevAction}
             hasNextAction={hasNextAction}

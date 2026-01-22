@@ -263,7 +263,6 @@ export function buildPartialBox({ box, playByPlay, range, awayTeamId, homeTeamId
   const homeOut = buildTeamOut(homeTeam, teams[homeId]?.players);
 
   return {
-    id: box.id,
     start: box.start,
     teams: {
       away: awayOut,

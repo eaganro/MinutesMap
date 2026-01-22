@@ -55,7 +55,8 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
         Effect   = "Allow"
         Resource = [
           "arn:aws:s3:::roryeagan.com-nba-processed-data/data/*",
-          "arn:aws:s3:::roryeagan.com-nba-processed-data/schedule/*"
+          "arn:aws:s3:::roryeagan.com-nba-processed-data/schedule/*",
+          "arn:aws:s3:::roryeagan.com-nba-processed-data/private/gameIdMap/*"
         ]
       },
       # 3. EventBridge Rule Control
@@ -124,6 +125,7 @@ resource "aws_lambda_function" "nba_poller" {
       DATA_BUCKET      = aws_s3_bucket.data_bucket.id
       POLLER_RULE_NAME = aws_cloudwatch_event_rule.nba_poller_rule.name
       SCHEDULE_RECONCILE_DAYS = "4"
+      GAME_ID_MAP_PREFIX = "private/gameIdMap/"
     }
   }
 }

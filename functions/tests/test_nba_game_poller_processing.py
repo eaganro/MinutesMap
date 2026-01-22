@@ -23,7 +23,6 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         )
 
         self.assertEqual(processed["v"], 2)
-        self.assertEqual(processed["game"], "0012200039")
         self.assertEqual(processed["periods"], 4)
 
         self.assertIsInstance(processed["feed"], list)

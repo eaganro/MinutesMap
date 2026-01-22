@@ -85,25 +85,46 @@ async function uploadJsonToS3(key, jsonObject, isFinal = false) {
   console.log(`Uploaded ${key}`);
 }
 
+function normalizeTeamSlug(value) {
+  if (!value) return null;
+  return String(value).trim().toLowerCase().replace(/[^a-z0-9]/g, '') || null;
+}
+
+function buildGameSlug(dateStr, awayTeam, homeTeam, fallbackId) {
+  const away = normalizeTeamSlug(awayTeam);
+  const home = normalizeTeamSlug(homeTeam);
+  if (dateStr && away && home) {
+    return `${dateStr}-${away}-${home}`;
+  }
+  return fallbackId ? String(fallbackId) : null;
+}
+
 // --- Update DynamoDB ---
 async function putGameToDDB(box) {
-  const key = box.gameId;
+  const nbaGameId = box.gameId;
+  const dateStr = box.gameEt.split('T')[0];
+  const gameKey = buildGameSlug(
+    dateStr,
+    box.awayTeam?.teamTricode,
+    box.homeTeam?.teamTricode,
+    nbaGameId
+  );
   const hash = crypto.createHash('md5')
     .update(JSON.stringify({ homescore: box.homeTeam.score, awayscore: box.awayTeam.score, status: box.gameStatusText }))
     .digest('hex');
-  if (lastPayloadHash.get(key + ':ddb') === hash) {
-    console.log(`Skipping DDB write for ${key}; no change.`);
+  if (lastPayloadHash.get(gameKey + ':ddb') === hash) {
+    console.log(`Skipping DDB write for ${gameKey}; no change.`);
     return;
   }
-  lastPayloadHash.set(key + ':ddb', hash);
-  const dateStr = box.gameEt.split('T')[0];
+  lastPayloadHash.set(gameKey + ':ddb', hash);
   await ddb.send(new PutCommand({
     TableName: DDB_TABLE,
     Item: {
-      PK:         `GAME#${key}`,
+      PK:         `GAME#${gameKey}`,
       SK:         `DATE#${dateStr}`,
       date:       dateStr,
-      id:         key,
+      id:         gameKey,
+      nbaGameId:  String(nbaGameId),
       homescore:  box.homeTeam.score,
       awayscore:  box.awayTeam.score,
       hometeam:   box.homeTeam.teamTricode,
@@ -137,26 +158,28 @@ async function recoverStuckGames() {
   do {
     const { Items, LastEvaluatedKey } = await ddb.send(new ScanCommand({
       TableName: DDB_TABLE,
-      ProjectionExpression:   '#id, #dt, #st',
+      ProjectionExpression:   '#id, #dt, #st, #nba',
       FilterExpression:       '#dt < :today AND NOT begins_with(#st, :final)',
-      ExpressionAttributeNames:  { '#id': 'id', '#dt': 'date', '#st': 'status' },
+      ExpressionAttributeNames:  { '#id': 'id', '#dt': 'date', '#st': 'status', '#nba': 'nbaGameId' },
       ExpressionAttributeValues: { ':today': today, ':final': 'Final' },
       ExclusiveStartKey: LastKey
     }));
     console.log('items', Items)
     for (const it of Items) {
-      stuck.push(it.id);
+      stuck.push({ id: it.id, nbaGameId: it.nbaGameId });
     }
     LastKey = LastEvaluatedKey;
   } while (LastKey);
 
   if (!stuck.length) return;
   console.log(`Recovering ${stuck.length} stuck games…`);
-  for (const gameId of stuck) {
+  for (const game of stuck) {
+    const publicId = game.id;
+    const nbaGameId = game.nbaGameId || game.id;
     try {
       const urls = {
-        play:  `https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_${gameId}.json`,
-        box:   `https://cdn.nba.com/static/json/liveData/boxscore/boxscore_${gameId}.json`,
+        play:  `https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_${nbaGameId}.json`,
+        box:   `https://cdn.nba.com/static/json/liveData/boxscore/boxscore_${nbaGameId}.json`,
       };
       const headers = {};
       const resList = await Promise.all(Object.values(urls).map(url =>
@@ -177,14 +200,14 @@ async function recoverStuckGames() {
       const actions = playJsonRaw?.game.actions;
       const box     = boxJsonRaw?.game;
       await Promise.all([
-        actions && uploadJsonToS3(`playByPlayData/${gameId}.json`, actions, true),
-        box     && uploadJsonToS3(`boxData/${gameId}.json`, box, true),
+        actions && uploadJsonToS3(`playByPlayData/${publicId}.json`, actions, true),
+        box     && uploadJsonToS3(`boxData/${publicId}.json`, box, true),
         box     && putGameToDDB(box)
       ]);
-      manifestSet.add(gameId);
-      console.log(`Recovered ${gameId}`);
+      manifestSet.add(publicId);
+      console.log(`Recovered ${publicId}`);
     } catch (e) {
-      console.error(`Failed to recover ${gameId}:`, e);
+      console.error(`Failed to recover ${publicId}:`, e);
     }
   }
   await uploadManifest();
@@ -193,12 +216,12 @@ async function recoverStuckGames() {
 // Map to store ETags for conditional GET
 const etagMap = new Map();
 // --- Poll a game until Final status with jitter + ETag ---
-function startPollingGame(gameId) {
+function startPollingGame({ publicId, nbaGameId }) {
   async function poll() {
     try {
       const urls = {
-        play:  `https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_${gameId}.json`,
-        box:   `https://cdn.nba.com/static/json/liveData/boxscore/boxscore_${gameId}.json`,
+        play:  `https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_${nbaGameId}.json`,
+        box:   `https://cdn.nba.com/static/json/liveData/boxscore/boxscore_${nbaGameId}.json`,
       };
       const responses = await Promise.all(Object.values(urls).map(async url => {
         const opts = {};
@@ -222,19 +245,19 @@ function startPollingGame(gameId) {
       const last = actions?.[actions.length - 1];
       if (actions || box) {
         await Promise.all([
-          actions?.length && uploadJsonToS3(`playByPlayData/${gameId}.json`, actions, last?.description?.trim().startsWith('Game End')),
-          box     && uploadJsonToS3(`boxData/${gameId}.json`, box, box?.gameStatusText?.trim().startsWith('Final')),
+          actions?.length && uploadJsonToS3(`playByPlayData/${publicId}.json`, actions, last?.description?.trim().startsWith('Game End')),
+          box     && uploadJsonToS3(`boxData/${publicId}.json`, box, box?.gameStatusText?.trim().startsWith('Final')),
           box     && putGameToDDB(box)
         ]);
       }
       if (last?.description?.trim().startsWith('Game End') && box?.gameStatusText?.trim().startsWith('Final')) {
-        manifestSet.add(gameId);
+        manifestSet.add(publicId);
         await uploadManifest();
-        console.log(`✅ Polling complete for ${gameId}`);
+        console.log(`✅ Polling complete for ${publicId}`);
         return;
       }
     } catch (err) {
-      console.error(`Error polling ${gameId}:`, err);
+      console.error(`Error polling ${publicId}:`, err);
     }
     // schedule next poll with jitter ±1s
     const jitter = (Math.random() * 20000) - 10000;
@@ -296,7 +319,7 @@ async function schedulePolling() {
       console.log(
         `→ [${g.id}] start time ${hourStr}:${minuteStr} ET already passed; polling immediately`
       );
-      startPollingGame(g.id);
+      startPollingGame({ publicId: g.id, nbaGameId: g.nbaGameId || g.id });
     }
 
     // and still schedule the daily ET job
@@ -307,7 +330,7 @@ async function schedulePolling() {
           timeZone: 'America/New_York'
         });
         console.log(`→ Started polling for ${g.id} at ${firedAt} ET`);
-        startPollingGame(g.id);
+        startPollingGame({ publicId: g.id, nbaGameId: g.nbaGameId || g.id });
       }
     );
   }

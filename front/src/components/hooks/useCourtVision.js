@@ -55,6 +55,7 @@ export function useCourtVision() {
     playByPlay,
     awayTeamId,
     homeTeamId,
+    nbaGameId,
     numQs,
     lastAction,
     gameStatusMessage,
@@ -393,6 +394,7 @@ export function useCourtVision() {
     isPlayLoading: isPlayVisible,
     showScoreDiff,
     gameStatus: currentScheduleGameStatus,
+    nbaGameId,
 
     // Stat controls
     statOn,

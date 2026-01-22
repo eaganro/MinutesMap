@@ -29,6 +29,20 @@ function n(v) {
   return Number.isFinite(num) ? num : 0;
 }
 
+function normalizeTeamSlug(value) {
+  if (!value) return null;
+  return String(value).trim().toLowerCase().replace(/[^a-z0-9]/g, '') || null;
+}
+
+function buildGameSlug(dateStr, awayTeam, homeTeam, fallbackId) {
+  const away = normalizeTeamSlug(awayTeam);
+  const home = normalizeTeamSlug(homeTeam);
+  if (dateStr && away && home) {
+    return `${dateStr}-${away}-${home}`;
+  }
+  return fallbackId ? String(fallbackId) : null;
+}
+
 // async function fetchAllGamesFromSchedule() {
 //   console.log(`Fetching league schedule: ${SCHEDULE_URL}`);
 //   const res = await fetch(SCHEDULE_URL);
@@ -126,8 +140,11 @@ async function fetchAllGamesFromSchedule() {
         }
       }
 
+      const gameKey = buildGameSlug(dateEt, away.teamTricode, home.teamTricode, g.gameId);
+
       games.push({
-        id:         g.gameId,
+        id:         gameKey,
+        nbaGameId:  String(g.gameId),
         date:       dateEt, 
         starttime:  startEtIso,
         hometeam:   home.teamTricode,
@@ -135,7 +152,7 @@ async function fetchAllGamesFromSchedule() {
         homescore:  n(home.score),
         awayscore:  n(away.score),
         status:     (g.gameStatusText || '').trim() || (g.gameStatus === 1 ? 'Scheduled' : 'Unknown'),
-        clock:      '', 
+        time:       '', 
         homerecord: `${home.wins ?? 0}-${home.losses ?? 0}`,
         awayrecord: `${away.wins ?? 0}-${away.losses ?? 0}`,
         label:      g.gameLabel || '',       

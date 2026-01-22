@@ -24,19 +24,19 @@ const ExternalLinkIcon = () => (
   </svg>
 );
 
-export default function PlayTooltip({ 
-  descriptionArray, 
+export default function PlayTooltip({
+  descriptionArray,
   focusActionMeta,
-  mousePosition, 
-  infoLocked, 
+  mousePosition,
+  infoLocked,
   isHoveringIcon,
-  gameId,
+  nbaGameId,
   allActions,
   hasPrevAction,
   hasNextAction,
   onNavigate,
-  containerRef, 
-  awayTeamNames, 
+  containerRef,
+  awayTeamNames,
   homeTeamNames, 
   teamColors,
   leftMargin 
@@ -242,7 +242,7 @@ export default function PlayTooltip({
   const baseVideoAction = descriptionArray.find((action) => !isSubstitutionAction(action)) || null;
   const resolvedVideoAction = resolveVideoAction(baseVideoAction, allActions);
   const videoUrl = buildNbaEventUrl({
-    gameId,
+    gameId: nbaGameId,
     actionNumber: resolvedVideoAction?.actionNumber ?? baseVideoAction?.actionNumber,
     description: resolvedVideoAction?.description ?? baseVideoAction?.description,
   });

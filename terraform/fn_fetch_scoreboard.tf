@@ -40,7 +40,10 @@ resource "aws_iam_role_policy" "fetch_scoreboard_s3_write" {
         Action = [
           "s3:PutObject"
         ]
-        Resource = "${aws_s3_bucket.data_bucket.arn}/schedule/*"
+        Resource = [
+          "${aws_s3_bucket.data_bucket.arn}/schedule/*",
+          "${aws_s3_bucket.data_bucket.arn}/private/gameIdMap/*"
+        ]
       }
     ]
   })
@@ -70,6 +73,7 @@ resource "aws_lambda_function" "fetch_scoreboard" {
     variables = {
       DATA_BUCKET     = aws_s3_bucket.data_bucket.id
       SCHEDULE_PREFIX = "schedule/"
+      GAME_ID_MAP_PREFIX = "private/gameIdMap/"
     }
   }
 }

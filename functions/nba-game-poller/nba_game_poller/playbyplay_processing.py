@@ -679,7 +679,6 @@ def process_playbyplay_payload(
 
     payload = {
         "v": 2,
-        "game": game_id,
         "periods": num_periods,
         "last": last_payload,
         "score": _trim_score_timeline(score_timeline),

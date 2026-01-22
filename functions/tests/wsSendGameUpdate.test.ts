@@ -89,7 +89,7 @@ describe("ws-sendGameUpdate-handler", () => {
         {
           s3: {
             object: {
-              key: "data/gamepack/12345.json",
+              key: "data/gamepack/2024-01-15-phi-cle.json",
               eTag: "\"etag123\"",
             },
           },
@@ -116,8 +116,8 @@ describe("ws-sendGameUpdate-handler", () => {
         ? dataValue
         : Buffer.from(dataValue as Uint8Array).toString();
     expect(JSON.parse(payload)).toEqual({
-      gameId: "12345",
-      key: "data/gamepack/12345.json",
+      gameId: "2024-01-15-phi-cle",
+      key: "data/gamepack/2024-01-15-phi-cle.json",
       version: "etag123",
     });
   });
@@ -170,7 +170,7 @@ describe("ws-sendGameUpdate-handler", () => {
         {
           s3: {
             object: {
-              key: "data/gameStats/999.json",
+              key: "data/gameStats/2024-01-15-phi-cle.json",
               eTag: "\"etag999\"",
             },
           },
@@ -189,8 +189,8 @@ describe("ws-sendGameUpdate-handler", () => {
         ? dataValue
         : Buffer.from(dataValue as Uint8Array).toString();
     expect(JSON.parse(payload)).toEqual({
-      gameId: "999",
-      key: "data/gameStats/999.json",
+      gameId: "2024-01-15-phi-cle",
+      key: "data/gameStats/2024-01-15-phi-cle.json",
       version: "etag999",
     });
   });
