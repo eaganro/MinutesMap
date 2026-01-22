@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { getNbaTodayString, parseStartTimeEt } from '../../helpers/gameSelectionUtils';
+import { parseStartTimeEt } from '../../helpers/gameSelectionUtils';
 
-export function useSelectedGameMeta({ gameId, date, schedule, todaySchedule }) {
+export function useSelectedGameMeta({ gameId, date, schedule }) {
   const [selectedGameDate, setSelectedGameDate] = useState(null);
   const [selectedGameStart, setSelectedGameStart] = useState(null);
   const [selectedGameStatus, setSelectedGameStatus] = useState(null);
@@ -54,14 +54,8 @@ export function useSelectedGameMeta({ gameId, date, schedule, todaySchedule }) {
       return true;
     };
 
-    const updated = tryUpdateFromSchedule(schedule, date);
-    if (!updated) {
-      const nbaToday = getNbaTodayString();
-      if (todaySchedule && nbaToday) {
-        tryUpdateFromSchedule(todaySchedule, nbaToday);
-      }
-    }
-  }, [gameId, schedule, todaySchedule, date]);
+    tryUpdateFromSchedule(schedule, date);
+  }, [gameId, schedule, date]);
 
   return {
     selectedGameDate,

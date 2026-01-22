@@ -19,8 +19,6 @@ export function useGameData() {
   // --- Schedule State ---
   const [schedule, setSchedule] = useState([]);
   const [isScheduleLoading, setIsScheduleLoading] = useState(false);
-  const [todaySchedule, setTodaySchedule] = useState([]);
-  const [isTodayScheduleLoading, setIsTodayScheduleLoading] = useState(false);
 
   // --- Loading States ---
   const [isBoxLoading, setIsBoxLoading] = useState(true);
@@ -127,30 +125,6 @@ export function useGameData() {
     }
   }, []);
 
-  const fetchTodaySchedule = useCallback(async (dateString) => {
-    if (!dateString) return;
-
-    setIsTodayScheduleLoading(true);
-    const url = `${PREFIX}/schedule/${dateString}.json.gz`;
-
-    try {
-      const res = await fetch(url);
-      if (res.status === 403 || res.status === 404) {
-        setTodaySchedule([]);
-        return;
-      }
-
-      if (!res.ok) throw new Error(`Schedule fetch failed: ${res.status}`);
-
-      const data = await res.json();
-      setTodaySchedule(data);
-    } catch (err) {
-      console.error('Error in fetchTodaySchedule:', err);
-      setTodaySchedule([]);
-    } finally {
-      setIsTodayScheduleLoading(false);
-    }
-  }, []);
 
   /**
    * Fetch combined game pack data for a game (box + play-by-play)
@@ -235,14 +209,11 @@ export function useGameData() {
     isBoxLoading,
     isPlayLoading,
     isScheduleLoading,
-    isTodayScheduleLoading,
-    todaySchedule,
     
     // Actions
     fetchGamePack,
     setGameNotStarted,
     fetchSchedule,
-    fetchTodaySchedule,
     resetLoadingStates,
   };
 }

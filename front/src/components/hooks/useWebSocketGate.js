@@ -9,7 +9,6 @@ import {
 export function useWebSocketGate({
   date,
   schedule,
-  todaySchedule,
   gameId,
   selectedGameDate,
   selectedGameStart,
@@ -79,13 +78,6 @@ export function useWebSocketGate({
       }
     }
 
-    if (!matchedGame && gameId && todaySchedule && todaySchedule.length > 0) {
-      matchedGame = todaySchedule.find((game) => String(game?.id) === String(gameId)) || null;
-      if (matchedGame) {
-        matchedGameDate = nbaToday;
-      }
-    }
-
     const resolvedStatus = matchedGame?.status ?? fallbackStatus;
     const resolvedStart = matchedGame?.starttime
       ? parseStartTimeEt(matchedGame.starttime)
@@ -131,7 +123,6 @@ export function useWebSocketGate({
   }, [
     date,
     schedule,
-    todaySchedule,
     gameId,
     selectedGameDate,
     selectedGameStart,

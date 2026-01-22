@@ -5,6 +5,7 @@
 export const MAX_AUTO_LOOKBACK_DAYS = 10;
 export const GAME_NOT_STARTED_MESSAGE = 'Game data is not available yet. The game has not started.';
 const ET_TIME_ZONE = 'America/New_York';
+const GAME_SLUG_RE = /^\d{4}-\d{2}-\d{2}-[a-z0-9]{2,}-[a-z0-9]{2,}$/i;
 
 function getTimeZoneParts(date, timeZone) {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -61,6 +62,22 @@ export function formatDateString(dateObj) {
  */
 export function getTodayString() {
   return formatDateString(new Date());
+}
+
+export function isGameSlug(value) {
+  if (!value || typeof value !== 'string') {
+    return false;
+  }
+  return GAME_SLUG_RE.test(value.trim());
+}
+
+export function parseGameSlug(value) {
+  if (!isGameSlug(value)) {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  const date = normalized.slice(0, 10);
+  return { date, gameId: normalized };
 }
 
 export function getNbaTodayString(now = new Date()) {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  getNbaTodayString,
   parseGameStatus,
+  parseGameSlug,
   scheduleMatchesDate,
   sortGamesForSelection,
 } from '../../helpers/gameSelectionUtils';
@@ -46,11 +46,8 @@ export function useCourtVision() {
   // === GAME DATA ===
   const {
     schedule,
-    todaySchedule,
     fetchSchedule,
-    fetchTodaySchedule,
     isScheduleLoading,
-    isTodayScheduleLoading,
     box,
     playByPlay,
     awayTeamId,
@@ -96,7 +93,10 @@ export function useCourtVision() {
           setDate(data.date);
           // The server also tells us the "Best Game" to show automatically
           if (data.autoSelectGameId && !initialParams.gameId) {
-            setGameId(data.autoSelectGameId);
+            const slugParams = parseGameSlug(data.autoSelectGameId);
+            if (slugParams) {
+              setGameId(slugParams.gameId);
+            }
           }
         } else {
           // Fallback: Browser date (only if init.json is missing/broken)
@@ -120,25 +120,6 @@ export function useCourtVision() {
     }
   }, [date, fetchSchedule]);
 
-  useEffect(() => {
-    if (!gameId) {
-      return;
-    }
-    const nbaToday = getNbaTodayString();
-    if (!nbaToday) {
-      return;
-    }
-    if (date === nbaToday && schedule && schedule.length > 0) {
-      return;
-    }
-    if (todaySchedule && todaySchedule.length > 0) {
-      return;
-    }
-    if (!isTodayScheduleLoading) {
-      fetchTodaySchedule(nbaToday);
-    }
-  }, [gameId, date, schedule, todaySchedule, fetchTodaySchedule, isTodayScheduleLoading]);
-
   // === WEBSOCKET HANDLERS ===
   const handleGameUpdate = useCallback((key, version) => {
     const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
@@ -161,13 +142,11 @@ export function useCourtVision() {
     gameId,
     date,
     schedule,
-    todaySchedule,
   });
 
   const { enabled: wsEnabled, followDate: wsFollowDate, followGame: wsFollowGame } = useWebSocketGate({
     date,
     schedule,
-    todaySchedule,
     gameId,
     selectedGameDate,
     selectedGameStart,
@@ -204,11 +183,8 @@ export function useCourtVision() {
     if (scheduleMatch) {
       return scheduleMatch;
     }
-    const todayMatch = (todaySchedule || []).find(
-      (game) => String(game?.id) === String(gameId)
-    );
-    return todayMatch || null;
-  }, [gameId, schedule, todaySchedule]);
+    return null;
+  }, [gameId, schedule]);
 
   const [cachedGameMeta, setCachedGameMeta] = useState(null);
 
@@ -253,7 +229,7 @@ export function useCourtVision() {
 
   const shouldWaitForSchedule = Boolean(gameId)
     && !selectedScheduleGame
-    && (isScheduleLoading || isTodayScheduleLoading);
+    && isScheduleLoading;
 
   // === GAME DATA FETCHING ===
   useEffect(() => {

@@ -1,17 +1,7 @@
 import { useCallback } from 'react';
+import { parseGameSlug } from '../../helpers/gameSelectionUtils';
 
 const DATE_PATH_RE = /^\d{4}-\d{2}-\d{2}$/;
-const GAME_SLUG_RE = /^\d{4}-\d{2}-\d{2}-[a-z0-9]{2,}-[a-z0-9]{2,}$/i;
-const LEGACY_GAME_ID_RE = /^\d+$/;
-
-function parseGameSlug(value) {
-  if (!value || !GAME_SLUG_RE.test(value)) {
-    return null;
-  }
-  const normalized = value.toLowerCase();
-  const date = normalized.slice(0, 10);
-  return { date, gameId: normalized };
-}
 
 function parsePathParams(pathname) {
   const trimmed = pathname.replace(/^\/+|\/+$/g, '');
@@ -25,9 +15,6 @@ function parsePathParams(pathname) {
     if (slugParams) {
       return slugParams;
     }
-    if (LEGACY_GAME_ID_RE.test(segments[0])) {
-      return { date: null, gameId: segments[0] };
-    }
     if (DATE_PATH_RE.test(segments[0])) {
       return { date: segments[0], gameId: null };
     }
@@ -40,10 +27,7 @@ function parsePathParams(pathname) {
     return slugParams;
   }
   if (DATE_PATH_RE.test(dateSegment)) {
-    const gameId = gameSegment && LEGACY_GAME_ID_RE.test(gameSegment)
-      ? gameSegment
-      : null;
-    return { date: dateSegment, gameId };
+    return { date: dateSegment, gameId: null };
   }
 
   return { date: null, gameId: null };
@@ -67,7 +51,7 @@ export function useQueryParams() {
     const slugParams = parseGameSlug(rawGameId);
     return {
       date: slugParams?.date ?? params.get('date'),
-      gameId: slugParams?.gameId ?? rawGameId,
+      gameId: slugParams?.gameId ?? null,
     };
   }, []);
 
