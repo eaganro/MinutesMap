@@ -247,19 +247,24 @@ def upload_init_state(games_today, date_str):
     Determines the best 'landing page' state for users.
     Logic:
     1. If there is a Live game, point to it.
-    2. If there are Final games today, point to the best one (or last one).
-    3. If today is empty (or all games are effectively 'tomorrow' due to time), 
+    2. If all games are Final, point to the first game of the day.
+    3. If there are some Final games today, point to the last Final game.
+    4. If today is empty (or all games are effectively 'tomorrow' due to time), 
        you could point to yesterday (optional, but 'get_nba_date' handles most of this).
     """
     
     best_game_id = None
     
-    # Sort: Live > Final > Scheduled
+    # Sort: Live > All Final (first game) > Some Final (last game) > Scheduled (first)
     live_games = [g for g in games_today if status_indicates_live(g)]
     final_games = [g for g in games_today if is_terminal_status(g.get('status'))]
+    all_games_final = bool(games_today) and len(final_games) == len(games_today)
     
     if live_games:
         best_game_id = live_games[0]['id']
+    elif all_games_final:
+        games_today.sort(key=lambda x: x.get('starttime', ''))
+        best_game_id = games_today[0]['id']
     elif final_games:
         best_game_id = final_games[-1]['id']
     elif games_today:
