@@ -118,7 +118,7 @@
     overflow-x: auto;
     position: relative;
     overscroll-behavior-x: contain;
-    overscroll-behavior-y: none;
+    overscroll-behavior-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
