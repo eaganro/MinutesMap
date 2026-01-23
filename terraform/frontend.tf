@@ -24,53 +24,6 @@ function handler(event) {
 EOF
 }
 
-resource "aws_cloudfront_function" "posthog_rewrite" {
-  name    = "courtvision-posthog-rewrite"
-  runtime = "cloudfront-js-1.0"
-  comment = "Rewrite /ph/* to /* for PostHog proxy"
-  publish = true
-  code    = <<EOF
-function handler(event) {
-  var request = event.request;
-
-  if (request.uri === '/ph') {
-    request.uri = '/';
-    return request;
-  }
-
-  if (request.uri.startsWith('/ph/')) {
-    request.uri = request.uri.slice(3);
-  }
-
-  return request;
-}
-EOF
-}
-
-resource "aws_cloudfront_cache_policy" "posthog_no_cache" {
-  name        = "courtvision-posthog-no-cache"
-  default_ttl = 0
-  max_ttl     = 0
-  min_ttl     = 0
-
-  parameters_in_cache_key_and_forwarded_to_origin {
-    cookies_config {
-      cookie_behavior = "none"
-    }
-
-    headers_config {
-      header_behavior = "none"
-    }
-
-    query_strings_config {
-      query_string_behavior = "none"
-    }
-
-    enable_accept_encoding_brotli = false
-    enable_accept_encoding_gzip   = false
-  }
-}
-
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -96,43 +49,11 @@ resource "aws_cloudfront_distribution" "main" {
     origin_access_control_id = "E3V205NEY044Q6"
   }
 
-  # Origin 3: PostHog ingestion
-  origin {
-    domain_name = "us.i.posthog.com"
-    origin_id   = "PostHogOrigin"
-
-    custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "https-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
-    }
-  }
-
   # ---------------------------------------------------------
   # BEHAVIORS
   # ---------------------------------------------------------
 
-  # 1. SPECIAL RULE: Proxy PostHog ingestion
-  ordered_cache_behavior {
-    path_pattern     = "/ph/*"
-    target_origin_id = "PostHogOrigin"
-
-    cache_policy_id          = aws_cloudfront_cache_policy.posthog_no_cache.id
-    origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
-
-    function_association {
-      event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.posthog_rewrite.arn
-    }
-
-    compress               = true
-    viewer_protocol_policy = "redirect-to-https"
-    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods         = ["GET", "HEAD"]
-  }
-
-  # 2. SPECIAL RULE: Serve JSON data from the Data Bucket
+  # 1. SPECIAL RULE: Serve JSON data from the Data Bucket
   ordered_cache_behavior {
     path_pattern     = "/data/*"
     target_origin_id = aws_s3_bucket.data_bucket.bucket_regional_domain_name
@@ -148,7 +69,7 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods         = ["GET", "HEAD"]
   }
 
-  # 3. SPECIAL RULE: Serve Schedule from the Data Bucket
+  # 2. SPECIAL RULE: Serve Schedule from the Data Bucket
   ordered_cache_behavior {
     path_pattern     = "/schedule/*"
     target_origin_id = aws_s3_bucket.data_bucket.bucket_regional_domain_name
@@ -164,7 +85,7 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods         = ["GET", "HEAD"]
   }
 
-  # 4. DEFAULT RULE: Serve the App from the Frontend Bucket
+  # 3. DEFAULT RULE: Serve the App from the Frontend Bucket
   default_cache_behavior {
     target_origin_id = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
 
