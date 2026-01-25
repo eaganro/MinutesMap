@@ -16,10 +16,14 @@ export function useWebSocket({
 }) {
   const [ws, setWs] = useState(null);
   const wsRef = useRef(null);
+  const connectRef = useRef(null);
   const lastFollowDateRef = useRef(null);
   const lastFollowGameRef = useRef(null);
   const followDateRef = useRef(followDate);
   const followGameRef = useRef(followGame);
+  const reconnectTimerRef = useRef(null);
+  const reconnectAttemptRef = useRef(0);
+  const allowReconnectRef = useRef(enabled);
   
   // Keep refs updated for callbacks
   const gameIdRef = useRef(gameId);
@@ -29,6 +33,7 @@ export function useWebSocket({
   dateRef.current = date;
   followDateRef.current = followDate;
   followGameRef.current = followGame;
+  allowReconnectRef.current = enabled;
   
   useEffect(() => {
     if (!gameId) {
@@ -41,6 +46,18 @@ export function useWebSocket({
       lastFollowDateRef.current = null;
     }
   }, [date]);
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const resetReconnectState = useCallback(() => {
+    clearReconnectTimer();
+    reconnectAttemptRef.current = 0;
+  }, [clearReconnectTimer]);
 
   const sendSubscriptions = useCallback(() => {
     const wsInstance = wsRef.current;
@@ -74,6 +91,29 @@ export function useWebSocket({
     }
   }, []);
 
+  const scheduleReconnect = useCallback(() => {
+    if (!allowReconnectRef.current) {
+      return;
+    }
+
+    if (document.visibilityState === 'hidden') {
+      return;
+    }
+
+    clearReconnectTimer();
+    const attempt = reconnectAttemptRef.current;
+    const baseDelay = 1000;
+    const maxDelay = 30000;
+    const delay = Math.min(baseDelay * 2 ** attempt, maxDelay);
+    const jitteredDelay = Math.round(delay * (0.8 + Math.random() * 0.4));
+
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      reconnectAttemptRef.current = Math.min(reconnectAttemptRef.current + 1, 10);
+      connectRef.current?.();
+    }, jitteredDelay);
+  }, [clearReconnectTimer]);
+
   const connect = useCallback(() => {
     if (!enabled) {
       return;
@@ -89,6 +129,7 @@ export function useWebSocket({
 
     newWs.onopen = () => {
       console.log('Connected to WebSocket');
+      resetReconnectState();
       sendSubscriptions();
     };
 
@@ -121,9 +162,90 @@ export function useWebSocket({
       console.log('Disconnected from WebSocket');
       lastFollowDateRef.current = null;
       lastFollowGameRef.current = null;
+      wsRef.current = null;
       setWs(null);
+      scheduleReconnect();
     };
-  }, [enabled, sendSubscriptions, onPlayByPlayUpdate, onBoxUpdate, onDateUpdate]);
+
+    newWs.onerror = () => {
+      if (newWs.readyState !== WebSocket.OPEN) {
+        scheduleReconnect();
+      }
+    };
+  }, [
+    enabled,
+    sendSubscriptions,
+    onPlayByPlayUpdate,
+    onBoxUpdate,
+    onDateUpdate,
+    resetReconnectState,
+    scheduleReconnect,
+  ]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
+
+  useEffect(() => {
+    if (!enabled) {
+      resetReconnectState();
+    }
+  }, [enabled, resetReconnectState]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+      if (!allowReconnectRef.current) {
+        return;
+      }
+      resetReconnectState();
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        connectRef.current?.();
+      }
+    };
+
+    const handleFocus = () => {
+      if (!allowReconnectRef.current) {
+        return;
+      }
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        resetReconnectState();
+        connectRef.current?.();
+      }
+    };
+
+    const handleOnline = () => {
+      if (!allowReconnectRef.current) {
+        return;
+      }
+      resetReconnectState();
+      connectRef.current?.();
+    };
+
+    const handlePageShow = () => {
+      if (!allowReconnectRef.current) {
+        return;
+      }
+      resetReconnectState();
+      if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        connectRef.current?.();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [resetReconnectState]);
 
   // Connection lifecycle
   useEffect(() => {
@@ -146,6 +268,12 @@ export function useWebSocket({
   const close = useCallback(() => {
     wsRef.current?.close();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      resetReconnectState();
+    };
+  }, [resetReconnectState]);
 
   return { ws, connect, close };
 }

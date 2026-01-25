@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
+  getNbaTodayString,
   parseGameStatus,
   parseGameSlug,
   scheduleMatchesDate,
@@ -18,6 +19,8 @@ import { useElementWidth } from './useElementWidth';
 
 const DEFAULT_STAT_ON = [true, false, true, true, false, false, false, false];
 const LOADING_DELAY_MS = 500;
+const RESUME_REFRESH_COOLDOWN_MS = 30000;
+const RESUME_REFRESH_WS_COOLDOWN_MS = 60000;
 
 /**
  * Facade hook that orchestrates all game data, WebSocket, and UI state.
@@ -63,6 +66,24 @@ export function useCourtVision() {
     resetLoadingStates,
   } = useGameData();
 
+  // === REFS FOR CALLBACKS ===
+  const fetchStateRef = useRef({ gameId: null, status: null });
+  const lastGamePackFetchRef = useRef({ at: 0, reason: null });
+  const lastScheduleFetchRef = useRef({ at: 0, reason: null });
+
+  const fetchGamePackWithReason = useCallback((params, reason) => {
+    lastGamePackFetchRef.current = { at: Date.now(), reason };
+    fetchGamePack(params);
+  }, [fetchGamePack]);
+
+  const fetchScheduleWithReason = useCallback((dateString, reason) => {
+    if (!dateString) {
+      return;
+    }
+    lastScheduleFetchRef.current = { at: Date.now(), reason };
+    fetchSchedule(dateString);
+  }, [fetchSchedule]);
+
   // === PROCESSED TIMELINES ===
   const {
     scoreTimeline,
@@ -75,9 +96,6 @@ export function useCourtVision() {
 
   // === LAYOUT ===
   const [playByPlaySectionRef, playByPlaySectionWidth] = useElementWidth();
-
-  // === REFS FOR CALLBACKS ===
-  const fetchStateRef = useRef({ gameId: null, status: null });
 
   // === 1. BOOT SEQUENCE: FETCH INIT STATE ===
   // If the user didn't provide a date in the URL, fetch init.json
@@ -116,22 +134,22 @@ export function useCourtVision() {
   // === EFFECT: FETCH SCHEDULE ON DATE CHANGE ===
   useEffect(() => {
     if (date) {
-      fetchSchedule(date);
+      fetchScheduleWithReason(date, 'date-change');
     }
-  }, [date, fetchSchedule]);
+  }, [date, fetchScheduleWithReason]);
 
   // === WEBSOCKET HANDLERS ===
   const handleGameUpdate = useCallback((key, version) => {
     const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
-    fetchGamePack({ url, showLoading: false });
-  }, [fetchGamePack]);
+    fetchGamePackWithReason({ url, showLoading: false }, 'ws');
+  }, [fetchGamePackWithReason]);
 
   const handleDateUpdate = useCallback((updatedDate) => {
     // If we receive a signal that the date we are viewing changed, refresh it
     if (updatedDate === date) {
-      fetchSchedule(date);
+      fetchScheduleWithReason(date, 'ws');
     }
-  }, [date, fetchSchedule]);
+  }, [date, fetchScheduleWithReason]);
 
   const {
     selectedGameDate,
@@ -155,7 +173,7 @@ export function useCourtVision() {
   });
 
   // === WEBSOCKET CONNECTION ===
-  useWebSocket({
+  const { ws } = useWebSocket({
     gameId,
     date,
     enabled: wsEnabled,
@@ -172,6 +190,14 @@ export function useCourtVision() {
       updateQueryParams(date, gameId);
     }
   }, [date, gameId, updateQueryParams]);
+
+  useEffect(() => {
+    lastGamePackFetchRef.current = { at: 0, reason: null };
+  }, [gameId]);
+
+  useEffect(() => {
+    lastScheduleFetchRef.current = { at: 0, reason: null };
+  }, [date]);
 
   const selectedScheduleGame = useMemo(() => {
     if (!gameId) {
@@ -252,11 +278,15 @@ export function useCourtVision() {
     if (isSameGame && lastStatus === 'fetched') {
       return;
     }
+    const previousGameId = fetchStateRef.current.gameId;
+    const reason = previousGameId
+      ? (isSameGame ? 'resume' : 'game-change')
+      : 'initial';
     fetchStateRef.current = { gameId, status: 'fetched' };
-    fetchGamePack({ gameId, showLoading: !isSameGame });
+    fetchGamePackWithReason({ gameId, showLoading: !isSameGame }, reason);
   }, [
     gameId,
-    fetchGamePack,
+    fetchGamePackWithReason,
     isSelectedGameUpcoming,
     selectedScheduleGame,
     setGameNotStarted,
@@ -313,6 +343,91 @@ export function useCourtVision() {
     setGameId(String(defaultGame.id));
   }, [date, gameId, isScheduleLoading, sortedGames]);
   const currentScheduleGameStatus = stableGameMeta?.status || null;
+  const isSelectedGameFinal = useMemo(() => {
+    if (!gameId) {
+      return true;
+    }
+    if (!currentScheduleGameStatus) {
+      return false;
+    }
+    return parseGameStatus(currentScheduleGameStatus).isFinal;
+  }, [gameId, currentScheduleGameStatus]);
+  const isWebSocketOpen = typeof WebSocket !== 'undefined'
+    && ws?.readyState === WebSocket.OPEN;
+
+  useEffect(() => {
+    const resolveThresholdMs = (lastReason) => {
+      if (!isWebSocketOpen) {
+        return RESUME_REFRESH_COOLDOWN_MS;
+      }
+      if (lastReason === 'ws') {
+        return RESUME_REFRESH_WS_COOLDOWN_MS;
+      }
+      return RESUME_REFRESH_COOLDOWN_MS;
+    };
+
+    const maybeRefreshOnResume = () => {
+      if (document.visibilityState && document.visibilityState !== 'visible') {
+        return;
+      }
+      const now = Date.now();
+
+      if (gameId && !isSelectedGameFinal) {
+        const { at: lastGamePackAt, reason: lastGamePackReason } = lastGamePackFetchRef.current;
+        const threshold = resolveThresholdMs(lastGamePackReason);
+        if (!lastGamePackAt || now - lastGamePackAt >= threshold) {
+          fetchGamePackWithReason({ gameId, showLoading: false }, 'resume');
+        }
+      }
+
+      const nbaToday = getNbaTodayString();
+      const isToday = date && date === nbaToday;
+      if (isToday) {
+        const { at: lastScheduleAt, reason: lastScheduleReason } = lastScheduleFetchRef.current;
+        const threshold = resolveThresholdMs(lastScheduleReason);
+        if (!lastScheduleAt || now - lastScheduleAt >= threshold) {
+          fetchScheduleWithReason(date, 'resume');
+        }
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        maybeRefreshOnResume();
+      }
+    };
+
+    const handleFocus = () => {
+      maybeRefreshOnResume();
+    };
+
+    const handleOnline = () => {
+      maybeRefreshOnResume();
+    };
+
+    const handlePageShow = () => {
+      maybeRefreshOnResume();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [
+    date,
+    fetchGamePackWithReason,
+    fetchScheduleWithReason,
+    gameId,
+    isSelectedGameFinal,
+    isWebSocketOpen,
+  ]);
 
   const awayTeam = box?.teams?.away;
   const homeTeam = box?.teams?.home;
