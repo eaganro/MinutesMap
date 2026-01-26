@@ -24,6 +24,8 @@ POLLER_RULE_NAME = os.environ['POLLER_RULE_NAME']
 PREFIX = 'data/'
 MANIFEST_KEY = f'{PREFIX}manifest.json'
 KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
+RECONCILE_SCHEDULE_PREFIX = 'NBA_Reconcile_'
+RECONCILE_LEAD_MINUTES = 15
 SCHEDULE_PREFIX = 'schedule/'
 GAMEPACK_PREFIX = 'gamepack/'
 GAME_ID_MAP_PREFIX = os.environ.get("GAME_ID_MAP_PREFIX", "private/gameIdMap/")
@@ -58,6 +60,8 @@ def main_handler(event, context):
         return manager_logic()
     elif task == 'enable_poller':
         return enable_poller_logic()
+    elif task == 'reconcile':
+        return reconcile_logic()
     else:
         return poller_logic(context)
 
@@ -74,6 +78,8 @@ def manager_logic():
     if not games:
         print("Manager: No games found in schedule for today.")
         return
+
+    schedule_reconcile_for_games(games)
 
     start_dt = get_earliest_start_time(games)
     
@@ -93,41 +99,79 @@ def manager_logic():
     print(f"Manager: First game at {start_dt}. Scheduling kickoff for {kickoff_time}.")
     schedule_kickoff(kickoff_time)
 
-def schedule_kickoff(run_at_dt):
+def reconcile_logic():
+    print("Reconcile: Running schedule reconciliation.")
+    reconcile_recent_schedule()
+
+def create_one_time_schedule(name, run_at_dt, payload):
     at_expression = f"at({run_at_dt.strftime('%Y-%m-%dT%H:%M:%S')})"
 
     try:
         # Cleanup old schedule if exists
         try:
-            scheduler_client.delete_schedule(Name=KICKOFF_SCHEDULE_NAME)
+            scheduler_client.delete_schedule(Name=name)
         except ClientError:
-            pass 
+            pass
 
         scheduler_client.create_schedule(
-            Name=KICKOFF_SCHEDULE_NAME,
+            Name=name,
             ScheduleExpression=at_expression,
             Target={
                 'Arn': LAMBDA_ARN,
                 'RoleArn': SCHEDULER_ROLE_ARN,
-                'Input': json.dumps({'task': 'enable_poller'})
+                'Input': json.dumps(payload)
             },
             FlexibleTimeWindow={'Mode': 'OFF'}
         )
-        print(f"Manager: Created one-time schedule '{KICKOFF_SCHEDULE_NAME}' at {at_expression}")
+        print(f"Manager: Created one-time schedule '{name}' at {at_expression}")
+        return True
     except Exception as e:
-        print(f"Manager Error: Failed to schedule kickoff: {e}")
+        print(f"Manager Error: Failed to schedule {name}: {e}")
+        return False
+
+def schedule_kickoff(run_at_dt):
+    if not create_one_time_schedule(
+        KICKOFF_SCHEDULE_NAME,
+        run_at_dt,
+        {'task': 'enable_poller'},
+    ):
         # Fallback: enable immediately so we don't miss games
         enable_poller_logic()
+
+def schedule_reconcile_for_games(games, lead_minutes=RECONCILE_LEAD_MINUTES):
+    if not games:
+        return
+    now_utc = datetime.now(UTC_ZONE)
+    scheduled = {}
+
+    for game in games:
+        start_et = parse_start_time_et(game.get('starttime'))
+        if not start_et:
+            continue
+        run_at = (start_et - timedelta(minutes=lead_minutes)).astimezone(UTC_ZONE)
+        run_at = run_at.replace(second=0, microsecond=0)
+        if run_at <= now_utc:
+            continue
+        key = run_at.strftime("%Y%m%d_%H%M")
+        scheduled[key] = run_at
+
+    if not scheduled:
+        print("Manager: No future reconcile schedules needed.")
+        return
+
+    for key, run_at in sorted(scheduled.items()):
+        schedule_name = f"{RECONCILE_SCHEDULE_PREFIX}{key}"
+        create_one_time_schedule(
+            schedule_name,
+            run_at,
+            {'task': 'reconcile'},
+        )
+
 
 # ==============================================================================
 # 2. KICKOFF LOGIC (One-Time Trigger)
 # ==============================================================================
 def enable_poller_logic():
-    print("Kickoff: Reconciling schedule before enabling poller...")
-    try:
-        reconcile_recent_schedule()
-    except Exception as e:
-        print(f"Kickoff: Reconcile failed, continuing anyway: {e}")
     print(f"Kickoff: Enabling {POLLER_RULE_NAME}...")
     try:
         events_client.enable_rule(Name=POLLER_RULE_NAME)
