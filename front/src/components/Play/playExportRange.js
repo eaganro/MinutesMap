@@ -1,5 +1,5 @@
 import { getGameTotalSeconds, getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
-import { formatClock } from '../../helpers/utils';
+import { formatClock, formatStatusText } from '../../helpers/utils';
 
 export const formatPeriodLabel = (period) => {
   const value = Number(period);
@@ -44,7 +44,7 @@ export const buildGameStatusLabel = ({
   scoreTimeline,
 }) => {
   if (isFinal && isFullGameRange) {
-    const statusText = typeof gameStatus === 'string' ? gameStatus.trim() : '';
+    const statusText = formatStatusText(gameStatus);
     return statusText || 'Final';
   }
   if (!isFullGameRange && Number.isFinite(periodRange?.end)) {
@@ -61,7 +61,7 @@ export const buildGameStatusLabel = ({
   if (periodLabel && formattedClock) {
     return `${periodLabel} ${formattedClock}`;
   }
-  const statusText = typeof gameStatus === 'string' ? gameStatus.trim() : '';
+  const statusText = formatStatusText(gameStatus);
   return statusText;
 };
 

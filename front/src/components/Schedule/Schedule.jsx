@@ -4,6 +4,7 @@ import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import { dateAdd, dateMinus, ASSET_PREFIX } from '../../environment';
 import { parseGameStatus } from '../../helpers/gameSelectionUtils';
+import { formatStatusText } from '../../helpers/utils';
 
 
 import './Schedule.scss';
@@ -60,10 +61,10 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   }
 
   const gamesList = (games || []).map(g => {
-    const { isLive } = parseGameStatus(g.status);
-    const isUpcoming = g.status.endsWith('ET');
+    const { isLive, isUpcoming } = parseGameStatus(g.status);
     const isSelected = g.id === selectedGameId;
     const gameClassName = `game${isSelected ? ' selected' : ''}`;
+    const statusText = formatStatusText(g.status);
 
     if (!isUpcoming) {
       return (
@@ -75,7 +76,7 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
           </div>
           <div>{g.awayscore} - {g.homescore}</div>
           <div className='statusRow'>
-            <span className='statusText'>{g.status}</span>
+            <span className='statusText'>{statusText}</span>
             {isLive && (
               <span className='liveDotIndicator' role='img' aria-label='Live game'>
                 <span className='liveDot' />
@@ -97,7 +98,7 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
             <span>{g.homerecord}</span> */}
           </div>
           <div className='statusRow'>
-            <span className='statusText'>{g.status}</span>
+            <span className='statusText'>{statusText}</span>
             {isLive && (
               <span className='liveDotIndicator' role='img' aria-label='Live game'>
                 <span className='liveDot' />

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import './Score.scss';
 import { ASSET_PREFIX } from '../../environment';
-import { formatClock, formatPeriod } from '../../helpers/utils';
+import { formatClock, formatPeriod, formatStatusText } from '../../helpers/utils';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 import { parseGameStatus } from '../../helpers/gameSelectionUtils';
 
@@ -96,18 +96,19 @@ export default function Score({
   }
 
   const gameDate = displayData.date ? new Date(displayData.date) : null;
-  const statusLabel = typeof displayData.gameStatus === 'string' ? displayData.gameStatus.trim() : '';
+  const rawStatusLabel = typeof displayData.gameStatus === 'string' ? displayData.gameStatus.trim() : '';
+  const statusLabel = formatStatusText(rawStatusLabel);
   const { isLive } = parseGameStatus(displayData.gameStatus);
   const formattedPeriod = formatPeriod(displayData.lastAction?.period);
   const formattedClock = formatClock(displayData.lastAction?.clock);
   const hasActionTime = Boolean(formattedPeriod && formattedClock);
   let gameTimeLabel = '';
 
-  if (statusLabel) {
-    const isFinal = statusLabel.startsWith('Final');
-    const isUpcoming = statusLabel.endsWith('ET');
+  if (rawStatusLabel) {
+    const isFinal = rawStatusLabel.startsWith('Final');
+    const isUpcoming = rawStatusLabel.endsWith('ET');
     if (isFinal || isUpcoming) {
-      gameTimeLabel = statusLabel;
+      gameTimeLabel = statusLabel || rawStatusLabel;
     }
   }
   if (!gameTimeLabel && hasActionTime) {
