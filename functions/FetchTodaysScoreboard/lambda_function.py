@@ -3,6 +3,7 @@ import json
 import gzip
 import urllib.request
 import boto3
+from botocore.exceptions import ClientError
 
 REGION = os.environ.get('AWS_REGION', 'us-east-1')
 BUCKET = os.environ['DATA_BUCKET']
@@ -78,10 +79,15 @@ def handler(event, context):
             return
 
         for date_str, date_games in games_by_date.items():
-            date_games.sort(key=lambda x: x.get('starttime', ''))
-            upload_schedule(date_str, date_games)
-            if game_id_maps.get(date_str):
-                upload_game_id_map(date_str, game_id_maps[date_str])
+            existing_games = load_existing_schedule(date_str)
+            merged_games = merge_schedule_lists(existing_games, date_games)
+            merged_games.sort(key=lambda x: x.get('starttime', ''))
+            upload_schedule(date_str, merged_games)
+
+            existing_map = load_existing_game_id_map(date_str)
+            merged_map = {**existing_map, **(game_id_maps.get(date_str) or {})}
+            if merged_map:
+                upload_game_id_map(date_str, merged_map)
 
         print(f"Uploaded {sum(len(g) for g in games_by_date.values())} games to S3")
 
@@ -116,6 +122,73 @@ def upload_game_id_map(date_str, mapping):
         CacheControl='s-maxage=0, max-age=0, must-revalidate',
     )
     print(f"Uploaded gameId map -> {key} ({len(mapping)} games)")
+
+def load_existing_schedule(date_str):
+    key = f"{SCHEDULE_PREFIX}{date_str}.json.gz"
+    try:
+        resp = s3_client.get_object(Bucket=BUCKET, Key=key)
+        payload = resp["Body"].read()
+        try:
+            payload = gzip.decompress(payload)
+        except OSError:
+            pass
+        data = json.loads(payload.decode("utf-8"))
+        return data if isinstance(data, list) else []
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404", "NotFound"):
+            return []
+        print(f"S3 Schedule Error: {e}")
+        return []
+    except Exception as e:
+        print(f"S3 Schedule Error: {e}")
+        return []
+
+def load_existing_game_id_map(date_str):
+    key = f"{GAME_ID_MAP_PREFIX}{date_str}.json"
+    try:
+        resp = s3_client.get_object(Bucket=BUCKET, Key=key)
+        payload = resp["Body"].read()
+        data = json.loads(payload.decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404", "NotFound"):
+            return {}
+        print(f"S3 GameIdMap Error: {e}")
+        return {}
+    except Exception as e:
+        print(f"S3 GameIdMap Error: {e}")
+        return {}
+
+def merge_schedule_lists(existing, incoming):
+    merged = {}
+    for game in existing or []:
+        game_id = game.get("id") if isinstance(game, dict) else None
+        if game_id:
+            merged[str(game_id)] = game
+    for game in incoming or []:
+        if not isinstance(game, dict):
+            continue
+        game_id = game.get("id")
+        if not game_id:
+            continue
+        existing_game = merged.get(str(game_id))
+        if existing_game:
+            merged[str(game_id)] = merge_game(existing_game, game)
+        else:
+            merged[str(game_id)] = game
+    return list(merged.values())
+
+def merge_game(existing, incoming):
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    for key, value in (incoming or {}).items():
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        merged[key] = value
+    return merged
 
 def normalize_team_slug(value):
     if not value:

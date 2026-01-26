@@ -26,6 +26,7 @@ MANIFEST_KEY = f'{PREFIX}manifest.json'
 KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
 RECONCILE_SCHEDULE_PREFIX = 'NBA_Reconcile_'
 RECONCILE_LEAD_MINUTES = 15
+RECONCILE_LATE_MINUTES = 45
 SCHEDULE_PREFIX = 'schedule/'
 GAMEPACK_PREFIX = 'gamepack/'
 GAME_ID_MAP_PREFIX = os.environ.get("GAME_ID_MAP_PREFIX", "private/gameIdMap/")
@@ -138,16 +139,23 @@ def schedule_kickoff(run_at_dt):
         # Fallback: enable immediately so we don't miss games
         enable_poller_logic()
 
-def schedule_reconcile_for_games(games, lead_minutes=RECONCILE_LEAD_MINUTES):
+def schedule_reconcile_for_games(
+    games,
+    lead_minutes=RECONCILE_LEAD_MINUTES,
+    late_minutes=RECONCILE_LATE_MINUTES,
+):
     if not games:
         return
     now_utc = datetime.now(UTC_ZONE)
     scheduled = {}
+    latest_start = None
 
     for game in games:
         start_et = parse_start_time_et(game.get('starttime'))
         if not start_et:
             continue
+        if not latest_start or start_et > latest_start:
+            latest_start = start_et
         run_at = (start_et - timedelta(minutes=lead_minutes)).astimezone(UTC_ZONE)
         run_at = run_at.replace(second=0, microsecond=0)
         if run_at <= now_utc:
@@ -155,8 +163,20 @@ def schedule_reconcile_for_games(games, lead_minutes=RECONCILE_LEAD_MINUTES):
         key = run_at.strftime("%Y%m%d_%H%M")
         scheduled[key] = run_at
 
+    if latest_start and late_minutes is not None:
+        late_run = (latest_start + timedelta(minutes=late_minutes)).astimezone(UTC_ZONE)
+        late_run = late_run.replace(second=0, microsecond=0)
+        if late_run > now_utc:
+            late_key = late_run.strftime("%Y%m%d_%H%M")
+            schedule_name = f"{RECONCILE_SCHEDULE_PREFIX}LATE_{late_key}"
+            create_one_time_schedule(
+                schedule_name,
+                late_run,
+                {'task': 'reconcile'},
+            )
+
     if not scheduled:
-        print("Manager: No future reconcile schedules needed.")
+        print("Manager: No future pre-tip reconcile schedules needed.")
         return
 
     for key, run_at in sorted(scheduled.items()):
