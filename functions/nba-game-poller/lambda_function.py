@@ -123,6 +123,11 @@ def schedule_kickoff(run_at_dt):
 # 2. KICKOFF LOGIC (One-Time Trigger)
 # ==============================================================================
 def enable_poller_logic():
+    print("Kickoff: Reconciling schedule before enabling poller...")
+    try:
+        reconcile_recent_schedule()
+    except Exception as e:
+        print(f"Kickoff: Reconcile failed, continuing anyway: {e}")
     print(f"Kickoff: Enabling {POLLER_RULE_NAME}...")
     try:
         events_client.enable_rule(Name=POLLER_RULE_NAME)
