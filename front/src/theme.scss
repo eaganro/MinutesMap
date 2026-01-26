@@ -57,6 +57,10 @@
   --stat-label-color: #374151;
   --stat-label-off: #475569;
   --score-diff-icon-color: #6366F1;
+
+  // Live indicator
+  --live-color: #22c55e;
+  --live-ring: rgba(34, 197, 94, 0.45);
   
   // Stat event colors - these stay vibrant in both modes
   // but we define them here for potential tweaking
@@ -132,6 +136,10 @@
   --stat-label-color: #d1d5db;
   --stat-label-off: #9ca3af;
   --score-diff-icon-color: #818CF8;
+
+  // Live indicator
+  --live-color: #4ade80;
+  --live-ring: rgba(74, 222, 128, 0.55);
   
   // Stat event colors - brighten slightly for dark mode visibility
   --event-point: #FBBF24;
@@ -163,6 +171,26 @@ body {
   transition: background-color 0.3s ease;
   margin: 0;
   padding: 0;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--live-color);
+  animation: livePulse 2.4s ease-out infinite;
+}
+
+@keyframes livePulse {
+  0% { box-shadow: 0 0 0 0 var(--live-ring); }
+  70% { box-shadow: 0 0 0 4px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot {
+    animation: none;
+  }
 }
 
 // Date input styling for dark mode

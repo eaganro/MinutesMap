@@ -4,6 +4,7 @@ import './Score.scss';
 import { ASSET_PREFIX } from '../../environment';
 import { formatClock, formatPeriod } from '../../helpers/utils';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
+import { parseGameStatus } from '../../helpers/gameSelectionUtils';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
@@ -96,6 +97,7 @@ export default function Score({
 
   const gameDate = displayData.date ? new Date(displayData.date) : null;
   const statusLabel = typeof displayData.gameStatus === 'string' ? displayData.gameStatus.trim() : '';
+  const { isLive } = parseGameStatus(displayData.gameStatus);
   const formattedPeriod = formatPeriod(displayData.lastAction?.period);
   const formattedClock = formatClock(displayData.lastAction?.clock);
   const hasActionTime = Boolean(formattedPeriod && formattedClock);
@@ -114,6 +116,7 @@ export default function Score({
   if (!gameTimeLabel && statusLabel) {
     gameTimeLabel = statusLabel;
   }
+
 
   const changeToGameDate = () => {
     if (!gameDate) {
@@ -181,7 +184,14 @@ export default function Score({
           <div>{displayData.score ? displayData.score.home : '--'}</div>
         </div>
         {gameTimeLabel && (
-          <div className='gameTime'>{gameTimeLabel}</div>
+          <div className='gameTime'>
+            <span className='timeText'>{gameTimeLabel}</span>
+            {isLive && (
+              <span className='liveDotIndicator' role='img' aria-label='Live game'>
+                <span className='liveDot' />
+              </span>
+            )}
+          </div>
         )}
       </div>
       {/* {statusMessage && (
