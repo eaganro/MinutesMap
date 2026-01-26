@@ -81,3 +81,67 @@ class TestFetchTodaysScoreboard:
 
         resp = self.s3.list_objects_v2(Bucket=self.bucket_name, Prefix="schedule/")
         assert resp.get("KeyCount", 0) == 0
+
+    @patch("urllib.request.urlopen")
+    def test_handler_merges_existing_schedule(self, mock_urlopen):
+        existing_games = [
+            {
+                "id": "2023-10-25-bos-nyk",
+                "date": "2023-10-25",
+                "hometeam": "NYK",
+                "awayteam": "BOS",
+                "homescore": 0,
+                "awayscore": 0,
+                "starttime": "2023-10-25T19:30:00",
+                "status": "Scheduled",
+            },
+            {
+                "id": "2023-10-25-lal-den",
+                "date": "2023-10-25",
+                "hometeam": "DEN",
+                "awayteam": "LAL",
+                "homescore": 0,
+                "awayscore": 0,
+                "starttime": "2023-10-25T22:00:00",
+                "status": "Scheduled",
+            },
+        ]
+        payload = gzip.compress(json.dumps(existing_games).encode("utf-8"))
+        self.s3.put_object(
+            Bucket=self.bucket_name,
+            Key="schedule/2023-10-25.json.gz",
+            Body=payload,
+            ContentType="application/json",
+            ContentEncoding="gzip",
+        )
+
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps({
+            "scoreboard": {
+                "games": [
+                    {
+                        "gameId": "12345",
+                        "gameEt": "2023-10-25T19:30:00",
+                        "gameClock": "12:00",
+                        "gameStatusText": "Q1 12:00",
+                        "homeTeam": {"teamTricode": "NYK", "score": 2, "wins": 1, "losses": 0},
+                        "awayTeam": {"teamTricode": "BOS", "score": 0, "wins": 0, "losses": 1}
+                    }
+                ]
+            }
+        }).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        self.module.handler({}, {})
+
+        resp = self.s3.get_object(
+            Bucket=self.bucket_name,
+            Key="schedule/2023-10-25.json.gz",
+        )
+        merged_payload = gzip.decompress(resp["Body"].read())
+        items = json.loads(merged_payload.decode("utf-8"))
+        ids = {item["id"] for item in items}
+        assert "2023-10-25-bos-nyk" in ids
+        assert "2023-10-25-lal-den" in ids

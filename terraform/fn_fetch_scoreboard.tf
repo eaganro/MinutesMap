@@ -38,6 +38,7 @@ resource "aws_iam_role_policy" "fetch_scoreboard_s3_write" {
       {
         Effect = "Allow"
         Action = [
+          "s3:GetObject",
           "s3:PutObject"
         ]
         Resource = [

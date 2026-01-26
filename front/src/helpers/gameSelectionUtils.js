@@ -161,7 +161,8 @@ export function shiftDateString(dateString, offset) {
  */
 export function parseGameStatus(status) {
   const trimmed = (status || '').trim();
-  const isFinal = trimmed.startsWith('Final');
+  const lower = trimmed.toLowerCase();
+  const isFinal = trimmed.startsWith('Final') || lower.startsWith('postponed') || lower.startsWith('cancelled') || lower.startsWith('canceled') || lower.startsWith('ppd');
   const isUpcoming = trimmed.endsWith('ET');
   const isLive = !!trimmed && !isFinal && !isUpcoming;
   

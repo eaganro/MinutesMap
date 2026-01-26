@@ -77,5 +77,12 @@ export function formatStatusText(status) {
   if (!status || typeof status !== 'string') return '';
   const trimmed = status.trim();
   if (!trimmed) return '';
+  const lower = trimmed.toLowerCase();
+  if (lower === 'ppd' || lower === 'postponed') {
+    return 'Postponed';
+  }
+  if (lower === 'canceled' || lower === 'cancelled') {
+    return 'Canceled';
+  }
   return trimmed.replace(/\s+:(\d{2}(?:\.\d+)?)/g, ' 0:$1');
 }
