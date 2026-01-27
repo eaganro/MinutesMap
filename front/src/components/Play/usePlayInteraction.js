@@ -78,12 +78,25 @@ export const usePlayInteraction = ({
   const hasPrevAction = useMemo(() => Boolean(getAdjacentAction(-1)), [getAdjacentAction]);
   const hasNextAction = useMemo(() => Boolean(getAdjacentAction(1)), [getAdjacentAction]);
 
+  const closeLockedTooltip = useCallback(() => {
+    setInfoLocked(false);
+    setMouseLinePos(null);
+    setDescriptionArray([]);
+    setHighlightActionIds([]);
+  }, [setInfoLocked, setMouseLinePos, setDescriptionArray, setHighlightActionIds]);
+
   // LOGIC: Keyboard Navigation (Left/Right Arrows)
   useEffect(() => {
-    if (!infoLocked || !allActions || allActions.length === 0) return;
+    if (!infoLocked) return;
 
     const handleKeyDown = (ev) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        closeLockedTooltip();
+        return;
+      }
       if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      if (!allActions || allActions.length === 0) return;
       ev.preventDefault();
       const direction = ev.key === 'ArrowLeft' ? -1 : 1;
       navigateAction(direction);
@@ -91,7 +104,7 @@ export const usePlayInteraction = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [infoLocked, allActions, navigateAction]);
+  }, [infoLocked, allActions, navigateAction, closeLockedTooltip]);
 
   // LOGIC: Click Outside to Close
   useEffect(() => {
@@ -102,10 +115,7 @@ export const usePlayInteraction = ({
       
       // If clicking outside the container, reset everything
       if (!container.contains(ev.target)) {
-        setInfoLocked(false);
-        setMouseLinePos(null);
-        setDescriptionArray([]);
-        setHighlightActionIds([]);
+        closeLockedTooltip();
       }
     };
     
@@ -115,7 +125,7 @@ export const usePlayInteraction = ({
       document.removeEventListener('mousedown', handleOutside);
       document.removeEventListener('touchstart', handleOutside);
     };
-  }, [infoLocked, playRef]);
+  }, [infoLocked, playRef, closeLockedTooltip]);
 
   // LOGIC: Main Hover Handler
   const updateHoverAt = useCallback((clientX, clientY, targetEl, force = false) => {
