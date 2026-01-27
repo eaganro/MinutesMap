@@ -104,18 +104,10 @@ export default function Score({
   const hasActionTime = Boolean(formattedPeriod && formattedClock);
   let gameTimeLabel = '';
 
-  if (rawStatusLabel) {
-    const isFinal = rawStatusLabel.startsWith('Final');
-    const isUpcoming = rawStatusLabel.endsWith('ET');
-    if (isFinal || isUpcoming) {
-      gameTimeLabel = statusLabel || rawStatusLabel;
-    }
-  }
-  if (!gameTimeLabel && hasActionTime) {
-    gameTimeLabel = `${formattedPeriod} ${formattedClock}`;
-  }
-  if (!gameTimeLabel && statusLabel) {
+  if (statusLabel) {
     gameTimeLabel = statusLabel;
+  } else if (hasActionTime) {
+    gameTimeLabel = `${formattedPeriod} ${formattedClock}`;
   }
 
 
