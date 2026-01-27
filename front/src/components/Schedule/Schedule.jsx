@@ -55,16 +55,6 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   const startX = useRef(0);
   const startScrollLeft = useRef(0);
   const dragMoved = useRef(false);
-  const [hasScrollbar, setHasScrollbar] = useState(false);
-
-  const updateScrollbarState = () => {
-    if (!scrollRef.current) {
-      setHasScrollbar(false);
-      return;
-    }
-    const { scrollWidth, clientWidth } = scrollRef.current;
-    setHasScrollbar(scrollWidth > clientWidth + 1);
-  };
   const handleGameClick = (id) => {
     if (dragMoved.current) return; // suppress click if user dragged
     changeGame(id);
@@ -120,20 +110,6 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
     }
 
   });
-
-  useEffect(() => {
-    if (isLoading) {
-      setHasScrollbar(false);
-      return;
-    }
-    updateScrollbarState();
-  }, [games, date, isLoading]);
-
-  useEffect(() => {
-    const handleResize = () => updateScrollbarState();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
   const scrollScheduleRight = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft += 100;
@@ -252,7 +228,7 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
             <NavigateNext />
           </IconButton>
         </div>
-        <div className={`gamePick${hasScrollbar ? ' hasScrollbar' : ''}`}>
+        <div className='gamePick'>
           <IconButton className='scheduleButton' onClick={scrollScheduleLeft} aria-label='Scroll games left'>
             <NavigateBefore />
           </IconButton>
