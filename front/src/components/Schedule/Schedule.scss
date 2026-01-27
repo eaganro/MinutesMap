@@ -62,14 +62,33 @@
         display: flex;
         margin-left: 10px;
         margin-right: auto;
-        overflow-x: hidden;
+        overflow-x: auto;
+        overflow-y: hidden;
         text-align: center;
         cursor: grab;
         touch-action: pan-y;
+        scrollbar-width: thin;
+        scrollbar-color: var(--divider) transparent;
+        scrollbar-gutter: stable;
 
         &.dragging {
           cursor: grabbing;
           user-select: none;
+        }
+
+        &::-webkit-scrollbar {
+          height: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background-color: var(--divider);
+          border-radius: 999px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
         }
       
         .game {
@@ -165,6 +184,14 @@
       }
     }
   }  
+
+  @media (hover: hover) and (pointer: fine) {
+    .scheduleContent {
+      .gamePick.hasScrollbar {
+        height: 73px;
+      }
+    }
+  }
 }
 
 .scheduleButton {
