@@ -82,6 +82,41 @@ export default function PlayTooltip({
     return -Infinity;
   };
 
+  const FREE_THROW_ORDER_PATTERN = /\b(?:ft|free throw)\b\s*(\d+)\s*(?:of|\/)\s*(\d+)/i;
+
+  const getFreeThrowOrderValue = (action) => {
+    if (!action) return null;
+    const text = `${action?.subType || ''} ${action?.description || ''}`;
+    const match = text.match(FREE_THROW_ORDER_PATTERN);
+    if (!match) return null;
+    const attempt = Number(match[1]);
+    if (Number.isNaN(attempt)) return null;
+    return attempt;
+  };
+
+  const compareTeamActions = (a, b) => {
+    const aIsFT = isFreeThrowAction(a?.description, a?.actionType);
+    const bIsFT = isFreeThrowAction(b?.description, b?.actionType);
+    if (aIsFT && bIsFT) {
+      const aAttempt = getFreeThrowOrderValue(a);
+      const bAttempt = getFreeThrowOrderValue(b);
+      if (aAttempt !== null && bAttempt !== null && aAttempt !== bAttempt) {
+        return aAttempt - bAttempt;
+      }
+      const aSeq = getActionOrderValue(a);
+      const bSeq = getActionOrderValue(b);
+      if (aSeq !== bSeq) return aSeq - bSeq;
+    }
+
+    const priorityDiff = getEventPriority(a) - getEventPriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    const aSeq = getActionOrderValue(a);
+    const bSeq = getActionOrderValue(b);
+    if (aSeq !== bSeq) return aSeq - bSeq;
+    return 0;
+  };
+
   const pickLatestAction = (actions) => (
     (actions || []).reduce((best, current) => (
       getActionOrderValue(current) > getActionOrderValue(best) ? current : best
@@ -361,9 +396,7 @@ export default function PlayTooltip({
 
         const renderItems = [
           ...(() => {
-            const teamActions = [...actionsByTeam.away].sort(
-              (a, b) => getEventPriority(a) - getEventPriority(b)
-            );
+            const teamActions = [...actionsByTeam.away].sort(compareTeamActions);
             const items = teamActions.map((action) => ({
               action,
               teamColor: teamColors.away,
@@ -379,9 +412,7 @@ export default function PlayTooltip({
             return items;
           })(),
           ...(() => {
-            const teamActions = [...actionsByTeam.home].sort(
-              (a, b) => getEventPriority(a) - getEventPriority(b)
-            );
+            const teamActions = [...actionsByTeam.home].sort(compareTeamActions);
             const items = teamActions.map((action) => ({
               action,
               teamColor: teamColors.home,
