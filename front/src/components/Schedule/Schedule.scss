@@ -65,7 +65,7 @@
         overflow-x: hidden;
         text-align: center;
         cursor: grab;
-        touch-action: pan-y;
+        touch-action: pan-x;
 
         &.dragging {
           cursor: grabbing;
