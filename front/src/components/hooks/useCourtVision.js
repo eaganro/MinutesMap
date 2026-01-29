@@ -70,6 +70,7 @@ export function useCourtVision() {
   const fetchStateRef = useRef({ gameId: null, status: null });
   const lastGamePackFetchRef = useRef({ at: 0, reason: null });
   const lastScheduleFetchRef = useRef({ at: 0, reason: null });
+  const lastTrackedGameIdRef = useRef(null);
 
   const fetchGamePackWithReason = useCallback((params, reason) => {
     lastGamePackFetchRef.current = { at: Date.now(), reason };
@@ -190,6 +191,20 @@ export function useCourtVision() {
       updateQueryParams(date, gameId);
     }
   }, [date, gameId, updateQueryParams]);
+
+  useEffect(() => {
+    if (isInitLoading) return;
+    if (!gameId) return;
+    if (lastTrackedGameIdRef.current === gameId) return;
+    lastTrackedGameIdRef.current = gameId;
+    if (!window?.umami?.track) return;
+    const trackedUrl = `${window.location.pathname}${window.location.search}`;
+    window.umami.track((props) => ({
+      ...props,
+      url: trackedUrl,
+      title: document.title,
+    }));
+  }, [gameId, isInitLoading]);
 
   useEffect(() => {
     lastGamePackFetchRef.current = { at: 0, reason: null };
