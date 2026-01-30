@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('CourtVision App', () => {
+test.describe('MinutesMap App', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
   });
@@ -13,7 +13,7 @@ test.describe('CourtVision App', () => {
     await expect(logo).toBeVisible();
 
     const appName = page.locator('.appName');
-    await expect(appName).toHaveText('CourtVision');
+    await expect(appName).toHaveText('MinutesMap');
   });
 
   test('should display the date picker', async ({ page }) => {
