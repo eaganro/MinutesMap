@@ -27,7 +27,7 @@ EOF
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
-  aliases             = ["courtvision.roryeagan.com"]
+  aliases             = ["minutesmap.com", "www.minutesmap.com"]
   price_class         = "PriceClass_All"
   default_root_object = "index.html"
 

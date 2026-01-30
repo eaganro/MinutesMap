@@ -22,6 +22,6 @@ terraform {
 data "aws_caller_identity" "current" {}
 
 data "aws_acm_certificate" "site_cert" {
-  domain   = "courtvision.roryeagan.com"
+  domain   = "minutesmap.com"
   statuses = ["ISSUED"]
 }
