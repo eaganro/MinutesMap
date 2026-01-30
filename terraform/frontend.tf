@@ -1,7 +1,7 @@
 # frontend.tf
 
 resource "aws_cloudfront_function" "spa_rewrite" {
-  name    = "courtvision-spa-rewrite"
+  name    = "minutesmap-spa-rewrite"
   runtime = "cloudfront-js-1.0"
   comment = "Rewrite SPA routes to /index.html"
   publish = true

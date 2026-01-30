@@ -7,4 +7,4 @@ export { useGameData } from './useGameData';
 export { useGameTimeline } from './useGameTimeline';
 export { useSelectedGameMeta } from './useSelectedGameMeta';
 export { useElementWidth } from './useElementWidth';
-export { useCourtVision } from './useCourtVision';
+export { useMinutesMap } from './useMinutesMap';

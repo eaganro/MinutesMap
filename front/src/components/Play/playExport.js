@@ -4,7 +4,7 @@ import { EVENT_TYPES, getEventType, isFreeThrowAction } from '../../helpers/even
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;
 const TIMELINE_ICON_SCALE = 0.8;
-const WATERMARK_TEXT = 'CourtVision.roryeagan.com';
+const WATERMARK_TEXT = 'MinutesMap.com';
 const EXPORT_RENDER_SCALE = 2.5;
 const EXPORT_MAX_SCALE = 3;
 

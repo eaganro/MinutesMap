@@ -1,4 +1,4 @@
-import { useCourtVision } from '../hooks';
+import { useMinutesMap } from '../hooks';
 
 import Schedule from '../Schedule/Schedule';
 import Score from '../Score/Score';
@@ -40,7 +40,7 @@ export default function App() {
 
     // Box score
     box, isBoxLoading,
-  } = useCourtVision();
+  } = useMinutesMap();
 
   return (
     <div className='topLevel'>
@@ -60,11 +60,11 @@ export default function App() {
               srcSet="/logo-70.png 1x, /logo-140.png 2x"
               width="70"
               height="70"
-              alt="CourtVision logo"
+              alt="MinutesMap logo"
               className='appLogo'
             />
           </picture>
-          <span className='appName'>CourtVision</span>
+          <span className='appName'>MinutesMap</span>
         </div>
         <DarkModeToggle />
       </header>

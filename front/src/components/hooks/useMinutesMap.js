@@ -26,7 +26,7 @@ const RESUME_REFRESH_WS_COOLDOWN_MS = 60000;
  * Facade hook that orchestrates all game data, WebSocket, and UI state.
  * Uses Server-Side Init to determine the landing state.
  */
-export function useCourtVision() {
+export function useMinutesMap() {
   // === INITIALIZATION ===
   const { getInitialParams, updateQueryParams } = useQueryParams();
   const initialParams = useMemo(() => getInitialParams(), []);

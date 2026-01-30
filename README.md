@@ -1,4 +1,4 @@
-# [CourtVision](https://courtvision.roryeagan.com) 🏀
+# [MinutesMap](https://courtvision.roryeagan.com) 🏀
 **Serverless Real-Time Basketball Analytics & Play-by-Play Visualization**
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-blue) ![DynamoDB](https://img.shields.io/badge/Database-DynamoDB-blueviolet) ![License](https://img.shields.io/badge/License-MIT-green)
@@ -6,10 +6,10 @@
 
 [ **Launch Live App** ](https://courtvision.roryeagan.com)
 
-![CourtVision Dashboard](docs/images/overview-desktop-dark.png)
+![MinutesMap Dashboard](docs/images/overview-desktop-dark.png)
 
 ## 📖 Introduction
-**CourtVision** is a web dashboard for visualizing live basketball games with high-density, interactive play-by-play views (beyond a standard scoreboard). I built it because I wanted a specific way to follow games live while watching, and I use it regularly.
+**MinutesMap** is a web dashboard for visualizing live basketball games with high-density, interactive play-by-play views (beyond a standard scoreboard). I built it because I wanted a specific way to follow games live while watching, and I use it regularly.
 
 The app runs on a **serverless AWS architecture** and uses a **hybrid push/pull real-time pattern**:
 - WebSockets notify clients when new data is available.
