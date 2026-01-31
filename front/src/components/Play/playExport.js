@@ -909,7 +909,7 @@ const buildFullExportCanvas = ({
       const x = chartLeft + chartWidth + 4;
       ctx.fillText(text, x, y + 3);
     };
-    ctx.setLineDash([5, 12]);
+    ctx.setLineDash([5, 18]);
     ctx.lineWidth = 1;
     for (let i = 0; i < numLines; i += 1) {
       const value = (i + 1) * lineJump;
@@ -917,18 +917,24 @@ const buildFullExportCanvas = ({
       const posy = baselineY - yOffset;
       const negy = baselineY + yOffset;
 
+      ctx.save();
+      ctx.globalAlpha = 0.35;
       ctx.strokeStyle = teamColors.away;
       ctx.beginPath();
       ctx.moveTo(chartLeft, posy);
       ctx.lineTo(chartLeft + chartWidth, posy);
       ctx.stroke();
+      ctx.restore();
       drawDiffLabel(value, posy, teamColors.away);
 
+      ctx.save();
+      ctx.globalAlpha = 0.35;
       ctx.strokeStyle = teamColors.home;
       ctx.beginPath();
       ctx.moveTo(chartLeft, negy);
       ctx.lineTo(chartLeft + chartWidth, negy);
       ctx.stroke();
+      ctx.restore();
       drawDiffLabel(value, negy, teamColors.home);
     }
     ctx.setLineDash([]);

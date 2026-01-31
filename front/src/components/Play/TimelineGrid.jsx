@@ -96,7 +96,7 @@ export default function TimelineGrid({
         const posy = 300 - yOffset;
         timelineElements.push(
             <g key={`sp${i}`}>
-                <line x1={leftMargin - 5} y1={posy} x2={leftMargin + width - 5} y2={posy} strokeDasharray="5,20" style={{ stroke: teamColors.away, strokeWidth: 0.5 }} />
+                <line x1={leftMargin - 5} y1={posy} x2={leftMargin + width - 5} y2={posy} strokeDasharray="5,20" style={{ stroke: teamColors.away, strokeWidth: 0.5, strokeOpacity: 0.7 }} />
                 <text x={leftMargin + width + 10} y={posy + 4} textAnchor="end" style={{ ...labelStyle, fill: teamColors.away }}>{value}</text>
             </g>
         );
@@ -105,7 +105,7 @@ export default function TimelineGrid({
         const negy = 300 + yOffset;
         timelineElements.push(
             <g key={`sn${i}`}>
-                <line x1={leftMargin - 5} y1={negy} x2={leftMargin + width - 5} y2={negy} strokeDasharray="5,20" style={{ stroke: teamColors.home, strokeWidth: 0.5 }} />
+                <line x1={leftMargin - 5} y1={negy} x2={leftMargin + width - 5} y2={negy} strokeDasharray="5,20" style={{ stroke: teamColors.home, strokeWidth: 0.5, strokeOpacity: 0.7 }} />
                 <text x={leftMargin + width + 10} y={negy + 4} textAnchor="end" style={{ ...labelStyle, fill: teamColors.home }}>{value}</text>
             </g>
         );
