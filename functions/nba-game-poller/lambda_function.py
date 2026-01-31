@@ -34,6 +34,9 @@ if GAME_ID_MAP_PREFIX and not GAME_ID_MAP_PREFIX.endswith('/'):
     GAME_ID_MAP_PREFIX += '/'
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
 SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
+HALF_POLL_SCHEDULE_PREFIX = "NBA_PollerHalf_"
+HALF_POLL_OFFSET_SECONDS = int(os.environ.get("HALF_POLL_OFFSET_SECONDS", "30"))
+POLL_WINDOW_SECONDS = float(os.environ.get("POLL_WINDOW_SECONDS", "15"))
 
 # 3. Security (From Terraform)
 LAMBDA_ARN = os.environ.get('LAMBDA_ARN')
@@ -63,8 +66,13 @@ def main_handler(event, context):
         return enable_poller_logic()
     elif task == 'reconcile':
         return reconcile_logic()
+    elif task == 'poller_half':
+        return poller_logic(context, schedule_half=False)
+    elif task == 'poller':
+        return poller_logic(context, schedule_half=True)
     else:
-        return poller_logic(context)
+        print(f"Unknown task '{task}'. Defaulting to poller.")
+        return poller_logic(context, schedule_half=True)
 
 # ==============================================================================
 # 1. MANAGER LOGIC (Runs Daily at Noon)
@@ -139,6 +147,19 @@ def schedule_kickoff(run_at_dt):
         # Fallback: enable immediately so we don't miss games
         enable_poller_logic()
 
+def schedule_half_poller():
+    if not LAMBDA_ARN or not SCHEDULER_ROLE_ARN:
+        print("Poller: Missing scheduler config. Skipping half-minute schedule.")
+        return False
+    run_at_dt = datetime.now(UTC_ZONE) + timedelta(seconds=HALF_POLL_OFFSET_SECONDS)
+    run_at_dt = run_at_dt.replace(microsecond=0)
+    schedule_name = f"{HALF_POLL_SCHEDULE_PREFIX}{run_at_dt.strftime('%Y%m%dT%H%M%S')}"
+    return create_one_time_schedule(
+        schedule_name,
+        run_at_dt,
+        {'task': 'poller_half'},
+    )
+
 def schedule_reconcile_for_games(
     games,
     lead_minutes=RECONCILE_LEAD_MINUTES,
@@ -203,7 +224,7 @@ def enable_poller_logic():
 # ==============================================================================
 # 3. POLLER LOGIC (Runs Every Minute)
 # ==============================================================================
-def poller_logic(context):
+def poller_logic(context, schedule_half=True):
     today_str = get_nba_date()
     games = get_games_from_s3(today_str)
 
@@ -255,6 +276,9 @@ def poller_logic(context):
         print("Poller: No active games yet. Keeping poller enabled.")
         return
 
+    if schedule_half:
+        schedule_half_poller()
+
     # --- SECURITY: Pick ONE identity for this entire session ---
     session_user_agent = random.choice(USER_AGENTS)
 
@@ -263,6 +287,7 @@ def poller_logic(context):
 
     total_games_to_process = len(active_games)
     schedule_dirty = False
+    poll_start_time = time.monotonic()
 
     for i, game in enumerate(active_games):
         game_key = game.get('id')
@@ -293,7 +318,13 @@ def poller_logic(context):
             # --- DYNAMIC SLEEP LOGIC ---
             # We skip sleep after the very last game
             if i < total_games_to_process - 1:
-                sleep_duration = calculate_safe_sleep(context, i, total_games_to_process)
+                sleep_duration = calculate_safe_sleep(
+                    context,
+                    i,
+                    total_games_to_process,
+                    window_seconds=POLL_WINDOW_SECONDS,
+                    window_start_time=poll_start_time,
+                )
                 if sleep_duration > 0:
                     time.sleep(sleep_duration)
 
@@ -357,54 +388,56 @@ def upload_init_state(games_today, date_str):
     )
     print(f"Updated init.json -> Date: {date_str}, Game: {best_game_id}")
 
-def calculate_safe_sleep(context, current_index, total_items):
+def calculate_safe_sleep(context, current_index, total_items, window_seconds=None, window_start_time=None):
     """
-    Calculates a sleep time that fits within the remaining Lambda execution window.
+    Calculates a sleep time that fits within the remaining Lambda execution window,
+    and optionally within a tighter per-poll window.
     """
     # Desired "Polite" range
     MIN_SLEEP = 1.0
     MAX_SLEEP = 3.0
-    
-    # If no context (local testing), just return random normal
-    if not context or not hasattr(context, 'get_remaining_time_in_millis'):
+
+    items_remaining = total_items - 1 - current_index
+    if items_remaining < 1:
+        return 0.0
+
+    # Remaining Lambda time in seconds.
+    lambda_remaining_sec = None
+    if context and hasattr(context, 'get_remaining_time_in_millis'):
+        remaining_ms = context.get_remaining_time_in_millis()
+        lambda_remaining_sec = remaining_ms / 1000.0
+
+    # Optional poll window remaining time.
+    window_remaining_sec = None
+    if window_seconds is not None and window_start_time is not None:
+        elapsed = time.monotonic() - window_start_time
+        window_remaining_sec = window_seconds - elapsed
+
+    # If neither constraint exists, return polite jitter.
+    if lambda_remaining_sec is None and window_remaining_sec is None:
         return random.uniform(MIN_SLEEP, MAX_SLEEP)
 
-    # 1. Get remaining time in seconds
-    remaining_ms = context.get_remaining_time_in_millis()
-    remaining_sec = remaining_ms / 1000.0
-
-    # 2. Reserve a safety buffer (5 seconds for teardown/overhead)
-    SAFETY_BUFFER = 5.0
-    
-    # 3. Estimate time needed for FUTURE network calls
-    # We estimate 1.5s per remaining game to process (network IO)
-    items_remaining = total_items - 1 - current_index
+    # Estimate time needed for future network calls (1.5s per remaining game).
     estimated_work_sec = items_remaining * 1.5
 
-    # 4. Calculate Budget
-    time_budget_for_sleep = remaining_sec - estimated_work_sec - SAFETY_BUFFER
-    
-    # If we are negative, we are already late. Don't sleep.
+    # Compute sleep budgets for each constraint and use the tightest.
+    budget_candidates = []
+    if lambda_remaining_sec is not None:
+        budget_candidates.append(lambda_remaining_sec - estimated_work_sec - 5.0)
+    if window_remaining_sec is not None:
+        budget_candidates.append(window_remaining_sec - estimated_work_sec - 0.5)
+
+    time_budget_for_sleep = min(budget_candidates)
     if time_budget_for_sleep <= 0:
         return 0.0
 
-    # 5. Distribute budget across remaining gaps
-    if items_remaining < 1: 
-        return 0.0
-
     max_allowable_sleep = time_budget_for_sleep / items_remaining
-
-    # 6. Cap it at our polite max, but shrink if needed
     actual_upper_limit = min(MAX_SLEEP, max_allowable_sleep)
-    
-    # If the budget is super tight (e.g. < 0.2s), just skip sleeping
-    if actual_upper_limit < 0.2:
+
+    if actual_upper_limit < 0.05:
         return 0.0
-    
-    # 7. Return random jitter
-    # Ensure lower bound isn't higher than upper bound
+
     actual_lower_limit = min(MIN_SLEEP, actual_upper_limit)
-    
     return random.uniform(actual_lower_limit, actual_upper_limit)
 
 def disable_self():
