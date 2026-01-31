@@ -1,10 +1,10 @@
-# [MinutesMap](https://courtvision.roryeagan.com) 🏀
+# [MinutesMap](https://MinutesMap.com) 🏀
 **Serverless Real-Time Basketball Analytics & Play-by-Play Visualization**
 
 ![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-blue) ![DynamoDB](https://img.shields.io/badge/Database-DynamoDB-blueviolet) ![License](https://img.shields.io/badge/License-MIT-green)
-![Backend Build](https://github.com/eaganro/courtvision/actions/workflows/infra.yml/badge.svg) ![Frontend Build](https://github.com/eaganro/courtvision/actions/workflows/frontend.yml/badge.svg)
+![Backend Build](https://github.com/eaganro/MinutesMap/actions/workflows/infra.yml/badge.svg) ![Frontend Build](https://github.com/eaganro/MinutesMap/actions/workflows/frontend.yml/badge.svg)
 
-[ **Launch Live App** ](https://courtvision.roryeagan.com)
+[ **Launch Live App** ](https://MinutesMap.com)
 
 ![MinutesMap Dashboard](docs/images/overview-desktop-dark.png)
 
@@ -153,7 +153,7 @@ The codebase is organized into three distinct logical units:
 
 1. Clone the repository:
 ```bash
-git clone [https://github.com/eaganro/courtvision.git](https://github.com/eaganro/courtvision.git)
+git clone [https://github.com/eaganro/MinutesMap.git](https://github.com/eaganro/MinutesMap.git)
 
 ```
 
