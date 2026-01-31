@@ -44,9 +44,11 @@
 }
 
 .appLogo {
-  width: 50px;
+  width: 45px;
   height: 50px;
   object-fit: contain;
+  position: relative;
+  top: 5px;
 }
 
 .appName {
