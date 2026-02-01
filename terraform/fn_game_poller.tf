@@ -59,6 +59,21 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
           "arn:aws:s3:::roryeagan.com-nba-processed-data/private/gameIdMap/*"
         ]
       },
+      {
+        Sid      = "S3ListDataPrefixes"
+        Action   = "s3:ListBucket"
+        Effect   = "Allow"
+        Resource = "arn:aws:s3:::roryeagan.com-nba-processed-data"
+        Condition = {
+          StringLike = {
+            "s3:prefix" = [
+              "data/*",
+              "schedule/*",
+              "private/gameIdMap/*"
+            ]
+          }
+        }
+      },
       # 3. EventBridge Rule Control
       {
         Sid      = "EventBridgeTogglePollerRule"
@@ -71,7 +86,11 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
         Sid      = "SchedulerManageOnlyKickoffSchedule"
         Action   = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
         Effect   = "Allow"
-        Resource = "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_Daily_Kickoff"
+        Resource = [
+          "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_Daily_Kickoff",
+          "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_Reconcile_*",
+          "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_PollerHalf_*"
+        ]
       },
       # 5. PassRole
       {
