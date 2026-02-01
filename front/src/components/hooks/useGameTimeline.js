@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { isMissDescription } from '../../helpers/eventStyles.jsx';
 import { timeToSeconds } from '../../helpers/utils';
 
 function isLegacyPlayByPlayPayload(data) {
@@ -44,7 +45,7 @@ function filterActions(a, statOn) {
     result === 'x' ||
     result === 'miss' ||
     type.includes('miss') ||
-    desc.includes('miss');
+    isMissDescription(desc);
 
   const isMake = result === 'm' || result === 'make' || (isShotType && !isMiss);
 

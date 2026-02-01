@@ -66,8 +66,10 @@ function getColor(config) {
 
 const FT_TOKEN = /\bft\b/i;
 const FREE_THROW_PATTERN = /\b(?:ft|free throw)\b\s*(\d+)\s*(?:of|\/)\s*(\d+)/i;
+const MISS_TOKEN = /\bmiss(?:ed|es)?\b/i;
 
 const normalize = (value) => (value || '').toString().toLowerCase();
+const hasMissToken = (value) => MISS_TOKEN.test((value || '').toString());
 
 const isShotAction = (type, desc) => (
   type === '2pt'
@@ -87,7 +89,7 @@ export function getEventType(description, actionType = null, result = null) {
   const type = normalize(actionType);
   const res = normalize(result);
 
-  const isMiss = res === 'x' || res === 'miss' || desc.includes('miss') || type.includes('miss');
+  const isMiss = res === 'x' || res === 'miss' || hasMissToken(desc) || type.includes('miss');
   const isShot = isShotAction(type, desc);
 
   if (isMiss) return 'miss';
@@ -100,6 +102,10 @@ export function getEventType(description, actionType = null, result = null) {
   if (type.includes('foul') || desc.includes('foul')) return 'foul';
 
   return null;
+}
+
+export function isMissDescription(description) {
+  return hasMissToken(description);
 }
 
 export function isFreeThrowAction(description, actionType = null) {
@@ -143,8 +149,7 @@ export function renderFreeThrowRing({
   isAnd1 = false,
   actionNumber = null
 }) {
-  const desc = (description || '').toString().toLowerCase();
-  const isMiss = desc.includes('miss');
+  const isMiss = hasMissToken(description);
   const strokeWidth = Math.max(1, size * 0.2);
   const { attempt, total } = getFreeThrowAttempt(description, subType);
   const ringRatio = isAnd1 ? 1.15 : getFreeThrowRingRatio(attempt, total);

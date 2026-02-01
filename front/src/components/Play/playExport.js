@@ -1,5 +1,5 @@
 import { getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
-import { EVENT_TYPES, getEventType, isFreeThrowAction } from '../../helpers/eventStyles.jsx';
+import { EVENT_TYPES, getEventType, isFreeThrowAction, isMissDescription } from '../../helpers/eventStyles.jsx';
 
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;
@@ -235,8 +235,7 @@ const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
 
 const drawFreeThrowRing = (ctx, cx, cy, size, description, subType, computedStyle, isAnd1 = false) => {
   if (!ctx) return;
-  const desc = (description || '').toString().toLowerCase();
-  const isMiss = desc.includes('miss');
+  const isMiss = isMissDescription(description);
   const { attempt, total } = getFreeThrowAttempt(description, subType);
   const ringRatio = isAnd1 ? 1.15 : getFreeThrowRingRatio(attempt, total);
   const strokeWidth = Math.max(1, size * 0.2);
