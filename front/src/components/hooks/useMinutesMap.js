@@ -16,6 +16,7 @@ import { useWebSocket } from './useWebSocket';
 import { useWebSocketGate } from './useWebSocketGate';
 import { useGameTimeline } from './useGameTimeline';
 import { useElementWidth } from './useElementWidth';
+import { useLineupStats } from './useLineupStats';
 
 const DEFAULT_STAT_ON = [true, false, true, true, false, false, false, false];
 const LOADING_DELAY_MS = 500;
@@ -94,6 +95,12 @@ export function useMinutesMap() {
     awayActions,
     homeActions,
   } = useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, statOn);
+  const lineupStats = useLineupStats({
+    awayPlayerTimeline,
+    homePlayerTimeline,
+    scoreTimeline,
+    numPeriods: numQs,
+  });
 
   // === LAYOUT ===
   const [playByPlaySectionRef, playByPlaySectionWidth] = useElementWidth();
@@ -510,5 +517,8 @@ export function useMinutesMap() {
     // Box score
     box,
     isBoxLoading: isBoxVisible,
+
+    // Lineups
+    lineupStats,
   };
 }

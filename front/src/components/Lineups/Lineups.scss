@@ -1,0 +1,227 @@
+.lineups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-primary);
+}
+
+.lineupsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lineupsTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.lineupsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.lineupsTeamPanel {
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  padding: 10px;
+  background: var(--bg-card-alt);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lineupsTeamHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lineupsTeamName {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.lineupsCount {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.lineupsTable {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lineupsRow {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 70px 55px;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--bg-table-even);
+}
+
+.lineupsRow:nth-child(even) {
+  background: var(--bg-table-odd);
+}
+
+.lineupsRowHeader {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  background: var(--bg-table-header);
+  border: 1px solid var(--divider);
+}
+
+.lineupsSortButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  width: 100%;
+  cursor: pointer;
+  padding: 0;
+}
+
+.lineupsSortButton.isActive {
+  color: var(--text-secondary);
+}
+
+.lineupsSortButton:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+.lineupsSortIndicator {
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.lineupsPlayers {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lineupsNames {
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.lineupsPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  width: 80px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--bg-table-header);
+  border: 1px solid var(--divider);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineupsBadge {
+  background: var(--bg-highlight-col-header);
+  color: var(--text-heading);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.lineupsStat {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.lineupsPlusMinus.isPositive {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.lineupsPlusMinus.isNegative {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.lineupsToggle {
+  align-self: flex-start;
+  margin-top: auto;
+  border: 1px solid var(--divider);
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.lineupsToggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.lineupsToggle:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+.lineupsLoading,
+.lineupsStatus,
+.lineupsEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-weight: 500;
+  min-height: 120px;
+  text-align: center;
+}
+
+.lineupsLoading {
+  min-height: 160px;
+}
+
+@media (max-width: 920px) {
+  .lineupsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .lineupsRow {
+    grid-template-columns: minmax(140px, 1fr) 60px 50px;
+    font-size: 0.8rem;
+  }
+}

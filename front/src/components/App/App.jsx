@@ -3,6 +3,7 @@ import { useMinutesMap } from '../hooks';
 import Schedule from '../Schedule/Schedule';
 import Score from '../Score/Score';
 import Boxscore from '../Boxscore/Boxscore';
+import Lineups from '../Lineups/Lineups';
 import Play from '../Play/Play';
 import StatButtons from '../StatButtons/StatButtons';
 import DarkModeToggle from '../DarkModeToggle/DarkModeToggle';
@@ -40,6 +41,9 @@ export default function App() {
 
     // Box score
     box, isBoxLoading,
+
+    // Lineups
+    lineupStats,
   } = useMinutesMap();
 
   return (
@@ -126,6 +130,14 @@ export default function App() {
           box={box} 
           isLoading={isBoxLoading} 
           statusMessage={gameStatusMessage} 
+        />
+        <Lineups
+          awayTeam={awayTeamName}
+          homeTeam={homeTeamName}
+          awayLineups={lineupStats?.away || []}
+          homeLineups={lineupStats?.home || []}
+          isLoading={isPlayLoading}
+          statusMessage={gameStatusMessage}
         />
       </main>
     </div>
