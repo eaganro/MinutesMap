@@ -12,6 +12,7 @@ const MIN_BLUR_MS = 300;
 
 export default function Boxscore({ box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: 'min', direction: 'desc' });
   const lastStableBoxRef = useRef(box);
   const lastStatusMessageRef = useRef(statusMessage);
   const [showLoadingText, setShowLoadingText] = useState(false);
@@ -104,6 +105,18 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     });
   };
 
+  const handleSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return {
+          key,
+          direction: prev.direction === 'desc' ? 'asc' : 'desc',
+        };
+      }
+      return { key, direction: 'desc' };
+    });
+  };
+
   const awayBox = processTeamStats(
     displayBox?.teams?.away,
     false,
@@ -112,7 +125,9 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     awayTableRef,
     () => syncScroll(awayTableRef, homeTableRef),
     isCompact,
-    matchupColors?.away
+    matchupColors?.away,
+    sortConfig,
+    handleSort
   );
   const homeBox = processTeamStats(
     displayBox?.teams?.home,
@@ -122,7 +137,9 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     homeTableRef,
     () => syncScroll(homeTableRef, awayTableRef),
     isCompact,
-    matchupColors?.home
+    matchupColors?.home,
+    sortConfig,
+    handleSort
   );
 
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;

@@ -64,7 +64,7 @@ const COLUMN_LABELS = {
 };
 const HIGHLIGHT_COLUMNS = new Set(['pts', 'reb', 'ast']);
 
-export default function(team, showButton, showMore, setShowMore, tableWrapperRef, onScroll, isCompact, teamColor) {
+export default function(team, showButton, showMore, setShowMore, tableWrapperRef, onScroll, isCompact, teamColor, sortConfig, onSort) {
   const getDisplayName = (player) => {
     const firstName = (player.first || '').trim();
     const familyName = (player.last || '').trim();
@@ -144,6 +144,68 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
 
   const columnOrder = isCompact ? COMPACT_COLUMN_ORDER : DEFAULT_COLUMN_ORDER;
 
+  const getSortName = (player) => {
+    const last = (player?.last || '').trim();
+    const first = (player?.first || '').trim();
+    return `${last}, ${first}`.trim().toLowerCase();
+  };
+
+  const getSortData = (item, key) => {
+    const stats = item.stats || {};
+    const getStat = (statKey) => Number(stats[statKey] ?? 0);
+    switch (key) {
+    case 'player':
+      return { type: 'string', primary: getSortName(item.player) };
+    case 'min':
+      return { type: 'number', primary: item.seconds };
+    case 'fgm-a':
+      return { type: 'number', primary: getStat('fgm'), secondary: getStat('fga') };
+    case 'fg%':
+      return { type: 'number', primary: getStat('fga') ? (getStat('fgm') / getStat('fga')) : 0 };
+    case '3pm-a':
+      return { type: 'number', primary: getStat('tpm'), secondary: getStat('tpa') };
+    case '3p%':
+      return { type: 'number', primary: getStat('tpa') ? (getStat('tpm') / getStat('tpa')) : 0 };
+    case 'ftm-a':
+      return { type: 'number', primary: getStat('ftm'), secondary: getStat('fta') };
+    case 'ft%':
+      return { type: 'number', primary: getStat('fta') ? (getStat('ftm') / getStat('fta')) : 0 };
+    case 'reb':
+      return { type: 'number', primary: getStat('oreb') + getStat('dreb') };
+    default:
+      return { type: 'number', primary: getStat(key) };
+    }
+  };
+
+  const sortPlayers = (items) => {
+    const { key = 'min', direction = 'desc' } = sortConfig || {};
+    const directionFactor = direction === 'desc' ? -1 : 1;
+    return (items || []).slice().sort((a, b) => {
+      const aData = getSortData(a, key);
+      const bData = getSortData(b, key);
+
+      if (aData.type === 'string') {
+        const compare = (aData.primary || '').localeCompare(bData.primary || '', undefined, {
+          sensitivity: 'base',
+        });
+        if (compare !== 0) return compare * directionFactor;
+      } else {
+        if (aData.primary !== bData.primary) {
+          return (aData.primary - bData.primary) * directionFactor;
+        }
+        if (Number.isFinite(aData.secondary) && Number.isFinite(bData.secondary)) {
+          if (aData.secondary !== bData.secondary) {
+            return (aData.secondary - bData.secondary) * directionFactor;
+          }
+        }
+      }
+
+      const fallback = (a.seconds - b.seconds) * directionFactor;
+      if (fallback !== 0) return fallback;
+      return getSortName(a.player).localeCompare(getSortName(b.player), undefined, { sensitivity: 'base' });
+    });
+  };
+
   const playersWithMinutes = (team.players || []).map((player) => {
     const stats = player?.stats || {};
     const minutes = normalizeMinutes(stats.min);
@@ -153,9 +215,11 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
       minutes,
       seconds: minutesToSeconds(minutes),
     };
-  }).filter((item) => item.seconds > 0).sort((a, b) => b.seconds - a.seconds);
+  }).filter((item) => item.seconds > 0);
 
-  let playerRows = playersWithMinutes.map((item, i) => {
+  const sortedPlayers = sortPlayers(playersWithMinutes);
+
+  let playerRows = sortedPlayers.map((item, i) => {
     const p = item.player;
     const stats = item.stats;
     const rowKey = `${team?.abbr || team?.id || 'team'}-${p?.first || ''}-${p?.last || ''}-${i}`;
@@ -304,9 +368,15 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
   const statHeadings = (
     <div key="stat-headings" className="rowGrid statHeadings">
       {columnOrder.map((key) => (
-        <span key={`heading-${key}`} className={getCellClassName(key)}>
+        <button
+          key={`heading-${key}`}
+          type="button"
+          className={`${getCellClassName(key)} statHeadingButton${sortConfig?.key === key ? ' isActive' : ''}`}
+          onClick={() => onSort?.(key)}
+          data-indicator={sortConfig?.key === key ? (sortConfig?.direction === 'desc' ? '▼' : '▲') : undefined}
+        >
           {COLUMN_LABELS[key]}
-        </span>
+        </button>
       ))}
     </div>
   );

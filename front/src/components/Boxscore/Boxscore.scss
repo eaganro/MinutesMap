@@ -23,7 +23,8 @@
     width: max-content;
     min-width: 100%;
 
-    span {
+    span,
+    .statHeadingButton {
       padding: 6px 8px;
       display: flex;
       align-items: center;
@@ -45,6 +46,37 @@
     .highlight-col {
       background-color: var(--bg-highlight-col-header);
     }
+  }
+
+  .statHeadingButton {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .statHeadingButton.isActive {
+    color: var(--text-primary);
+  }
+
+  .statHeadingButton:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  .statHeadingButton::after {
+    content: attr(data-indicator);
+    margin-left: 4px;
+    font-size: 0.7rem;
+    line-height: 1;
   }
 
   .playerNameCol {
