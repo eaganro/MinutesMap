@@ -165,3 +165,65 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertIn("B. Starter", processed["players"]["away"])
         self.assertEqual(processed["segments"]["home"]["A. Starter"], [])
         self.assertEqual(processed["segments"]["away"]["B. Starter"], [])
+
+    def test_off_court_technical_foul_does_not_start_segment(self):
+        actions = [
+            {
+                "actionNumber": 0,
+                "actionId": 0,
+                "clock": "PT12M00.00S",
+                "period": 3,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 101,
+                "playerName": "Brown",
+                "playerNameI": "J. Brown",
+                "description": "SUB in: J. Brown",
+                "actionType": "substitution",
+                "subType": "in",
+                "scoreHome": "50",
+                "scoreAway": "50",
+            },
+            {
+                "actionNumber": 1,
+                "actionId": 1,
+                "clock": "PT05M00.00S",
+                "period": 3,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 101,
+                "playerName": "Brown",
+                "playerNameI": "J. Brown",
+                "description": "SUB out: J. Brown",
+                "actionType": "substitution",
+                "subType": "out",
+                "scoreHome": "50",
+                "scoreAway": "50",
+            },
+            {
+                "actionNumber": 2,
+                "actionId": 2,
+                "clock": "PT05M00.00S",
+                "period": 3,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 101,
+                "playerName": "Brown",
+                "playerNameI": "J. Brown",
+                "description": "J. Brown technical FOUL (1 Tech)",
+                "actionType": "foul",
+                "subType": "technical",
+                "scoreHome": "50",
+                "scoreAway": "50",
+            },
+        ]
+        processed = process_playbyplay_payload(
+            game_id="off-court-tech",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+        )
+        brown_segments = processed["segments"]["away"].get("J. Brown") or []
+        self.assertEqual(len(brown_segments), 1)
+        self.assertEqual(brown_segments[0]["start"], "1200.00")
+        self.assertEqual(brown_segments[0]["end"], "0500.00")

@@ -255,9 +255,18 @@ def _format_action_text(action):
     return f"{name} {action_type}".strip()
 
 
+def _looks_like_initialed_name(name):
+    if not name or not isinstance(name, str):
+        return False
+    return ". " in name or " " in name
+
+
 def fix_player_name(action):
     player_name = action.get("playerName")
+    player_name_i = action.get("playerNameI")
     description = action.get("description") or ""
+    if player_name_i and _looks_like_initialed_name(player_name_i):
+        return player_name_i.strip()
     if not player_name or not isinstance(description, str):
         return player_name
 
@@ -302,6 +311,8 @@ def process_score_timeline(actions):
 def _normalize_special_cases(name, team_tricode):
     if name == "Porter" and team_tricode == "CLE":
         return "Porter Jr."
+    if name == "Yang" and team_tricode == "POR":
+        return "Hansen"
     if name == "Jokic":
         return "Jokić"
     return name
@@ -425,10 +436,23 @@ def _seed_playtimes(playtimes, seed_names, seed_clock, seed_period):
             )
 
 
+def _should_skip_off_court_action(action):
+    action_type = _clean_phrase(action.get("actionType"))
+    if "foul" not in action_type:
+        return False
+    detail = _clean_phrase(action.get("subType"))
+    desc = _clean_phrase(action.get("description"))
+    if "technical" in detail or "technical" in desc:
+        return True
+    return False
+
+
 def update_playtime_for_name(player_name, action, playtimes):
     if not player_name or player_name not in playtimes:
         return playtimes
     if playtimes[player_name]["on"] is False:
+        if _should_skip_off_court_action(action):
+            return playtimes
         playtimes[player_name]["on"] = True
         playtimes[player_name]["times"].append(
             {"start": "PT12M00.00S", "period": action.get("period"), "end": action.get("clock")}
@@ -443,6 +467,9 @@ def update_playtime_for_name(player_name, action, playtimes):
 def update_playtimes_with_action(action, playtimes):
     player_name = fix_player_name(action)
     action_type = action.get("actionType")
+
+    if action_type in ("Substitution", "substitution") and _is_start_period_sub_out(action):
+        return playtimes
 
     if action_type == "Substitution":
         desc = action.get("description") or ""
@@ -512,6 +539,26 @@ def quarter_change(playtimes):
     return playtimes
 
 
+def _is_start_period_sub_out(action):
+    qualifiers = action.get("qualifiers") or []
+    has_start = any(
+        isinstance(q, str) and q.lower() == "startperiod" for q in qualifiers
+    )
+    if not has_start:
+        return False
+    clock = action.get("clock")
+    seconds = time_to_seconds(clock)
+    if seconds not in (12 * 60, 5 * 60):
+        return False
+    sub_type = _clean_phrase(action.get("subType"))
+    desc = _clean_phrase(action.get("description"))
+    if "out" in sub_type:
+        return True
+    if "sub out" in desc or "out:" in desc:
+        return True
+    return False
+
+
 def end_playtimes(playtimes, last_action):
     for player in list((playtimes or {}).keys()):
         if playtimes[player].get("on") is True and playtimes[player].get("times"):
@@ -519,6 +566,36 @@ def end_playtimes(playtimes, last_action):
             t[-1]["end"] = (last_action or {}).get("clock")
         playtimes[player] = playtimes[player].get("times", [])
     return playtimes
+
+
+def sort_actions_by_order(actions):
+    def sort_key(a):
+        order = a.get("orderNumber")
+        try:
+            order = int(order)
+            has_order = True
+        except Exception:
+            order = 0
+            has_order = False
+
+        action_num = a.get("actionNumber")
+        try:
+            action_num = int(action_num)
+        except Exception:
+            action_num = 0
+
+        if has_order:
+            return (0, order, action_num)
+
+        period = a.get("period") or a.get("quarter") or 0
+        try:
+            period = int(period)
+        except Exception:
+            period = 0
+        clock = a.get("clock") or a.get("time")
+        return (1, period, -time_to_seconds(clock), action_num)
+
+    return sorted(list(actions or []), key=sort_key)
 
 
 def sort_actions(actions):
@@ -660,7 +737,7 @@ def process_playbyplay_payload(
     except Exception:
         home_team_id = None
 
-    actions = actions or []
+    actions = sort_actions_by_order(actions or [])
     last_action = actions[-1] if actions else None
     if seed_period is None:
         seed_period = (last_action or {}).get("period") or 1
