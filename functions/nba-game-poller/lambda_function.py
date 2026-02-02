@@ -504,28 +504,40 @@ def process_game(game_item, user_agent=None, date_str=None):
     # --- 1. Play by Play ---
     if play_data:
         actions = play_data.get('game', {}).get('actions', [])
-        if actions:
-            # Check if last action is "Game End"
-            last_desc = actions[-1].get('description', '').strip()
+        last_action = actions[-1] if actions else None
+
+        if last_action:
+            last_desc = last_action.get('description', '').strip()
             is_play_final = last_desc.startswith('Game End')
 
-            # Build slim processed payload for the compact gamepack.
-            if not (home_team_id and away_team_id):
-                inferred_away, inferred_home = infer_team_ids_from_actions(actions)
-                away_team_id = away_team_id or inferred_away
-                home_team_id = home_team_id or inferred_home
+        if actions and not (home_team_id and away_team_id):
+            inferred_away, inferred_home = infer_team_ids_from_actions(actions)
+            away_team_id = away_team_id or inferred_away
+            home_team_id = home_team_id or inferred_home
 
-            if home_team_id and away_team_id:
-                processed = process_playbyplay_payload(
-                    game_id=nba_game_id,
-                    actions=actions,
-                    away_team_id=away_team_id,
-                    home_team_id=home_team_id,
-                    include_actions=False,
-                    include_all_actions=False,
-                )
+        seed_home = []
+        seed_away = []
+        seed_period = (last_action or {}).get('period') or 1
+        seed_clock = (last_action or {}).get('clock') or box_game.get('gameClock')
+        if seed_period == 1 and box_game:
+            seed_home = extract_oncourt_names(box_game.get("homeTeam"))
+            seed_away = extract_oncourt_names(box_game.get("awayTeam"))
 
-            updates['play_etag'] = play_etag
+        if home_team_id and away_team_id and (actions or seed_home or seed_away):
+            processed = process_playbyplay_payload(
+                game_id=nba_game_id,
+                actions=actions,
+                away_team_id=away_team_id,
+                home_team_id=home_team_id,
+                include_actions=False,
+                include_all_actions=False,
+                seed_home=seed_home,
+                seed_away=seed_away,
+                seed_clock=seed_clock,
+                seed_period=seed_period,
+            )
+
+        updates['play_etag'] = play_etag
 
     # --- 2. Box Score ---
     if box_data:
@@ -645,6 +657,45 @@ def build_team_payload(team):
         "name": team.get("teamName"),
         "players": players,
     }
+
+
+def extract_oncourt_names(team):
+    if not isinstance(team, dict):
+        return []
+    players = team.get("players") or []
+    names = []
+    seen = set()
+    for player in players:
+        if not isinstance(player, dict):
+            continue
+        if str(player.get("oncourt") or "").strip() != "1":
+            continue
+        name = (
+            player.get("nameI")
+            or player.get("name")
+            or player.get("familyName")
+            or ""
+        ).strip()
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    if names:
+        return names
+    for player in players:
+        if not isinstance(player, dict):
+            continue
+        if str(player.get("starter") or "").strip() != "1":
+            continue
+        name = (
+            player.get("nameI")
+            or player.get("name")
+            or player.get("familyName")
+            or ""
+        ).strip()
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    return names
 
 def normalize_minutes(raw_minutes):
     if not raw_minutes:

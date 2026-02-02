@@ -401,6 +401,30 @@ def create_playtimes(players):
     return playtimes
 
 
+def _ensure_seed_players(players, seed_names):
+    for name in seed_names or []:
+        if not name:
+            continue
+        if name not in players:
+            players[name] = []
+
+
+def _seed_playtimes(playtimes, seed_names, seed_clock, seed_period):
+    if seed_period != 1:
+        return
+    for name in seed_names or []:
+        if not name:
+            continue
+        if name not in playtimes:
+            playtimes[name] = {"times": [], "on": False}
+        if playtimes[name].get("times"):
+            continue
+        if seed_clock:
+            playtimes[name]["times"].append(
+                {"start": "PT12M00.00S", "period": 1, "end": seed_clock}
+            )
+
+
 def update_playtime_for_name(player_name, action, playtimes):
     if not player_name or player_name not in playtimes:
         return playtimes
@@ -619,6 +643,10 @@ def process_playbyplay_payload(
     home_team_id=None,
     include_actions=True,
     include_all_actions=True,
+    seed_home=None,
+    seed_away=None,
+    seed_clock=None,
+    seed_period=None,
 ):
     """
     Produces a compact play-by-play payload with trimmed field names.
@@ -634,6 +662,10 @@ def process_playbyplay_payload(
 
     actions = actions or []
     last_action = actions[-1] if actions else None
+    if seed_period is None:
+        seed_period = (last_action or {}).get("period") or 1
+    if seed_clock is None and last_action:
+        seed_clock = last_action.get("clock")
     num_periods = 4
     try:
         if last_action and (last_action.get("period") or 0) > 4:
@@ -645,6 +677,9 @@ def process_playbyplay_payload(
     players = create_players(actions, away_team_id, home_team_id)
     away_players = players["awayPlayers"]
     home_players = players["homePlayers"]
+
+    _ensure_seed_players(away_players, seed_away)
+    _ensure_seed_players(home_players, seed_home)
 
     away_playtimes = create_playtimes(away_players)
     home_playtimes = create_playtimes(home_players)
@@ -661,6 +696,9 @@ def process_playbyplay_payload(
             away_playtimes = update_playtimes_with_action(a, away_playtimes)
         if home_team_id is not None and a.get("teamId") == home_team_id:
             home_playtimes = update_playtimes_with_action(a, home_playtimes)
+
+    _seed_playtimes(away_playtimes, seed_away, seed_clock, seed_period)
+    _seed_playtimes(home_playtimes, seed_home, seed_clock, seed_period)
 
     away_playtimes = end_playtimes(away_playtimes, last_action)
     home_playtimes = end_playtimes(home_playtimes, last_action)

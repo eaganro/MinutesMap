@@ -128,3 +128,40 @@ class TestPlayByPlayProcessing(unittest.TestCase):
                     self.assertIsNotNone(seg["start"])
                     self.assertIsNotNone(seg["end"])
         self.assertGreater(checked, 0, "Expected at least one playtime segment to be produced")
+
+    def test_seed_players_create_q1_segments(self):
+        processed = process_playbyplay_payload(
+            game_id="seed-q1",
+            actions=[],
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+            seed_home=["A. Starter"],
+            seed_away=["B. Starter"],
+            seed_clock="PT11M34.00S",
+            seed_period=1,
+        )
+        self.assertIn("A. Starter", processed["players"]["home"])
+        self.assertIn("B. Starter", processed["players"]["away"])
+
+        home_segments = processed["segments"]["home"]["A. Starter"]
+        away_segments = processed["segments"]["away"]["B. Starter"]
+        self.assertEqual(home_segments[0]["start"], "1200.00")
+        self.assertEqual(home_segments[0]["end"], "1134.00")
+        self.assertEqual(away_segments[0]["start"], "1200.00")
+        self.assertEqual(away_segments[0]["end"], "1134.00")
+
+    def test_seed_players_without_clock_have_no_segments(self):
+        processed = process_playbyplay_payload(
+            game_id="seed-no-clock",
+            actions=[],
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+            seed_home=["A. Starter"],
+            seed_away=["B. Starter"],
+            seed_clock=None,
+            seed_period=1,
+        )
+        self.assertIn("A. Starter", processed["players"]["home"])
+        self.assertIn("B. Starter", processed["players"]["away"])
+        self.assertEqual(processed["segments"]["home"]["A. Starter"], [])
+        self.assertEqual(processed["segments"]["away"]["B. Starter"], [])
