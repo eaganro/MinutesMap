@@ -43,25 +43,28 @@ export const buildGameStatusLabel = ({
   periodRange,
   scoreTimeline,
 }) => {
+  const statusText = formatStatusText(gameStatus);
   if (isFinal && isFullGameRange) {
-    const statusText = formatStatusText(gameStatus);
     return statusText || 'Final';
   }
-  if (!isFullGameRange && Number.isFinite(periodRange?.end)) {
-    const rangeLabel = formatPeriodLabel(periodRange.end);
-    if (rangeLabel) {
-      return `End ${rangeLabel}`;
+  const lastScoreEntry = scoreTimeline?.length ? scoreTimeline[scoreTimeline.length - 1] : null;
+  const currentPeriod = lastAction?.period ?? lastScoreEntry?.period;
+  const currentClock = lastAction?.clock ?? lastScoreEntry?.clock;
+  const currentPeriodValue = Number(currentPeriod);
+  const rangeEndValue = Number(periodRange?.end);
+  if (!isFullGameRange && Number.isFinite(rangeEndValue)) {
+    const rangeLabel = formatPeriodLabel(rangeEndValue);
+    const shouldShowRangeEnd = isFinal
+      || (Number.isFinite(currentPeriodValue) && currentPeriodValue > rangeEndValue);
+    if (shouldShowRangeEnd) {
+      return rangeLabel ? `End ${rangeLabel}` : statusText || '';
     }
   }
-  const lastScoreEntry = scoreTimeline?.length ? scoreTimeline[scoreTimeline.length - 1] : null;
-  const period = lastScoreEntry?.period ?? lastAction?.period;
-  const clock = lastScoreEntry?.clock ?? lastAction?.clock;
-  const periodLabel = formatPeriodLabel(period);
-  const formattedClock = formatClockLabel(clock);
+  const periodLabel = formatPeriodLabel(currentPeriod);
+  const formattedClock = formatClockLabel(currentClock);
   if (periodLabel && formattedClock) {
     return `${periodLabel} ${formattedClock}`;
   }
-  const statusText = formatStatusText(gameStatus);
   return statusText;
 };
 
