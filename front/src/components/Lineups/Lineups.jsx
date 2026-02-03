@@ -1,5 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
+import Checkbox from '@mui/material/Checkbox';
+import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
+import OutlinedInput from '@mui/material/OutlinedInput';
+import Select from '@mui/material/Select';
 import { useTheme } from '../hooks/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
 import './Lineups.scss';
@@ -8,6 +13,7 @@ const DEFAULT_VISIBLE_COUNT = 5;
 const COMPACT_LAST_NAME_MAX = 12;
 const COMPACT_LAST_NAME_KEEP = 10;
 const DISPLAY_NAME_MAX = 14;
+const MAX_SELECTED_PLAYERS = 5;
 const SUFFIXES = new Set(['Jr.', 'Sr.', 'II', 'III', 'IV', 'V']);
 const LAST_NAME_PARTICLES = new Set([
   'da',
@@ -43,6 +49,26 @@ const formatSeconds = (seconds) => {
 const formatPlusMinus = (value) => {
   if (!Number.isFinite(value) || value === 0) return '0';
   return value > 0 ? `+${value}` : `${value}`;
+};
+
+const buildPlayerOptions = (lineups) => {
+  const players = new Set();
+  (lineups || []).forEach((lineup) => {
+    (lineup?.players || []).forEach((player) => {
+      if (player) players.add(player);
+    });
+  });
+  return Array.from(players).sort((a, b) => a.localeCompare(b));
+};
+
+const filterLineupsByPlayers = (lineups, selectedPlayers) => {
+  const selected = selectedPlayers || [];
+  if (!selected.length) return lineups || [];
+  return (lineups || []).filter((lineup) => {
+    const players = lineup?.players || [];
+    if (players.length !== 5) return false;
+    return selected.every((player) => players.includes(player));
+  });
 };
 
 const parseNameParts = (rawName) => {
@@ -141,33 +167,66 @@ export default function Lineups({
 }) {
   const [sortConfig, setSortConfig] = useState({ key: 'minutes', direction: 'desc' });
   const [showAll, setShowAll] = useState(false);
+  const [selectedAwayPlayers, setSelectedAwayPlayers] = useState([]);
+  const [selectedHomePlayers, setSelectedHomePlayers] = useState([]);
   const { isDarkMode } = useTheme();
   const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode);
 
+  const awayOptions = useMemo(() => buildPlayerOptions(awayLineups), [awayLineups]);
+  const homeOptions = useMemo(() => buildPlayerOptions(homeLineups), [homeLineups]);
+
+  useEffect(() => {
+    setSelectedAwayPlayers((prev) => prev.filter((player) => awayOptions.includes(player)));
+  }, [awayOptions]);
+
+  useEffect(() => {
+    setSelectedHomePlayers((prev) => prev.filter((player) => homeOptions.includes(player)));
+  }, [homeOptions]);
+
+  const awayFiltered = useMemo(
+    () => filterLineupsByPlayers(awayLineups, selectedAwayPlayers),
+    [awayLineups, selectedAwayPlayers],
+  );
+  const homeFiltered = useMemo(
+    () => filterLineupsByPlayers(homeLineups, selectedHomePlayers),
+    [homeLineups, selectedHomePlayers],
+  );
+
   const awaySorted = useMemo(
-    () => sortLineups(awayLineups, sortConfig),
-    [awayLineups, sortConfig],
+    () => sortLineups(awayFiltered, sortConfig),
+    [awayFiltered, sortConfig],
   );
   const homeSorted = useMemo(
-    () => sortLineups(homeLineups, sortConfig),
-    [homeLineups, sortConfig],
+    () => sortLineups(homeFiltered, sortConfig),
+    [homeFiltered, sortConfig],
   );
   const awayLastNameCounts = useMemo(
-    () => buildLastNameCounts(awayLineups),
-    [awayLineups],
+    () => buildLastNameCounts(awayFiltered),
+    [awayFiltered],
   );
   const homeLastNameCounts = useMemo(
-    () => buildLastNameCounts(homeLineups),
-    [homeLineups],
+    () => buildLastNameCounts(homeFiltered),
+    [homeFiltered],
   );
 
   const hasData = (awaySorted?.length || 0) > 0 || (homeSorted?.length || 0) > 0;
   const showLoadingIndicator = isLoading && !hasData && !statusMessage;
   const showStatusMessage = Boolean(statusMessage) && !hasData;
 
-  const renderTeamPanel = (teamLabel, lineups, isExpanded, onToggle, lastNameCounts, teamColor) => {
+  const renderTeamPanel = (
+    teamLabel,
+    lineups,
+    isExpanded,
+    onToggle,
+    lastNameCounts,
+    teamColor,
+    selectedPlayers,
+    onSelectionChange,
+    playerOptions,
+  ) => {
     const visible = isExpanded ? lineups : lineups.slice(0, DEFAULT_VISIBLE_COUNT);
     const hasMore = lineups.length > DEFAULT_VISIBLE_COUNT;
+    const selectionLimitReached = selectedPlayers.length >= MAX_SELECTED_PLAYERS;
     return (
       <div className="lineupsTeamPanel">
         <div className="lineupsTeamHeader">
@@ -181,8 +240,58 @@ export default function Lineups({
             <span className="lineupsCount">{lineups.length} lineups</span>
           )}
         </div>
+        <div className="lineupsFilters">
+          <span className="lineupsFilterLabel">Filter players (max {MAX_SELECTED_PLAYERS})</span>
+          <Select
+            multiple
+            displayEmpty
+            value={selectedPlayers}
+            input={<OutlinedInput />}
+            onChange={(event) => {
+              const value = event.target.value;
+              const next = Array.isArray(value) ? value : String(value).split(',');
+              if (next.length > MAX_SELECTED_PLAYERS) return;
+              onSelectionChange(next);
+            }}
+            renderValue={(selected) => (
+              selected.length ? selected.join(', ') : 'All players'
+            )}
+            className="lineupsFilterSelect"
+            aria-label={`${teamLabel} lineup player filter`}
+            MenuProps={{
+              PaperProps: { style: { maxHeight: 280 } },
+            }}
+          >
+            {playerOptions.map((player) => {
+              const isSelected = selectedPlayers.includes(player);
+              return (
+                <MenuItem
+                  key={`${teamLabel}-${player}`}
+                  value={player}
+                  disabled={!isSelected && selectionLimitReached}
+                >
+                  <Checkbox checked={isSelected} />
+                  <ListItemText primary={player} />
+                </MenuItem>
+              );
+            })}
+          </Select>
+          {selectedPlayers.length > 0 && (
+            <button
+              type="button"
+              className="lineupsFilterClear"
+              onClick={() => onSelectionChange([])}
+            >
+              Clear
+            </button>
+          )}
+        </div>
         {lineups.length === 0 ? (
-          <div className="lineupsEmpty">No lineup data yet.</div>
+          <div className="lineupsEmpty">
+            {selectedPlayers.length
+              ? 'No 5-man lineups match that selection.'
+              : 'No lineup data yet.'}
+          </div>
         ) : (
           <>
             <div className="lineupsTable">
@@ -283,22 +392,28 @@ export default function Lineups({
         <div className="lineupsGrid">
           {renderTeamPanel(
             awayTeam?.name || awayTeam?.abr || 'Away',
-            awaySorted,
-            showAll,
-            () => setShowAll((prev) => !prev),
-            awayLastNameCounts,
-            matchupColors?.away,
-          )}
-          {renderTeamPanel(
-            homeTeam?.name || homeTeam?.abr || 'Home',
-            homeSorted,
-            showAll,
-            () => setShowAll((prev) => !prev),
-            homeLastNameCounts,
-            matchupColors?.home,
-          )}
-        </div>
-      )}
+          awaySorted,
+          showAll,
+          () => setShowAll((prev) => !prev),
+          awayLastNameCounts,
+          matchupColors?.away,
+          selectedAwayPlayers,
+          setSelectedAwayPlayers,
+          awayOptions,
+        )}
+        {renderTeamPanel(
+          homeTeam?.name || homeTeam?.abr || 'Home',
+          homeSorted,
+          showAll,
+          () => setShowAll((prev) => !prev),
+          homeLastNameCounts,
+          matchupColors?.home,
+          selectedHomePlayers,
+          setSelectedHomePlayers,
+          homeOptions,
+        )}
+      </div>
+    )}
     </div>
   );
 }

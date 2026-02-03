@@ -61,6 +61,63 @@
   gap: 4px;
 }
 
+.lineupsFilters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lineupsFilterLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.lineupsFilterSelect {
+  min-width: 220px;
+  background: var(--bg-table-header);
+  border-radius: 10px;
+}
+
+.lineupsFilterSelect .MuiOutlinedInput-notchedOutline {
+  border-color: var(--divider);
+}
+
+.lineupsFilterSelect .MuiSelect-select {
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.lineupsFilterSelect .MuiSvgIcon-root {
+  color: var(--text-secondary);
+}
+
+.lineupsFilterSelect.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--focus-ring-color);
+}
+
+.lineupsFilterClear {
+  border: 1px solid var(--divider);
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.lineupsFilterClear:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.lineupsFilterClear:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
 .lineupsRow {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) 70px 55px;
