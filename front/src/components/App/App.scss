@@ -58,6 +58,40 @@
   letter-spacing: -0.02em;
   transition: color 0.3s ease;
 }
+
+.appHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.appSocialLink {
+  height: 28px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  color: var(--text-primary);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.appSocialLink:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+}
+
+.appSocialLink:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
 .playByPlaySection {
   display: flex;
   flex-direction: column;

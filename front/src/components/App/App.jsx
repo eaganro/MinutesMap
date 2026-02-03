@@ -70,7 +70,19 @@ export default function App() {
           </picture>
           <span className='appName'>MinutesMap</span>
         </div>
-        <DarkModeToggle />
+        <div className='appHeaderActions'>
+          <a
+            className='appSocialLink'
+            href="https://x.com/intent/follow?screen_name=MinutesMap"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Follow @MinutesMap on X"
+            title="Follow @MinutesMap on X"
+          >
+            Follow on X
+          </a>
+          <DarkModeToggle />
+        </div>
       </header>
       <main className='appMain'>
         <Schedule
