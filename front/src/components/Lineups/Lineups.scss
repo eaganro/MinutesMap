@@ -74,28 +74,47 @@
   color: var(--text-muted);
 }
 
-.lineupsFilterSelect {
-  min-width: 220px;
+.lineupsFilterPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  flex: 1 1 auto;
+}
+
+.lineupsFilterPill {
+  border: 1px solid var(--divider);
   background: var(--bg-table-header);
-  border-radius: 10px;
-}
-
-.lineupsFilterSelect .MuiOutlinedInput-notchedOutline {
-  border-color: var(--divider);
-}
-
-.lineupsFilterSelect .MuiSelect-select {
-  padding: 8px 10px;
-  font-size: 0.8rem;
   color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  white-space: nowrap;
 }
 
-.lineupsFilterSelect .MuiSvgIcon-root {
-  color: var(--text-secondary);
+.lineupsFilterPill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-.lineupsFilterSelect.Mui-focused .MuiOutlinedInput-notchedOutline {
-  border-color: var(--focus-ring-color);
+.lineupsFilterPill.isSelected {
+  background: var(--bg-highlight-col-header);
+  border-color: var(--bg-highlight-col-header);
+  color: var(--text-heading);
+}
+
+.lineupsFilterPill.isDisabled,
+.lineupsFilterPill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.lineupsFilterPill:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 .lineupsFilterClear {
@@ -111,6 +130,11 @@
 .lineupsFilterClear:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.lineupsFilterClear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .lineupsFilterClear:focus-visible {
@@ -204,6 +228,12 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.lineupsPill.isSelected {
+  background: var(--bg-highlight-col-header);
+  border-color: var(--bg-highlight-col-header);
+  color: var(--text-heading);
 }
 
 .lineupsBadge {

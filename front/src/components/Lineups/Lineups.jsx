@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-import Checkbox from '@mui/material/Checkbox';
-import ListItemText from '@mui/material/ListItemText';
-import MenuItem from '@mui/material/MenuItem';
-import OutlinedInput from '@mui/material/OutlinedInput';
-import Select from '@mui/material/Select';
 import { useTheme } from '../hooks/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
 import './Lineups.scss';
@@ -242,49 +237,40 @@ export default function Lineups({
         </div>
         <div className="lineupsFilters">
           <span className="lineupsFilterLabel">Filter players (max {MAX_SELECTED_PLAYERS})</span>
-          <Select
-            multiple
-            displayEmpty
-            value={selectedPlayers}
-            input={<OutlinedInput />}
-            onChange={(event) => {
-              const value = event.target.value;
-              const next = Array.isArray(value) ? value : String(value).split(',');
-              if (next.length > MAX_SELECTED_PLAYERS) return;
-              onSelectionChange(next);
-            }}
-            renderValue={(selected) => (
-              selected.length ? selected.join(', ') : 'All players'
-            )}
-            className="lineupsFilterSelect"
-            aria-label={`${teamLabel} lineup player filter`}
-            MenuProps={{
-              PaperProps: { style: { maxHeight: 280 } },
-            }}
-          >
+          <div className="lineupsFilterPills" role="group" aria-label={`${teamLabel} player filters`}>
             {playerOptions.map((player) => {
               const isSelected = selectedPlayers.includes(player);
+              const isDisabled = !isSelected && selectionLimitReached;
               return (
-                <MenuItem
+                <button
                   key={`${teamLabel}-${player}`}
-                  value={player}
-                  disabled={!isSelected && selectionLimitReached}
+                  type="button"
+                  className={`lineupsFilterPill${isSelected ? ' isSelected' : ''}${isDisabled ? ' isDisabled' : ''}`}
+                  onClick={() => {
+                    if (isDisabled) return;
+                    if (isSelected) {
+                      onSelectionChange(selectedPlayers.filter((name) => name !== player));
+                      return;
+                    }
+                    onSelectionChange([...selectedPlayers, player]);
+                  }}
+                  aria-pressed={isSelected}
+                  disabled={isDisabled}
+                  title={player}
                 >
-                  <Checkbox checked={isSelected} />
-                  <ListItemText primary={player} />
-                </MenuItem>
+                  {player}
+                </button>
               );
             })}
-          </Select>
-          {selectedPlayers.length > 0 && (
-            <button
-              type="button"
-              className="lineupsFilterClear"
-              onClick={() => onSelectionChange([])}
-            >
-              Clear
-            </button>
-          )}
+          </div>
+          <button
+            type="button"
+            className="lineupsFilterClear"
+            onClick={() => onSelectionChange([])}
+            disabled={selectedPlayers.length === 0}
+          >
+            Clear
+          </button>
         </div>
         {lineups.length === 0 ? (
           <div className="lineupsEmpty">
@@ -335,16 +321,22 @@ export default function Lineups({
                       <span className="lineupsBadge">{lineup.players.length}-man</span>
                     )}
                     <span className="lineupsNames">
-                    {lineup.players.map((player) => (
+                    {[
+                      ...lineup.players.filter((player) => selectedPlayers.includes(player)),
+                      ...lineup.players.filter((player) => !selectedPlayers.includes(player)),
+                    ].map((player) => {
+                      const isSelected = selectedPlayers.includes(player);
+                      return (
                         <span
-                          className="lineupsPill"
+                          className={`lineupsPill${isSelected ? ' isSelected' : ''}`}
                           key={`${lineup.key}-${player}`}
                           title={player}
                           aria-label={player}
                         >
                           {formatPlayerName(player, lastNameCounts)}
                         </span>
-                      ))}
+                      );
+                    })}
                     </span>
                   </div>
                   <span className="lineupsStat">{formatSeconds(lineup.seconds)}</span>
