@@ -62,7 +62,9 @@
 .appHeaderActions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  position: relative;
+  top: 3px;
 }
 
 .appSocialLink {
@@ -92,6 +94,7 @@
   outline: 2px solid var(--focus-ring-color);
   outline-offset: 2px;
 }
+
 .playByPlaySection {
   display: flex;
   flex-direction: column;
