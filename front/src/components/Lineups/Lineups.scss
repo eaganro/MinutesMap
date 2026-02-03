@@ -167,6 +167,20 @@
   border: 1px solid var(--divider);
 }
 
+.lineupsRowSummary {
+  border: 1px solid var(--divider);
+  background: var(--bg-table-header);
+  font-weight: 600;
+}
+
+.lineupsSummaryLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
 .lineupsSortButton {
   border: none;
   background: transparent;

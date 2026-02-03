@@ -222,6 +222,15 @@ export default function Lineups({
     const visible = isExpanded ? lineups : lineups.slice(0, DEFAULT_VISIBLE_COUNT);
     const hasMore = lineups.length > DEFAULT_VISIBLE_COUNT;
     const selectionLimitReached = selectedPlayers.length >= MAX_SELECTED_PLAYERS;
+    const summary = selectedPlayers.length
+      ? lineups.reduce(
+        (acc, lineup) => ({
+          seconds: acc.seconds + (lineup?.seconds || 0),
+          plusMinus: acc.plusMinus + (lineup?.plusMinus || 0),
+        }),
+        { seconds: 0, plusMinus: 0 },
+      )
+      : null;
     return (
       <div className="lineupsTeamPanel">
         <div className="lineupsTeamHeader">
@@ -314,6 +323,33 @@ export default function Lineups({
                   )}
                 </button>
               </div>
+              {summary && (
+                <div className="lineupsRow lineupsRowSummary">
+                  <div className="lineupsPlayers">
+                    <span className="lineupsSummaryLabel">Selected total</span>
+                    <span className="lineupsNames">
+                      {selectedPlayers.map((player) => (
+                        <span
+                          className="lineupsPill isSelected"
+                          key={`${teamLabel}-summary-${player}`}
+                          title={player}
+                          aria-label={player}
+                        >
+                          {formatPlayerName(player, lastNameCounts)}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                  <span className="lineupsStat">{formatSeconds(summary.seconds)}</span>
+                  <span
+                    className={`lineupsStat lineupsPlusMinus${
+                      summary.plusMinus > 0 ? ' isPositive' : summary.plusMinus < 0 ? ' isNegative' : ''
+                    }`}
+                  >
+                    {formatPlusMinus(summary.plusMinus)}
+                  </span>
+                </div>
+              )}
               {visible.map((lineup) => (
                 <div className="lineupsRow" key={lineup.key}>
                   <div className="lineupsPlayers">
