@@ -12,6 +12,7 @@ _JUMPBALL_RE = re.compile(
 )
 _SUB_IN_OUT_RE = re.compile(r"SUB\s+(in|out):\s*(.+)", re.IGNORECASE)
 _SUB_FOR_RE = re.compile(r"SUB:\s*(.+?)\s+FOR\s+(.+)", re.IGNORECASE)
+_INITIAL_PREFIX_RE = re.compile(r"^[A-Z]\.")
 
 
 def time_to_seconds(clock):
@@ -61,6 +62,43 @@ def _clean_phrase(value):
     cleaned = value.strip().lower()
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned
+
+
+def _normalize_match_name(value):
+    if not value or not isinstance(value, str):
+        return ""
+    cleaned = value.strip().lower()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = cleaned.replace(".", "")
+    return cleaned
+
+
+def _has_initial_prefix(name):
+    if not name or not isinstance(name, str):
+        return False
+    return bool(_INITIAL_PREFIX_RE.match(name.strip()))
+
+
+def _resolve_player_name(name, roster):
+    if not name or not roster:
+        return name
+    norm_name = _normalize_match_name(name)
+    if not norm_name:
+        return name
+    matches = []
+    for candidate in roster.keys():
+        norm_candidate = _normalize_match_name(candidate)
+        if not norm_candidate:
+            continue
+        if norm_candidate == norm_name or norm_candidate.endswith(f" {norm_name}"):
+            matches.append(candidate)
+    if len(matches) == 1:
+        return matches[0]
+    if name in roster:
+        initial_matches = [c for c in matches if c != name and _has_initial_prefix(c)]
+        if len(initial_matches) == 1:
+            return initial_matches[0]
+    return name
 
 
 def _normalize_shot_detail(sub_type):
@@ -468,25 +506,42 @@ def update_playtimes_with_action(action, playtimes):
     player_name = fix_player_name(action)
     action_type = action.get("actionType")
 
-    if action_type in ("Substitution", "substitution") and _is_start_period_sub_out(action):
-        return playtimes
-
     if action_type == "Substitution":
         desc = action.get("description") or ""
         start_name = desc.find("SUB:") + 5
         end_name = desc.find("FOR") - 1
         name = desc[start_name:end_name]
         name = _normalize_special_cases(name, action.get("teamTricode"))
+        name = _resolve_player_name(name, playtimes)
 
         if name not in playtimes:
             playtimes[name] = {"times": [], "on": False}
             print("PROBLEM: Player Name Not Found", name)
 
-        playtimes[name]["times"].append({"start": action.get("clock"), "period": action.get("period")})
-        playtimes[name]["on"] = True
+        incoming_times = playtimes[name]["times"]
+        if playtimes[name]["on"] is True and incoming_times and incoming_times[-1].get("end") is None:
+            incoming_times[-1]["end"] = action.get("clock")
+        if not (
+            playtimes[name]["on"] is True
+            and incoming_times
+            and incoming_times[-1].get("start") == action.get("clock")
+            and incoming_times[-1].get("period") == action.get("period")
+        ):
+            incoming_times.append({"start": action.get("clock"), "period": action.get("period")})
+            playtimes[name]["on"] = True
 
         if player_name and player_name in playtimes:
             t = playtimes[player_name]["times"]
+            if _is_start_period_sub_out(action):
+                if playtimes[player_name]["on"] is True:
+                    if (
+                        t
+                        and t[-1].get("start") == action.get("clock")
+                        and t[-1].get("period") == action.get("period")
+                    ):
+                        t.pop()
+                playtimes[player_name]["on"] = False
+                return playtimes
             if playtimes[player_name]["on"] is False:
                 if (action.get("period") or 0) <= 4:
                     t.append({"start": "PT12M00.00S", "period": action.get("period")})
@@ -501,6 +556,7 @@ def update_playtimes_with_action(action, playtimes):
         name = desc[desc.find(":") + 2 :]
         if name == "Yang":
             name = "Hansen"
+        name = _resolve_player_name(name, playtimes)
 
         if name not in playtimes:
             playtimes[name] = {"times": [], "on": False}
@@ -508,6 +564,16 @@ def update_playtimes_with_action(action, playtimes):
 
         t = playtimes[name]["times"]
         if "out:" in desc:
+            if _is_start_period_sub_out(action):
+                if playtimes[name]["on"] is True:
+                    if (
+                        t
+                        and t[-1].get("start") == action.get("clock")
+                        and t[-1].get("period") == action.get("period")
+                    ):
+                        t.pop()
+                    playtimes[name]["on"] = False
+                return playtimes
             if playtimes[name]["on"] is False:
                 if (action.get("period") or 0) <= 4:
                     t.append({"start": "PT12M00.00S", "period": action.get("period")})
@@ -517,6 +583,15 @@ def update_playtimes_with_action(action, playtimes):
                 t[-1]["end"] = action.get("clock")
             playtimes[name]["on"] = False
         elif "in:" in desc:
+            if playtimes[name]["on"] is True:
+                if (
+                    t
+                    and t[-1].get("start") == action.get("clock")
+                    and t[-1].get("period") == action.get("period")
+                ):
+                    return playtimes
+                if t and t[-1].get("end") is None:
+                    t[-1]["end"] = action.get("clock")
             playtimes[name]["times"].append({"start": action.get("clock"), "period": action.get("period")})
             playtimes[name]["on"] = True
 
@@ -536,6 +611,20 @@ def quarter_change(playtimes):
             t = playtimes[player]["times"]
             t[-1]["end"] = "PT00M00.00S"
             playtimes[player]["on"] = False
+    return playtimes
+
+
+def _period_start_clock(period):
+    return "PT12M00.00S" if (period or 0) <= 4 else "PT05M00.00S"
+
+
+def quarter_change_with_carry(playtimes, next_period):
+    for player in (playtimes or {}).keys():
+        if playtimes[player].get("on") is True and playtimes[player].get("times"):
+            t = playtimes[player]["times"]
+            t[-1]["end"] = "PT00M00.00S"
+            t.append({"start": _period_start_clock(next_period), "period": next_period})
+            playtimes[player]["on"] = True
     return playtimes
 
 
@@ -765,8 +854,8 @@ def process_playbyplay_payload(
     for a in actions:
         period = a.get("period") or 1
         if period != current_q:
-            away_playtimes = quarter_change(away_playtimes)
-            home_playtimes = quarter_change(home_playtimes)
+            away_playtimes = quarter_change_with_carry(away_playtimes, period)
+            home_playtimes = quarter_change_with_carry(home_playtimes, period)
             current_q = period
 
         if away_team_id is not None and a.get("teamId") == away_team_id:

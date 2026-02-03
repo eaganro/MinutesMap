@@ -227,3 +227,69 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(len(brown_segments), 1)
         self.assertEqual(brown_segments[0]["start"], "1200.00")
         self.assertEqual(brown_segments[0]["end"], "0500.00")
+
+    def test_carryover_player_stays_on_next_period(self):
+        actions = [
+            {
+                "actionNumber": 1,
+                "actionId": 1,
+                "orderNumber": 1000,
+                "clock": "PT01M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 500,
+                "playerName": "Carry",
+                "playerNameI": "C. Carry",
+                "description": "C. Carry 2PT Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "2",
+            },
+            {
+                "actionNumber": 2,
+                "actionId": 2,
+                "orderNumber": 2000,
+                "clock": "PT11M50.00S",
+                "period": 2,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 501,
+                "playerName": "Other",
+                "playerNameI": "O. Other",
+                "description": "O. Other 2PT Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "4",
+            },
+            {
+                "actionNumber": 3,
+                "actionId": 3,
+                "orderNumber": 3000,
+                "clock": "PT11M50.00S",
+                "period": 3,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 501,
+                "playerName": "Other",
+                "playerNameI": "O. Other",
+                "description": "O. Other 2PT Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "6",
+            },
+        ]
+        processed = process_playbyplay_payload(
+            game_id="carryover-test",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+        )
+        carry_segments = processed["segments"]["away"].get("C. Carry") or []
+        q2_segments = [s for s in carry_segments if s.get("quarter") == 2]
+        self.assertEqual(len(q2_segments), 1)
+        self.assertEqual(q2_segments[0]["start"], "1200.00")
+        self.assertEqual(q2_segments[0]["end"], "0000.00")
