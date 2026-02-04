@@ -14,6 +14,22 @@ function handler(event) {
     return request;
   }
 
+  if (uri === '/privacy' || uri.startsWith('/privacy/')) {
+    return request;
+  }
+
+  if (uri === '/about' || uri.startsWith('/about/')) {
+    return request;
+  }
+
+  if (uri === '/contact' || uri.startsWith('/contact/')) {
+    return request;
+  }
+
+  if (uri.startsWith('/static-pages/')) {
+    return request;
+  }
+
   if (uri.indexOf('.') !== -1) {
     return request;
   }

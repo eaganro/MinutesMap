@@ -7,6 +7,7 @@ import Lineups from '../Lineups/Lineups';
 import Play from '../Play/Play';
 import StatButtons from '../StatButtons/StatButtons';
 import DarkModeToggle from '../DarkModeToggle/DarkModeToggle';
+import Footer from '../Footer/Footer';
 
 import './App.scss';
 
@@ -49,7 +50,7 @@ export default function App() {
   return (
     <div className='topLevel'>
       <header className='appHeader'>
-        <div className='appBranding'>
+        <a className='appBranding' href="/" aria-label="MinutesMap home">
           <picture>
             <source
               type="image/avif"
@@ -69,7 +70,7 @@ export default function App() {
             />
           </picture>
           <span className='appName'>MinutesMap</span>
-        </div>
+        </a>
         <div className='appHeaderActions'>
           <a
             className='appSocialLink'
@@ -152,6 +153,7 @@ export default function App() {
           statusMessage={gameStatusMessage}
         />
       </main>
+      <Footer />
     </div>
   );
 }

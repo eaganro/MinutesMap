@@ -1,0 +1,113 @@
+.siteFooter {
+  width: 100%;
+  background-color: var(--bg-footer);
+  border-top: 1px solid var(--divider);
+  margin-top: 40px;
+  padding: 40px 20px 32px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.footerContent {
+  width: 1235px;
+  max-width: 90%;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 40px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footerBranding {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.footerLogo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  position: relative;
+  top: 5px;
+}
+
+.footerName {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  transition: color 0.3s ease;
+}
+
+.footerLinks {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.footerLinkList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  row-gap: 8px;
+
+  li {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  li:not(:last-child)::after {
+    content: "|";
+    margin: 0 12px;
+    color: var(--text-muted);
+  }
+
+  a {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+  }
+}
+
+// Responsive: stack on smaller screens
+@media (max-width: 605px) {
+  .siteFooter {
+    padding: 32px 16px 24px;
+  }
+
+  .footerContent {
+    gap: 20px;
+  }
+
+  .footerLinks {
+    width: 100%;
+  }
+
+  .footerLinkList {
+    flex-direction: column;
+    align-items: flex-end;
+    row-gap: 6px;
+  }
+
+  .footerLinkList li:not(:last-child)::after {
+    content: "";
+    margin: 0;
+  }
+
+  .footerName {
+    font-size: 1rem;
+  }
+}

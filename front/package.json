@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "devpi": "vite --host",
-    "build": "vite build",
+    "build": "npm run build:static-pages && vite build",
+    "build:static-pages": "node scripts/build-static-pages.cjs",
     "preview": "vite preview",
     "build:prod:upload": "npm run build && npm run sync:static && npm run sync:index",
     "sync:static": "aws s3 sync dist s3://roryeagan.com-nba --delete --size-only --exclude \"index.html\" --cache-control \"public, max-age=31536000, immutable\"",

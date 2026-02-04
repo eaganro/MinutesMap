@@ -7,3 +7,8 @@
 
 # Global Node dependencies
 node_modules/
+
+# Generated static pages
+front/public/privacy/
+front/public/about/
+front/public/static-pages/

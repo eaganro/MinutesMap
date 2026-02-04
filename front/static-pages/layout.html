@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{TITLE}}</title>
+    <meta name="description" content="{{DESCRIPTION}}" />
+    <script src="/static-pages/theme-init.js"></script>
+    <link rel="stylesheet" href="/static-pages/layout.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="appHeader">
+        <a class="appBranding" href="/" aria-label="MinutesMap home">
+          <picture>
+            <source type="image/avif" srcset="/logo-70.avif 1x, /logo-140.avif 2x" />
+            <source type="image/webp" srcset="/logo-70.webp 1x, /logo-140.webp 2x" />
+            <img
+              src="/logo-70.png"
+              srcset="/logo-70.png 1x, /logo-140.png 2x"
+              width="70"
+              height="70"
+              alt="MinutesMap logo"
+              class="appLogo"
+            />
+          </picture>
+          <span class="appName">MinutesMap</span>
+        </a>
+        <div class="appHeaderActions">
+          <a
+            class="appSocialLink"
+            href="https://x.com/intent/follow?screen_name=MinutesMap"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Follow @MinutesMap on X"
+            title="Follow @MinutesMap on X"
+          >
+            Follow on X
+          </a>
+          <button
+            class="dark-mode-toggle"
+            aria-label="Switch to dark mode"
+            title="Switch to dark mode"
+            type="button"
+          >
+            <div class="toggle-track">
+              <span class="toggle-icon sun">☀️</span>
+              <span class="toggle-icon moon">🌙</span>
+              <div class="toggle-thumb light"></div>
+            </div>
+          </button>
+        </div>
+      </header>
+
+      <main class="content">
+        <article class="card">
+          {{CONTENT}}
+        </article>
+      </main>
+
+      <footer class="site-footer">
+        <div class="footerContent">
+          <div class="footerBranding">
+            <picture>
+              <source type="image/avif" srcset="/logo-70.avif 1x, /logo-140.avif 2x" />
+              <source type="image/webp" srcset="/logo-70.webp 1x, /logo-140.webp 2x" />
+              <img
+                src="/logo-70.png"
+                srcset="/logo-70.png 1x, /logo-140.png 2x"
+                width="40"
+                height="40"
+                alt="MinutesMap logo"
+                class="footerLogo"
+              />
+            </picture>
+            <span class="footerName">MinutesMap</span>
+          </div>
+          <nav class="footerLinks" aria-label="Footer">
+            <ul class="footerLinkList">
+              <li><a href="/about">About</a></li>
+              <li><a href="mailto:minutesmap.viz@gmail.com">Contact</a></li>
+              <li><a href="/privacy/">Privacy Policy</a></li>
+              <li>
+                <a href="https://x.com/MinutesMap" target="_blank" rel="noopener noreferrer">
+                  Twitter / X
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </footer>
+    </div>
+    <script src="/static-pages/theme-toggle.js" defer></script>
+  </body>
+</html>
