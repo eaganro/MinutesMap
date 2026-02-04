@@ -123,10 +123,10 @@ test.describe('MinutesMap App', () => {
 test.describe('Navigation', () => {
   test('should load with query parameters', async ({ page }) => {
     // Navigate with specific date
-    await page.goto('/?date=2024-01-15');
+    await page.goto('/?date=2026-02-03');
 
     const datePicker = page.locator('input[type="date"]');
-    await expect(datePicker).toHaveValue('2024-01-15');
+    await expect(datePicker).toHaveValue('2026-02-03');
     await expect(page).toHaveURL(/\/$/);
   });
 
@@ -135,9 +135,9 @@ test.describe('Navigation', () => {
     await page.goto('2026-02-03-phi-gsw');
 
     const datePicker = page.locator('input[type="date"]');
-    await expect(datePicker).toHaveValue('2024-01-15');
+    await expect(datePicker).toHaveValue('2026-02-03');
 
-    await expect(page).toHaveURL(/\2026-02-03-phi-gsw$/);
+    await expect(page).toHaveURL(/\/2026-02-03-phi-gsw$/);
   });
 });
 

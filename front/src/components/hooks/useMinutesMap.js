@@ -190,7 +190,6 @@ export function useMinutesMap() {
     followDate: wsFollowDate,
     followGame: wsFollowGame,
     onPlayByPlayUpdate: handleGameUpdate,
-    onBoxUpdate: handleGameUpdate,
     onDateUpdate: handleDateUpdate,
   });
 

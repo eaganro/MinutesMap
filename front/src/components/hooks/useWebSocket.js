@@ -11,7 +11,6 @@ export function useWebSocket({
   followDate = true,
   followGame = true,
   onPlayByPlayUpdate, 
-  onBoxUpdate, 
   onDateUpdate 
 }) {
   const [ws, setWs] = useState(null);
@@ -145,12 +144,7 @@ export function useWebSocket({
       try {
         if (msg.key?.includes("gamepack")) {
           onPlayByPlayUpdate?.(msg.key, msg.version);
-        } else if (msg.key?.includes("gameflow") || msg.key?.includes("playByPlayData")) {
-          onPlayByPlayUpdate?.(msg.key, msg.version);
-        } else if (msg.key?.includes("gameStats")) {
-          onBoxUpdate?.(msg.key, msg.version);
-        } 
-        else if (msg.type === "date_update") {
+        } else if (msg.type === "date_update") {
           onDateUpdate?.(msg.date);
         }
       } catch (err) {
@@ -176,7 +170,6 @@ export function useWebSocket({
     enabled,
     sendSubscriptions,
     onPlayByPlayUpdate,
-    onBoxUpdate,
     onDateUpdate,
     resetReconnectState,
     scheduleReconnect,

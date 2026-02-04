@@ -89,7 +89,7 @@ describe("ws-sendGameUpdate-handler", () => {
         {
           s3: {
             object: {
-              key: "data/gamepack2026-02-03-phi-gsw.json",
+              key: "data/gamepack/2026-02-03-phi-gsw.json",
               eTag: "\"etag123\"",
             },
           },
@@ -116,82 +116,9 @@ describe("ws-sendGameUpdate-handler", () => {
         ? dataValue
         : Buffer.from(dataValue as Uint8Array).toString();
     expect(JSON.parse(payload)).toEqual({
-      gameId: "2024-01-15-phi-cle",
-      key: "data/gamepack2026-02-03-phi-gsw.json",
+      gameId: "2026-02-03-phi-gsw",
+      key: "data/gamepack/2026-02-03-phi-gsw.json",
       version: "etag123",
-    });
-  });
-
-  it("sends box score updates", async () => {
-    const dynamodb = new DynamoDBClient({});
-    const apigwClient = new ApiGatewayManagementApiClient({
-      endpoint: "https://example.com",
-    });
-
-    let paginateCalls = 0;
-    const paginator = (
-      _config: { client: DynamoDBClient; pageSize?: number },
-      _input: QueryCommandInput
-    ) => {
-      paginateCalls += 1;
-      async function* iterator() {
-        yield {
-          Items: [{ connectionId: { S: "c1" } }],
-        };
-      }
-
-      return iterator();
-    };
-
-    const postCalls: PostToConnectionCommandInput[] = [];
-    vi.spyOn(apigwClient, "send").mockImplementation(async (command) => {
-      if (!(command instanceof PostToConnectionCommand)) {
-        throw new Error("Unexpected API Gateway command");
-      }
-
-      postCalls.push(command.input);
-      return {};
-    });
-
-    const handler = createHandler({
-      dynamodb,
-      apigwClient,
-      paginator,
-      env: {
-        CONN_TABLE: "GameConnections",
-        WS_API_ENDPOINT: "https://example.com",
-        SEND_BATCH_SIZE: 50,
-        SEND_MAX_CONCURRENCY: 10,
-      },
-    });
-
-    const event = {
-      Records: [
-        {
-          s3: {
-            object: {
-              key: "data/gameStats2026-02-03-phi-gsw.json",
-              eTag: "\"etag999\"",
-            },
-          },
-        },
-      ],
-    } as S3Event;
-
-    await handler(event);
-
-    expect(paginateCalls).toBe(1);
-    expect(postCalls).toHaveLength(1);
-
-    const dataValue = postCalls[0]?.Data;
-    const payload =
-      typeof dataValue === "string"
-        ? dataValue
-        : Buffer.from(dataValue as Uint8Array).toString();
-    expect(JSON.parse(payload)).toEqual({
-      gameId: "2024-01-15-phi-cle",
-      key: "data/gameStats2026-02-03-phi-gsw.json",
-      version: "etag999",
     });
   });
 

@@ -24,8 +24,7 @@ type HandlerDependencies = {
 
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_MAX_CONCURRENCY = 10;
-const GAMEPACK_PATTERN = /^data\/gamepack\/(.+?)\.json/;
-const BOX_PATTERN = /^data\/gameStats\/(.+?)\.json/;
+const GAMEPACK_PATTERN = /^data\/gamepack\/(.+?)\.json(?:\.gz)?$/;
 
 export const handler = createHandler();
 
@@ -143,16 +142,7 @@ function parseGameUpdate(
     };
   }
 
-  const boxMatch = decodedKey.match(BOX_PATTERN);
-  if (!boxMatch) {
-    return null;
-  }
-
-  return {
-    gameId: boxMatch[1],
-    key: decodedKey,
-    version,
-  };
+  return null;
 }
 
 function decodeS3Key(key: string): string {
