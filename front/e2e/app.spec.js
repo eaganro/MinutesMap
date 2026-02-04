@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/analytics.minutesmap.com/**', route => route.abort());
+});
+
 test.describe('MinutesMap App', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/analytics.minutesmap.com/**', route => route.abort());
     await page.goto('/');
   });
 
