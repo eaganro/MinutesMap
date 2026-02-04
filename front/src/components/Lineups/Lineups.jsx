@@ -56,9 +56,9 @@ const buildPlayerOptions = (lineups) => {
   return Array.from(players).sort((a, b) => a.localeCompare(b));
 };
 
-const filterLineupsByPlayers = (lineups, selectedPlayers) => {
+const filterLineupsByPlayers = (lineups, selectedPlayers, mode) => {
   const selected = selectedPlayers || [];
-  if (!selected.length) return lineups || [];
+  if (!selected.length || mode !== 'filter') return lineups || [];
   return (lineups || []).filter((lineup) => {
     const players = lineup?.players || [];
     if (players.length !== 5) return false;
@@ -164,6 +164,8 @@ export default function Lineups({
   const [showAll, setShowAll] = useState(false);
   const [selectedAwayPlayers, setSelectedAwayPlayers] = useState([]);
   const [selectedHomePlayers, setSelectedHomePlayers] = useState([]);
+  const [awaySelectionMode, setAwaySelectionMode] = useState('filter');
+  const [homeSelectionMode, setHomeSelectionMode] = useState('filter');
   const { isDarkMode } = useTheme();
   const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode);
 
@@ -179,12 +181,12 @@ export default function Lineups({
   }, [homeOptions]);
 
   const awayFiltered = useMemo(
-    () => filterLineupsByPlayers(awayLineups, selectedAwayPlayers),
-    [awayLineups, selectedAwayPlayers],
+    () => filterLineupsByPlayers(awayLineups, selectedAwayPlayers, awaySelectionMode),
+    [awayLineups, selectedAwayPlayers, awaySelectionMode],
   );
   const homeFiltered = useMemo(
-    () => filterLineupsByPlayers(homeLineups, selectedHomePlayers),
-    [homeLineups, selectedHomePlayers],
+    () => filterLineupsByPlayers(homeLineups, selectedHomePlayers, homeSelectionMode),
+    [homeLineups, selectedHomePlayers, homeSelectionMode],
   );
 
   const awaySorted = useMemo(
@@ -217,12 +219,14 @@ export default function Lineups({
     teamColor,
     selectedPlayers,
     onSelectionChange,
+    selectionMode,
+    onSelectionModeChange,
     playerOptions,
   ) => {
     const visible = isExpanded ? lineups : lineups.slice(0, DEFAULT_VISIBLE_COUNT);
     const hasMore = lineups.length > DEFAULT_VISIBLE_COUNT;
     const selectionLimitReached = selectedPlayers.length >= MAX_SELECTED_PLAYERS;
-    const summary = selectedPlayers.length
+    const summary = selectedPlayers.length && selectionMode === 'filter'
       ? lineups.reduce(
         (acc, lineup) => ({
           seconds: acc.seconds + (lineup?.seconds || 0),
@@ -246,6 +250,22 @@ export default function Lineups({
         </div>
         <div className="lineupsFilters">
           <span className="lineupsFilterLabel">Filter players (max {MAX_SELECTED_PLAYERS})</span>
+          <div className="lineupsFilterMode" role="group" aria-label={`${teamLabel} selection mode`}>
+            <button
+              type="button"
+              className={`lineupsFilterModeButton${selectionMode === 'filter' ? ' isActive' : ''}`}
+              onClick={() => onSelectionModeChange('filter')}
+            >
+              Filter
+            </button>
+            <button
+              type="button"
+              className={`lineupsFilterModeButton${selectionMode === 'highlight' ? ' isActive' : ''}`}
+              onClick={() => onSelectionModeChange('highlight')}
+            >
+              Highlight
+            </button>
+          </div>
           <div className="lineupsFilterPills" role="group" aria-label={`${teamLabel} player filters`}>
             {playerOptions.map((player) => {
               const isSelected = selectedPlayers.includes(player);
@@ -283,7 +303,7 @@ export default function Lineups({
         </div>
         {lineups.length === 0 ? (
           <div className="lineupsEmpty">
-            {selectedPlayers.length
+            {selectedPlayers.length && selectionMode === 'filter'
               ? 'No 5-man lineups match that selection.'
               : 'No lineup data yet.'}
           </div>
@@ -427,6 +447,8 @@ export default function Lineups({
           matchupColors?.away,
           selectedAwayPlayers,
           setSelectedAwayPlayers,
+          awaySelectionMode,
+          setAwaySelectionMode,
           awayOptions,
         )}
         {renderTeamPanel(
@@ -438,10 +460,12 @@ export default function Lineups({
           matchupColors?.home,
           selectedHomePlayers,
           setSelectedHomePlayers,
+          homeSelectionMode,
+          setHomeSelectionMode,
           homeOptions,
         )}
       </div>
     )}
-    </div>
+  </div>
   );
 }

@@ -74,6 +74,34 @@
   color: var(--text-muted);
 }
 
+.lineupsFilterMode {
+  display: inline-flex;
+  border: 1px solid var(--divider);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bg-table-header);
+}
+
+.lineupsFilterModeButton {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.lineupsFilterModeButton.isActive {
+  background: var(--bg-highlight-col-header);
+  color: var(--text-heading);
+}
+
+.lineupsFilterModeButton:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
 .lineupsFilterPills {
   display: flex;
   flex-wrap: wrap;
