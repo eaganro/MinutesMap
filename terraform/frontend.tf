@@ -14,15 +14,13 @@ function handler(event) {
     return request;
   }
 
-  if (uri === '/privacy' || uri.startsWith('/privacy/')) {
+  if (uri === '/privacy' || uri === '/privacy/') {
+    request.uri = '/privacy/index.html';
     return request;
   }
 
-  if (uri === '/about' || uri.startsWith('/about/')) {
-    return request;
-  }
-
-  if (uri === '/contact' || uri.startsWith('/contact/')) {
+  if (uri === '/about' || uri === '/about/') {
+    request.uri = '/about/index.html';
     return request;
   }
 
