@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
+import { trackFeatureUse } from '../../helpers/analytics';
 import './Lineups.scss';
 
 const DEFAULT_VISIBLE_COUNT = 5;
@@ -167,7 +168,14 @@ export default function Lineups({
   const [awaySelectionMode, setAwaySelectionMode] = useState('filter');
   const [homeSelectionMode, setHomeSelectionMode] = useState('filter');
   const { isDarkMode } = useTheme();
+  const featureUseTrackedRef = useRef(false);
   const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode);
+
+  const handleTrackFeatureUse = () => {
+    if (featureUseTrackedRef.current) return;
+    featureUseTrackedRef.current = true;
+    trackFeatureUse('lineups');
+  };
 
   const awayOptions = useMemo(() => buildPlayerOptions(awayLineups), [awayLineups]);
   const homeOptions = useMemo(() => buildPlayerOptions(homeLineups), [homeLineups]);
@@ -422,7 +430,7 @@ export default function Lineups({
   };
 
   return (
-    <div className="lineups">
+    <div className="lineups" onClick={handleTrackFeatureUse} onTouchStart={handleTrackFeatureUse}>
       <div className="lineupsHeader">
         <div className="lineupsTitle">
           <span>Lineups</span>

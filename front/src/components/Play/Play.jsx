@@ -15,6 +15,7 @@ import {
 } from './playExport';
 import { buildExportRangeData, buildRangeLabel, formatPeriodLabel } from './playExportRange';
 import { useExportRange } from './useExportRange';
+import { trackFeatureUse } from '../../helpers/analytics';
 
 // Sub-components
 import Player from './Player/Player';
@@ -163,6 +164,8 @@ export default function Play({
   const exportPreviewUrlRef = useRef(null);
   const exportRangeKeyRef = useRef('1-1');
   const exportPreviewRef = useRef(null);
+  const playFeatureTrackedRef = useRef(false);
+  const imageBuilderTrackedRef = useRef(false);
   const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
@@ -170,6 +173,16 @@ export default function Play({
   ));
   const { isDarkMode } = useTheme();
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+  const trackPlayFeatureUse = () => {
+    if (playFeatureTrackedRef.current) return;
+    playFeatureTrackedRef.current = true;
+    trackFeatureUse('play-by-play');
+  };
+  const trackImageBuilderUse = () => {
+    if (imageBuilderTrackedRef.current) return;
+    imageBuilderTrackedRef.current = true;
+    trackFeatureUse('image-builder');
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) {
@@ -571,6 +584,7 @@ export default function Play({
     if (Date.now() < touchClickGuardUntilRef.current) {
       return;
     }
+    trackPlayFeatureUse();
     const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
     const actionNumber = actionMeta?.actionNumber ?? null;
     if (actionNumber && canOpenVideoOnClick) {
@@ -606,6 +620,7 @@ export default function Play({
 
   const handleTouchStart = (e) => {
     if (isDataLoading || !e.touches[0]) return;
+    trackPlayFeatureUse();
     touchAxisRef.current = null;
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     touchMovedRef.current = false;
@@ -695,6 +710,9 @@ export default function Play({
   const handleExportImage = async ({ keepPreviewOpen = false } = {}) => {
     if (!playRef.current || isExporting) return;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (!keepPreviewOpen) {
+      trackImageBuilderUse();
+    }
     setIsExporting(true);
     setExportPreviewState((prev) => {
       if (!keepPreviewOpen) return null;

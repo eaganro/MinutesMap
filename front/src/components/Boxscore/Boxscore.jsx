@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 import { useTheme } from '../hooks/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
+import { trackFeatureUse } from '../../helpers/analytics';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
@@ -22,6 +23,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const homeTableRef = useRef(null);
   const isSyncingScrollRef = useRef(false);
   const syncRafRef = useRef(null);
+  const featureUseTrackedRef = useRef(false);
   const [isCompact, setIsCompact] = useState(() => (
     typeof window !== 'undefined'
       ? window.matchMedia('(max-width: 640px)').matches
@@ -143,9 +145,18 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   );
 
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
+  const handleTrackFeatureUse = () => {
+    if (featureUseTrackedRef.current) return;
+    featureUseTrackedRef.current = true;
+    trackFeatureUse('boxscore');
+  };
 
   return (
-    <div className={`box ${isDataLoading ? 'isLoading' : ''}`}>
+    <div
+      className={`box ${isDataLoading ? 'isLoading' : ''}`}
+      onClick={handleTrackFeatureUse}
+      onTouchStart={handleTrackFeatureUse}
+    >
       {showLoadingOverlay && (
         <div className='loadingOverlay'>
           <CircularProgress size={20} thickness={5} />

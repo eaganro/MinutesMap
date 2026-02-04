@@ -5,6 +5,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { dateAdd, dateMinus, ASSET_PREFIX } from '../../environment';
 import { parseGameStatus } from '../../helpers/gameSelectionUtils';
 import { formatStatusText } from '../../helpers/utils';
+import { trackFeatureUse } from '../../helpers/analytics';
 
 
 import './Schedule.scss';
@@ -55,6 +56,12 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   const startX = useRef(0);
   const startScrollLeft = useRef(0);
   const dragMoved = useRef(false);
+  const dateFeatureTrackedRef = useRef(false);
+  const trackDateFeatureUse = () => {
+    if (dateFeatureTrackedRef.current) return;
+    dateFeatureTrackedRef.current = true;
+    trackFeatureUse('date-selector');
+  };
   const handleGameClick = (id) => {
     if (dragMoved.current) return; // suppress click if user dragged
     changeGame(id);
@@ -122,6 +129,7 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   }
 
   const dateDown = () => {
+    trackDateFeatureUse();
     const downdate = new Date(date);
     downdate.setDate(downdate.getDate() - dateMinus);
     let month = downdate.getMonth() + 1;
@@ -139,6 +147,7 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
     }
   }
   const dateUp = () => {
+    trackDateFeatureUse();
     const update = new Date(date);
     update.setDate(update.getDate() + dateAdd);
     let month = update.getMonth() + 1;
@@ -222,7 +231,10 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
             className='dateInput'
             type="date"
             value={date}
-            onChange={(e) => changeDate(e)}
+            onChange={(e) => {
+              trackDateFeatureUse();
+              changeDate(e);
+            }}
           />
           <IconButton className='scheduleButton' onClick={dateUp} aria-label='Next date'>
             <NavigateNext />

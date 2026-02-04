@@ -22,6 +22,7 @@ const DEFAULT_STAT_ON = [true, false, true, true, false, false, false, false];
 const LOADING_DELAY_MS = 500;
 const RESUME_REFRESH_COOLDOWN_MS = 30000;
 const RESUME_REFRESH_WS_COOLDOWN_MS = 60000;
+const HEARTBEAT_INTERVAL_MS = 15000;
 
 /**
  * Facade hook that orchestrates all game data, WebSocket, and UI state.
@@ -72,6 +73,7 @@ export function useMinutesMap() {
   const lastGamePackFetchRef = useRef({ at: 0, reason: null });
   const lastScheduleFetchRef = useRef({ at: 0, reason: null });
   const lastTrackedGameIdRef = useRef(null);
+  const closeSignalSentRef = useRef(false);
 
   const fetchGamePackWithReason = useCallback((params, reason) => {
     lastGamePackFetchRef.current = { at: Date.now(), reason };
@@ -365,6 +367,67 @@ export function useMinutesMap() {
     setGameId(String(defaultGame.id));
   }, [date, gameId, isScheduleLoading, sortedGames]);
   const currentScheduleGameStatus = stableGameMeta?.status || null;
+  useEffect(() => {
+    if (isInitLoading) return;
+
+    const sendHeartbeat = () => {
+      if (document.visibilityState && document.visibilityState !== 'visible') {
+        return;
+      }
+      if (!window?.umami?.track) return;
+      const trackedUrl = `${window.location.pathname}${window.location.search}`;
+      window.umami.track('heartbeat', {
+        url: trackedUrl,
+        title: document.title,
+        gameId: gameId || null,
+        date: date || null,
+        status: currentScheduleGameStatus || null,
+      });
+    };
+
+    sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [date, gameId, currentScheduleGameStatus, isInitLoading]);
+
+  useEffect(() => {
+    if (isInitLoading) return;
+
+    const sendCloseSignal = (reason) => {
+      if (closeSignalSentRef.current) return;
+      closeSignalSentRef.current = true;
+      if (!window?.umami?.track) return;
+      const trackedUrl = `${window.location.pathname}${window.location.search}`;
+      window.umami.track('page-close', {
+        reason,
+        url: trackedUrl,
+        title: document.title,
+        gameId: gameId || null,
+        date: date || null,
+        status: currentScheduleGameStatus || null,
+      });
+    };
+
+    const handlePageHide = (event) => {
+      const reason = event?.persisted ? 'pagehide-bfcache' : 'pagehide';
+      sendCloseSignal(reason);
+    };
+
+    const handleBeforeUnload = () => {
+      sendCloseSignal('beforeunload');
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [date, gameId, currentScheduleGameStatus, isInitLoading]);
   const isSelectedGameFinal = useMemo(() => {
     if (!gameId) {
       return true;
