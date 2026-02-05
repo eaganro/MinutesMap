@@ -115,6 +115,7 @@ export default function App() {
             nbaGameId={nbaGameId}
             gameStatus={gameStatus}
             gameDate={gameDate}
+            box={box}
             awayTeamNames={awayTeamName}
             homeTeamNames={homeTeamName}
             awayPlayers={awayActions}

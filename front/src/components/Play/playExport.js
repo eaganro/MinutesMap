@@ -315,10 +315,23 @@ const drawWatermark = (ctx, computedStyle, x, y) => {
   ctx.restore();
 };
 
-const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = false, statOn, showScoreDiff, includeScoreLead = true) => {
+const drawLegend = (
+  ctx,
+  computedStyle,
+  startX,
+  startY,
+  maxWidth,
+  allowWrap = false,
+  statOn,
+  showScoreDiff,
+  includeScoreLead = true,
+  legendScale = 1,
+  forceWrapAfterGroupIndex = null
+) => {
   if (!ctx) return startY;
-  const rowHeight = 18;
-  const rowGap = 8;
+  const normalizedLegendScale = Number.isFinite(legendScale) && legendScale > 0 ? legendScale : 1;
+  const rowHeight = 18 * normalizedLegendScale;
+  const rowGap = 8 * normalizedLegendScale;
   const textColor = getCssVar(computedStyle, '--text-secondary', '#6b7280');
   const labelColor = getCssVar(computedStyle, '--stat-label-color', textColor);
   const labelOffColor = getCssVar(computedStyle, '--stat-label-off', '#94a3b8');
@@ -425,17 +438,17 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
   };
 
   let rowConfig = buildRow({
-    iconSize: 6,
-    fontSize: 11,
-    itemGap: 10,
-    groupGap: 16
+    iconSize: 6 * normalizedLegendScale,
+    fontSize: 11 * normalizedLegendScale,
+    itemGap: 10 * normalizedLegendScale,
+    groupGap: 16 * normalizedLegendScale
   });
   if (rowConfig.rowWidth > maxWidth && !allowWrap) {
     rowConfig = buildRow({
-      iconSize: 5,
-      fontSize: 10,
-      itemGap: 8,
-      groupGap: 12
+      iconSize: 5 * normalizedLegendScale,
+      fontSize: 10 * normalizedLegendScale,
+      itemGap: 8 * normalizedLegendScale,
+      groupGap: 12 * normalizedLegendScale
     });
   }
 
@@ -444,7 +457,7 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
   if (allowWrap) {
     const rows = [[]];
     const rowWidths = [0];
-    rowConfig.groups.forEach((group) => {
+    rowConfig.groups.forEach((group, index) => {
       const rowIndex = rows.length - 1;
       const addWidth = group.width + (rows[rowIndex].length ? rowConfig.groupGap : 0);
       if (rows[rowIndex].length && rowWidths[rowIndex] + addWidth > maxWidth) {
@@ -453,6 +466,10 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
       } else {
         rows[rowIndex].push(group);
         rowWidths[rowIndex] += addWidth;
+      }
+      if (forceWrapAfterGroupIndex === index && index < rowConfig.groups.length - 1) {
+        rows.push([]);
+        rowWidths.push(0);
       }
     });
 
@@ -494,10 +511,21 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
   return rowY + rowHeight / 2;
 };
 
-const measureLegendHeight = (ctx, computedStyle, maxWidth, allowWrap = false, statOn, showScoreDiff, includeScoreLead = true) => {
+const measureLegendHeight = (
+  ctx,
+  computedStyle,
+  maxWidth,
+  allowWrap = false,
+  statOn,
+  showScoreDiff,
+  includeScoreLead = true,
+  legendScale = 1,
+  forceWrapAfterGroupIndex = null
+) => {
   if (!ctx) return 0;
-  const rowHeight = 18;
-  const rowGap = 8;
+  const normalizedLegendScale = Number.isFinite(legendScale) && legendScale > 0 ? legendScale : 1;
+  const rowHeight = 18 * normalizedLegendScale;
+  const rowGap = 8 * normalizedLegendScale;
   const isStatOn = (index) => (Array.isArray(statOn) ? statOn[index] !== false : true);
   const isScoreLeadOn = showScoreDiff !== false;
 
@@ -575,17 +603,17 @@ const measureLegendHeight = (ctx, computedStyle, maxWidth, allowWrap = false, st
   };
 
   let rowConfig = buildRow({
-    iconSize: 6,
-    fontSize: 11,
-    itemGap: 10,
-    groupGap: 16
+    iconSize: 6 * normalizedLegendScale,
+    fontSize: 11 * normalizedLegendScale,
+    itemGap: 10 * normalizedLegendScale,
+    groupGap: 16 * normalizedLegendScale
   });
   if (rowConfig.rowWidth > maxWidth && !allowWrap) {
     rowConfig = buildRow({
-      iconSize: 5,
-      fontSize: 10,
-      itemGap: 8,
-      groupGap: 12
+      iconSize: 5 * normalizedLegendScale,
+      fontSize: 10 * normalizedLegendScale,
+      itemGap: 8 * normalizedLegendScale,
+      groupGap: 12 * normalizedLegendScale
     });
   }
 
@@ -595,7 +623,7 @@ const measureLegendHeight = (ctx, computedStyle, maxWidth, allowWrap = false, st
 
   const rows = [[]];
   const rowWidths = [0];
-  rowConfig.groups.forEach((group) => {
+  rowConfig.groups.forEach((group, index) => {
     const rowIndex = rows.length - 1;
     const addWidth = group.width + (rows[rowIndex].length ? rowConfig.groupGap : 0);
     if (rows[rowIndex].length && rowWidths[rowIndex] + addWidth > maxWidth) {
@@ -604,6 +632,10 @@ const measureLegendHeight = (ctx, computedStyle, maxWidth, allowWrap = false, st
     } else {
       rows[rowIndex].push(group);
       rowWidths[rowIndex] += addWidth;
+    }
+    if (forceWrapAfterGroupIndex === index && index < rowConfig.groups.length - 1) {
+      rows.push([]);
+      rowWidths.push(0);
     }
   });
 
@@ -1166,6 +1198,7 @@ const buildSinglePlayerExportCanvas = ({
   statOn,
   showScoreDiff,
   selectedPlayer,
+  playerDisplayName,
 }) => {
   if (typeof window === 'undefined') return null;
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
@@ -1185,6 +1218,7 @@ const buildSinglePlayerExportCanvas = ({
   const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
   const styleSource = playRef?.current || document.documentElement;
   const computed = window.getComputedStyle(styleSource);
+  const legendScale = 0.85;
   const legendMeasureCtx = document.createElement('canvas').getContext('2d');
   const legendHeight = measureLegendHeight(
     legendMeasureCtx,
@@ -1193,12 +1227,14 @@ const buildSinglePlayerExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
-    false
+    false,
+    legendScale
   );
   const hasPlayer = Boolean(selectedPlayer?.name);
   const isAway = hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
   const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
   const playerName = selectedPlayer?.name || '';
+  const playerLabel = playerDisplayName || playerName;
   const actions = (isAway ? filteredAwayPlayers : filteredHomePlayers)?.[playerName] || [];
   const boxScoreActions = (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
   const timeline = (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
@@ -1210,7 +1246,7 @@ const buildSinglePlayerExportCanvas = ({
     periodRange,
     teamKey,
   });
-  const boxScoreItems = buildBoxScoreColumns(boxScoreStats, playerName, true);
+  const boxScoreItems = buildBoxScoreColumns(boxScoreStats, playerLabel, true);
   const boxScoreGap = boxScoreItems.length ? 10 : 0;
   const boxScoreWidth = contentWidth;
   const boxScoreX = Math.max(0, (contentWidth - boxScoreWidth) / 2);
@@ -1257,7 +1293,7 @@ const buildSinglePlayerExportCanvas = ({
     ctx.font = '500 12px system-ui, -apple-system, sans-serif';
     ctx.fillText(formattedGameDate, 6, 38);
   }
-  const displayName = playerName || 'Select a player';
+  const displayName = playerLabel || 'Select a player';
   const playerNameMaxWidth = Math.max(0, contentWidth - rightPad - 12);
   const playerNameY = formattedGameDate ? 54 : 38;
   const nameFontFamily = 'system-ui, -apple-system, sans-serif';
@@ -1414,7 +1450,7 @@ const buildSinglePlayerExportCanvas = ({
   });
 
   const legendTop = playAreaTop + playAreaHeight + 10;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, false);
+  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, false, legendScale);
   if (boxScoreItems.length) {
     const boxScoreTop = legendTop + legendHeight + boxScoreGap;
     drawBoxScoreTable(ctx, computed, boxScoreItems, boxScoreX, boxScoreTop, boxScoreWidth);
@@ -1447,6 +1483,7 @@ const buildSinglePlayerStackedExportCanvas = ({
   statOn,
   showScoreDiff,
   selectedPlayer,
+  playerDisplayName,
 }) => {
   if (typeof window === 'undefined') return null;
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
@@ -1480,6 +1517,8 @@ const buildSinglePlayerStackedExportCanvas = ({
   const legendGap = 0;
   const styleSource = playRef?.current || document.documentElement;
   const computed = window.getComputedStyle(styleSource);
+  const legendScale = 0.85;
+  const legendForceWrapAfterGroupIndex = 1;
   const legendMeasureCtx = document.createElement('canvas').getContext('2d');
   const legendHeight = measureLegendHeight(
     legendMeasureCtx,
@@ -1488,12 +1527,15 @@ const buildSinglePlayerStackedExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
-    false
+    false,
+    legendScale,
+    legendForceWrapAfterGroupIndex
   );
   const hasPlayer = Boolean(selectedPlayer?.name);
   const isAway = hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
   const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
   const playerName = selectedPlayer?.name || '';
+  const playerLabel = playerDisplayName || playerName;
   const actions = (isAway ? filteredAwayPlayers : filteredHomePlayers)?.[playerName] || [];
   const boxScoreActions = (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
   const timeline = (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
@@ -1551,7 +1593,7 @@ const buildSinglePlayerStackedExportCanvas = ({
     ctx.font = '500 12px system-ui, -apple-system, sans-serif';
     ctx.fillText(formattedGameDate, 6, 38);
   }
-  const displayName = playerName || 'Select a player';
+  const displayName = playerLabel || 'Select a player';
   const playerNameMaxWidth = Math.max(0, contentWidth - rightPad - 12);
   const playerNameY = formattedGameDate ? 54 : 38;
   const nameFontFamily = 'system-ui, -apple-system, sans-serif';
@@ -1688,7 +1730,19 @@ const buildSinglePlayerStackedExportCanvas = ({
   });
 
   const legendTop = playAreaTop + playAreaHeight + legendGap;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, false);
+  drawLegend(
+    ctx,
+    computed,
+    12,
+    legendTop,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    false,
+    legendScale,
+    legendForceWrapAfterGroupIndex
+  );
   if (boxScoreItems.length) {
     const boxScoreTop = legendTop + legendHeight + boxScoreGap;
     drawBoxScoreTable(ctx, computed, boxScoreItems, boxScoreX, boxScoreTop, boxScoreWidth, {

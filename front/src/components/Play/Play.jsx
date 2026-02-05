@@ -113,11 +113,85 @@ const buildSharePayload = ({ file, title, text, url }) => {
   return payload;
 };
 
+const normalizeNameToken = (value) => (
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z\s'.-]/g, '')
+    .trim()
+);
+
+const resolveFullNameFromRoster = (rawName, rosterPlayers) => {
+  const cleaned = String(rawName || '').trim();
+  if (!cleaned) return '';
+  const normalized = normalizeNameToken(cleaned);
+  if (!normalized) return cleaned;
+
+  const roster = (rosterPlayers || [])
+    .map((player) => {
+      const first = String(player?.first || '').trim();
+      const last = String(player?.last || '').trim();
+      const full = [first, last].filter(Boolean).join(' ').trim();
+      if (!full) return null;
+      return {
+        first,
+        last,
+        full,
+        firstNorm: normalizeNameToken(first),
+        lastNorm: normalizeNameToken(last),
+        fullNorm: normalizeNameToken(full),
+      };
+    })
+    .filter(Boolean);
+
+  if (!roster.length) return cleaned;
+
+  const direct = roster.find((player) => player.fullNorm === normalized);
+  if (direct) return direct.full;
+
+  const rawTokens = cleaned.split(/\s+/).filter(Boolean);
+  const tokens = rawTokens.map(normalizeNameToken).filter(Boolean);
+  if (!tokens.length) return cleaned;
+
+  const firstTokenRaw = rawTokens[0] || '';
+  const firstTokenNorm = tokens[0] || '';
+  const lastTokenNorm = tokens[tokens.length - 1] || '';
+  const firstLooksInitial = firstTokenRaw.replace(/\./g, '').length === 1;
+
+  const candidates = roster.filter((player) => (
+    player.lastNorm === lastTokenNorm ||
+    player.lastNorm.endsWith(` ${lastTokenNorm}`) ||
+    player.lastNorm.endsWith(lastTokenNorm)
+  ));
+
+  if (candidates.length === 1) {
+    return candidates[0].full;
+  }
+
+  if (firstLooksInitial && firstTokenNorm) {
+    const initialMatches = candidates.filter((player) => player.firstNorm.startsWith(firstTokenNorm));
+    if (initialMatches.length === 1) {
+      return initialMatches[0].full;
+    }
+  }
+
+  if (!firstLooksInitial && tokens.length >= 2) {
+    const fullMatches = candidates.filter((player) => (
+      player.firstNorm.startsWith(firstTokenNorm)
+    ));
+    if (fullMatches.length === 1) {
+      return fullMatches[0].full;
+    }
+  }
+
+  return cleaned;
+};
+
 export default function Play({ 
   gameId,
   nbaGameId,
   gameStatus,
   gameDate,
+  box,
   awayTeamNames, 
   homeTeamNames, 
   awayPlayers, 
@@ -445,6 +519,12 @@ export default function Play({
     () => exportPlayerOptions.find((option) => option.key === exportPlayerKey) || null,
     [exportPlayerOptions, exportPlayerKey]
   );
+  const exportPlayerDisplayName = useMemo(() => {
+    if (!selectedExportPlayer?.name) return '';
+    const teamKey = selectedExportPlayer?.teamKey === 'away' ? 'away' : 'home';
+    const rosterPlayers = box?.teams?.[teamKey]?.players || [];
+    return resolveFullNameFromRoster(selectedExportPlayer.name, rosterPlayers) || selectedExportPlayer.name;
+  }, [selectedExportPlayer, box]);
 
   useEffect(() => {
     if (!exportPlayerOptions.length) {
@@ -850,6 +930,7 @@ export default function Play({
       const outputCanvas = buildPlayExportCanvas({
         exportView,
         selectedPlayer: selectedExportPlayer,
+        playerDisplayName: exportPlayerDisplayName,
         exportWidth: dataExportWidth,
         legendShouldWrap,
         rangeLabel: exportRangeLabel,
