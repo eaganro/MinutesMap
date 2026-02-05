@@ -169,6 +169,8 @@ export function useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, 
         allActions: [],
         awayActions: {},
         homeActions: {},
+        awayActionsAll: {},
+        homeActionsAll: {},
       };
     }
 
@@ -183,6 +185,8 @@ export function useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, 
         allActions,
         awayActions: filterPlayerActions(awayActions, statOn),
         homeActions: filterPlayerActions(homeActions, statOn),
+        awayActionsAll: awayActions,
+        homeActionsAll: homeActions,
       };
     }
 
@@ -194,6 +198,8 @@ export function useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, 
       allActions,
       awayActions: filterPlayerActions(playByPlay.awayActions, statOn),
       homeActions: filterPlayerActions(playByPlay.homeActions, statOn),
+      awayActionsAll: playByPlay.awayActions || {},
+      homeActionsAll: playByPlay.homeActions || {},
     };
   }, [playByPlay, statOn]);
 }

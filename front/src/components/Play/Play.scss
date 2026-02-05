@@ -82,6 +82,16 @@
   align-items: flex-end;
 }
 
+.playExportRange {
+  display: flex;
+  gap: 8px;
+  flex: 1 1 180px;
+}
+
+.playExportRange .playExportOption {
+  flex: 1 1 0;
+}
+
 .playExportOption {
   display: flex;
   flex-direction: column;

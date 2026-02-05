@@ -23,7 +23,9 @@ export default function App() {
     awayTeamName,
     homeTeamName,
     awayActions,
+    awayActionsAll,
     homeActions,
+    homeActionsAll,
     allActions,
     scoreTimeline,
     awayPlayerTimeline,
@@ -116,7 +118,9 @@ export default function App() {
             awayTeamNames={awayTeamName}
             homeTeamNames={homeTeamName}
             awayPlayers={awayActions}
+            awayPlayersAll={awayActionsAll}
             homePlayers={homeActions}
+            homePlayersAll={homeActionsAll}
             allActions={allActions}
             scoreTimeline={scoreTimeline}
             awayPlayerTimeline={awayPlayerTimeline}

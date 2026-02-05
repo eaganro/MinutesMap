@@ -96,6 +96,8 @@ export function useMinutesMap() {
     allActions,
     awayActions,
     homeActions,
+    awayActionsAll,
+    homeActionsAll,
   } = useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, statOn);
   const lineupStats = useLineupStats({
     awayPlayerTimeline,
@@ -558,6 +560,8 @@ export function useMinutesMap() {
     homeTeamName,
     awayActions,
     homeActions,
+    awayActionsAll,
+    homeActionsAll,
     allActions,
     scoreTimeline,
     awayPlayerTimeline,

@@ -1,5 +1,5 @@
 import { getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
-import { EVENT_TYPES, getEventType, isFreeThrowAction, isMissDescription } from '../../helpers/eventStyles.jsx';
+import { EVENT_TYPES, getEventType, isFreeThrowAction, isMissDescription, isThreePointAction } from '../../helpers/eventStyles.jsx';
 
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;
@@ -315,7 +315,7 @@ const drawWatermark = (ctx, computedStyle, x, y) => {
   ctx.restore();
 };
 
-const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = false, statOn, showScoreDiff) => {
+const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = false, statOn, showScoreDiff, includeScoreLead = true) => {
   if (!ctx) return startY;
   const rowHeight = 18;
   const rowGap = 8;
@@ -401,10 +401,6 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
     const foulGroup = buildGroup([
       createItem('Foul', (cx, cy) => drawEventShape(ctx, 'foul', cx, cy, iconSize, computedStyle, false), !isStatOn(7)),
     ]);
-    const scoreLeadGroup = buildGroup([
-      createItem('Score Lead', (cx, cy) => drawScoreLeadIcon(ctx, cx, cy, iconSize, computedStyle), !isScoreLeadOn),
-    ]);
-
     const groups = [
       pointGroup,
       missGroup,
@@ -414,8 +410,13 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
       blockGroup,
       stealGroup,
       foulGroup,
-      scoreLeadGroup
     ];
+    if (includeScoreLead) {
+      const scoreLeadGroup = buildGroup([
+        createItem('Score Lead', (cx, cy) => drawScoreLeadIcon(ctx, cx, cy, iconSize, computedStyle), !isScoreLeadOn),
+      ]);
+      groups.push(scoreLeadGroup);
+    }
 
     const rowWidth = groups.reduce((sum, group) => sum + group.width, 0)
       + groupGap * Math.max(0, groups.length - 1);
@@ -491,6 +492,123 @@ const drawLegend = (ctx, computedStyle, startX, startY, maxWidth, allowWrap = fa
   ctx.restore();
 
   return rowY + rowHeight / 2;
+};
+
+const measureLegendHeight = (ctx, computedStyle, maxWidth, allowWrap = false, statOn, showScoreDiff, includeScoreLead = true) => {
+  if (!ctx) return 0;
+  const rowHeight = 18;
+  const rowGap = 8;
+  const isStatOn = (index) => (Array.isArray(statOn) ? statOn[index] !== false : true);
+  const isScoreLeadOn = showScoreDiff !== false;
+
+  const buildRow = ({ iconSize, fontSize, itemGap, groupGap }) => {
+    const iconBox = iconSize * 2;
+    ctx.font = `600 ${fontSize}px system-ui, -apple-system, sans-serif`;
+
+    const createItem = (label, isOff = false) => {
+      const labelWidth = ctx.measureText(label).width;
+      return {
+        label,
+        labelWidth,
+        isOff,
+        width: iconBox + 4 + labelWidth,
+      };
+    };
+
+    const buildGroup = (items) => {
+      const total = items.reduce((sum, item) => sum + item.width, 0);
+      return {
+        items,
+        width: total + itemGap * Math.max(0, items.length - 1),
+      };
+    };
+
+    const pointGroup = buildGroup([
+      createItem('2PT', !isStatOn(0)),
+      createItem('3PT', !isStatOn(0)),
+      createItem('FT', !isStatOn(0)),
+    ]);
+    const missGroup = buildGroup([
+      createItem('Miss', !isStatOn(1)),
+      createItem('3PT', !isStatOn(1)),
+      createItem('FT', !isStatOn(1)),
+    ]);
+    const reboundGroup = buildGroup([
+      createItem('Rebound', !isStatOn(2)),
+    ]);
+    const assistGroup = buildGroup([
+      createItem('Assist', !isStatOn(3)),
+    ]);
+    const turnoverGroup = buildGroup([
+      createItem('Turnover', !isStatOn(4)),
+    ]);
+    const blockGroup = buildGroup([
+      createItem('Block', !isStatOn(5)),
+    ]);
+    const stealGroup = buildGroup([
+      createItem('Steal', !isStatOn(6)),
+    ]);
+    const foulGroup = buildGroup([
+      createItem('Foul', !isStatOn(7)),
+    ]);
+    const groups = [
+      pointGroup,
+      missGroup,
+      reboundGroup,
+      assistGroup,
+      turnoverGroup,
+      blockGroup,
+      stealGroup,
+      foulGroup,
+    ];
+    if (includeScoreLead) {
+      const scoreLeadGroup = buildGroup([
+        createItem('Score Lead', !isScoreLeadOn),
+      ]);
+      groups.push(scoreLeadGroup);
+    }
+
+    const rowWidth = groups.reduce((sum, group) => sum + group.width, 0)
+      + groupGap * Math.max(0, groups.length - 1);
+
+    return { groups, rowWidth, groupGap };
+  };
+
+  let rowConfig = buildRow({
+    iconSize: 6,
+    fontSize: 11,
+    itemGap: 10,
+    groupGap: 16
+  });
+  if (rowConfig.rowWidth > maxWidth && !allowWrap) {
+    rowConfig = buildRow({
+      iconSize: 5,
+      fontSize: 10,
+      itemGap: 8,
+      groupGap: 12
+    });
+  }
+
+  if (!allowWrap) {
+    return rowHeight;
+  }
+
+  const rows = [[]];
+  const rowWidths = [0];
+  rowConfig.groups.forEach((group) => {
+    const rowIndex = rows.length - 1;
+    const addWidth = group.width + (rows[rowIndex].length ? rowConfig.groupGap : 0);
+    if (rows[rowIndex].length && rowWidths[rowIndex] + addWidth > maxWidth) {
+      rows.push([group]);
+      rowWidths.push(group.width);
+    } else {
+      rows[rowIndex].push(group);
+      rowWidths[rowIndex] += addWidth;
+    }
+  });
+
+  const rowCount = rows.length || 1;
+  return rowHeight * rowCount + rowGap * Math.max(0, rowCount - 1);
 };
 
 const drawStepScoreDiff = ({
@@ -571,6 +689,306 @@ const drawStepScoreDiff = ({
   }
 };
 
+const BOX_TABLE_HEADER_HEIGHT = 20;
+const BOX_TABLE_ROW_HEIGHT = 22;
+const BOX_TABLE_FONT_HEADER = '600 9px system-ui, -apple-system, sans-serif';
+const BOX_TABLE_FONT_VALUE = '600 10px system-ui, -apple-system, sans-serif';
+const BOX_TABLE_PADDING_X = 6;
+const BOX_HIGHLIGHT_KEYS = new Set(['pts', 'reb', 'ast']);
+const STACKED_BOX_SCORE_WEIGHTS = {
+  min: 1.3,
+  fg: 1.25,
+  '3p': 1.25,
+  ft: 1.25,
+  reb: 0.8,
+  ast: 0.8,
+  stl: 0.8,
+  blk: 0.8,
+  to: 0.8,
+  pf: 0.8,
+  pm: 0.8,
+};
+
+const drawBoxScoreTable = (ctx, computedStyle, columns, startX, startY, maxWidth, options = {}) => {
+  if (!ctx || !columns || !columns.length) return 0;
+  const textHeading = getCssVar(computedStyle, '--text-heading', '#374151');
+  const textPrimary = getCssVar(computedStyle, '--text-primary', '#111111');
+  const textSecondary = getCssVar(computedStyle, '--text-secondary', '#6b7280');
+  const headerBg = getCssVar(computedStyle, '--bg-table-header', '#ffffff');
+  const rowBg = getCssVar(computedStyle, '--bg-table-even', '#f9fafb');
+  const highlightHeaderBg = getCssVar(computedStyle, '--bg-highlight-col-header', '#dbeafe');
+  const highlightBg = getCssVar(computedStyle, '--bg-highlight-col', '#eff6ff');
+  const dividerColor = getCssVar(computedStyle, '--divider', '#e5e7eb');
+
+  const statCount = Math.max(1, columns.length - 1);
+  const minStatWidth = 30;
+  const minPlayerWidth = 70;
+  const maxPlayerWidth = 160;
+  let playerWidth = Math.min(maxPlayerWidth, Math.max(90, maxWidth * 0.28));
+  let widths = [];
+
+  if (options?.statWeights && columns.length > 1) {
+    const statWeights = columns.slice(1).map((col) => {
+      const weight = Number(options.statWeights[col.key]);
+      return Number.isFinite(weight) && weight > 0 ? weight : 1;
+    });
+    const totalWeight = statWeights.reduce((sum, weight) => sum + weight, 0);
+    const minWeight = Math.min(...statWeights);
+    if (Number.isFinite(totalWeight) && totalWeight > 0 && Number.isFinite(minWeight) && minWeight > 0) {
+      let availableWidth = maxWidth - playerWidth;
+      const requiredAvailable = (minStatWidth * totalWeight) / minWeight;
+      if (availableWidth < requiredAvailable) {
+        playerWidth = Math.max(minPlayerWidth, maxWidth - requiredAvailable);
+        availableWidth = maxWidth - playerWidth;
+      }
+      widths = [playerWidth, ...statWeights.map((weight) => (availableWidth * weight) / totalWeight)];
+    }
+  }
+
+  if (!widths.length) {
+    let statWidth = (maxWidth - playerWidth) / statCount;
+    if (statWidth < minStatWidth) {
+      playerWidth = Math.max(minPlayerWidth, maxWidth - statCount * minStatWidth);
+      statWidth = (maxWidth - playerWidth) / statCount;
+    }
+    widths = columns.map((_, index) => (index === 0 ? playerWidth : statWidth));
+  }
+
+  const headerTop = startY;
+  const rowTop = headerTop + BOX_TABLE_HEADER_HEIGHT;
+
+  ctx.fillStyle = headerBg;
+  ctx.fillRect(startX, headerTop, maxWidth, BOX_TABLE_HEADER_HEIGHT);
+  ctx.fillStyle = rowBg;
+  ctx.fillRect(startX, rowTop, maxWidth, BOX_TABLE_ROW_HEIGHT);
+
+  let cursorX = startX;
+  columns.forEach((col, index) => {
+    const width = widths[index];
+    const isHighlight = BOX_HIGHLIGHT_KEYS.has(col.key);
+    if (isHighlight) {
+      ctx.fillStyle = highlightHeaderBg;
+      ctx.fillRect(cursorX, headerTop, width, BOX_TABLE_HEADER_HEIGHT);
+      ctx.fillStyle = highlightBg;
+      ctx.fillRect(cursorX, rowTop, width, BOX_TABLE_ROW_HEIGHT);
+    }
+
+    ctx.textBaseline = 'middle';
+    ctx.font = BOX_TABLE_FONT_HEADER;
+    ctx.fillStyle = textHeading;
+    ctx.textAlign = index === 0 ? 'left' : 'center';
+    const headerX = index === 0 ? cursorX + BOX_TABLE_PADDING_X : cursorX + width / 2;
+    ctx.fillText(col.label, headerX, headerTop + BOX_TABLE_HEADER_HEIGHT / 2);
+
+    ctx.font = BOX_TABLE_FONT_VALUE;
+    ctx.fillStyle = index === 0 ? textSecondary : textPrimary;
+    const valueText = index === 0
+      ? truncateText(ctx, col.value, width - BOX_TABLE_PADDING_X * 2)
+      : col.value;
+    const valueX = index === 0 ? cursorX + BOX_TABLE_PADDING_X : cursorX + width / 2;
+    ctx.fillText(valueText, valueX, rowTop + BOX_TABLE_ROW_HEIGHT / 2);
+
+    cursorX += width;
+  });
+
+  ctx.strokeStyle = dividerColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(startX, rowTop);
+  ctx.lineTo(startX + maxWidth, rowTop);
+  ctx.stroke();
+
+  ctx.textAlign = 'left';
+  return BOX_TABLE_HEADER_HEIGHT + BOX_TABLE_ROW_HEIGHT;
+};
+
+const formatMinutesSeconds = (totalSeconds) => {
+  const total = Math.max(0, Math.round(totalSeconds || 0));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+
+const computePlayerBoxScore = ({
+  actions,
+  timeline,
+  scoreTimeline,
+  displayScoreTimeline,
+  periodRange,
+  teamKey,
+}) => {
+  const stats = {
+    seconds: 0,
+    pts: 0,
+    fgm: 0,
+    fga: 0,
+    tpm: 0,
+    tpa: 0,
+    ftm: 0,
+    fta: 0,
+    reb: 0,
+    ast: 0,
+    stl: 0,
+    blk: 0,
+    to: 0,
+    pf: 0,
+    pm: 0,
+  };
+
+  (timeline || []).forEach((entry) => {
+    if (!entry?.start || !entry?.end) return;
+    const start = getSecondsElapsed(entry.period, entry.start);
+    const end = getSecondsElapsed(entry.period, entry.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+    const duration = Math.max(0, end - start);
+    stats.seconds += duration;
+  });
+
+  (actions || []).forEach((action) => {
+    const type = (action?.actionType || '').toString().toLowerCase();
+    const desc = (action?.description || '').toString().toLowerCase();
+    const result = (action?.result || '').toString().toLowerCase();
+    const eventType = getEventType(desc, type, result);
+    const isShotEvent = eventType === 'point' || eventType === 'miss';
+    if (isShotEvent) {
+      const isFreeThrow = isFreeThrowAction(desc, type);
+      const isThree = isThreePointAction(desc, type);
+      if (isFreeThrow) {
+        stats.fta += 1;
+        if (eventType === 'point') {
+          stats.ftm += 1;
+          stats.pts += 1;
+        }
+        return;
+      }
+      stats.fga += 1;
+      if (isThree) {
+        stats.tpa += 1;
+      }
+      if (eventType === 'point') {
+        stats.fgm += 1;
+        stats.pts += isThree ? 3 : 2;
+        if (isThree) {
+          stats.tpm += 1;
+        }
+      }
+      return;
+    }
+    if (eventType === 'rebound') {
+      stats.reb += 1;
+    } else if (eventType === 'assist') {
+      stats.ast += 1;
+    } else if (eventType === 'steal') {
+      stats.stl += 1;
+    } else if (eventType === 'block') {
+      stats.blk += 1;
+    } else if (eventType === 'turnover') {
+      stats.to += 1;
+    } else if (eventType === 'foul') {
+      stats.pf += 1;
+    }
+  });
+
+  if (teamKey) {
+    const segments = (timeline || []).map((entry) => {
+      if (!entry?.start || !entry?.end) return null;
+      const start = getSecondsElapsed(entry.period, entry.start);
+      const end = getSecondsElapsed(entry.period, entry.end);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+      const s = Math.min(start, end);
+      const e = Math.max(start, end);
+      return { start: s, end: e };
+    }).filter(Boolean);
+    const isOnCourt = (elapsed) => segments.some((seg) => elapsed >= seg.start && elapsed <= seg.end);
+
+    const rangeStart = Number(periodRange?.start);
+    const rangeEnd = Number(periodRange?.end);
+    const rangeStartSeconds = Number.isFinite(rangeStart) ? getPeriodStartSeconds(rangeStart) : 0;
+    const rangeEndSeconds = Number.isFinite(rangeEnd)
+      ? getPeriodStartSeconds(rangeEnd) + getPeriodDurationSeconds(rangeEnd)
+      : Infinity;
+
+    const scoreSource = (displayScoreTimeline && displayScoreTimeline.length)
+      ? displayScoreTimeline
+      : (scoreTimeline || []);
+    const scored = (scoreSource || [])
+      .map((entry) => {
+        const elapsed = getSecondsElapsed(entry.period, entry.clock);
+        if (!Number.isFinite(elapsed)) return null;
+        return { ...entry, elapsed };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.elapsed - b.elapsed);
+
+    let prev = null;
+    scored.forEach((entry) => {
+      if (entry.elapsed <= rangeStartSeconds) {
+        prev = entry;
+      }
+    });
+
+    scored
+      .filter((entry) => entry.elapsed >= rangeStartSeconds && entry.elapsed <= rangeEndSeconds)
+      .forEach((entry) => {
+        if (!prev) {
+          prev = entry;
+          return;
+        }
+        const deltaAway = Number(entry.away) - Number(prev.away);
+        const deltaHome = Number(entry.home) - Number(prev.home);
+        if (deltaAway || deltaHome) {
+          if (isOnCourt(entry.elapsed)) {
+            stats.pm += teamKey === 'away' ? (deltaAway - deltaHome) : (deltaHome - deltaAway);
+          }
+        }
+        prev = entry;
+      });
+  }
+
+  return stats;
+};
+
+const buildBoxScoreColumns = (stats, playerName, includeAttempts) => {
+  const plusMinus = stats.pm === 0 ? '0' : (stats.pm > 0 ? `+${stats.pm}` : `${stats.pm}`);
+  const columns = [
+    { key: 'player', label: 'PLAYER', value: playerName || 'Player' },
+    { key: 'min', label: 'MIN', value: formatMinutesSeconds(stats.seconds) },
+    { key: 'pts', label: 'PTS', value: `${stats.pts}` },
+  ];
+  if (includeAttempts) {
+    columns.push(
+      { key: 'fg', label: 'FG', value: `${stats.fgm}-${stats.fga}` },
+      { key: '3p', label: '3P', value: `${stats.tpm}-${stats.tpa}` },
+      { key: 'ft', label: 'FT', value: `${stats.ftm}-${stats.fta}` },
+    );
+  }
+  columns.push(
+    { key: 'reb', label: 'REB', value: `${stats.reb}` },
+    { key: 'ast', label: 'AST', value: `${stats.ast}` },
+    { key: 'stl', label: 'STL', value: `${stats.stl}` },
+    { key: 'blk', label: 'BLK', value: `${stats.blk}` },
+    { key: 'to', label: 'TO', value: `${stats.to}` },
+    { key: 'pf', label: 'PF', value: `${stats.pf}` },
+    { key: 'pm', label: '+/-', value: plusMinus },
+  );
+  return columns;
+};
+
+const drawPeriodCaps = (ctx, xStart, xEnd, centerY, color) => {
+  if (!ctx) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(xStart, centerY - 6);
+  ctx.lineTo(xStart, centerY + 6);
+  ctx.moveTo(xEnd, centerY - 6);
+  ctx.lineTo(xEnd, centerY + 6);
+  ctx.stroke();
+  ctx.restore();
+};
+
 const buildLiteExportCanvas = ({
   exportWidth,
   legendShouldWrap,
@@ -605,7 +1023,7 @@ const buildLiteExportCanvas = ({
   const legendHeight = legendShouldWrap ? 72 : 44;
   const chartHeight = 360;
   const chartTop = headerHeight + 8;
-  const chartLeft = leftPad;
+  const chartLeft = rightPad;
   const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
   const contentHeight = chartTop + chartHeight + footerHeight + legendHeight;
   const baseHeight = contentHeight + outerPadding * 2;
@@ -719,6 +1137,564 @@ const buildLiteExportCanvas = ({
 
   const legendTop = chartTop + chartHeight + 12;
   drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff);
+  drawWatermark(ctx, computed, 6, contentHeight - 6);
+
+  return canvas;
+};
+
+const buildSinglePlayerExportCanvas = ({
+  exportWidth,
+  legendShouldWrap,
+  rangeLabel,
+  periodRange,
+  leftMargin,
+  rightMargin,
+  playRef,
+  gameDate,
+  displayAwayTeamNames,
+  displayHomeTeamNames,
+  filteredAwayPlayers,
+  filteredHomePlayers,
+  boxScoreAwayPlayers,
+  boxScoreHomePlayers,
+  filteredAwayPlayerTimeline,
+  filteredHomePlayerTimeline,
+  filteredScoreTimeline,
+  displayScoreTimeline,
+  statusLabel,
+  timelineWindow,
+  statOn,
+  showScoreDiff,
+  selectedPlayer,
+}) => {
+  if (typeof window === 'undefined') return null;
+  const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
+  const outerPadding = 12;
+  const baseWidth = contentWidth + outerPadding * 2;
+  const leftPad = leftMargin;
+  const rightPad = rightMargin;
+  const headerHeight = 60;
+  const playAreaTop = headerHeight + 8;
+  const topPadding = 8;
+  const teamLabelHeight = 0;
+  const rowHeight = 48;
+  const bottomPadding = 12;
+  const playAreaHeight = topPadding + teamLabelHeight + 4 + rowHeight + bottomPadding;
+  const chartTop = playAreaTop;
+  const chartLeft = rightPad;
+  const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
+  const styleSource = playRef?.current || document.documentElement;
+  const computed = window.getComputedStyle(styleSource);
+  const legendMeasureCtx = document.createElement('canvas').getContext('2d');
+  const legendHeight = measureLegendHeight(
+    legendMeasureCtx,
+    computed,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    false
+  );
+  const hasPlayer = Boolean(selectedPlayer?.name);
+  const isAway = hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
+  const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
+  const playerName = selectedPlayer?.name || '';
+  const actions = (isAway ? filteredAwayPlayers : filteredHomePlayers)?.[playerName] || [];
+  const boxScoreActions = (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
+  const timeline = (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
+  const boxScoreStats = computePlayerBoxScore({
+    actions: boxScoreActions,
+    timeline,
+    scoreTimeline: filteredScoreTimeline,
+    displayScoreTimeline,
+    periodRange,
+    teamKey,
+  });
+  const boxScoreItems = buildBoxScoreColumns(boxScoreStats, playerName, true);
+  const boxScoreGap = boxScoreItems.length ? 10 : 0;
+  const boxScoreWidth = contentWidth;
+  const boxScoreX = Math.max(0, (contentWidth - boxScoreWidth) / 2);
+  const boxScoreHeight = boxScoreItems.length ? (BOX_TABLE_HEADER_HEIGHT + BOX_TABLE_ROW_HEIGHT) : 0;
+  const boxScoreBottomPadding = boxScoreItems.length ? 38 : 16;
+  const contentHeight = playAreaTop + playAreaHeight + legendHeight + boxScoreGap + boxScoreHeight + boxScoreBottomPadding;
+  const baseHeight = contentHeight + outerPadding * 2;
+
+  const scale = getExportScale();
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(baseWidth * scale);
+  canvas.height = Math.round(baseHeight * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.scale(scale, scale);
+
+  const backgroundColor = resolveExportBackground(playRef?.current);
+  ctx.fillStyle = backgroundColor;
+  ctx.fillRect(0, 0, baseWidth, baseHeight);
+  ctx.translate(outerPadding, outerPadding);
+  const textPrimary = getCssVar(computed, '--text-primary', '#111111');
+  const textSecondary = getCssVar(computed, '--text-secondary', '#6b7280');
+  const lineColor = getCssVar(computed, '--line-color', '#cbd5f5');
+  const lineLight = getCssVar(computed, '--line-color-light', '#94a3b8');
+  const quarterLabelColor = getCssVar(computed, '--quarter-label-color', '#6b7280');
+
+  const awayLabel = displayAwayTeamNames?.abr || 'Away';
+  const homeLabel = displayHomeTeamNames?.abr || 'Home';
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = textPrimary;
+  ctx.font = '600 16px system-ui, -apple-system, sans-serif';
+  const titleText = `${awayLabel} vs ${homeLabel}`;
+  ctx.fillText(titleText, 6, 22);
+  if (rangeLabel) {
+    const titleWidth = ctx.measureText(titleText).width;
+    ctx.fillStyle = textSecondary;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(rangeLabel, 6 + titleWidth + 8, 22);
+  }
+  const formattedGameDate = formatGameDate(gameDate);
+  if (formattedGameDate) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(formattedGameDate, 6, 38);
+  }
+  const displayName = playerName || 'Select a player';
+  const playerNameMaxWidth = Math.max(0, contentWidth - rightPad - 12);
+  const playerNameY = formattedGameDate ? 54 : 38;
+  const nameFontFamily = 'system-ui, -apple-system, sans-serif';
+  let nameFontSize = 12;
+  const minNameFontSize = 9;
+  ctx.fillStyle = textPrimary;
+  ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
+  while (nameFontSize > minNameFontSize && ctx.measureText(displayName).width > playerNameMaxWidth) {
+    nameFontSize -= 1;
+    ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
+  }
+  ctx.fillText(displayName, 6, playerNameY);
+
+  const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
+    ? filteredScoreTimeline
+    : (displayScoreTimeline || []);
+  const lastScoreEntry = scoreTimelineSource.length
+    ? scoreTimelineSource[scoreTimelineSource.length - 1]
+    : null;
+  if (lastScoreEntry) {
+    const scoreText = `${awayLabel} ${lastScoreEntry.away} - ${lastScoreEntry.home} ${homeLabel}`;
+    ctx.fillStyle = textPrimary;
+    ctx.font = '600 14px system-ui, -apple-system, sans-serif';
+    const textWidth = ctx.measureText(scoreText).width;
+    ctx.fillText(scoreText, contentWidth - rightPad - textWidth, 22);
+  }
+  if (statusLabel) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    const statusWidth = ctx.measureText(statusLabel).width;
+    ctx.fillText(statusLabel, contentWidth - rightPad - statusWidth, 38);
+  }
+
+  const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
+  const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
+  const getXForSeconds = (seconds) => {
+    if (windowDurationSeconds <= 0) return chartLeft;
+    const ratio = (seconds - windowStartSeconds) / windowDurationSeconds;
+    return chartLeft + Math.max(0, Math.min(chartWidth, ratio * chartWidth));
+  };
+  const timelineBottom = playAreaTop + playAreaHeight;
+  const rangeStart = Number(periodRange?.start);
+  const rangeEnd = Number(periodRange?.end);
+  if (
+    windowDurationSeconds > 0 &&
+    Number.isFinite(rangeStart) &&
+    Number.isFinite(rangeEnd) &&
+    rangeEnd >= rangeStart
+  ) {
+    ctx.strokeStyle = lineColor;
+    for (let period = rangeStart + 1; period <= rangeEnd; period += 1) {
+      const x = getXForSeconds(getPeriodStartSeconds(period));
+      ctx.beginPath();
+      ctx.moveTo(x, chartTop);
+      ctx.lineTo(x, timelineBottom);
+      ctx.stroke();
+    }
+
+    if (rangeEnd > rangeStart) {
+      ctx.fillStyle = quarterLabelColor;
+      ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+      const labelY = chartTop + 10;
+      for (let period = rangeStart; period <= rangeEnd; period += 1) {
+        const label = formatPeriodLabel(period);
+        if (!label) continue;
+        const centerSeconds = getPeriodStartSeconds(period) + getPeriodDurationSeconds(period) / 2;
+        const x = getXForSeconds(centerSeconds);
+        ctx.fillText(label, x - ctx.measureText(label).width / 2, labelY);
+      }
+    }
+  }
+
+  const sectionTop = chartTop + topPadding;
+
+  const rowTop = sectionTop + 4;
+  const centerY = rowTop + rowHeight / 2;
+  ctx.textBaseline = 'middle';
+
+  const getXForTime = (period, clock) => {
+    const elapsed = getSecondsElapsed(period, clock);
+    return getXForSeconds(elapsed);
+  };
+
+  if (
+    windowDurationSeconds > 0 &&
+    Number.isFinite(rangeStart) &&
+    Number.isFinite(rangeEnd) &&
+    rangeEnd >= rangeStart
+  ) {
+    for (let period = rangeStart; period <= rangeEnd; period += 1) {
+      const startSeconds = getPeriodStartSeconds(period);
+      const endSeconds = startSeconds + getPeriodDurationSeconds(period);
+      const xStart = getXForSeconds(startSeconds);
+      const xEnd = getXForSeconds(endSeconds);
+      drawPeriodCaps(ctx, xStart, xEnd, centerY, lineLight);
+    }
+  }
+
+  ctx.strokeStyle = lineLight;
+  ctx.lineWidth = 1;
+  timeline.forEach((entry) => {
+    if (!entry?.end) return;
+    const x1 = getXForTime(entry.period, entry.start);
+    const x2 = getXForTime(entry.period, entry.end);
+    ctx.beginPath();
+    ctx.moveTo(x1, centerY);
+    ctx.lineTo(x2, centerY);
+    ctx.stroke();
+  });
+
+  const filteredActions = actions.filter((action) => {
+    const type = (action?.actionType || '').toString().toLowerCase();
+    return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
+  });
+  const pointAtTime = new Set();
+  const freeThrowOneAtTime = new Set();
+  filteredActions.forEach((action) => {
+    const timeKey = `${action.period}|${action.clock}`;
+    if (isFreeThrowAction(action.description, action.actionType)) {
+      if (isOneOfOneFreeThrow(action)) {
+        freeThrowOneAtTime.add(timeKey);
+      }
+      return;
+    }
+    if (getEventType(action.description, action.actionType, action.result) === 'point') {
+      pointAtTime.add(timeKey);
+    }
+  });
+  const size = Math.max(3, Math.min(5, rowHeight * 0.28)) * TIMELINE_ICON_SCALE;
+  filteredActions.forEach((action) => {
+    const x = getXForTime(action.period, action.clock);
+    const isFreeThrow = isFreeThrowAction(action.description, action.actionType);
+    const timeKey = `${action.period}|${action.clock}`;
+    if (isFreeThrow) {
+      const isAnd1 = freeThrowOneAtTime.has(timeKey) && pointAtTime.has(timeKey);
+      drawFreeThrowRing(
+        ctx,
+        x,
+        centerY,
+        size * 1.1,
+        action.description,
+        action.subType,
+        computed,
+        isAnd1
+      );
+      return;
+    }
+    const eventType = getEventType(action.description, action.actionType, action.result);
+    if (!eventType) return;
+    const type = (action.actionType || '').toString().toLowerCase();
+    const desc = (action.description || '').toString().toLowerCase();
+    const is3PT = type === '3pt' || desc.includes('3pt');
+    drawEventShape(ctx, eventType, x, centerY, size, computed, is3PT);
+  });
+
+  const legendTop = playAreaTop + playAreaHeight + 10;
+  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, false);
+  if (boxScoreItems.length) {
+    const boxScoreTop = legendTop + legendHeight + boxScoreGap;
+    drawBoxScoreTable(ctx, computed, boxScoreItems, boxScoreX, boxScoreTop, boxScoreWidth);
+  }
+  drawWatermark(ctx, computed, 6, contentHeight - 6);
+
+  return canvas;
+};
+
+const buildSinglePlayerStackedExportCanvas = ({
+  exportWidth,
+  legendShouldWrap,
+  rangeLabel,
+  periodRange,
+  leftMargin,
+  rightMargin,
+  playRef,
+  gameDate,
+  displayAwayTeamNames,
+  displayHomeTeamNames,
+  filteredAwayPlayers,
+  filteredHomePlayers,
+  boxScoreAwayPlayers,
+  boxScoreHomePlayers,
+  filteredAwayPlayerTimeline,
+  filteredHomePlayerTimeline,
+  filteredScoreTimeline,
+  displayScoreTimeline,
+  statusLabel,
+  statOn,
+  showScoreDiff,
+  selectedPlayer,
+}) => {
+  if (typeof window === 'undefined') return null;
+  const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
+  const outerPadding = 12;
+  const baseWidth = contentWidth + outerPadding * 2;
+  const leftPad = leftMargin;
+  const rightPad = rightMargin;
+  const headerHeight = 60;
+  const playAreaTop = headerHeight + 8;
+  const topPadding = 8;
+  const teamLabelHeight = 0;
+  const quarterLabelHeight = 16;
+  const rowHeight = 32;
+  const sectionGap = 10;
+  const bottomPadding = 28;
+
+  const rangeStart = Number(periodRange?.start);
+  const rangeEnd = Number(periodRange?.end);
+  const periods = (Number.isFinite(rangeStart) && Number.isFinite(rangeEnd) && rangeEnd >= rangeStart)
+    ? Array.from({ length: rangeEnd - rangeStart + 1 }, (_, idx) => rangeStart + idx)
+    : [];
+
+  const sectionHeight = quarterLabelHeight + rowHeight;
+  const playAreaHeight = topPadding
+    + (periods.length * sectionHeight)
+    + (Math.max(0, periods.length - 1) * sectionGap)
+    + bottomPadding;
+  const chartTop = playAreaTop;
+  const chartLeft = rightPad;
+  const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
+  const legendGap = 0;
+  const styleSource = playRef?.current || document.documentElement;
+  const computed = window.getComputedStyle(styleSource);
+  const legendMeasureCtx = document.createElement('canvas').getContext('2d');
+  const legendHeight = measureLegendHeight(
+    legendMeasureCtx,
+    computed,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    false
+  );
+  const hasPlayer = Boolean(selectedPlayer?.name);
+  const isAway = hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
+  const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
+  const playerName = selectedPlayer?.name || '';
+  const actions = (isAway ? filteredAwayPlayers : filteredHomePlayers)?.[playerName] || [];
+  const boxScoreActions = (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
+  const timeline = (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
+  const boxScoreStats = computePlayerBoxScore({
+    actions: boxScoreActions,
+    timeline,
+    scoreTimeline: filteredScoreTimeline,
+    displayScoreTimeline,
+    periodRange,
+    teamKey,
+  });
+  const boxScoreItems = buildBoxScoreColumns(boxScoreStats, playerName, true);
+  const boxScoreGap = boxScoreItems.length ? 12 : 0;
+  const boxScoreWidth = contentWidth;
+  const boxScoreX = Math.max(0, (contentWidth - boxScoreWidth) / 2);
+  const boxScoreHeight = boxScoreItems.length ? (BOX_TABLE_HEADER_HEIGHT + BOX_TABLE_ROW_HEIGHT) : 0;
+  const boxScoreBottomPadding = boxScoreItems.length ? 26 : 16;
+  const contentHeight = playAreaTop + playAreaHeight + legendGap + legendHeight + boxScoreGap + boxScoreHeight + boxScoreBottomPadding;
+  const baseHeight = contentHeight + outerPadding * 2;
+
+  const scale = getExportScale();
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(baseWidth * scale);
+  canvas.height = Math.round(baseHeight * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.scale(scale, scale);
+
+  const backgroundColor = resolveExportBackground(playRef?.current);
+  ctx.fillStyle = backgroundColor;
+  ctx.fillRect(0, 0, baseWidth, baseHeight);
+  ctx.translate(outerPadding, outerPadding);
+  const textPrimary = getCssVar(computed, '--text-primary', '#111111');
+  const textSecondary = getCssVar(computed, '--text-secondary', '#6b7280');
+  const lineLight = getCssVar(computed, '--line-color-light', '#94a3b8');
+  const quarterLabelColor = getCssVar(computed, '--quarter-label-color', '#6b7280');
+
+  const awayLabel = displayAwayTeamNames?.abr || 'Away';
+  const homeLabel = displayHomeTeamNames?.abr || 'Home';
+
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = textPrimary;
+  ctx.font = '600 16px system-ui, -apple-system, sans-serif';
+  const titleText = `${awayLabel} vs ${homeLabel}`;
+  ctx.fillText(titleText, 6, 22);
+  if (rangeLabel) {
+    const titleWidth = ctx.measureText(titleText).width;
+    ctx.fillStyle = textSecondary;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(rangeLabel, 6 + titleWidth + 8, 22);
+  }
+  const formattedGameDate = formatGameDate(gameDate);
+  if (formattedGameDate) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+    ctx.fillText(formattedGameDate, 6, 38);
+  }
+  const displayName = playerName || 'Select a player';
+  const playerNameMaxWidth = Math.max(0, contentWidth - rightPad - 12);
+  const playerNameY = formattedGameDate ? 54 : 38;
+  const nameFontFamily = 'system-ui, -apple-system, sans-serif';
+  let nameFontSize = 12;
+  const minNameFontSize = 9;
+  ctx.fillStyle = textPrimary;
+  ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
+  while (nameFontSize > minNameFontSize && ctx.measureText(displayName).width > playerNameMaxWidth) {
+    nameFontSize -= 1;
+    ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
+  }
+  ctx.fillText(displayName, 6, playerNameY);
+
+  const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
+    ? filteredScoreTimeline
+    : (displayScoreTimeline || []);
+  const lastScoreEntry = scoreTimelineSource.length
+    ? scoreTimelineSource[scoreTimelineSource.length - 1]
+    : null;
+  if (lastScoreEntry) {
+    const scoreText = `${awayLabel} ${lastScoreEntry.away} - ${lastScoreEntry.home} ${homeLabel}`;
+    ctx.fillStyle = textPrimary;
+    ctx.font = '600 14px system-ui, -apple-system, sans-serif';
+    const textWidth = ctx.measureText(scoreText).width;
+    ctx.fillText(scoreText, contentWidth - rightPad - textWidth, 22);
+  }
+  if (statusLabel) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    const statusWidth = ctx.measureText(statusLabel).width;
+    ctx.fillText(statusLabel, contentWidth - rightPad - statusWidth, 38);
+  }
+
+  const sectionTop = chartTop + topPadding;
+
+  const filteredActions = actions.filter((action) => {
+    const type = (action?.actionType || '').toString().toLowerCase();
+    return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
+  });
+  const pointAtTime = new Set();
+  const freeThrowOneAtTime = new Set();
+  filteredActions.forEach((action) => {
+    const timeKey = `${action.period}|${action.clock}`;
+    if (isFreeThrowAction(action.description, action.actionType)) {
+      if (isOneOfOneFreeThrow(action)) {
+        freeThrowOneAtTime.add(timeKey);
+      }
+      return;
+    }
+    if (getEventType(action.description, action.actionType, action.result) === 'point') {
+      pointAtTime.add(timeKey);
+    }
+  });
+
+  const iconSize = Math.max(3, Math.min(5, rowHeight * 0.35)) * TIMELINE_ICON_SCALE;
+
+  ctx.textBaseline = 'middle';
+
+  periods.forEach((period, index) => {
+    const blockTop = sectionTop + 6 + (index * (sectionHeight + sectionGap));
+    const label = formatPeriodLabel(period);
+    if (label) {
+      ctx.fillStyle = quarterLabelColor;
+      ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+      ctx.textBaseline = 'top';
+      const labelWidth = ctx.measureText(label).width;
+      ctx.fillText(label, chartLeft + (chartWidth - labelWidth) / 2, blockTop);
+    }
+
+    const rowTop = blockTop + quarterLabelHeight;
+    const centerY = rowTop + rowHeight / 2;
+    ctx.textBaseline = 'middle';
+
+    const windowStartSeconds = getPeriodStartSeconds(period);
+    const windowDurationSeconds = getPeriodDurationSeconds(period);
+    const baseDurationSeconds = getPeriodDurationSeconds(1) || windowDurationSeconds || 1;
+    const durationRatio = windowDurationSeconds > 0 ? windowDurationSeconds / baseDurationSeconds : 1;
+    const rowWidth = Math.max(1, Math.min(chartWidth, chartWidth * durationRatio));
+    const rowLeft = chartLeft + (chartWidth - rowWidth);
+    const rowRight = rowLeft + rowWidth;
+    const getXForSeconds = (seconds) => {
+      if (windowDurationSeconds <= 0) return chartLeft;
+      const ratio = (seconds - windowStartSeconds) / windowDurationSeconds;
+      return rowLeft + Math.max(0, Math.min(rowWidth, ratio * rowWidth));
+    };
+    const getXForTime = (periodValue, clock) => {
+      const elapsed = getSecondsElapsed(periodValue, clock);
+      return getXForSeconds(elapsed);
+    };
+
+    drawPeriodCaps(ctx, rowLeft, rowRight, centerY, lineLight);
+
+    ctx.strokeStyle = lineLight;
+    ctx.lineWidth = 1;
+    timeline
+      .filter((entry) => Number(entry?.period) === period)
+      .forEach((entry) => {
+        if (!entry?.end) return;
+        const x1 = getXForTime(entry.period, entry.start);
+        const x2 = getXForTime(entry.period, entry.end);
+        ctx.beginPath();
+        ctx.moveTo(x1, centerY);
+        ctx.lineTo(x2, centerY);
+        ctx.stroke();
+      });
+
+    filteredActions
+      .filter((action) => Number(action?.period) === period)
+      .forEach((action) => {
+        const x = getXForTime(action.period, action.clock);
+        const isFreeThrow = isFreeThrowAction(action.description, action.actionType);
+        const timeKey = `${action.period}|${action.clock}`;
+        if (isFreeThrow) {
+          const isAnd1 = freeThrowOneAtTime.has(timeKey) && pointAtTime.has(timeKey);
+          drawFreeThrowRing(
+            ctx,
+            x,
+            centerY,
+            iconSize * 1.1,
+            action.description,
+            action.subType,
+            computed,
+            isAnd1
+          );
+          return;
+        }
+        const eventType = getEventType(action.description, action.actionType, action.result);
+        if (!eventType) return;
+        const type = (action.actionType || '').toString().toLowerCase();
+        const desc = (action.description || '').toString().toLowerCase();
+        const is3PT = type === '3pt' || desc.includes('3pt');
+        drawEventShape(ctx, eventType, x, centerY, iconSize, computed, is3PT);
+      });
+  });
+
+  const legendTop = playAreaTop + playAreaHeight + legendGap;
+  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, false);
+  if (boxScoreItems.length) {
+    const boxScoreTop = legendTop + legendHeight + boxScoreGap;
+    drawBoxScoreTable(ctx, computed, boxScoreItems, boxScoreX, boxScoreTop, boxScoreWidth, {
+      statWeights: STACKED_BOX_SCORE_WEIGHTS,
+    });
+  }
   drawWatermark(ctx, computed, 6, contentHeight - 6);
 
   return canvas;
@@ -1070,6 +2046,12 @@ const buildFullExportCanvas = ({
   return canvas;
 };
 
-export const buildPlayExportCanvas = (params) => (
-  buildFullExportCanvas(params) || buildLiteExportCanvas(params)
-);
+export const buildPlayExportCanvas = (params) => {
+  if (params?.exportView === 'player') {
+    return buildSinglePlayerExportCanvas(params);
+  }
+  if (params?.exportView === 'player-stacked') {
+    return buildSinglePlayerStackedExportCanvas(params);
+  }
+  return buildFullExportCanvas(params) || buildLiteExportCanvas(params);
+};
