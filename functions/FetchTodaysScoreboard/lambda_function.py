@@ -182,13 +182,90 @@ def merge_schedule_lists(existing, incoming):
 
 def merge_game(existing, incoming):
     merged = dict(existing) if isinstance(existing, dict) else {}
+    existing_status = merged.get("status")
+    existing_is_final = is_final_status(existing_status)
+    incoming_status = (incoming or {}).get("status")
+    incoming_is_terminal = is_terminal_status(incoming_status)
+    incoming_is_final = is_final_status(incoming_status)
+
     for key, value in (incoming or {}).items():
         if value is None:
             continue
         if isinstance(value, str) and not value.strip():
             continue
+        if existing_is_final and key in ("status", "time", "homescore", "awayscore") and (
+            not incoming_is_terminal or is_pregame_status(incoming_status)
+        ):
+            continue
         merged[key] = value
+
+    if existing_is_final and isinstance(incoming_status, str) and incoming_status.strip():
+        if not incoming_is_terminal or is_pregame_status(incoming_status):
+            merged["status"] = existing.get("status")
+            merged["homescore"] = existing.get("homescore", merged.get("homescore", 0))
+            merged["awayscore"] = existing.get("awayscore", merged.get("awayscore", 0))
+            merged["time"] = existing.get("time", merged.get("time", ""))
+        elif incoming_is_final:
+            existing_home = parse_score(existing.get("homescore"))
+            existing_away = parse_score(existing.get("awayscore"))
+            incoming_home = parse_score(incoming.get("homescore"))
+            incoming_away = parse_score(incoming.get("awayscore"))
+            if (
+                existing_home is not None and existing_away is not None
+                and (existing_home > 0 or existing_away > 0)
+                and incoming_home == 0 and incoming_away == 0
+            ):
+                merged["homescore"] = existing.get("homescore")
+                merged["awayscore"] = existing.get("awayscore")
+
     return merged
+
+TERMINAL_STATUS_PREFIXES = (
+    "final",
+    "postponed",
+    "cancelled",
+    "canceled",
+    "ppd",
+)
+
+PREGAME_STATUS_PREFIXES = (
+    "scheduled",
+    "pre",
+    "tbd",
+)
+
+def normalize_status(status_text):
+    return (status_text or "").strip().lower()
+
+def is_terminal_status(status_text):
+    status = normalize_status(status_text)
+    return any(status.startswith(prefix) for prefix in TERMINAL_STATUS_PREFIXES)
+
+def is_final_status(status_text):
+    status = normalize_status(status_text)
+    return status.startswith("final")
+
+def is_pregame_status(status_text):
+    status = normalize_status(status_text)
+    if not status:
+        return False
+    if status.startswith(PREGAME_STATUS_PREFIXES) or "tbd" in status:
+        return True
+    if ":" in status and (
+        " am" in status
+        or " pm" in status
+        or status.endswith("am")
+        or status.endswith("pm")
+        or " et" in status
+    ):
+        return True
+    return False
+
+def parse_score(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
 
 def normalize_team_slug(value):
     if not value:

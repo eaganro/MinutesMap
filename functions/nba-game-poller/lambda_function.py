@@ -253,8 +253,7 @@ def poller_logic(context, schedule_half=True):
         game_key = game.get("id")
         if game_id_map and game_key and game_key in game_id_map:
             game["nbaGameId"] = game_id_map[game_key]
-        status_text = (game.get('status') or '').strip()
-        if is_terminal_status(status_text):
+        if is_confirmed_terminal_game(game):
             continue
         remaining_games += 1
         if has_game_started(game, now_et):
@@ -483,6 +482,8 @@ def process_game(game_item, user_agent=None, date_str=None):
     updates = {}
     is_game_final = False
     is_play_final = False
+    play_final_home_score = None
+    play_final_away_score = None
     processed = None
     slim_box = None
 
@@ -510,6 +511,8 @@ def process_game(game_item, user_agent=None, date_str=None):
         if last_action:
             last_desc = last_action.get('description', '').strip()
             is_play_final = last_desc.startswith('Game End')
+            play_final_home_score = parse_score(last_action.get('scoreHome'))
+            play_final_away_score = parse_score(last_action.get('scoreAway'))
 
         if actions and not (home_team_id and away_team_id):
             inferred_away, inferred_home = infer_team_ids_from_actions(actions)
@@ -564,6 +567,41 @@ def process_game(game_item, user_agent=None, date_str=None):
             'awayTeamId': away_team_id,
         })
 
+    # If the play feed ended but box status regressed (or lags), promote schedule state to Final.
+    if is_play_final:
+        if not is_final_status(updates.get('status')):
+            updates['status'] = 'Final'
+            updates['time'] = ''
+        if not is_game_final:
+            updates['finalConfirmed'] = False
+            existing_pending = game_item.get('finalPendingSince')
+            if isinstance(existing_pending, str) and existing_pending.strip():
+                updates['finalPendingSince'] = existing_pending
+            else:
+                updates['finalPendingSince'] = datetime.now(UTC_ZONE).isoformat()
+        else:
+            updates['finalConfirmed'] = True
+            updates['finalPendingSince'] = ''
+
+        incoming_home = parse_score(updates.get('homescore'))
+        incoming_away = parse_score(updates.get('awayscore'))
+        existing_home = parse_score(game_item.get('homescore'))
+        existing_away = parse_score(game_item.get('awayscore'))
+
+        if incoming_home == 0 and incoming_away == 0:
+            if (
+                play_final_home_score is not None and play_final_away_score is not None
+                and (play_final_home_score > 0 or play_final_away_score > 0)
+            ):
+                updates['homescore'] = play_final_home_score
+                updates['awayscore'] = play_final_away_score
+            elif (
+                existing_home is not None and existing_away is not None
+                and (existing_home > 0 or existing_away > 0)
+            ):
+                updates['homescore'] = existing_home
+                updates['awayscore'] = existing_away
+
     if processed is not None or slim_box is not None:
         if processed is None or slim_box is None:
             existing = load_gamepack(game_key)
@@ -586,10 +624,13 @@ def process_game(game_item, user_agent=None, date_str=None):
                 prefix=PREFIX,
                 key=f"{GAMEPACK_PREFIX}{game_key}.json",
                 data=gamepack,
-                is_final=is_game_final or is_play_final,
+                is_final=is_game_final,
             )
         else:
             print(f"Poller: Skipping gamepack upload for {game_key}, missing data.")
+
+    if updates:
+        updates = protect_final_schedule_state(game_item, updates)
 
     return is_game_final, updates
 
@@ -640,6 +681,85 @@ def normalize_status(status_text):
 def is_terminal_status(status_text):
     status = normalize_status(status_text)
     return any(status.startswith(prefix) for prefix in TERMINAL_STATUS_PREFIXES)
+
+def is_confirmed_terminal_game(game):
+    if not isinstance(game, dict):
+        return False
+    status_text = game.get('status')
+    if not is_terminal_status(status_text):
+        return False
+    if is_final_status(status_text):
+        return game.get('finalConfirmed') is not False
+    return True
+
+def is_final_status(status_text):
+    status = normalize_status(status_text)
+    return status.startswith('final')
+
+def is_pregame_status(status_text):
+    status = normalize_status(status_text)
+    if not status:
+        return False
+    if status.startswith(PREGAME_STATUS_PREFIXES) or 'tbd' in status:
+        return True
+    if ':' in status and (
+        ' am' in status
+        or ' pm' in status
+        or status.endswith('am')
+        or status.endswith('pm')
+        or ' et' in status
+    ):
+        return True
+    return False
+
+def parse_score(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+def protect_final_schedule_state(existing_game, incoming_updates):
+    if not isinstance(existing_game, dict) or not isinstance(incoming_updates, dict):
+        return incoming_updates
+
+    existing_status = existing_game.get('status')
+    if not is_final_status(existing_status):
+        return incoming_updates
+
+    incoming_status = incoming_updates.get('status')
+    if not isinstance(incoming_status, str) or not incoming_status.strip():
+        return incoming_updates
+
+    incoming_is_terminal = is_terminal_status(incoming_status)
+    incoming_is_final = is_final_status(incoming_status)
+
+    # Never allow a known final game to regress to scheduled/pregame states.
+    if not incoming_is_terminal or is_pregame_status(incoming_status):
+        safe = dict(incoming_updates)
+        safe['status'] = existing_status
+        safe['homescore'] = existing_game.get('homescore', safe.get('homescore', 0))
+        safe['awayscore'] = existing_game.get('awayscore', safe.get('awayscore', 0))
+        safe['time'] = existing_game.get('time', safe.get('time', ''))
+        return safe
+
+    # Guard against occasional final score rollbacks (e.g., 0-0 from stale payloads).
+    if incoming_is_final:
+        existing_home = parse_score(existing_game.get('homescore'))
+        existing_away = parse_score(existing_game.get('awayscore'))
+        incoming_home = parse_score(incoming_updates.get('homescore'))
+        incoming_away = parse_score(incoming_updates.get('awayscore'))
+
+        if (
+            existing_home is not None and existing_away is not None
+            and (existing_home > 0 or existing_away > 0)
+            and incoming_home == 0 and incoming_away == 0
+        ):
+            safe = dict(incoming_updates)
+            safe['homescore'] = existing_game.get('homescore')
+            safe['awayscore'] = existing_game.get('awayscore')
+            return safe
+
+    return incoming_updates
 
 def status_indicates_live(game):
     status = normalize_status(game.get('status'))

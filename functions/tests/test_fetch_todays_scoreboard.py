@@ -145,3 +145,25 @@ class TestFetchTodaysScoreboard:
         ids = {item["id"] for item in items}
         assert "2023-10-25-bos-nyk" in ids
         assert "2023-10-25-lal-den" in ids
+
+    def test_merge_game_preserves_final_from_pregame_regression(self):
+        existing = {
+            "id": "2026-02-01-phi-lal",
+            "status": "Final",
+            "homescore": 104,
+            "awayscore": 118,
+            "time": "",
+        }
+        incoming = {
+            "id": "2026-02-01-phi-lal",
+            "status": "10:30 PM ET",
+            "homescore": 0,
+            "awayscore": 0,
+            "time": "",
+        }
+
+        merged = self.module.merge_game(existing, incoming)
+
+        assert merged["status"] == "Final"
+        assert merged["homescore"] == 104
+        assert merged["awayscore"] == 118

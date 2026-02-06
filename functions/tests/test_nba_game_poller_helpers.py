@@ -48,3 +48,29 @@ class TestNbaGamePollerHelpers:
 
         now_before = datetime(2025, 1, 1, 18, 0, tzinfo=ET_ZONE)
         assert not self.module.has_game_started(game, now_before)
+
+    def test_protect_final_schedule_state_prevents_pregame_regression(self):
+        existing = {
+            "status": "Final",
+            "homescore": 111,
+            "awayscore": 109,
+            "time": "",
+        }
+        incoming = {
+            "status": "10:00 PM ET",
+            "homescore": 0,
+            "awayscore": 0,
+            "time": "",
+        }
+
+        safe = self.module.protect_final_schedule_state(existing, incoming)
+        assert safe["status"] == "Final"
+        assert safe["homescore"] == 111
+        assert safe["awayscore"] == 109
+
+    def test_is_confirmed_terminal_game_requires_final_confirmation(self):
+        assert not self.module.is_confirmed_terminal_game(
+            {"status": "Final", "finalConfirmed": False}
+        )
+        assert self.module.is_confirmed_terminal_game({"status": "Final"})
+        assert self.module.is_confirmed_terminal_game({"status": "Postponed"})
