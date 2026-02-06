@@ -1,5 +1,5 @@
-import { getGameTotalSeconds, getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
-import { formatClock, formatStatusText } from '../../helpers/utils';
+import { getGameTotalSeconds, getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../../helpers/playTimeline';
+import { formatClock, formatStatusText } from '../../../helpers/utils';
 
 export const formatPeriodLabel = (period) => {
   const value = Number(period);
