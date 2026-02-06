@@ -315,6 +315,47 @@ const drawWatermark = (ctx, computedStyle, x, y) => {
   ctx.restore();
 };
 
+const getPeriodCountFromRange = (periodRange, fallback = 4) => {
+  const start = Number(periodRange?.start);
+  const end = Number(periodRange?.end);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return fallback;
+  return Math.max(1, end - start + 1);
+};
+
+const getQuarterAwareLegendScale = (periodCount) => {
+  const currentScale = 0.85;
+  const q1Scale = 0.6;
+  const count = Number(periodCount);
+  if (!Number.isFinite(count) || count <= 0) return currentScale;
+  if (count >= 4) return currentScale;
+  if (count <= 1) return q1Scale;
+  const ratio = (count - 1) / 3;
+  return q1Scale + (currentScale - q1Scale) * ratio;
+};
+
+const getFullTimelineLegendScale = (periodCount) => {
+  const currentScale = 0.85;
+  const q1Scale = 0.78;
+  const count = Number(periodCount);
+  if (!Number.isFinite(count) || count <= 0) return currentScale;
+  if (count >= 4) return currentScale;
+  if (count <= 1) return q1Scale;
+  const ratio = (count - 1) / 3;
+  return q1Scale + (currentScale - q1Scale) * ratio;
+};
+
+const getQuarterAwareLegendGap = (periodCount, q1Gap, q4Gap) => {
+  const minGap = Number(q1Gap);
+  const maxGap = Number(q4Gap);
+  if (!Number.isFinite(minGap) || !Number.isFinite(maxGap)) return 0;
+  const count = Number(periodCount);
+  if (!Number.isFinite(count) || count <= 0) return maxGap;
+  if (count >= 4) return maxGap;
+  if (count <= 1) return minGap;
+  const ratio = (count - 1) / 3;
+  return minGap + (maxGap - minGap) * ratio;
+};
+
 const drawLegend = (
   ctx,
   computedStyle,
@@ -1025,6 +1066,7 @@ const buildLiteExportCanvas = ({
   exportWidth,
   legendShouldWrap,
   rangeLabel,
+  periodRange,
   leftMargin,
   rightMargin,
   playRef,
@@ -1052,7 +1094,22 @@ const buildLiteExportCanvas = ({
   const rightPad = rightMargin;
   const headerHeight = 54;
   const footerHeight = 32;
-  const legendHeight = legendShouldWrap ? 72 : 44;
+  const styleSource = playRef?.current || document.documentElement;
+  const computed = window.getComputedStyle(styleSource);
+  const periodCount = getPeriodCountFromRange(periodRange);
+  const legendScale = getFullTimelineLegendScale(periodCount);
+  const legendTopGap = getQuarterAwareLegendGap(periodCount, 6, 12);
+  const legendMeasureCtx = document.createElement('canvas').getContext('2d');
+  const legendHeight = measureLegendHeight(
+    legendMeasureCtx,
+    computed,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    true,
+    legendScale
+  );
   const chartHeight = 360;
   const chartTop = headerHeight + 8;
   const chartLeft = rightPad;
@@ -1073,8 +1130,6 @@ const buildLiteExportCanvas = ({
   ctx.fillRect(0, 0, baseWidth, baseHeight);
   ctx.translate(outerPadding, outerPadding);
 
-  const styleSource = playRef?.current || document.documentElement;
-  const computed = window.getComputedStyle(styleSource);
   const getVar = (name, fallback) => {
     const value = computed.getPropertyValue(name);
     return value ? value.trim() : fallback;
@@ -1167,8 +1222,8 @@ const buildLiteExportCanvas = ({
     endAtSeconds,
   });
 
-  const legendTop = chartTop + chartHeight + 12;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff);
+  const legendTop = chartTop + chartHeight + legendTopGap;
+  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, true, legendScale);
   drawWatermark(ctx, computed, 6, contentHeight - 6);
 
   return canvas;
@@ -1211,14 +1266,15 @@ const buildSinglePlayerExportCanvas = ({
   const topPadding = 8;
   const teamLabelHeight = 0;
   const rowHeight = 48;
-  const bottomPadding = 12;
+  const periodCount = getPeriodCountFromRange(periodRange);
+  const bottomPadding = getQuarterAwareLegendGap(periodCount, 6, 12);
   const playAreaHeight = topPadding + teamLabelHeight + 4 + rowHeight + bottomPadding;
   const chartTop = playAreaTop;
   const chartLeft = rightPad;
   const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
   const styleSource = playRef?.current || document.documentElement;
   const computed = window.getComputedStyle(styleSource);
-  const legendScale = 0.85;
+  const legendScale = getQuarterAwareLegendScale(periodCount);
   const legendMeasureCtx = document.createElement('canvas').getContext('2d');
   const legendHeight = measureLegendHeight(
     legendMeasureCtx,
@@ -1498,7 +1554,8 @@ const buildSinglePlayerStackedExportCanvas = ({
   const quarterLabelHeight = 16;
   const rowHeight = 32;
   const sectionGap = 10;
-  const bottomPadding = 28;
+  const periodCount = getPeriodCountFromRange(periodRange);
+  const bottomPadding = getQuarterAwareLegendGap(periodCount, 22, 28);
 
   const rangeStart = Number(periodRange?.start);
   const rangeEnd = Number(periodRange?.end);
@@ -1517,7 +1574,7 @@ const buildSinglePlayerStackedExportCanvas = ({
   const legendGap = 0;
   const styleSource = playRef?.current || document.documentElement;
   const computed = window.getComputedStyle(styleSource);
-  const legendScale = 0.85;
+  const legendScale = getQuarterAwareLegendScale(periodCount);
   const legendForceWrapAfterGroupIndex = 1;
   const legendMeasureCtx = document.createElement('canvas').getContext('2d');
   const legendHeight = measureLegendHeight(
@@ -1795,7 +1852,22 @@ const buildFullExportCanvas = ({
   const teamLabelHeight = 18;
   const teamSectionHeight = 275;
   const playAreaHeight = 600;
-  const legendHeight = legendShouldWrap ? 72 : 44;
+  const styleSource = playRef?.current || document.documentElement;
+  const computed = window.getComputedStyle(styleSource);
+  const periodCount = getPeriodCountFromRange(periodRange);
+  const legendScale = getFullTimelineLegendScale(periodCount);
+  const legendTopGap = getQuarterAwareLegendGap(periodCount, 5, 10);
+  const legendMeasureCtx = document.createElement('canvas').getContext('2d');
+  const legendHeight = measureLegendHeight(
+    legendMeasureCtx,
+    computed,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    true,
+    legendScale
+  );
   const chartHeight = playAreaHeight;
   const chartTop = playAreaTop;
   const chartLeft = leftPad;
@@ -1806,7 +1878,8 @@ const buildFullExportCanvas = ({
   const awayRowHeight = teamSectionHeight / Math.max(1, awayNames.length);
   const homeRowHeight = teamSectionHeight / Math.max(1, homeNames.length);
 
-  const contentHeight = playAreaTop + playAreaHeight + legendHeight + 16;
+  const watermarkBottomPadding = 24;
+  const contentHeight = playAreaTop + playAreaHeight + legendTopGap + legendHeight + watermarkBottomPadding;
   const baseHeight = contentHeight + outerPadding * 2;
 
   const scale = getExportScale();
@@ -1822,8 +1895,6 @@ const buildFullExportCanvas = ({
   ctx.fillRect(0, 0, baseWidth, baseHeight);
   ctx.translate(outerPadding, outerPadding);
 
-  const styleSource = playRef?.current || document.documentElement;
-  const computed = window.getComputedStyle(styleSource);
   const textPrimary = getCssVar(computed, '--text-primary', '#111111');
   const textSecondary = getCssVar(computed, '--text-secondary', '#6b7280');
   const lineColor = getCssVar(computed, '--line-color', '#cbd5f5');
@@ -2093,8 +2164,8 @@ const buildFullExportCanvas = ({
     homeRowHeight
   );
 
-  const legendTop = playAreaTop + playAreaHeight + 10;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff);
+  const legendTop = playAreaTop + playAreaHeight + legendTopGap;
+  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, true, legendScale);
   drawWatermark(ctx, computed, 6, contentHeight - 6);
 
   return canvas;
