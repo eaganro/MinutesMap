@@ -3,11 +3,11 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme'; // Adjust path
 import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
-import { getGameTotalSeconds, getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../helpers/playTimeline';
-import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
-import { formatPeriodLabel } from './PlayExport/playExportRange';
-import { trackFeatureUse } from '../../helpers/analytics';
 import PlayExportControls from './PlayExport/PlayExportControls';
+import { useStablePlayData } from './hooks/useStablePlayData';
+import { useActivePeriodSelection } from './hooks/useActivePeriodSelection';
+import { usePeriodFilteredData } from './hooks/usePeriodFilteredData';
+import { usePlayPointerHandlers } from './hooks/usePlayPointerHandlers';
 
 // Sub-components
 import Player from './Player/Player';
@@ -22,33 +22,6 @@ import './Play.scss';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
-const TOUCH_AXIS_LOCK_PX = 8;
-const QUARTER_VIEW_BREAKPOINT = 700;
-
-const findActionMetaFromTarget = (targetEl, containerEl) => {
-  let checkEl = targetEl;
-  while (checkEl && checkEl !== containerEl) {
-    if (checkEl.dataset) {
-      const actionNumber = checkEl.dataset.actionNumber ?? null;
-      if (actionNumber) {
-        return { actionNumber };
-      }
-    }
-    if (checkEl.tagName === 'svg') break;
-    checkEl = checkEl.parentElement;
-  }
-  return null;
-};
-
-const hasPlayData = (data) => Boolean(
-  data &&
-  (
-    (data.allActions && data.allActions.length) ||
-    (data.scoreTimeline && data.scoreTimeline.length) ||
-    Object.keys(data.awayPlayers || {}).length ||
-    Object.keys(data.homePlayers || {}).length
-  )
-);
 
 export default function Play({ 
   gameId,
@@ -75,9 +48,21 @@ export default function Play({
   statOn
 }) {
   const playRef = useRef(null);
-  const appliedGameIdRef = useRef(gameId);
-  const pendingGameChangeRef = useRef(false);
-  const lastStableRef = useRef({
+  const [showLoadingText, setShowLoadingText] = useState(false);
+  const { isDarkMode } = useTheme();
+  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+
+  const {
+    displayData,
+    isShowingStableData,
+    hasDisplayData,
+    displayStatusMessage,
+    showStatusMessage,
+    isDataLoading,
+  } = useStablePlayData({
+    isLoading,
+    isBlurred,
+    statusMessage,
     awayTeamNames,
     homeTeamNames,
     awayPlayers,
@@ -92,107 +77,6 @@ export default function Play({
     lastAction,
     gameDate,
   });
-  const lastStatusMessageRef = useRef(statusMessage);
-  const touchStartRef = useRef({ x: 0, y: 0 });
-  const touchAxisRef = useRef(null);
-  const touchMovedRef = useRef(false);
-  const touchClickGuardUntilRef = useRef(0);
-  const userSelectedPeriodRef = useRef(false);
-  const [showLoadingText, setShowLoadingText] = useState(false);
-  const [isHoveringIcon, setIsHoveringIcon] = useState(false);
-  const playFeatureTrackedRef = useRef(false);
-  const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia
-      ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
-      : true
-  ));
-  const { isDarkMode } = useTheme();
-  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
-  const trackPlayFeatureUse = () => {
-    if (playFeatureTrackedRef.current) return;
-    playFeatureTrackedRef.current = true;
-    trackFeatureUse('play-by-play');
-  };
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) {
-      return undefined;
-    }
-    const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
-    const handleChange = (event) => setCanOpenVideoOnClick(event.matches);
-
-    setCanOpenVideoOnClick(mediaQuery.matches);
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
-  }, []);
-
-  useEffect(() => {
-    if (isLoading || isBlurred) {
-      return;
-    }
-    lastStableRef.current = {
-      awayTeamNames,
-      homeTeamNames,
-      awayPlayers,
-      awayPlayersAll: awayPlayersAll || awayPlayers,
-      homePlayers,
-      homePlayersAll: homePlayersAll || homePlayers,
-      allActions,
-      scoreTimeline,
-      awayPlayerTimeline,
-      homePlayerTimeline,
-      numQs,
-      lastAction,
-      gameDate,
-    };
-  }, [
-    isLoading,
-    isBlurred,
-    awayTeamNames,
-    homeTeamNames,
-    awayPlayers,
-    awayPlayersAll,
-    homePlayers,
-    homePlayersAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numQs,
-    lastAction,
-    gameDate,
-  ]);
-
-  useEffect(() => {
-    if (isLoading || isBlurred) {
-      return;
-    }
-    lastStatusMessageRef.current = statusMessage;
-  }, [statusMessage, isLoading, isBlurred]);
-
-  const showStableData = (isLoading || isBlurred) && lastStableRef.current;
-  const displayData = showStableData
-    ? lastStableRef.current
-    : {
-      awayTeamNames,
-      homeTeamNames,
-      awayPlayers,
-      awayPlayersAll: awayPlayersAll || awayPlayers,
-      homePlayers,
-      homePlayersAll: homePlayersAll || homePlayers,
-      allActions,
-      scoreTimeline,
-      awayPlayerTimeline,
-      homePlayerTimeline,
-      numQs,
-      lastAction,
-      gameDate,
-    };
-  const isShowingStableData = Boolean(showStableData);
 
   const {
     awayTeamNames: displayAwayTeamNames,
@@ -209,17 +93,6 @@ export default function Play({
     lastAction: displayLastAction,
     gameDate: displayGameDate,
   } = displayData;
-
-  const hasDisplayData = hasPlayData(displayData);
-  const hasIncomingData = hasPlayData({
-    allActions,
-    scoreTimeline,
-    awayPlayers,
-    homePlayers,
-  });
-  const displayStatusMessage = (isLoading || isBlurred) ? lastStatusMessageRef.current : statusMessage;
-  const showStatusMessage = Boolean(displayStatusMessage) && !hasDisplayData;
-  const isDataLoading = isBlurred && (hasDisplayData || hasIncomingData || showStatusMessage);
 
   useEffect(() => {
     if (isLoading && hasDisplayData) {
@@ -246,157 +119,45 @@ export default function Play({
   }, [width, displayNumQs]);
 
   const numPeriods = Number(displayNumQs) || 0;
-  const isQuarterView = sectionWidth > 0 && sectionWidth < QUARTER_VIEW_BREAKPOINT;
+  const {
+    isQuarterView,
+    periodOptions,
+    isFinal,
+    activePeriod,
+    isQuarterFocus,
+    activePeriodLabel,
+    latestStartedPeriod,
+    selectPeriod,
+  } = useActivePeriodSelection({
+    gameId,
+    gameStatus,
+    displayLastAction,
+    numPeriods,
+    sectionWidth,
+    isShowingStableData,
+  });
 
-  const periodOptions = useMemo(() => {
-    if (numPeriods <= 0) return [];
-    const options = [{ period: 0, label: 'Game' }];
-    for (let i = 0; i < numPeriods; i += 1) {
-      const period = i + 1;
-      options.push({
-        period,
-        label: formatPeriodLabel(period),
-      });
-    }
-    return options;
-  }, [numPeriods]);
-
-  const isFinal = useMemo(() => {
-    if (typeof gameStatus === 'string' && gameStatus.trim().startsWith('Final')) {
-      return true;
-    }
-    const status = displayLastAction?.status;
-    return typeof status === 'string' && status.trim().startsWith('Final');
-  }, [displayLastAction?.status, gameStatus]);
-
-  const defaultPeriod = useMemo(() => {
-    if (isFinal) return 1;
-    const fallback = Number(displayLastAction?.period || numPeriods || 4);
-    if (!Number.isFinite(fallback) || fallback <= 0) return 1;
-    return numPeriods > 0 ? Math.min(fallback, numPeriods) : fallback;
-  }, [displayLastAction?.period, numPeriods, isFinal]);
-
-  const hasPeriodData = useMemo(() => {
-    const period = Number(displayLastAction?.period);
-    return Number.isFinite(period) && period > 0;
-  }, [displayLastAction?.period]);
-
-  const [selectedPeriod, setSelectedPeriod] = useState(null);
-
-  useEffect(() => {
-    if (gameId === appliedGameIdRef.current) return;
-    appliedGameIdRef.current = gameId;
-    pendingGameChangeRef.current = true;
-    userSelectedPeriodRef.current = false;
-  }, [gameId]);
-
-  useEffect(() => {
-    if (!pendingGameChangeRef.current) return;
-    if (isShowingStableData) return;
-    pendingGameChangeRef.current = false;
-    setSelectedPeriod(defaultPeriod);
-  }, [isShowingStableData, defaultPeriod]);
-
-  useEffect(() => {
-    if (!isQuarterView || numPeriods <= 0) return;
-    if (pendingGameChangeRef.current) return;
-    if (!hasPeriodData && !isFinal) return;
-    setSelectedPeriod((prev) => {
-      if (prev === 0) return 0;
-      const prevValid = Number.isFinite(prev) && prev > 0 && prev <= numPeriods;
-      if (userSelectedPeriodRef.current && prevValid) return prev;
-      return defaultPeriod;
-    });
-  }, [isQuarterView, numPeriods, defaultPeriod, hasPeriodData, isFinal]);
-
-  const resolvedSelectedPeriod = pendingGameChangeRef.current && !isShowingStableData
-    ? defaultPeriod
-    : selectedPeriod;
-  const activePeriod = isQuarterView ? (resolvedSelectedPeriod !== null ? resolvedSelectedPeriod : defaultPeriod) : null;
-  const isQuarterFocus = isQuarterView && activePeriod !== 0;
-  const activePeriodLabel = isQuarterFocus ? formatPeriodLabel(activePeriod) : '';
-
-  const timelineWindow = useMemo(() => {
-    const totalSeconds = getGameTotalSeconds(numPeriods);
-    if (!activePeriod) {
-      return { startSeconds: 0, durationSeconds: totalSeconds };
-    }
-    return {
-      startSeconds: getPeriodStartSeconds(activePeriod),
-      durationSeconds: getPeriodDurationSeconds(activePeriod),
-    };
-  }, [activePeriod, numPeriods]);
-
-  const filteredAllActions = useMemo(() => {
-    if (!activePeriod) return displayAllActions || [];
-    return (displayAllActions || []).filter((action) => Number(action.period) === activePeriod);
-  }, [displayAllActions, activePeriod]);
-
-  const filteredScoreTimeline = useMemo(() => {
-    if (!activePeriod) return displayScoreTimeline || [];
-    return (displayScoreTimeline || []).filter((action) => Number(action.period) === activePeriod);
-  }, [displayScoreTimeline, activePeriod]);
-
-  const filteredAwayPlayers = useMemo(() => {
-    if (!activePeriod) return displayAwayPlayers || {};
-    return Object.fromEntries(
-      Object.entries(displayAwayPlayers || {}).map(([name, actions]) => [
-        name,
-        (actions || []).filter((action) => Number(action.period) === activePeriod),
-      ])
-    );
-  }, [displayAwayPlayers, activePeriod]);
-
-  const filteredHomePlayers = useMemo(() => {
-    if (!activePeriod) return displayHomePlayers || {};
-    return Object.fromEntries(
-      Object.entries(displayHomePlayers || {}).map(([name, actions]) => [
-        name,
-        (actions || []).filter((action) => Number(action.period) === activePeriod),
-      ])
-    );
-  }, [displayHomePlayers, activePeriod]);
-
-  const filteredAwayPlayerTimeline = useMemo(() => {
-    if (!activePeriod) return displayAwayPlayerTimeline || {};
-    return Object.fromEntries(
-      Object.entries(displayAwayPlayerTimeline || {}).map(([name, timeline]) => [
-        name,
-        (timeline || []).filter((entry) => Number(entry.period) === activePeriod),
-      ])
-    );
-  }, [displayAwayPlayerTimeline, activePeriod]);
-
-  const filteredHomePlayerTimeline = useMemo(() => {
-    if (!activePeriod) return displayHomePlayerTimeline || {};
-    return Object.fromEntries(
-      Object.entries(displayHomePlayerTimeline || {}).map(([name, timeline]) => [
-        name,
-        (timeline || []).filter((entry) => Number(entry.period) === activePeriod),
-      ])
-    );
-  }, [displayHomePlayerTimeline, activePeriod]);
-
-  const filteredLastAction = useMemo(() => {
-    if (!activePeriod) return displayLastAction;
-    if (!filteredAllActions.length) return null;
-    return filteredAllActions[filteredAllActions.length - 1];
-  }, [activePeriod, filteredAllActions, displayLastAction]);
-
-  const startScoreDiff = useMemo(() => {
-    if (!activePeriod) return 0;
-    const startSeconds = getPeriodStartSeconds(activePeriod);
-    let diff = 0;
-    (displayScoreTimeline || []).forEach((entry) => {
-      const elapsed = getSecondsElapsed(entry.period, entry.clock);
-      if (elapsed <= startSeconds) {
-        diff = Number(entry.away) - Number(entry.home);
-      }
-    });
-    return diff;
-  }, [activePeriod, displayScoreTimeline]);
-
-  const latestStartedPeriod = Number(displayLastAction?.period || 0);
+  const {
+    timelineWindow,
+    filteredAllActions,
+    filteredScoreTimeline,
+    filteredAwayPlayers,
+    filteredHomePlayers,
+    filteredAwayPlayerTimeline,
+    filteredHomePlayerTimeline,
+    filteredLastAction,
+    startScoreDiff,
+  } = usePeriodFilteredData({
+    activePeriod,
+    numPeriods,
+    displayAllActions,
+    displayScoreTimeline,
+    displayAwayPlayers,
+    displayHomePlayers,
+    displayAwayPlayerTimeline,
+    displayHomePlayerTimeline,
+    displayLastAction,
+  });
 
   // --- Custom Hook for Logic ---
   const {
@@ -431,6 +192,29 @@ export default function Play({
     setHighlightActionIds([]);
   }, [activePeriod, setInfoLocked, setMouseLinePos, setDescriptionArray, setHighlightActionIds]);
 
+  const {
+    isHoveringIcon,
+    clearHoverIcon,
+    handleMouseMove,
+    handleMouseLeave,
+    handleClick,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    handleTouchCancel,
+  } = usePlayPointerHandlers({
+    playRef,
+    nbaGameId,
+    displayAllActions,
+    isDataLoading,
+    infoLocked,
+    descriptionArray,
+    setInfoLocked,
+    setMousePosition,
+    updateHoverAt,
+    resetInteraction,
+  });
+
   // --- Visual Data Prep ---
   const teamColors = getMatchupColors(displayAwayTeamNames.abr, displayHomeTeamNames.abr, isDarkMode);
   
@@ -454,119 +238,6 @@ export default function Play({
   }, [displayScoreTimeline]);
 
 
-  // --- Event Handlers ---
-  const handleMouseMove = (e) => {
-    const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
-    setIsHoveringIcon(Boolean(actionMeta?.actionNumber));
-    updateHoverAt(e.clientX, e.clientY, e.target);
-  };
-
-  const handleClick = (e) => {
-    if (Date.now() < touchClickGuardUntilRef.current) {
-      return;
-    }
-    trackPlayFeatureUse();
-    const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
-    const actionNumber = actionMeta?.actionNumber ?? null;
-    if (actionNumber && canOpenVideoOnClick) {
-      let action = null;
-      if (actionNumber) {
-        action = (displayAllActions || []).find(
-          (entry) => String(entry.actionNumber) === String(actionNumber)
-        );
-      }
-      const targetAction = resolveVideoAction(action, displayAllActions);
-      const url = buildNbaEventUrl({
-        gameId: nbaGameId,
-        actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber,
-        description: targetAction?.description ?? action?.description,
-      });
-      if (url && typeof window !== 'undefined') {
-        window.open(url, '_blank', 'noopener');
-        return;
-      }
-    }
-    if (!infoLocked) {
-      setInfoLocked(true);
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    } else {
-      setInfoLocked(false);
-      if (!canOpenVideoOnClick) {
-        resetInteraction(true);
-      } else {
-        resetInteraction();
-      }
-    }
-  };
-
-  const handleTouchStart = (e) => {
-    if (isDataLoading || !e.touches[0]) return;
-    trackPlayFeatureUse();
-    touchAxisRef.current = null;
-    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    touchMovedRef.current = false;
-    resetInteraction();
-  };
-
-  const handleTouchMove = (e) => {
-    if (isDataLoading || !e.touches[0]) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - touchStartRef.current.x;
-    const dy = touch.clientY - touchStartRef.current.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    if (!touchAxisRef.current) {
-      if (absDx < TOUCH_AXIS_LOCK_PX && absDy < TOUCH_AXIS_LOCK_PX) {
-        return;
-      }
-      touchAxisRef.current = absDx >= absDy ? 'horizontal' : 'vertical';
-      touchMovedRef.current = true;
-    }
-
-    if (touchAxisRef.current === 'vertical') {
-      if (!infoLocked) {
-        resetInteraction();
-      }
-      return;
-    }
-
-    const wasLocked = infoLocked;
-    if (wasLocked) {
-      setInfoLocked(false);
-    }
-    touchMovedRef.current = true;
-    e.preventDefault();
-    updateHoverAt(touch.clientX, touch.clientY, e.target, wasLocked);
-  };
-
-  const handleTouchEnd = () => {
-    if (isDataLoading) return;
-    if (touchMovedRef.current) {
-      const shouldLock = touchAxisRef.current === 'horizontal' && descriptionArray.length > 0;
-      touchClickGuardUntilRef.current = Date.now() + 200;
-      if (!infoLocked) {
-        if (shouldLock) {
-          setInfoLocked(true);
-        } else {
-          resetInteraction();
-        }
-      }
-    }
-    touchAxisRef.current = null;
-    touchMovedRef.current = false;
-  };
-
-  const handleTouchCancel = () => {
-    if (isDataLoading) return;
-    touchClickGuardUntilRef.current = Date.now() + 200;
-    if (!infoLocked) {
-      resetInteraction();
-    }
-    touchAxisRef.current = null;
-    touchMovedRef.current = false;
-  };
-
   const showQuarterSwitcher = isQuarterView && periodOptions.length > 0 && hasDisplayData;
   const quarterSwitcher = showQuarterSwitcher ? (
     <div className="playQuarterSwitcher" style={{ width: sectionWidth }}>
@@ -575,10 +246,7 @@ export default function Play({
           key={period}
           type="button"
           className={`quarterTab ${period === activePeriod ? 'isActive' : ''}`}
-          onClick={() => {
-            userSelectedPeriodRef.current = true;
-            setSelectedPeriod(period);
-          }}
+          onClick={() => selectPeriod(period)}
           disabled={isDataLoading || (period !== 0 && period > latestStartedPeriod)}
           aria-pressed={period === activePeriod}
         >
@@ -652,7 +320,7 @@ export default function Play({
         displayLastAction={displayLastAction}
         onExportInteractionStart={() => {
           setInfoLocked(false);
-          setIsHoveringIcon(false);
+          clearHoverIcon();
           resetInteraction(true);
         }}
       />
@@ -661,10 +329,7 @@ export default function Play({
         className={`play ${isDataLoading ? 'isLoading' : ''}`}
         style={{ width: sectionWidth }} // Use full section width including margins
         onMouseMove={isDataLoading ? undefined : handleMouseMove}
-        onMouseLeave={isDataLoading ? undefined : () => {
-          setIsHoveringIcon(false);
-          resetInteraction();
-        }}
+        onMouseLeave={isDataLoading ? undefined : handleMouseLeave}
         onClick={isDataLoading ? undefined : handleClick}
         // Touch support
         onTouchStart={handleTouchStart}
