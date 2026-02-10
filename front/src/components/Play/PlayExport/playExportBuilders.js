@@ -3,7 +3,7 @@ import {
   getPeriodStartSeconds,
   getSecondsElapsed,
 } from '../../../helpers/playTimeline';
-import { getEventType, isFreeThrowAction } from '../../../helpers/eventStyles.jsx';
+import { getEventType, isFreeThrowAction } from '../../../domain/events/classification';
 import {
   DESKTOP_EXPORT_WIDTH,
   TIMELINE_ICON_SCALE,

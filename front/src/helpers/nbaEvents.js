@@ -1,4 +1,4 @@
-import { getEventType, isFreeThrowAction } from './eventStyles.jsx';
+import { getEventType, isFreeThrowAction } from '../domain/events/classification';
 
 const NBA_EVENT_BASE_URL = 'https://www.nba.com/stats/events';
 

@@ -3,9 +3,8 @@ import {
   getEventType,
   isFreeThrowAction,
   isThreePointAction,
-  LegendShape,
-  renderFreeThrowRing,
-} from '../../helpers/eventStyles.jsx';
+} from '../../domain/events/classification';
+import { LegendShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
 import { formatClock, formatPeriod } from '../../helpers/utils';
 import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
 

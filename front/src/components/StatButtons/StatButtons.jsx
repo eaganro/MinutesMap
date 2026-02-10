@@ -1,4 +1,4 @@
-import { EVENT_TYPES, LegendShape, renderFreeThrowRing } from '../../helpers/eventStyles.jsx';
+import { EVENT_TYPES, LegendShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
 import './StatButtons.scss';
 
 export default function StatButtons({

@@ -4,12 +4,12 @@ import {
   getSecondsElapsed,
 } from '../../../helpers/playTimeline';
 import {
-  EVENT_TYPES,
   getEventType,
   isFreeThrowAction,
   isMissDescription,
   isThreePointAction,
-} from '../../../helpers/eventStyles.jsx';
+} from '../../../domain/events/classification';
+import { EVENT_TYPES } from '../../../ui/eventShapes.jsx';
 
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;

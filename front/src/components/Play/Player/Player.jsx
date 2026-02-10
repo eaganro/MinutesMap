@@ -3,9 +3,8 @@ import {
   getEventType,
   isFreeThrowAction,
   isThreePointAction,
-  renderEventShape,
-  renderFreeThrowRing,
-} from '../../../helpers/eventStyles.jsx';
+} from '../../../domain/events/classification';
+import { renderEventShape, renderFreeThrowRing } from '../../../ui/eventShapes.jsx';
 
 import './Player.scss';
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSecondsElapsed } from '../../helpers/playTimeline';
-import { getEventType, isFreeThrowAction } from '../../helpers/eventStyles.jsx';
+import { getEventType, isFreeThrowAction } from '../../domain/events/classification';
 
 export const usePlayInteraction = ({
   allActions,

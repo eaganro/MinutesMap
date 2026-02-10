@@ -1,0 +1,328 @@
+export const legacyPlayByPlayPayload = {
+  schemaVersion: 1,
+  scoreTimeline: [
+    { period: 1, clock: 'PT12M00.00S', away: 0, home: 0 },
+    { period: 1, clock: 'PT10M32.00S', away: 2, home: 0 },
+    { period: 1, clock: 'PT07M00.00S', away: 2, home: 1 },
+    { period: 2, clock: 'PT11M20.00S', away: 2, home: 4 },
+  ],
+  awayPlayerTimeline: {
+    'Away One': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
+    'Away Two': [{ period: 1, start: 'PT09M20.00S', end: 'PT00M00.00S' }],
+  },
+  homePlayerTimeline: {
+    'Home One': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
+    'Home Two': [{ period: 2, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
+  },
+  awayActions: {
+    'Away One': [
+      {
+        period: 1,
+        clock: 'PT10M32.00S',
+        actionType: '2pt',
+        description: 'Away One makes 2PT driving layup',
+        result: 'm',
+        actionNumber: 11,
+        scoreAway: 2,
+        scoreHome: 0,
+      },
+      {
+        period: 1,
+        clock: 'PT09M58.00S',
+        actionType: 'rebound',
+        description: 'Away One defensive rebound',
+        actionNumber: 13,
+      },
+    ],
+    'Away Two': [
+      {
+        period: 1,
+        clock: 'PT08M50.00S',
+        actionType: 'turnover',
+        description: 'Away Two bad pass turnover',
+        actionNumber: 21,
+      },
+    ],
+  },
+  homeActions: {
+    'Home One': [
+      {
+        period: 1,
+        clock: 'PT10M10.00S',
+        actionType: 'block',
+        description: 'Home One block',
+        actionNumber: 12,
+      },
+      {
+        period: 1,
+        clock: 'PT07M00.00S',
+        actionType: 'foul',
+        description: 'Home One shooting foul',
+        actionNumber: 31,
+      },
+    ],
+    'Home Two': [
+      {
+        period: 2,
+        clock: 'PT11M20.00S',
+        actionType: '3pt',
+        description: 'Home Two misses 3PT jump shot',
+        result: 'x',
+        actionNumber: 41,
+      },
+    ],
+  },
+};
+
+export const compactPlayByPlayPayload = {
+  v: 2,
+  score: [
+    { quarter: 1, time: 'PT12M00.00S', awayScore: 0, homeScore: 0 },
+    { quarter: 1, time: 'PT11M00.00S', awayScore: 2, homeScore: 0 },
+    { quarter: 2, time: 'PT11M50.00S', awayScore: 2, homeScore: 3 },
+  ],
+  players: {
+    away: {
+      'Away Guard': [
+        {
+          quarter: 1,
+          time: 'PT11M00.00S',
+          type: '2pt',
+          text: 'Away Guard makes driving layup',
+          r: 'm',
+          seq: 101,
+          awayScore: 2,
+          homeScore: 0,
+        },
+        {
+          quarter: 1,
+          time: 'PT09M20.00S',
+          type: 'free throw',
+          text: 'MISS FT 1 of 2',
+          r: 'x',
+          detail: 'FT 1 of 2',
+          seq: 102,
+          awayScore: 2,
+          homeScore: 0,
+        },
+      ],
+    },
+    home: {
+      'Home Wing': [
+        {
+          quarter: 1,
+          time: 'PT10M45.00S',
+          type: 'assist',
+          text: 'Home Wing assist',
+          seq: 103,
+        },
+        {
+          quarter: 2,
+          time: 'PT11M50.00S',
+          type: '3pt',
+          text: 'Home Wing 3PT Jump Shot',
+          r: 'm',
+          seq: 201,
+          awayScore: 2,
+          homeScore: 3,
+        },
+      ],
+    },
+  },
+  segments: {
+    away: {
+      'Away Guard': [{ quarter: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
+    },
+    home: {
+      'Home Wing': [
+        { quarter: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' },
+        { quarter: 2, start: 'PT12M00.00S', end: 'PT00M00.00S' },
+      ],
+    },
+  },
+};
+
+export const expectedLegacyNormalized = {
+  scoreTimeline: legacyPlayByPlayPayload.scoreTimeline,
+  awayPlayerTimeline: legacyPlayByPlayPayload.awayPlayerTimeline,
+  homePlayerTimeline: legacyPlayByPlayPayload.homePlayerTimeline,
+  awayActionsAll: legacyPlayByPlayPayload.awayActions,
+  homeActionsAll: legacyPlayByPlayPayload.homeActions,
+  allActions: [
+    {
+      period: 1,
+      clock: 'PT10M32.00S',
+      actionType: '2pt',
+      description: 'Away One makes 2PT driving layup',
+      result: 'm',
+      actionNumber: 11,
+      scoreAway: 2,
+      scoreHome: 0,
+      side: 'away',
+    },
+    {
+      period: 1,
+      clock: 'PT10M10.00S',
+      actionType: 'block',
+      description: 'Home One block',
+      actionNumber: 12,
+      side: 'home',
+    },
+    {
+      period: 1,
+      clock: 'PT09M58.00S',
+      actionType: 'rebound',
+      description: 'Away One defensive rebound',
+      actionNumber: 13,
+      side: 'away',
+    },
+    {
+      period: 1,
+      clock: 'PT08M50.00S',
+      actionType: 'turnover',
+      description: 'Away Two bad pass turnover',
+      actionNumber: 21,
+      side: 'away',
+    },
+    {
+      period: 1,
+      clock: 'PT07M00.00S',
+      actionType: 'foul',
+      description: 'Home One shooting foul',
+      actionNumber: 31,
+      side: 'home',
+    },
+    {
+      period: 2,
+      clock: 'PT11M20.00S',
+      actionType: '3pt',
+      description: 'Home Two misses 3PT jump shot',
+      result: 'x',
+      actionNumber: 41,
+      side: 'home',
+    },
+  ],
+};
+
+export const expectedCompactNormalized = {
+  scoreTimeline: [
+    { period: 1, clock: 'PT12M00.00S', away: 0, home: 0 },
+    { period: 1, clock: 'PT11M00.00S', away: 2, home: 0 },
+    { period: 2, clock: 'PT11M50.00S', away: 2, home: 3 },
+  ],
+  awayPlayerTimeline: {
+    'Away Guard': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
+  },
+  homePlayerTimeline: {
+    'Home Wing': [
+      { period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' },
+      { period: 2, start: 'PT12M00.00S', end: 'PT00M00.00S' },
+    ],
+  },
+  awayActionsAll: {
+    'Away Guard': [
+      {
+        period: 1,
+        clock: 'PT11M00.00S',
+        actionType: '2pt',
+        description: 'Away Guard makes driving layup',
+        result: 'm',
+        subType: undefined,
+        actionNumber: 101,
+        scoreAway: 2,
+        scoreHome: 0,
+        side: 'away',
+      },
+      {
+        period: 1,
+        clock: 'PT09M20.00S',
+        actionType: 'free throw',
+        description: 'MISS FT 1 of 2',
+        result: 'x',
+        subType: 'FT 1 of 2',
+        actionNumber: 102,
+        scoreAway: 2,
+        scoreHome: 0,
+        side: 'away',
+      },
+    ],
+  },
+  homeActionsAll: {
+    'Home Wing': [
+      {
+        period: 1,
+        clock: 'PT10M45.00S',
+        actionType: 'assist',
+        description: 'Home Wing assist',
+        result: undefined,
+        subType: undefined,
+        actionNumber: 103,
+        scoreAway: undefined,
+        scoreHome: undefined,
+        side: 'home',
+      },
+      {
+        period: 2,
+        clock: 'PT11M50.00S',
+        actionType: '3pt',
+        description: 'Home Wing 3PT Jump Shot',
+        result: 'm',
+        subType: undefined,
+        actionNumber: 201,
+        scoreAway: 2,
+        scoreHome: 3,
+        side: 'home',
+      },
+    ],
+  },
+  allActions: [
+    {
+      period: 1,
+      clock: 'PT11M00.00S',
+      actionType: '2pt',
+      description: 'Away Guard makes driving layup',
+      result: 'm',
+      subType: undefined,
+      actionNumber: 101,
+      scoreAway: 2,
+      scoreHome: 0,
+      side: 'away',
+    },
+    {
+      period: 1,
+      clock: 'PT10M45.00S',
+      actionType: 'assist',
+      description: 'Home Wing assist',
+      result: undefined,
+      subType: undefined,
+      actionNumber: 103,
+      scoreAway: undefined,
+      scoreHome: undefined,
+      side: 'home',
+    },
+    {
+      period: 1,
+      clock: 'PT09M20.00S',
+      actionType: 'free throw',
+      description: 'MISS FT 1 of 2',
+      result: 'x',
+      subType: 'FT 1 of 2',
+      actionNumber: 102,
+      scoreAway: 2,
+      scoreHome: 0,
+      side: 'away',
+    },
+    {
+      period: 2,
+      clock: 'PT11M50.00S',
+      actionType: '3pt',
+      description: 'Home Wing 3PT Jump Shot',
+      result: 'm',
+      subType: undefined,
+      actionNumber: 201,
+      scoreAway: 2,
+      scoreHome: 3,
+      side: 'home',
+    },
+  ],
+};
