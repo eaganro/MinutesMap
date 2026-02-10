@@ -1,4 +1,8 @@
-import { getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../../helpers/playTimeline';
+import {
+  getPeriodDurationSeconds,
+  getPeriodStartSeconds,
+  getSecondsElapsed,
+} from '../../../helpers/playTimeline';
 import { getEventType, isFreeThrowAction } from '../../../helpers/eventStyles.jsx';
 import {
   DESKTOP_EXPORT_WIDTH,
@@ -75,7 +79,7 @@ const buildLiteExportCanvas = ({
     statOn,
     showScoreDiff,
     true,
-    legendScale
+    legendScale,
   );
   const chartHeight = 360;
   const chartTop = headerHeight + 8;
@@ -125,9 +129,10 @@ const buildLiteExportCanvas = ({
     ctx.fillText(formattedGameDate, 6, 40);
   }
 
-  const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
-    ? filteredScoreTimeline
-    : (displayScoreTimeline || []);
+  const scoreTimelineSource =
+    filteredScoreTimeline && filteredScoreTimeline.length
+      ? filteredScoreTimeline
+      : displayScoreTimeline || [];
   const lastScoreEntry = scoreTimelineSource.length
     ? scoreTimelineSource[scoreTimelineSource.length - 1]
     : null;
@@ -190,7 +195,18 @@ const buildLiteExportCanvas = ({
   });
 
   const legendTop = chartTop + chartHeight + legendTopGap;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, true, legendScale);
+  drawLegend(
+    ctx,
+    computed,
+    12,
+    legendTop,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    true,
+    legendScale,
+  );
   drawWatermark(ctx, computed, 6, contentHeight - 6);
 
   return canvas;
@@ -251,16 +267,19 @@ const buildSinglePlayerExportCanvas = ({
     statOn,
     showScoreDiff,
     false,
-    legendScale
+    legendScale,
   );
   const hasPlayer = Boolean(selectedPlayer?.name);
-  const isAway = hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
+  const isAway =
+    hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
   const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
   const playerName = selectedPlayer?.name || '';
   const playerLabel = playerDisplayName || playerName;
   const actions = (isAway ? filteredAwayPlayers : filteredHomePlayers)?.[playerName] || [];
-  const boxScoreActions = (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
-  const timeline = (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
+  const boxScoreActions =
+    (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
+  const timeline =
+    (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
   const boxScoreStats = computePlayerBoxScore({
     actions: boxScoreActions,
     timeline,
@@ -273,9 +292,15 @@ const buildSinglePlayerExportCanvas = ({
   const boxScoreGap = boxScoreItems.length ? 10 : 0;
   const boxScoreWidth = contentWidth;
   const boxScoreX = Math.max(0, (contentWidth - boxScoreWidth) / 2);
-  const boxScoreHeight = boxScoreItems.length ? (BOX_TABLE_HEADER_HEIGHT + BOX_TABLE_ROW_HEIGHT) : 0;
+  const boxScoreHeight = boxScoreItems.length ? BOX_TABLE_HEADER_HEIGHT + BOX_TABLE_ROW_HEIGHT : 0;
   const boxScoreBottomPadding = boxScoreItems.length ? 38 : 16;
-  const contentHeight = playAreaTop + playAreaHeight + legendHeight + boxScoreGap + boxScoreHeight + boxScoreBottomPadding;
+  const contentHeight =
+    playAreaTop +
+    playAreaHeight +
+    legendHeight +
+    boxScoreGap +
+    boxScoreHeight +
+    boxScoreBottomPadding;
   const baseHeight = contentHeight + outerPadding * 2;
 
   const scale = getExportScale();
@@ -324,15 +349,19 @@ const buildSinglePlayerExportCanvas = ({
   const minNameFontSize = 9;
   ctx.fillStyle = textPrimary;
   ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
-  while (nameFontSize > minNameFontSize && ctx.measureText(displayName).width > playerNameMaxWidth) {
+  while (
+    nameFontSize > minNameFontSize &&
+    ctx.measureText(displayName).width > playerNameMaxWidth
+  ) {
     nameFontSize -= 1;
     ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
   }
   ctx.fillText(displayName, 6, playerNameY);
 
-  const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
-    ? filteredScoreTimeline
-    : (displayScoreTimeline || []);
+  const scoreTimelineSource =
+    filteredScoreTimeline && filteredScoreTimeline.length
+      ? filteredScoreTimeline
+      : displayScoreTimeline || [];
   const lastScoreEntry = scoreTimelineSource.length
     ? scoreTimelineSource[scoreTimelineSource.length - 1]
     : null;
@@ -429,7 +458,9 @@ const buildSinglePlayerExportCanvas = ({
 
   const filteredActions = actions.filter((action) => {
     const type = (action?.actionType || '').toString().toLowerCase();
-    return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
+    return (
+      type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation'
+    );
   });
   const pointAtTime = new Set();
   const freeThrowOneAtTime = new Set();
@@ -460,7 +491,7 @@ const buildSinglePlayerExportCanvas = ({
         action.description,
         action.subType,
         computed,
-        isAnd1
+        isAnd1,
       );
       return;
     }
@@ -473,7 +504,18 @@ const buildSinglePlayerExportCanvas = ({
   });
 
   const legendTop = playAreaTop + playAreaHeight + 10;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, false, legendScale);
+  drawLegend(
+    ctx,
+    computed,
+    12,
+    legendTop,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    false,
+    legendScale,
+  );
   if (boxScoreItems.length) {
     const boxScoreTop = legendTop + legendHeight + boxScoreGap;
     drawBoxScoreTable(ctx, computed, boxScoreItems, boxScoreX, boxScoreTop, boxScoreWidth);
@@ -526,15 +568,17 @@ const buildSinglePlayerStackedExportCanvas = ({
 
   const rangeStart = Number(periodRange?.start);
   const rangeEnd = Number(periodRange?.end);
-  const periods = (Number.isFinite(rangeStart) && Number.isFinite(rangeEnd) && rangeEnd >= rangeStart)
-    ? Array.from({ length: rangeEnd - rangeStart + 1 }, (_, idx) => rangeStart + idx)
-    : [];
+  const periods =
+    Number.isFinite(rangeStart) && Number.isFinite(rangeEnd) && rangeEnd >= rangeStart
+      ? Array.from({ length: rangeEnd - rangeStart + 1 }, (_, idx) => rangeStart + idx)
+      : [];
 
   const sectionHeight = quarterLabelHeight + rowHeight;
-  const playAreaHeight = topPadding
-    + (periods.length * sectionHeight)
-    + (Math.max(0, periods.length - 1) * sectionGap)
-    + bottomPadding;
+  const playAreaHeight =
+    topPadding +
+    periods.length * sectionHeight +
+    Math.max(0, periods.length - 1) * sectionGap +
+    bottomPadding;
   const chartTop = playAreaTop;
   const chartLeft = rightPad;
   const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
@@ -553,16 +597,19 @@ const buildSinglePlayerStackedExportCanvas = ({
     showScoreDiff,
     false,
     legendScale,
-    legendForceWrapAfterGroupIndex
+    legendForceWrapAfterGroupIndex,
   );
   const hasPlayer = Boolean(selectedPlayer?.name);
-  const isAway = hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
+  const isAway =
+    hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
   const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
   const playerName = selectedPlayer?.name || '';
   const playerLabel = playerDisplayName || playerName;
   const actions = (isAway ? filteredAwayPlayers : filteredHomePlayers)?.[playerName] || [];
-  const boxScoreActions = (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
-  const timeline = (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
+  const boxScoreActions =
+    (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
+  const timeline =
+    (isAway ? filteredAwayPlayerTimeline : filteredHomePlayerTimeline)?.[playerName] || [];
   const boxScoreStats = computePlayerBoxScore({
     actions: boxScoreActions,
     timeline,
@@ -575,9 +622,16 @@ const buildSinglePlayerStackedExportCanvas = ({
   const boxScoreGap = boxScoreItems.length ? 12 : 0;
   const boxScoreWidth = contentWidth;
   const boxScoreX = Math.max(0, (contentWidth - boxScoreWidth) / 2);
-  const boxScoreHeight = boxScoreItems.length ? (BOX_TABLE_HEADER_HEIGHT + BOX_TABLE_ROW_HEIGHT) : 0;
+  const boxScoreHeight = boxScoreItems.length ? BOX_TABLE_HEADER_HEIGHT + BOX_TABLE_ROW_HEIGHT : 0;
   const boxScoreBottomPadding = boxScoreItems.length ? 26 : 16;
-  const contentHeight = playAreaTop + playAreaHeight + legendGap + legendHeight + boxScoreGap + boxScoreHeight + boxScoreBottomPadding;
+  const contentHeight =
+    playAreaTop +
+    playAreaHeight +
+    legendGap +
+    legendHeight +
+    boxScoreGap +
+    boxScoreHeight +
+    boxScoreBottomPadding;
   const baseHeight = contentHeight + outerPadding * 2;
 
   const scale = getExportScale();
@@ -625,15 +679,19 @@ const buildSinglePlayerStackedExportCanvas = ({
   const minNameFontSize = 9;
   ctx.fillStyle = textPrimary;
   ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
-  while (nameFontSize > minNameFontSize && ctx.measureText(displayName).width > playerNameMaxWidth) {
+  while (
+    nameFontSize > minNameFontSize &&
+    ctx.measureText(displayName).width > playerNameMaxWidth
+  ) {
     nameFontSize -= 1;
     ctx.font = `600 ${nameFontSize}px ${nameFontFamily}`;
   }
   ctx.fillText(displayName, 6, playerNameY);
 
-  const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
-    ? filteredScoreTimeline
-    : (displayScoreTimeline || []);
+  const scoreTimelineSource =
+    filteredScoreTimeline && filteredScoreTimeline.length
+      ? filteredScoreTimeline
+      : displayScoreTimeline || [];
   const lastScoreEntry = scoreTimelineSource.length
     ? scoreTimelineSource[scoreTimelineSource.length - 1]
     : null;
@@ -655,7 +713,9 @@ const buildSinglePlayerStackedExportCanvas = ({
 
   const filteredActions = actions.filter((action) => {
     const type = (action?.actionType || '').toString().toLowerCase();
-    return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
+    return (
+      type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation'
+    );
   });
   const pointAtTime = new Set();
   const freeThrowOneAtTime = new Set();
@@ -677,7 +737,7 @@ const buildSinglePlayerStackedExportCanvas = ({
   ctx.textBaseline = 'middle';
 
   periods.forEach((period, index) => {
-    const blockTop = sectionTop + 6 + (index * (sectionHeight + sectionGap));
+    const blockTop = sectionTop + 6 + index * (sectionHeight + sectionGap);
     const label = formatPeriodLabel(period);
     if (label) {
       ctx.fillStyle = quarterLabelColor;
@@ -694,7 +754,8 @@ const buildSinglePlayerStackedExportCanvas = ({
     const windowStartSeconds = getPeriodStartSeconds(period);
     const windowDurationSeconds = getPeriodDurationSeconds(period);
     const baseDurationSeconds = getPeriodDurationSeconds(1) || windowDurationSeconds || 1;
-    const durationRatio = windowDurationSeconds > 0 ? windowDurationSeconds / baseDurationSeconds : 1;
+    const durationRatio =
+      windowDurationSeconds > 0 ? windowDurationSeconds / baseDurationSeconds : 1;
     const rowWidth = Math.max(1, Math.min(chartWidth, chartWidth * durationRatio));
     const rowLeft = chartLeft + (chartWidth - rowWidth);
     const rowRight = rowLeft + rowWidth;
@@ -740,7 +801,7 @@ const buildSinglePlayerStackedExportCanvas = ({
             action.description,
             action.subType,
             computed,
-            isAnd1
+            isAnd1,
           );
           return;
         }
@@ -765,7 +826,7 @@ const buildSinglePlayerStackedExportCanvas = ({
     showScoreDiff,
     false,
     legendScale,
-    legendForceWrapAfterGroupIndex
+    legendForceWrapAfterGroupIndex,
   );
   if (boxScoreItems.length) {
     const boxScoreTop = legendTop + legendHeight + boxScoreGap;
@@ -833,7 +894,7 @@ const buildFullExportCanvas = ({
     statOn,
     showScoreDiff,
     true,
-    legendScale
+    legendScale,
   );
   const chartHeight = playAreaHeight;
   const chartTop = playAreaTop;
@@ -846,7 +907,8 @@ const buildFullExportCanvas = ({
   const homeRowHeight = teamSectionHeight / Math.max(1, homeNames.length);
 
   const watermarkBottomPadding = 24;
-  const contentHeight = playAreaTop + playAreaHeight + legendTopGap + legendHeight + watermarkBottomPadding;
+  const contentHeight =
+    playAreaTop + playAreaHeight + legendTopGap + legendHeight + watermarkBottomPadding;
   const baseHeight = contentHeight + outerPadding * 2;
 
   const scale = getExportScale();
@@ -888,9 +950,10 @@ const buildFullExportCanvas = ({
     ctx.fillText(formattedGameDate, 6, 38);
   }
 
-  const scoreTimelineSource = (filteredScoreTimeline && filteredScoreTimeline.length)
-    ? filteredScoreTimeline
-    : (displayScoreTimeline || []);
+  const scoreTimelineSource =
+    filteredScoreTimeline && filteredScoreTimeline.length
+      ? filteredScoreTimeline
+      : displayScoreTimeline || [];
   const lastScoreEntry = scoreTimelineSource.length
     ? scoreTimelineSource[scoreTimelineSource.length - 1]
     : null;
@@ -957,13 +1020,13 @@ const buildFullExportCanvas = ({
   if (showScoreDiff && maxLead > 0) {
     let numLines = 0;
     let lineJump = 0;
-    if ((maxLead / 5) < 5) {
+    if (maxLead / 5 < 5) {
       numLines = Math.floor(maxLead / 5);
       lineJump = 5;
-    } else if ((maxLead / 10) < 5) {
+    } else if (maxLead / 10 < 5) {
       numLines = Math.floor(maxLead / 10);
       lineJump = 10;
-    } else if ((maxLead / 15) < 5) {
+    } else if (maxLead / 15 < 5) {
       numLines = Math.floor(maxLead / 15);
       lineJump = 15;
     } else {
@@ -980,7 +1043,7 @@ const buildFullExportCanvas = ({
     ctx.lineWidth = 1;
     for (let i = 0; i < numLines; i += 1) {
       const value = (i + 1) * lineJump;
-      const yOffset = value * (chartHeight / 2) / maxY;
+      const yOffset = (value * (chartHeight / 2)) / maxY;
       const posy = baselineY - yOffset;
       const negy = baselineY + yOffset;
 
@@ -1062,7 +1125,12 @@ const buildFullExportCanvas = ({
 
       const actions = (players?.[name] || []).filter((action) => {
         const type = (action?.actionType || '').toString().toLowerCase();
-        return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
+        return (
+          type !== 'substitution' &&
+          type !== 'jump ball' &&
+          type !== 'jumpball' &&
+          type !== 'violation'
+        );
       });
       const pointAtTime = new Set();
       const freeThrowOneAtTime = new Set();
@@ -1093,7 +1161,7 @@ const buildFullExportCanvas = ({
             action.description,
             action.subType,
             computed,
-            isAnd1
+            isAnd1,
           );
           return;
         }
@@ -1118,7 +1186,7 @@ const buildFullExportCanvas = ({
     filteredAwayPlayers,
     filteredAwayPlayerTimeline,
     cursorY,
-    awayRowHeight
+    awayRowHeight,
   );
 
   drawTeamSection(
@@ -1128,11 +1196,22 @@ const buildFullExportCanvas = ({
     filteredHomePlayers,
     filteredHomePlayerTimeline,
     cursorY,
-    homeRowHeight
+    homeRowHeight,
   );
 
   const legendTop = playAreaTop + playAreaHeight + legendTopGap;
-  drawLegend(ctx, computed, 12, legendTop, contentWidth - 24, legendShouldWrap, statOn, showScoreDiff, true, legendScale);
+  drawLegend(
+    ctx,
+    computed,
+    12,
+    legendTop,
+    contentWidth - 24,
+    legendShouldWrap,
+    statOn,
+    showScoreDiff,
+    true,
+    legendScale,
+  );
   drawWatermark(ctx, computed, 6, contentHeight - 6);
 
   return canvas;

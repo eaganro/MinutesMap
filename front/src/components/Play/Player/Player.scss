@@ -1,6 +1,6 @@
 .player {
   position: relative;
-  
+
   .playerName {
     display: inline-block;
     white-space: nowrap;
@@ -17,7 +17,9 @@
   .playerTimeline {
     stroke: var(--line-color-light);
     stroke-width: 1.5;
-    transition: stroke 0.2s ease, stroke-width 0.2s ease;
+    transition:
+      stroke 0.2s ease,
+      stroke-width 0.2s ease;
   }
 
   @media (hover: hover) and (pointer: fine) {

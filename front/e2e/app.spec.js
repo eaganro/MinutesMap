@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/analytics.minutesmap.com/**', route => route.abort());
+  await page.route('**/analytics.minutesmap.com/**', (route) => route.abort());
 });
 
 test.describe('MinutesMap App', () => {
@@ -28,7 +28,7 @@ test.describe('MinutesMap App', () => {
   test('should display the schedule section', async ({ page }) => {
     // Wait for initial loading to complete
     await page.waitForLoadState('networkidle');
-    
+
     // Schedule container should be visible
     const schedule = page.locator('.schedule, [class*="Schedule"]').first();
     await expect(schedule).toBeVisible();
@@ -36,7 +36,7 @@ test.describe('MinutesMap App', () => {
 
   test('should display the score section', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    
+
     const score = page.locator('.scoreElement');
     await expect(score).toBeVisible();
   });
@@ -48,8 +48,8 @@ test.describe('MinutesMap App', () => {
 
   test('should toggle dark mode when clicking the toggle', async ({ page }) => {
     // Get initial theme
-    const initialTheme = await page.evaluate(() => 
-      document.documentElement.getAttribute('data-theme')
+    const initialTheme = await page.evaluate(() =>
+      document.documentElement.getAttribute('data-theme'),
     );
 
     // Click the dark mode toggle
@@ -57,10 +57,8 @@ test.describe('MinutesMap App', () => {
     await toggle.click();
 
     // Verify theme changed
-    const newTheme = await page.evaluate(() => 
-      document.documentElement.getAttribute('data-theme')
-    );
-    
+    const newTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+
     expect(newTheme).not.toBe(initialTheme);
   });
 
@@ -70,10 +68,8 @@ test.describe('MinutesMap App', () => {
     await toggle.click();
 
     // Check localStorage was updated
-    const darkModeSaved = await page.evaluate(() => 
-      localStorage.getItem('darkMode')
-    );
-    
+    const darkModeSaved = await page.evaluate(() => localStorage.getItem('darkMode'));
+
     expect(darkModeSaved).not.toBeNull();
   });
 
@@ -83,14 +79,14 @@ test.describe('MinutesMap App', () => {
 
     // Get current date value
     const currentDate = await datePicker.inputValue();
-    
+
     // Set a new date (yesterday)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
-    
+
     await datePicker.fill(yesterdayStr);
-    
+
     // Verify the date picker value changed
     await expect(datePicker).toHaveValue(yesterdayStr);
   });
@@ -103,21 +99,21 @@ test.describe('MinutesMap App', () => {
 
   test('should display stat buttons section', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    
+
     const statButtons = page.locator('.statButtons, [class*="StatButtons"]').first();
     await expect(statButtons).toBeVisible();
   });
 
   test('should display play-by-play section', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    
+
     const playSection = page.locator('.playByPlaySection');
     await expect(playSection).toBeVisible();
   });
 
   test('should display boxscore section', async ({ page }) => {
     await page.waitForLoadState('networkidle');
-    
+
     const boxscore = page.locator('.box');
     await expect(boxscore).toBeVisible();
   });
@@ -148,10 +144,10 @@ test.describe('Responsive Design', () => {
   test('should be responsive on mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
-    
+
     const header = page.locator('.appHeader');
     await expect(header).toBeVisible();
-    
+
     const appName = page.locator('.appName');
     await expect(appName).toBeVisible();
   });
@@ -159,7 +155,7 @@ test.describe('Responsive Design', () => {
   test('should be responsive on tablet viewport', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto('/');
-    
+
     const header = page.locator('.appHeader');
     await expect(header).toBeVisible();
   });
@@ -168,13 +164,13 @@ test.describe('Responsive Design', () => {
 test.describe('Loading States', () => {
   test('should show loading indicator during data fetch', async ({ page }) => {
     // Slow down network to catch loading state
-    await page.route('**/*.json*', async route => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    await page.route('**/*.json*', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       await route.continue();
     });
 
     await page.goto('/');
-    
+
     // The app shows loading after 500ms delay, so this might not always catch it
     // but the structure should still be visible
     const topLevel = page.locator('.topLevel');

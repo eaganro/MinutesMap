@@ -11,7 +11,7 @@ export const useExportRange = ({ gameId, numPeriods }) => {
 
   const resolvedExportRange = useMemo(
     () => normalizeExportRange(exportRange, numPeriods),
-    [exportRange, numPeriods]
+    [exportRange, numPeriods],
   );
 
   const handleExportRangeStartChange = useCallback((event) => {

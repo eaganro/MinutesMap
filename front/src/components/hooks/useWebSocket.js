@@ -4,14 +4,14 @@ import { wsLocation } from '../../environment';
 /**
  * Hook for managing WebSocket connection to the game server
  */
-export function useWebSocket({ 
-  gameId, 
-  date, 
+export function useWebSocket({
+  gameId,
+  date,
   enabled = true,
   followDate = true,
   followGame = true,
-  onPlayByPlayUpdate, 
-  onDateUpdate 
+  onPlayByPlayUpdate,
+  onDateUpdate,
 }) {
   const [ws, setWs] = useState(null);
   const wsRef = useRef(null);
@@ -23,7 +23,7 @@ export function useWebSocket({
   const reconnectTimerRef = useRef(null);
   const reconnectAttemptRef = useRef(0);
   const allowReconnectRef = useRef(enabled);
-  
+
   // Keep refs updated for callbacks
   const gameIdRef = useRef(gameId);
   const dateRef = useRef(date);
@@ -33,13 +33,13 @@ export function useWebSocket({
   followDateRef.current = followDate;
   followGameRef.current = followGame;
   allowReconnectRef.current = enabled;
-  
+
   useEffect(() => {
     if (!gameId) {
       lastFollowGameRef.current = null;
     }
   }, [gameId]);
-  
+
   useEffect(() => {
     if (!date) {
       lastFollowDateRef.current = null;
@@ -117,8 +117,10 @@ export function useWebSocket({
     if (!enabled) {
       return;
     }
-    if (wsRef.current?.readyState === WebSocket.OPEN || 
-        wsRef.current?.readyState === WebSocket.CONNECTING) {
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    ) {
       return;
     }
 
@@ -137,18 +139,18 @@ export function useWebSocket({
       try {
         msg = JSON.parse(event.data);
       } catch (err) {
-        console.error("Malformed WS message", event.data, err);
+        console.error('Malformed WS message', event.data, err);
         return;
       }
-    
+
       try {
-        if (msg.key?.includes("gamepack")) {
+        if (msg.key?.includes('gamepack')) {
           onPlayByPlayUpdate?.(msg.key, msg.version);
-        } else if (msg.type === "date_update") {
+        } else if (msg.type === 'date_update') {
           onDateUpdate?.(msg.date);
         }
       } catch (err) {
-        console.error("Error handling WS message", msg, err);
+        console.error('Error handling WS message', msg, err);
       }
     };
 

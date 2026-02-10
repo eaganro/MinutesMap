@@ -67,12 +67,11 @@ const buildSharePayload = ({ file, title, text, url }) => {
   return payload;
 };
 
-const normalizeNameToken = (value) => (
+const normalizeNameToken = (value) =>
   String(value || '')
     .toLowerCase()
     .replace(/[^a-z\s'.-]/g, '')
-    .trim()
-);
+    .trim();
 
 const resolveFullNameFromRoster = (rawName, rosterPlayers) => {
   const cleaned = String(rawName || '').trim();
@@ -111,27 +110,28 @@ const resolveFullNameFromRoster = (rawName, rosterPlayers) => {
   const lastTokenNorm = tokens[tokens.length - 1] || '';
   const firstLooksInitial = firstTokenRaw.replace(/\./g, '').length === 1;
 
-  const candidates = roster.filter((player) => (
-    player.lastNorm === lastTokenNorm ||
-    player.lastNorm.endsWith(` ${lastTokenNorm}`) ||
-    player.lastNorm.endsWith(lastTokenNorm)
-  ));
+  const candidates = roster.filter(
+    (player) =>
+      player.lastNorm === lastTokenNorm ||
+      player.lastNorm.endsWith(` ${lastTokenNorm}`) ||
+      player.lastNorm.endsWith(lastTokenNorm),
+  );
 
   if (candidates.length === 1) {
     return candidates[0].full;
   }
 
   if (firstLooksInitial && firstTokenNorm) {
-    const initialMatches = candidates.filter((player) => player.firstNorm.startsWith(firstTokenNorm));
+    const initialMatches = candidates.filter((player) =>
+      player.firstNorm.startsWith(firstTokenNorm),
+    );
     if (initialMatches.length === 1) {
       return initialMatches[0].full;
     }
   }
 
   if (!firstLooksInitial && tokens.length >= 2) {
-    const fullMatches = candidates.filter((player) => (
-      player.firstNorm.startsWith(firstTokenNorm)
-    ));
+    const fullMatches = candidates.filter((player) => player.firstNorm.startsWith(firstTokenNorm));
     if (fullMatches.length === 1) {
       return fullMatches[0].full;
     }
@@ -202,11 +202,14 @@ export default function PlayExportControls({
     });
   };
 
-  useEffect(() => () => {
-    if (exportPreviewUrlRef.current && typeof URL !== 'undefined') {
-      URL.revokeObjectURL(exportPreviewUrlRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (exportPreviewUrlRef.current && typeof URL !== 'undefined') {
+        URL.revokeObjectURL(exportPreviewUrlRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!exportPreview) return undefined;
@@ -229,24 +232,22 @@ export default function PlayExportControls({
     };
   }, [exportPreview]);
 
-  const {
-    resolvedExportRange,
-    handleExportRangeStartChange,
-    handleExportRangeEndChange,
-  } = useExportRange({ gameId, numPeriods });
+  const { resolvedExportRange, handleExportRangeStartChange, handleExportRangeEndChange } =
+    useExportRange({ gameId, numPeriods });
 
   const exportRangeKey = `${resolvedExportRange.start}-${resolvedExportRange.end}`;
-  const exportPreviewKey = exportView !== 'full'
-    ? `${exportRangeKey}|${exportView}|${exportPlayerKey}`
-    : `${exportRangeKey}|${exportView}`;
+  const exportPreviewKey =
+    exportView !== 'full'
+      ? `${exportRangeKey}|${exportView}|${exportPlayerKey}`
+      : `${exportRangeKey}|${exportView}`;
 
   const exportViewOptions = useMemo(
-    () => ([
+    () => [
       { value: 'full', label: 'Full Timeline' },
       { value: 'player-stacked', label: 'Single Player Stacked' },
       { value: 'player', label: 'Single Player' },
-    ]),
-    []
+    ],
+    [],
   );
 
   const exportPlayerOptions = useMemo(() => {
@@ -270,14 +271,17 @@ export default function PlayExportControls({
 
   const selectedExportPlayer = useMemo(
     () => exportPlayerOptions.find((option) => option.key === exportPlayerKey) || null,
-    [exportPlayerOptions, exportPlayerKey]
+    [exportPlayerOptions, exportPlayerKey],
   );
 
   const exportPlayerDisplayName = useMemo(() => {
     if (!selectedExportPlayer?.name) return '';
     const teamKey = selectedExportPlayer?.teamKey === 'away' ? 'away' : 'home';
     const rosterPlayers = box?.teams?.[teamKey]?.players || [];
-    return resolveFullNameFromRoster(selectedExportPlayer.name, rosterPlayers) || selectedExportPlayer.name;
+    return (
+      resolveFullNameFromRoster(selectedExportPlayer.name, rosterPlayers) ||
+      selectedExportPlayer.name
+    );
   }, [selectedExportPlayer, box]);
 
   useEffect(() => {
@@ -314,15 +318,16 @@ export default function PlayExportControls({
     setExportError(null);
     const isMobileViewport = Boolean(
       typeof window !== 'undefined' &&
-      window.matchMedia &&
-      window.matchMedia(`(max-width: ${QUARTER_VIEW_BREAKPOINT}px)`).matches
+        window.matchMedia &&
+        window.matchMedia(`(max-width: ${QUARTER_VIEW_BREAKPOINT}px)`).matches,
     );
     const shouldShowPreview = true;
     const exportTimeoutMs = isMobileViewport ? 30000 : EXPORT_TIMEOUT_MS;
     const exportRangeSnapshot = resolvedExportRange;
-    exportPreviewKeyRef.current = exportView !== 'full'
-      ? `${exportRangeSnapshot.start}-${exportRangeSnapshot.end}|${exportView}|${exportPlayerKey}`
-      : `${exportRangeSnapshot.start}-${exportRangeSnapshot.end}|${exportView}`;
+    exportPreviewKeyRef.current =
+      exportView !== 'full'
+        ? `${exportRangeSnapshot.start}-${exportRangeSnapshot.end}|${exportView}|${exportPlayerKey}`
+        : `${exportRangeSnapshot.start}-${exportRangeSnapshot.end}|${exportView}`;
     const exportIsFullGameRange = exportRangeSnapshot.isFullGame;
     const exportRangeLabel = buildRangeLabel(exportRangeSnapshot);
     const legendShouldWrap = exportView === 'player-stacked' ? true : !exportIsFullGameRange;
@@ -355,29 +360,28 @@ export default function PlayExportControls({
         numPeriods,
         timelineWindow,
       });
-      const {
-        exportAwayPlayers: exportAwayPlayersAll,
-        exportHomePlayers: exportHomePlayersAll,
-      } = buildExportRangeData({
-        displayAwayPlayers: displayAwayPlayersAll || displayAwayPlayers,
-        displayAwayPlayerTimeline,
-        displayHomePlayers: displayHomePlayersAll || displayHomePlayers,
-        displayHomePlayerTimeline,
-        displayLastAction,
-        displayScoreTimeline,
-        exportRangeSnapshot,
-        gameStatus,
-        isFinal,
-        numPeriods,
-        timelineWindow,
-      });
+      const { exportAwayPlayers: exportAwayPlayersAll, exportHomePlayers: exportHomePlayersAll } =
+        buildExportRangeData({
+          displayAwayPlayers: displayAwayPlayersAll || displayAwayPlayers,
+          displayAwayPlayerTimeline,
+          displayHomePlayers: displayHomePlayersAll || displayHomePlayers,
+          displayHomePlayerTimeline,
+          displayLastAction,
+          displayScoreTimeline,
+          exportRangeSnapshot,
+          gameStatus,
+          isFinal,
+          numPeriods,
+          timelineWindow,
+        });
       const scaledWidth = DESKTOP_EXPORT_WIDTH * durationRatio;
       const stackedWidth = Math.min(360, MOBILE_EXPORT_MAX_WIDTH, DESKTOP_EXPORT_WIDTH);
-      const dataExportWidth = exportView === 'player-stacked'
-        ? stackedWidth
-        : (exportIsFullGameRange
-          ? DESKTOP_EXPORT_WIDTH
-          : Math.max(360, Math.min(MOBILE_EXPORT_MAX_WIDTH, scaledWidth)));
+      const dataExportWidth =
+        exportView === 'player-stacked'
+          ? stackedWidth
+          : exportIsFullGameRange
+            ? DESKTOP_EXPORT_WIDTH
+            : Math.max(360, Math.min(MOBILE_EXPORT_MAX_WIDTH, scaledWidth));
 
       const outputCanvas = buildPlayExportCanvas({
         exportView,
@@ -419,7 +423,11 @@ export default function PlayExportControls({
         throw new Error('Export failed: unable to build image.');
       }
 
-      let blob = await withTimeout(canvasToBlob(outputCanvas), exportTimeoutMs, 'Play export image');
+      let blob = await withTimeout(
+        canvasToBlob(outputCanvas),
+        exportTimeoutMs,
+        'Play export image',
+      );
       if (!blob && outputCanvas.toDataURL) {
         blob = dataUrlToBlob(outputCanvas.toDataURL('image/png'));
       }
@@ -487,12 +495,14 @@ export default function PlayExportControls({
       if (typeof navigator !== 'undefined' && navigator.share) {
         if (canShareFiles) {
           try {
-            await navigator.share(buildSharePayload({
-              file,
-              title: shareTitle,
-              text: shareText,
-              url: shareUrl,
-            }));
+            await navigator.share(
+              buildSharePayload({
+                file,
+                title: shareTitle,
+                text: shareText,
+                url: shareUrl,
+              }),
+            );
             shared = true;
           } catch (err) {
             if (err?.name !== 'AbortError') {
@@ -528,12 +538,14 @@ export default function PlayExportControls({
     if (!exportPreview?.file || !exportPreview?.canShare) return;
     if (typeof navigator === 'undefined' || !navigator.share) return;
     try {
-      await navigator.share(buildSharePayload({
-        file: exportPreview.file,
-        title: exportPreview.shareTitle,
-        text: exportPreview.shareText,
-        url: exportPreview.shareUrl,
-      }));
+      await navigator.share(
+        buildSharePayload({
+          file: exportPreview.file,
+          title: exportPreview.shareTitle,
+          text: exportPreview.shareText,
+          url: exportPreview.shareUrl,
+        }),
+      );
       setExportPreviewState(null);
     } catch (err) {
       if (err?.name !== 'AbortError') {
@@ -551,24 +563,21 @@ export default function PlayExportControls({
 
   const exportDisabled = !hasDisplayData || isDataLoading || isExporting;
 
-  const exportRangeOptions = useMemo(
-    () => {
-      if (numPeriods <= 0) return [];
-      const options = [];
-      for (let i = 0; i < numPeriods; i += 1) {
-        const period = i + 1;
-        options.push({
-          period,
-          label: formatPeriodLabel(period),
-        });
-      }
-      return options;
-    },
-    [numPeriods]
-  );
+  const exportRangeOptions = useMemo(() => {
+    if (numPeriods <= 0) return [];
+    const options = [];
+    for (let i = 0; i < numPeriods; i += 1) {
+      const period = i + 1;
+      options.push({
+        period,
+        label: formatPeriodLabel(period),
+      });
+    }
+    return options;
+  }, [numPeriods]);
 
   const filteredRangeEndOptions = exportRangeOptions.filter(
-    (option) => option.period >= resolvedExportRange.start
+    (option) => option.period >= resolvedExportRange.start,
   );
 
   const previewIsUpdating = Boolean(exportPreview?.isUpdating);
@@ -654,14 +663,23 @@ export default function PlayExportControls({
               <select
                 value={exportPlayerKey}
                 onChange={(event) => setExportPlayerKey(event.target.value)}
-                disabled={exportView === 'full' || isExporting || previewIsUpdating || !exportPlayerOptions.length}
+                disabled={
+                  exportView === 'full' ||
+                  isExporting ||
+                  previewIsUpdating ||
+                  !exportPlayerOptions.length
+                }
               >
-                {exportPlayerOptions.length ? exportPlayerOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
+                {exportPlayerOptions.length ? (
+                  exportPlayerOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No players
                   </option>
-                )) : (
-                  <option value="" disabled>No players</option>
                 )}
               </select>
             </label>
@@ -703,11 +721,7 @@ export default function PlayExportControls({
           </div>
           <div className="playExportPreviewActions">
             {exportPreview.canShare && (
-              <button
-                type="button"
-                className="playExportActionButton"
-                onClick={handleSharePreview}
-              >
+              <button type="button" className="playExportActionButton" onClick={handleSharePreview}>
                 Share
               </button>
             )}

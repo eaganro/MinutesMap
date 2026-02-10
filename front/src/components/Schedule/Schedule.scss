@@ -20,7 +20,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-  
+
       .dateInput {
         min-width: 120px;
         height: 30px;
@@ -30,7 +30,10 @@
         color: var(--input-text);
         border: 1px solid var(--input-border);
         border-radius: 4px;
-        transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+        transition:
+          background-color 0.3s ease,
+          border-color 0.3s ease,
+          color 0.3s ease;
       }
     }
     .gamePick {
@@ -70,7 +73,7 @@
           cursor: grabbing;
           user-select: none;
         }
-      
+
         .game {
           background-color: var(--bg-game);
           border-radius: 15px;
@@ -79,8 +82,10 @@
           white-space: nowrap;
           cursor: inherit;
           color: var(--text-primary);
-          transition: background-color 0.3s ease, color 0.3s ease;
-  
+          transition:
+            background-color 0.3s ease,
+            color 0.3s ease;
+
           &:not(.selected):hover {
             background-color: var(--bg-game-hover);
           }
@@ -108,10 +113,14 @@
               position: absolute;
               inset: 1px;
               border-radius: 50%;
-              background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.1)), var(--bg-table-even);
+              background:
+                radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.1)),
+                var(--bg-table-even);
               border: 1px solid var(--divider);
               opacity: 0;
-              transition: opacity 0.2s ease, filter 0.2s ease;
+              transition:
+                opacity 0.2s ease,
+                filter 0.2s ease;
             }
 
             .teamLogoWrapper.isPending::before {
@@ -122,7 +131,9 @@
             .teamLogo {
               display: block;
               object-fit: contain;
-              transition: opacity 0.2s ease, filter 0.2s ease;
+              transition:
+                opacity 0.2s ease,
+                filter 0.2s ease;
             }
 
             .teamLogoWrapper.isPending .teamLogo {
@@ -159,11 +170,15 @@
             }
           }
         }
-        &.dragging .game { cursor: grabbing; }
-        &:not(.dragging) .game:hover { cursor: pointer; }
+        &.dragging .game {
+          cursor: grabbing;
+        }
+        &:not(.dragging) .game:hover {
+          cursor: pointer;
+        }
       }
     }
-  }  
+  }
 }
 
 .scheduleButton {

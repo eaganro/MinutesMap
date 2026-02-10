@@ -25,4 +25,3 @@ export function useLocalStorageState(key, defaultValue) {
 
   return [value, setValue];
 }
-

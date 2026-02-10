@@ -30,5 +30,7 @@ export function getSecondsElapsed(period, clock) {
   if (p <= 4) {
     return (p - 1) * REGULATION_PERIOD_SECONDS + (REGULATION_PERIOD_SECONDS - remaining);
   }
-  return REGULATION_SECONDS + (p - 5) * OVERTIME_PERIOD_SECONDS + (OVERTIME_PERIOD_SECONDS - remaining);
+  return (
+    REGULATION_SECONDS + (p - 5) * OVERTIME_PERIOD_SECONDS + (OVERTIME_PERIOD_SECONDS - remaining)
+  );
 }

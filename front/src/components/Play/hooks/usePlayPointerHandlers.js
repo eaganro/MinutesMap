@@ -37,11 +37,11 @@ export function usePlayPointerHandlers({
   const touchClickGuardUntilRef = useRef(0);
   const playFeatureTrackedRef = useRef(false);
   const [isHoveringIcon, setIsHoveringIcon] = useState(false);
-  const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() => (
+  const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
-      : true
-  ));
+      : true,
+  );
 
   const trackPlayFeatureUse = useCallback(() => {
     if (playFeatureTrackedRef.current) return;
@@ -65,104 +65,116 @@ export function usePlayPointerHandlers({
     return () => mediaQuery.removeListener(handleChange);
   }, []);
 
-  const handleMouseMove = useCallback((e) => {
-    const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
-    setIsHoveringIcon(Boolean(actionMeta?.actionNumber));
-    updateHoverAt(e.clientX, e.clientY, e.target);
-  }, [playRef, updateHoverAt]);
+  const handleMouseMove = useCallback(
+    (e) => {
+      const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
+      setIsHoveringIcon(Boolean(actionMeta?.actionNumber));
+      updateHoverAt(e.clientX, e.clientY, e.target);
+    },
+    [playRef, updateHoverAt],
+  );
 
   const handleMouseLeave = useCallback(() => {
     setIsHoveringIcon(false);
     resetInteraction();
   }, [resetInteraction]);
 
-  const handleClick = useCallback((e) => {
-    if (Date.now() < touchClickGuardUntilRef.current) {
-      return;
-    }
-    trackPlayFeatureUse();
-    const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
-    const actionNumber = actionMeta?.actionNumber ?? null;
-
-    if (actionNumber && canOpenVideoOnClick) {
-      const action = (displayAllActions || []).find(
-        (entry) => String(entry.actionNumber) === String(actionNumber)
-      );
-      const targetAction = resolveVideoAction(action, displayAllActions);
-      const url = buildNbaEventUrl({
-        gameId: nbaGameId,
-        actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber,
-        description: targetAction?.description ?? action?.description,
-      });
-      if (url && typeof window !== 'undefined') {
-        window.open(url, '_blank', 'noopener');
+  const handleClick = useCallback(
+    (e) => {
+      if (Date.now() < touchClickGuardUntilRef.current) {
         return;
       }
-    }
+      trackPlayFeatureUse();
+      const actionMeta = findActionMetaFromTarget(e.target, playRef.current);
+      const actionNumber = actionMeta?.actionNumber ?? null;
 
-    if (!infoLocked) {
-      setInfoLocked(true);
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    } else {
-      setInfoLocked(false);
-      if (!canOpenVideoOnClick) {
-        resetInteraction(true);
-      } else {
-        resetInteraction();
+      if (actionNumber && canOpenVideoOnClick) {
+        const action = (displayAllActions || []).find(
+          (entry) => String(entry.actionNumber) === String(actionNumber),
+        );
+        const targetAction = resolveVideoAction(action, displayAllActions);
+        const url = buildNbaEventUrl({
+          gameId: nbaGameId,
+          actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber,
+          description: targetAction?.description ?? action?.description,
+        });
+        if (url && typeof window !== 'undefined') {
+          window.open(url, '_blank', 'noopener');
+          return;
+        }
       }
-    }
-  }, [
-    trackPlayFeatureUse,
-    playRef,
-    canOpenVideoOnClick,
-    displayAllActions,
-    nbaGameId,
-    infoLocked,
-    setInfoLocked,
-    setMousePosition,
-    resetInteraction,
-  ]);
 
-  const handleTouchStart = useCallback((e) => {
-    if (isDataLoading || !e.touches[0]) return;
-    trackPlayFeatureUse();
-    touchAxisRef.current = null;
-    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    touchMovedRef.current = false;
-    resetInteraction();
-  }, [isDataLoading, trackPlayFeatureUse, resetInteraction]);
-
-  const handleTouchMove = useCallback((e) => {
-    if (isDataLoading || !e.touches[0]) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - touchStartRef.current.x;
-    const dy = touch.clientY - touchStartRef.current.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    if (!touchAxisRef.current) {
-      if (absDx < TOUCH_AXIS_LOCK_PX && absDy < TOUCH_AXIS_LOCK_PX) {
-        return;
-      }
-      touchAxisRef.current = absDx >= absDy ? 'horizontal' : 'vertical';
-      touchMovedRef.current = true;
-    }
-
-    if (touchAxisRef.current === 'vertical') {
       if (!infoLocked) {
-        resetInteraction();
+        setInfoLocked(true);
+        setMousePosition({ x: e.clientX, y: e.clientY });
+      } else {
+        setInfoLocked(false);
+        if (!canOpenVideoOnClick) {
+          resetInteraction(true);
+        } else {
+          resetInteraction();
+        }
       }
-      return;
-    }
+    },
+    [
+      trackPlayFeatureUse,
+      playRef,
+      canOpenVideoOnClick,
+      displayAllActions,
+      nbaGameId,
+      infoLocked,
+      setInfoLocked,
+      setMousePosition,
+      resetInteraction,
+    ],
+  );
 
-    const wasLocked = infoLocked;
-    if (wasLocked) {
-      setInfoLocked(false);
-    }
-    touchMovedRef.current = true;
-    e.preventDefault();
-    updateHoverAt(touch.clientX, touch.clientY, e.target, wasLocked);
-  }, [isDataLoading, infoLocked, resetInteraction, setInfoLocked, updateHoverAt]);
+  const handleTouchStart = useCallback(
+    (e) => {
+      if (isDataLoading || !e.touches[0]) return;
+      trackPlayFeatureUse();
+      touchAxisRef.current = null;
+      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      touchMovedRef.current = false;
+      resetInteraction();
+    },
+    [isDataLoading, trackPlayFeatureUse, resetInteraction],
+  );
+
+  const handleTouchMove = useCallback(
+    (e) => {
+      if (isDataLoading || !e.touches[0]) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      if (!touchAxisRef.current) {
+        if (absDx < TOUCH_AXIS_LOCK_PX && absDy < TOUCH_AXIS_LOCK_PX) {
+          return;
+        }
+        touchAxisRef.current = absDx >= absDy ? 'horizontal' : 'vertical';
+        touchMovedRef.current = true;
+      }
+
+      if (touchAxisRef.current === 'vertical') {
+        if (!infoLocked) {
+          resetInteraction();
+        }
+        return;
+      }
+
+      const wasLocked = infoLocked;
+      if (wasLocked) {
+        setInfoLocked(false);
+      }
+      touchMovedRef.current = true;
+      e.preventDefault();
+      updateHoverAt(touch.clientX, touch.clientY, e.target, wasLocked);
+    },
+    [isDataLoading, infoLocked, resetInteraction, setInfoLocked, updateHoverAt],
+  );
 
   const handleTouchEnd = useCallback(() => {
     if (isDataLoading) return;

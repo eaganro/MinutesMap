@@ -1,10 +1,25 @@
 import { getSecondsElapsed } from '../../../helpers/playTimeline';
-import { getEventType, isFreeThrowAction, isThreePointAction, renderEventShape, renderFreeThrowRing } from '../../../helpers/eventStyles.jsx';
+import {
+  getEventType,
+  isFreeThrowAction,
+  isThreePointAction,
+  renderEventShape,
+  renderFreeThrowRing,
+} from '../../../helpers/eventStyles.jsx';
 
 import './Player.scss';
 
-export default function Player({ actions, timeline, name, width, rightMargin = 0, heightDivide, highlight, leftMargin, timelineWindow }) {
-
+export default function Player({
+  actions,
+  timeline,
+  name,
+  width,
+  rightMargin = 0,
+  heightDivide,
+  highlight,
+  leftMargin,
+  timelineWindow,
+}) {
   const playerName = name;
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
   const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
@@ -16,11 +31,12 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
     return Math.max(0, Math.min(width, ratio * width));
   };
 
-  const filteredActions = actions
-    .filter((a) => {
-      const type = (a?.actionType || '').toString().toLowerCase();
-      return type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation';
-    });
+  const filteredActions = actions.filter((a) => {
+    const type = (a?.actionType || '').toString().toLowerCase();
+    return (
+      type !== 'substitution' && type !== 'jump ball' && type !== 'jumpball' && type !== 'violation'
+    );
+  });
 
   const freeThrowOneOfOnePattern = /\b(?:ft|free throw)\b\s*1\s*(?:of|\/)\s*1/i;
   const and1PointScale = 0.88;
@@ -44,10 +60,8 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
       pointAtTime.add(timeKey);
     }
   });
-  const and1AtTime = new Set(
-    [...pointAtTime].filter(timeKey => freeThrowOneAtTime.has(timeKey))
-  );
-  
+  const and1AtTime = new Set([...pointAtTime].filter((timeKey) => freeThrowOneAtTime.has(timeKey)));
+
   const buildActionShapes = (actionList, size) => {
     const shapes = [];
     const freeThrowShapes = [];
@@ -67,7 +81,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
           description: a.description,
           subType: a.subType,
           isAnd1,
-          actionNumber: a.actionNumber
+          actionNumber: a.actionNumber,
         });
         if (ring) {
           freeThrowShapes.push(ring);
@@ -79,7 +93,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
       const is3PT = isThreePointAction(a.description, a.actionType);
       const isAnd1Point = eventType === 'point' && and1AtTime.has(timeKey);
       const shapeSize = isAnd1Point ? size * and1PointScale : size;
-      const markerScaleOverride = (isAnd1Point && is3PT) ? and1MarkerScale : null;
+      const markerScaleOverride = isAnd1Point && is3PT ? and1MarkerScale : null;
       const shape = renderEventShape(
         eventType,
         pos,
@@ -88,7 +102,7 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
         `action-${a.actionNumber}`,
         is3PT,
         a.actionNumber,
-        markerScaleOverride
+        markerScaleOverride,
       );
       if (shape) {
         shapes.push(shape);
@@ -100,42 +114,36 @@ export default function Player({ actions, timeline, name, width, rightMargin = 0
 
   // Render non-highlighted dots first, then highlighted dots on top
   const nonHighlightedDots = buildActionShapes(
-    filteredActions.filter(a => !highlight.includes(a.actionNumber)),
-    4
+    filteredActions.filter((a) => !highlight.includes(a.actionNumber)),
+    4,
   );
-  
+
   const highlightedDots = buildActionShapes(
-    filteredActions.filter(a => highlight.includes(a.actionNumber)),
-    8
+    filteredActions.filter((a) => highlight.includes(a.actionNumber)),
+    8,
   );
 
-  const playTimeLines = timeline?.filter(t => {
-    if (!t.end) {
-      console.log('PLAYER TIMELINE ERROR', name)
-      return false;
-    }
-    return true;
-  }).map((t, i) => {
-    let x1 = getXPosition(t.period, t.start);
-    let x2 = getXPosition(t.period, t.end);
-    x2 = isNaN(x2) ? x1 : x2; 
-    return (
-      <line
-        key={i}
-        x1={x1}
-        y1={14}
-        x2={x2}
-        y2={14}
-        className="playerTimeline"
-      />
-    );
-  });
-
+  const playTimeLines = timeline
+    ?.filter((t) => {
+      if (!t.end) {
+        console.log('PLAYER TIMELINE ERROR', name);
+        return false;
+      }
+      return true;
+    })
+    .map((t, i) => {
+      let x1 = getXPosition(t.period, t.start);
+      let x2 = getXPosition(t.period, t.end);
+      x2 = isNaN(x2) ? x1 : x2;
+      return <line key={i} x1={x1} y1={14} x2={x2} y2={14} className="playerTimeline" />;
+    });
 
   return (
-    <div className='player' style={{ height: `${275/heightDivide}px`}}>
-      <div className='playerName' style={{ width: 90 }}>{playerName}</div>
-      <svg width={width + rightMargin} height="28" className='line' style={{left: leftMargin}}>
+    <div className="player" style={{ height: `${275 / heightDivide}px` }}>
+      <div className="playerName" style={{ width: 90 }}>
+        {playerName}
+      </div>
+      <svg width={width + rightMargin} height="28" className="line" style={{ left: leftMargin }}>
         {playTimeLines}
         {nonHighlightedDots}
         {highlightedDots}

@@ -1,4 +1,6 @@
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 .statButtons {
   display: flex;
@@ -13,7 +15,7 @@
     opacity: 0.6;
     pointer-events: none;
   }
-  
+
   @media (max-width: 500px) {
     gap: 4px 12px;
   }
@@ -28,23 +30,23 @@
   border-radius: 6px;
   transition: all 0.15s ease;
   user-select: none;
-  
+
   &:hover {
     background-color: var(--bg-hover);
   }
-  
+
   &.off {
     opacity: 0.5;
     .shapeContainer {
       opacity: 0.5;
     }
-    
+
     .label {
       text-decoration: line-through;
       color: var(--stat-label-off);
     }
   }
-  
+
   .shapeContainer {
     display: flex;
     align-items: center;
@@ -54,7 +56,7 @@
     flex-shrink: 0;
     transition: opacity 0.15s ease;
   }
-  
+
   .label {
     font-size: 12px;
     font-weight: 500;
@@ -92,10 +94,10 @@
       color: var(--stat-label-off);
     }
   }
-  
+
   &.scoreDiff {
     .scoreDiffIcon {
-      color: var(--score-diff-icon-color, #6366F1);
+      color: var(--score-diff-icon-color, #6366f1);
     }
   }
 }

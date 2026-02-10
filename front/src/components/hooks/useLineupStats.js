@@ -23,7 +23,7 @@ const normalizeScoreTimeline = (scoreTimeline) => {
       return { period, timeSec, home, away };
     })
     .filter(Boolean)
-    .sort((a, b) => (a.period - b.period) || (b.timeSec - a.timeSec));
+    .sort((a, b) => a.period - b.period || b.timeSec - a.timeSec);
 };
 
 const buildScoreLookup = (scoreTimeline, numPeriods) => {
@@ -36,11 +36,7 @@ const buildScoreLookup = (scoreTimeline, numPeriods) => {
     entriesByPeriod.get(entry.period).push(entry);
   }
 
-  const maxPeriod = Math.max(
-    Number(numPeriods) || 0,
-    ...Array.from(entriesByPeriod.keys()),
-    0
-  );
+  const maxPeriod = Math.max(Number(numPeriods) || 0, ...Array.from(entriesByPeriod.keys()), 0);
 
   const periodStartScores = new Map();
   let runningHome = 0;

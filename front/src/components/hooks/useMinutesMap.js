@@ -32,7 +32,7 @@ export function useMinutesMap() {
   // === INITIALIZATION ===
   const { getInitialParams, updateQueryParams } = useQueryParams();
   const initialParams = useMemo(() => getInitialParams(), []);
-  
+
   // Note: We removed getTodayString() because we now trust init.json
 
   // === CORE STATE ===
@@ -75,18 +75,24 @@ export function useMinutesMap() {
   const lastTrackedGameIdRef = useRef(null);
   const closeSignalSentRef = useRef(false);
 
-  const fetchGamePackWithReason = useCallback((params, reason) => {
-    lastGamePackFetchRef.current = { at: Date.now(), reason };
-    fetchGamePack(params);
-  }, [fetchGamePack]);
+  const fetchGamePackWithReason = useCallback(
+    (params, reason) => {
+      lastGamePackFetchRef.current = { at: Date.now(), reason };
+      fetchGamePack(params);
+    },
+    [fetchGamePack],
+  );
 
-  const fetchScheduleWithReason = useCallback((dateString, reason) => {
-    if (!dateString) {
-      return;
-    }
-    lastScheduleFetchRef.current = { at: Date.now(), reason };
-    fetchSchedule(dateString);
-  }, [fetchSchedule]);
+  const fetchScheduleWithReason = useCallback(
+    (dateString, reason) => {
+      if (!dateString) {
+        return;
+      }
+      lastScheduleFetchRef.current = { at: Date.now(), reason };
+      fetchSchedule(dateString);
+    },
+    [fetchSchedule],
+  );
 
   // === PROCESSED TIMELINES ===
   const {
@@ -133,7 +139,7 @@ export function useMinutesMap() {
           setDate(new Date().toISOString().split('T')[0]);
         }
       } catch (err) {
-        console.error("Init fetch failed:", err);
+        console.error('Init fetch failed:', err);
         setDate(new Date().toISOString().split('T')[0]);
       } finally {
         setIsInitLoading(false);
@@ -151,30 +157,36 @@ export function useMinutesMap() {
   }, [date, fetchScheduleWithReason]);
 
   // === WEBSOCKET HANDLERS ===
-  const handleGameUpdate = useCallback((key, version) => {
-    const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
-    fetchGamePackWithReason({ url, showLoading: false }, 'ws');
-  }, [fetchGamePackWithReason]);
+  const handleGameUpdate = useCallback(
+    (key, version) => {
+      const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
+      fetchGamePackWithReason({ url, showLoading: false }, 'ws');
+    },
+    [fetchGamePackWithReason],
+  );
 
-  const handleDateUpdate = useCallback((updatedDate) => {
-    // If we receive a signal that the date we are viewing changed, refresh it
-    if (updatedDate === date) {
-      fetchScheduleWithReason(date, 'ws');
-    }
-  }, [date, fetchScheduleWithReason]);
+  const handleDateUpdate = useCallback(
+    (updatedDate) => {
+      // If we receive a signal that the date we are viewing changed, refresh it
+      if (updatedDate === date) {
+        fetchScheduleWithReason(date, 'ws');
+      }
+    },
+    [date, fetchScheduleWithReason],
+  );
+
+  const { selectedGameDate, selectedGameStart, selectedGameStatus, selectedGameMetaId } =
+    useSelectedGameMeta({
+      gameId,
+      date,
+      schedule,
+    });
 
   const {
-    selectedGameDate,
-    selectedGameStart,
-    selectedGameStatus,
-    selectedGameMetaId,
-  } = useSelectedGameMeta({
-    gameId,
-    date,
-    schedule,
-  });
-
-  const { enabled: wsEnabled, followDate: wsFollowDate, followGame: wsFollowGame } = useWebSocketGate({
+    enabled: wsEnabled,
+    followDate: wsFollowDate,
+    followGame: wsFollowGame,
+  } = useWebSocketGate({
     date,
     schedule,
     gameId,
@@ -228,9 +240,7 @@ export function useMinutesMap() {
     if (!gameId) {
       return null;
     }
-    const scheduleMatch = (schedule || []).find(
-      (game) => String(game?.id) === String(gameId)
-    );
+    const scheduleMatch = (schedule || []).find((game) => String(game?.id) === String(gameId));
     if (scheduleMatch) {
       return scheduleMatch;
     }
@@ -256,9 +266,8 @@ export function useMinutesMap() {
     });
   }, [gameId, selectedScheduleGame]);
 
-  const cachedMetaForGame = cachedGameMeta && String(cachedGameMeta.id) === String(gameId)
-    ? cachedGameMeta
-    : null;
+  const cachedMetaForGame =
+    cachedGameMeta && String(cachedGameMeta.id) === String(gameId) ? cachedGameMeta : null;
   const stableGameMeta = selectedScheduleGame || cachedMetaForGame;
 
   const isSelectedGameUpcoming = useMemo(() => {
@@ -272,15 +281,11 @@ export function useMinutesMap() {
     }
     const normalized = status.trim().toLowerCase();
     return (
-      normalized === 'scheduled' ||
-      normalized.startsWith('scheduled') ||
-      normalized.includes('tbd')
+      normalized === 'scheduled' || normalized.startsWith('scheduled') || normalized.includes('tbd')
     );
   }, [selectedScheduleGame?.status]);
 
-  const shouldWaitForSchedule = Boolean(gameId)
-    && !selectedScheduleGame
-    && isScheduleLoading;
+  const shouldWaitForSchedule = Boolean(gameId) && !selectedScheduleGame && isScheduleLoading;
 
   // === GAME DATA FETCHING ===
   useEffect(() => {
@@ -304,9 +309,7 @@ export function useMinutesMap() {
       return;
     }
     const previousGameId = fetchStateRef.current.gameId;
-    const reason = previousGameId
-      ? (isSameGame ? 'resume' : 'game-change')
-      : 'initial';
+    const reason = previousGameId ? (isSameGame ? 'resume' : 'game-change') : 'initial';
     fetchStateRef.current = { gameId, status: 'fetched' };
     fetchGamePackWithReason({ gameId, showLoading: !isSameGame }, reason);
   }, [
@@ -330,26 +333,35 @@ export function useMinutesMap() {
   }, [isGlobalLoading]);
 
   // === PUBLIC EVENT HANDLERS ===
-  const changeDate = useCallback((e) => {
-    const newDate = e.target.value;
-    if (newDate === date) return;
-    
-    setDate(newDate);
-  }, [date]);
+  const changeDate = useCallback(
+    (e) => {
+      const newDate = e.target.value;
+      if (newDate === date) return;
 
-  const changeGame = useCallback((id) => {
-    if (!id || id === gameId) return;
-    resetLoadingStates();
-    setGameId(id);
-  }, [gameId, resetLoadingStates]);
+      setDate(newDate);
+    },
+    [date],
+  );
 
-  const changeStatOn = useCallback((index) => {
-    setStatOn(prev => {
-      const updated = [...prev];
-      updated[index] = !updated[index];
-      return updated;
-    });
-  }, [setStatOn]);
+  const changeGame = useCallback(
+    (id) => {
+      if (!id || id === gameId) return;
+      resetLoadingStates();
+      setGameId(id);
+    },
+    [gameId, resetLoadingStates],
+  );
+
+  const changeStatOn = useCallback(
+    (index) => {
+      setStatOn((prev) => {
+        const updated = [...prev];
+        updated[index] = !updated[index];
+        return updated;
+      });
+    },
+    [setStatOn],
+  );
 
   // === COMPUTED VALUES ===
   const sortedGames = useMemo(() => sortGamesForSelection(schedule || []), [schedule]);
@@ -438,8 +450,7 @@ export function useMinutesMap() {
     }
     return parseGameStatus(currentScheduleGameStatus).isFinal;
   }, [gameId, currentScheduleGameStatus]);
-  const isWebSocketOpen = typeof WebSocket !== 'undefined'
-    && ws?.readyState === WebSocket.OPEN;
+  const isWebSocketOpen = typeof WebSocket !== 'undefined' && ws?.readyState === WebSocket.OPEN;
 
   useEffect(() => {
     const resolveThresholdMs = (lastReason) => {
@@ -518,15 +529,21 @@ export function useMinutesMap() {
   const awayTeam = box?.teams?.away;
   const homeTeam = box?.teams?.home;
 
-  const awayTeamName = useMemo(() => ({
-    name: awayTeam?.name || 'Away Team',
-    abr: awayTeam?.abbr || '',
-  }), [awayTeam?.name, awayTeam?.abbr]);
+  const awayTeamName = useMemo(
+    () => ({
+      name: awayTeam?.name || 'Away Team',
+      abr: awayTeam?.abbr || '',
+    }),
+    [awayTeam?.name, awayTeam?.abbr],
+  );
 
-  const homeTeamName = useMemo(() => ({
-    name: homeTeam?.name || 'Home Team',
-    abr: homeTeam?.abbr || '',
-  }), [homeTeam?.name, homeTeam?.abbr]);
+  const homeTeamName = useMemo(
+    () => ({
+      name: homeTeam?.name || 'Home Team',
+      abr: homeTeam?.abbr || '',
+    }),
+    [homeTeam?.name, homeTeam?.abbr],
+  );
 
   const scoreAwayTeam = awayTeam?.abbr || stableGameMeta?.awayteam || null;
   const scoreHomeTeam = homeTeam?.abbr || stableGameMeta?.hometeam || null;
@@ -541,7 +558,7 @@ export function useMinutesMap() {
   return {
     // Schedule
     games: sortedGames,
-    date: date || "", // Guard against null during init
+    date: date || '', // Guard against null during init
     gameId,
     changeDate,
     changeGame,

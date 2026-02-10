@@ -2,7 +2,7 @@
  * Event type configuration with distinct shapes and accessible colors.
  * Each event type has a unique shape + color combination to reduce cognitive load
  * and improve accessibility for colorblind users.
- * 
+ *
  * Colors use CSS custom properties for dark mode support.
  */
 
@@ -71,15 +71,14 @@ const MISS_TOKEN = /\bmiss(?:ed|es)?\b/i;
 const normalize = (value) => (value || '').toString().toLowerCase();
 const hasMissToken = (value) => MISS_TOKEN.test((value || '').toString());
 
-const isShotAction = (type, desc) => (
-  type === '2pt'
-  || type === '3pt'
-  || type === 'freethrow'
-  || type === 'free throw'
-  || type.includes('shot')
-  || desc.includes('free throw')
-  || FT_TOKEN.test(desc)
-);
+const isShotAction = (type, desc) =>
+  type === '2pt' ||
+  type === '3pt' ||
+  type === 'freethrow' ||
+  type === 'free throw' ||
+  type.includes('shot') ||
+  desc.includes('free throw') ||
+  FT_TOKEN.test(desc);
 
 /**
  * Detect event type from action description
@@ -147,7 +146,7 @@ export function renderFreeThrowRing({
   description,
   subType,
   isAnd1 = false,
-  actionNumber = null
+  actionNumber = null,
 }) {
   const isMiss = hasMissToken(description);
   const strokeWidth = Math.max(1, size * 0.2);
@@ -157,14 +156,15 @@ export function renderFreeThrowRing({
   if (!isAnd1 && total > 1 && attempt === 1) {
     ringRadius = Math.max(0.5, ringRadius - strokeWidth / 2);
   }
-  const ringColor = isMiss
-    ? 'var(--event-miss, #475569)'
-    : 'var(--event-point, #F59E0B)';
-  const dataAttrs = (actionNumber !== null) ? {
-    ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
-    'data-event-type': 'free-throw',
-    style: { cursor: 'pointer' }
-  } : {};
+  const ringColor = isMiss ? 'var(--event-miss, #475569)' : 'var(--event-point, #F59E0B)';
+  const dataAttrs =
+    actionNumber !== null
+      ? {
+          ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
+          'data-event-type': 'free-throw',
+          style: { cursor: 'pointer' },
+        }
+      : {};
 
   return (
     <circle
@@ -199,44 +199,55 @@ export function renderEventShape(
   key,
   is3PT = false,
   actionNumber = null,
-  markerScaleOverride = null
+  markerScaleOverride = null,
 ) {
   const config = EVENT_TYPES[eventType];
   if (!config) return null;
-  
+
   const color = getColor(config);
   const { shape } = config;
   const s = size; // shorthand
-  
+
   // Data attributes for hover detection
-  const dataAttrs = (actionNumber !== null) ? {
-    ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
-    'data-event-type': eventType,
-    style: { cursor: 'pointer' }
-  } : {};
-  
+  const dataAttrs =
+    actionNumber !== null
+      ? {
+          ...(actionNumber !== null ? { 'data-action-number': actionNumber } : {}),
+          'data-event-type': eventType,
+          style: { cursor: 'pointer' },
+        }
+      : {};
+
   // 3PT marker color also uses CSS variable
   const markerColor = 'var(--event-3pt-marker, #DC2626)';
   const markerRadius = s * (markerScaleOverride ?? 0.6);
-  
+
   // Helper to create a group with optional 3PT marker
   const wrapWith3PT = (mainShape) => {
     if (!is3PT) return mainShape;
     return (
       <g key={key} {...dataAttrs}>
         {mainShape}
-        <circle cx={cx} cy={cy} r={markerRadius} fill={markerColor} style={{ pointerEvents: 'none' }} />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={markerRadius}
+          fill={markerColor}
+          style={{ pointerEvents: 'none' }}
+        />
       </g>
     );
   };
-  
+
   switch (shape) {
     case 'circle': {
       // Simple circle
-      const el = <circle key={key} cx={cx} cy={cy} r={s} fill={color} {...(is3PT ? {} : dataAttrs)} />;
+      const el = (
+        <circle key={key} cx={cx} cy={cy} r={s} fill={color} {...(is3PT ? {} : dataAttrs)} />
+      );
       return wrapWith3PT(el);
     }
-    
+
     case 'cross': {
       // X shape
       const t = s * 0.35; // thickness
@@ -258,51 +269,51 @@ export function renderEventShape(
       const el = <path key={key} d={path} fill={color} {...(is3PT ? {} : dataAttrs)} />;
       return wrapWith3PT(el);
     }
-    
+
     case 'diamond': {
       // Rotated square (diamond)
       const points = `${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`;
       const el = <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />;
       return wrapWith3PT(el);
     }
-    
+
     case 'chevron': {
       // Filled right-pointing arrow/triangle
       const points = `${cx - s * 0.6},${cy - s} ${cx + s},${cy} ${cx - s * 0.6},${cy + s}`;
       const el = <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />;
       return wrapWith3PT(el);
     }
-    
+
     case 'triangleDown': {
       // Downward pointing triangle
       const points = `${cx},${cy + s} ${cx - s},${cy - s * 0.7} ${cx + s},${cy - s * 0.7}`;
       const el = <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />;
       return wrapWith3PT(el);
     }
-    
+
     case 'triangleUp': {
       // Upward pointing triangle
       const points = `${cx},${cy - s} ${cx - s},${cy + s * 0.7} ${cx + s},${cy + s * 0.7}`;
       const el = <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />;
       return wrapWith3PT(el);
     }
-    
+
     case 'square': {
       // Simple square
       const el = (
-        <rect 
-          key={key} 
-          x={cx - s * 0.8} 
-          y={cy - s * 0.8} 
-          width={s * 1.6} 
-          height={s * 1.6} 
+        <rect
+          key={key}
+          x={cx - s * 0.8}
+          y={cy - s * 0.8}
+          width={s * 1.6}
+          height={s * 1.6}
           fill={color}
           {...(is3PT ? {} : dataAttrs)}
         />
       );
       return wrapWith3PT(el);
     }
-    
+
     case 'hexagon': {
       // Hexagon (stop-sign-like for fouls)
       const points = [];
@@ -310,12 +321,16 @@ export function renderEventShape(
         const angle = (i * 60 - 90) * (Math.PI / 180);
         points.push(`${cx + s * Math.cos(angle)},${cy + s * Math.sin(angle)}`);
       }
-      const el = <polygon key={key} points={points.join(' ')} fill={color} {...(is3PT ? {} : dataAttrs)} />;
+      const el = (
+        <polygon key={key} points={points.join(' ')} fill={color} {...(is3PT ? {} : dataAttrs)} />
+      );
       return wrapWith3PT(el);
     }
-    
+
     default: {
-      const el = <circle key={key} cx={cx} cy={cy} r={s} fill={color} {...(is3PT ? {} : dataAttrs)} />;
+      const el = (
+        <circle key={key} cx={cx} cy={cy} r={s} fill={color} {...(is3PT ? {} : dataAttrs)} />
+      );
       return wrapWith3PT(el);
     }
   }
@@ -328,15 +343,15 @@ export function renderEventShape(
 export function LegendShape({ eventType, size = 12, is3PT = false }) {
   const config = EVENT_TYPES[eventType];
   if (!config) return null;
-  
+
   const padding = 2;
   const viewSize = size + padding * 2;
   const center = viewSize / 2;
-  
+
   return (
-    <svg 
-      width={viewSize} 
-      height={viewSize} 
+    <svg
+      width={viewSize}
+      height={viewSize}
       viewBox={`0 0 ${viewSize} ${viewSize}`}
       style={{ display: 'inline-block', verticalAlign: 'middle' }}
     >

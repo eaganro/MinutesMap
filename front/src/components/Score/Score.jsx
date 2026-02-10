@@ -64,10 +64,7 @@ export default function Score({
   }, [displayData.homeTeam]);
 
   const hasDisplayData = Boolean(
-    displayData?.homeTeam ||
-    displayData?.awayTeam ||
-    displayData?.score ||
-    displayData?.date
+    displayData?.homeTeam || displayData?.awayTeam || displayData?.score || displayData?.date,
   );
   const hasIncomingData = Boolean(homeTeam || awayTeam || score || date);
   const awayLogoPending = Boolean(displayData.awayTeam) && !awayLogoLoaded;
@@ -86,8 +83,8 @@ export default function Score({
 
   if (isLoading && !hasDisplayData) {
     return (
-      <div className='scoreElement'>
-        <div className='loadingIndicator'>
+      <div className="scoreElement">
+        <div className="loadingIndicator">
           <CircularProgress size={24} thickness={5} />
           <span>Loading game...</span>
         </div>
@@ -96,7 +93,8 @@ export default function Score({
   }
 
   const gameDate = displayData.date ? new Date(displayData.date) : null;
-  const rawStatusLabel = typeof displayData.gameStatus === 'string' ? displayData.gameStatus.trim() : '';
+  const rawStatusLabel =
+    typeof displayData.gameStatus === 'string' ? displayData.gameStatus.trim() : '';
   const statusLabel = formatStatusText(rawStatusLabel);
   const { isLive } = parseGameStatus(displayData.gameStatus);
   const formattedPeriod = formatPeriod(displayData.lastAction?.period);
@@ -110,7 +108,6 @@ export default function Score({
     gameTimeLabel = `${formattedPeriod} ${formattedClock}`;
   }
 
-
   const changeToGameDate = () => {
     if (!gameDate) {
       return;
@@ -123,27 +120,27 @@ export default function Score({
     if (day < 10) {
       day = '0' + day;
     }
-    let val = `${gameDate.getFullYear()}-${month}-${day}`
-    changeDate({ target: { value: val }});
-  }
+    let val = `${gameDate.getFullYear()}-${month}-${day}`;
+    changeDate({ target: { value: val } });
+  };
 
   return (
     <div className={`scoreElement ${isDataLoading ? 'isLoading' : ''}`}>
       {showOverlay && (
-        <div className='loadingOverlay'>
+        <div className="loadingOverlay">
           <CircularProgress size={20} thickness={5} />
           <span>Loading game...</span>
         </div>
       )}
-      <div className='scoreContent'>
+      <div className="scoreContent">
         <div
           onClick={gameDate ? changeToGameDate : undefined}
-          className='gameDate'
+          className="gameDate"
           style={{ cursor: gameDate ? 'pointer' : 'default' }}
         >
           {gameDate ? gameDate.toDateString().slice(4) : '---'}
         </div>
-        <div className='scoreArea'>
+        <div className="scoreArea">
           <div>{displayData.score ? displayData.score.away : '--'}</div>
           {displayData.awayTeam && (
             <div className={`logoWrapper${awayLogoPending ? ' isPending' : ''}`}>
@@ -151,7 +148,7 @@ export default function Score({
                 ref={awayImgRef}
                 height="80"
                 width="80"
-                className='teamLogo awayImg'
+                className="teamLogo awayImg"
                 src={buildLogoSrc(displayData.awayTeam)}
                 alt={displayData.awayTeam}
                 onLoad={() => setAwayLogoLoaded(true)}
@@ -159,14 +156,14 @@ export default function Score({
               />
             </div>
           )}
-          <div className='at'>AT</div>
+          <div className="at">AT</div>
           {displayData.homeTeam && (
             <div className={`logoWrapper${homeLogoPending ? ' isPending' : ''}`}>
               <img
                 ref={homeImgRef}
                 height="80"
                 width="80"
-                className='teamLogo homeImg'
+                className="teamLogo homeImg"
                 src={buildLogoSrc(displayData.homeTeam)}
                 alt={displayData.homeTeam}
                 onLoad={() => setHomeLogoLoaded(true)}
@@ -177,11 +174,11 @@ export default function Score({
           <div>{displayData.score ? displayData.score.home : '--'}</div>
         </div>
         {gameTimeLabel && (
-          <div className='gameTime'>
-            <span className='timeText'>{gameTimeLabel}</span>
+          <div className="gameTime">
+            <span className="timeText">{gameTimeLabel}</span>
             {isLive && (
-              <span className='liveDotIndicator' role='img' aria-label='Live game'>
-                <span className='liveDot' />
+              <span className="liveDotIndicator" role="img" aria-label="Live game">
+                <span className="liveDot" />
               </span>
             )}
           </div>

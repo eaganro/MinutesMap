@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -30,17 +30,17 @@
     <title>MinutesMap</title>
     <!-- Flash Prevention: Set theme BEFORE React loads -->
     <script>
-      (function() {
+      (function () {
         var saved = localStorage.getItem('darkMode');
         var isDark;
-        
+
         if (saved !== null) {
           isDark = JSON.parse(saved);
         } else {
           // Check system preference
           isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         }
-        
+
         document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
       })();
     </script>
@@ -50,8 +50,8 @@
       src="https://analytics.minutesmap.com/script.js"
       data-auto-track="false"
       data-website-id="1eabd220-9cce-4dd8-8137-5b2f2f4f144e"
-      data-host-url="https://analytics.minutesmap.com">
-    </script>
+      data-host-url="https://analytics.minutesmap.com"
+    ></script>
   </head>
   <body>
     <section id="root"></section>

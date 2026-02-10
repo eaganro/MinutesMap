@@ -41,15 +41,10 @@ export default function LineupsTeamPanel({
   return (
     <div className="lineupsTeamPanel">
       <div className="lineupsTeamHeader">
-        <span
-          className="lineupsTeamName"
-          style={teamColor ? { color: teamColor } : undefined}
-        >
+        <span className="lineupsTeamName" style={teamColor ? { color: teamColor } : undefined}>
           {teamLabel}
         </span>
-        {lineups.length > 0 && (
-          <span className="lineupsCount">{lineups.length} lineups</span>
-        )}
+        {lineups.length > 0 && <span className="lineupsCount">{lineups.length} lineups</span>}
       </div>
       <div className="lineupsFilters">
         <span className="lineupsFilterLabel">Filter players (max {MAX_SELECTED_PLAYERS})</span>
@@ -118,9 +113,7 @@ export default function LineupsTeamPanel({
               <button
                 type="button"
                 className={`lineupsSortButton${sortConfig.key === 'minutes' ? ' isActive' : ''}`}
-                onClick={() =>
-                  onSortChange((prev) => getNextSortConfig(prev, 'minutes'))
-                }
+                onClick={() => onSortChange((prev) => getNextSortConfig(prev, 'minutes'))}
               >
                 {SORT_LABELS.minutes}
                 {sortConfig.key === 'minutes' && (
@@ -132,9 +125,7 @@ export default function LineupsTeamPanel({
               <button
                 type="button"
                 className={`lineupsSortButton${sortConfig.key === 'plusMinus' ? ' isActive' : ''}`}
-                onClick={() =>
-                  onSortChange((prev) => getNextSortConfig(prev, 'plusMinus'))
-                }
+                onClick={() => onSortChange((prev) => getNextSortConfig(prev, 'plusMinus'))}
               >
                 {SORT_LABELS.plusMinus}
                 {sortConfig.key === 'plusMinus' && (
@@ -164,7 +155,11 @@ export default function LineupsTeamPanel({
                 <span className="lineupsStat">{formatSeconds(summary.seconds)}</span>
                 <span
                   className={`lineupsStat lineupsPlusMinus${
-                    summary.plusMinus > 0 ? ' isPositive' : summary.plusMinus < 0 ? ' isNegative' : ''
+                    summary.plusMinus > 0
+                      ? ' isPositive'
+                      : summary.plusMinus < 0
+                        ? ' isNegative'
+                        : ''
                   }`}
                 >
                   {formatPlusMinus(summary.plusMinus)}
@@ -208,11 +203,7 @@ export default function LineupsTeamPanel({
             ))}
           </div>
           {hasMore && (
-            <button
-              type="button"
-              className="lineupsToggle"
-              onClick={onToggle}
-            >
+            <button type="button" className="lineupsToggle" onClick={onToggle}>
               {isExpanded ? 'Show top lineups' : `Show all (${lineups.length})`}
             </button>
           )}

@@ -64,7 +64,18 @@ const COLUMN_LABELS = {
 };
 const HIGHLIGHT_COLUMNS = new Set(['pts', 'reb', 'ast']);
 
-export default function(team, showButton, showMore, setShowMore, tableWrapperRef, onScroll, isCompact, teamColor, sortConfig, onSort) {
+export default function (
+  team,
+  showButton,
+  showMore,
+  setShowMore,
+  tableWrapperRef,
+  onScroll,
+  isCompact,
+  teamColor,
+  sortConfig,
+  onSort,
+) {
   const getDisplayName = (player) => {
     const firstName = (player.first || '').trim();
     const familyName = (player.last || '').trim();
@@ -78,7 +89,7 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
     }
     return [firstInitial, compactLast].filter(Boolean).join(' ');
   };
-  
+
   const getCellClassName = (key) => {
     const classes = [];
     if (key === 'player') {
@@ -154,26 +165,26 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
     const stats = item.stats || {};
     const getStat = (statKey) => Number(stats[statKey] ?? 0);
     switch (key) {
-    case 'player':
-      return { type: 'string', primary: getSortName(item.player) };
-    case 'min':
-      return { type: 'number', primary: item.seconds };
-    case 'fgm-a':
-      return { type: 'number', primary: getStat('fgm'), secondary: getStat('fga') };
-    case 'fg%':
-      return { type: 'number', primary: getStat('fga') ? (getStat('fgm') / getStat('fga')) : 0 };
-    case '3pm-a':
-      return { type: 'number', primary: getStat('tpm'), secondary: getStat('tpa') };
-    case '3p%':
-      return { type: 'number', primary: getStat('tpa') ? (getStat('tpm') / getStat('tpa')) : 0 };
-    case 'ftm-a':
-      return { type: 'number', primary: getStat('ftm'), secondary: getStat('fta') };
-    case 'ft%':
-      return { type: 'number', primary: getStat('fta') ? (getStat('ftm') / getStat('fta')) : 0 };
-    case 'reb':
-      return { type: 'number', primary: getStat('oreb') + getStat('dreb') };
-    default:
-      return { type: 'number', primary: getStat(key) };
+      case 'player':
+        return { type: 'string', primary: getSortName(item.player) };
+      case 'min':
+        return { type: 'number', primary: item.seconds };
+      case 'fgm-a':
+        return { type: 'number', primary: getStat('fgm'), secondary: getStat('fga') };
+      case 'fg%':
+        return { type: 'number', primary: getStat('fga') ? getStat('fgm') / getStat('fga') : 0 };
+      case '3pm-a':
+        return { type: 'number', primary: getStat('tpm'), secondary: getStat('tpa') };
+      case '3p%':
+        return { type: 'number', primary: getStat('tpa') ? getStat('tpm') / getStat('tpa') : 0 };
+      case 'ftm-a':
+        return { type: 'number', primary: getStat('ftm'), secondary: getStat('fta') };
+      case 'ft%':
+        return { type: 'number', primary: getStat('fta') ? getStat('ftm') / getStat('fta') : 0 };
+      case 'reb':
+        return { type: 'number', primary: getStat('oreb') + getStat('dreb') };
+      default:
+        return { type: 'number', primary: getStat(key) };
     }
   };
 
@@ -202,20 +213,24 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
 
       const fallback = (a.seconds - b.seconds) * directionFactor;
       if (fallback !== 0) return fallback;
-      return getSortName(a.player).localeCompare(getSortName(b.player), undefined, { sensitivity: 'base' });
+      return getSortName(a.player).localeCompare(getSortName(b.player), undefined, {
+        sensitivity: 'base',
+      });
     });
   };
 
-  const playersWithMinutes = (team.players || []).map((player) => {
-    const stats = player?.stats || {};
-    const minutes = normalizeMinutes(stats.min);
-    return {
-      player,
-      stats,
-      minutes,
-      seconds: minutesToSeconds(minutes),
-    };
-  }).filter((item) => item.seconds > 0);
+  const playersWithMinutes = (team.players || [])
+    .map((player) => {
+      const stats = player?.stats || {};
+      const minutes = normalizeMinutes(stats.min);
+      return {
+        player,
+        stats,
+        minutes,
+        seconds: minutesToSeconds(minutes),
+      };
+    })
+    .filter((item) => item.seconds > 0);
 
   const sortedPlayers = sortPlayers(playersWithMinutes);
 
@@ -242,48 +257,48 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
     const minutes = item.minutes;
     const getPlayerValue = (key) => {
       switch (key) {
-      case 'player':
-        return getDisplayName(p);
-      case 'min':
-        return minutes;
-      case 'pts':
-        return getStat('pts');
-      case 'fgm-a':
-        return `${getStat('fgm')}-${getStat('fga')}`;
-      case 'fg%':
-        return formatPercentage(getStat('fgm'), getStat('fga'));
-      case '3pm-a':
-        return `${getStat('tpm')}-${getStat('tpa')}`;
-      case '3p%':
-        return formatPercentage(getStat('tpm'), getStat('tpa'));
-      case 'ftm-a':
-        return `${getStat('ftm')}-${getStat('fta')}`;
-      case 'ft%':
-        return formatPercentage(getStat('ftm'), getStat('fta'));
-      case 'reb':
-        return getStat('oreb') + getStat('dreb');
-      case 'oreb':
-        return getStat('oreb');
-      case 'dreb':
-        return getStat('dreb');
-      case 'ast':
-        return getStat('ast');
-      case 'stl':
-        return getStat('stl');
-      case 'blk':
-        return getStat('blk');
-      case 'to':
-        return getStat('to');
-      case 'pf':
-        return getStat('pf');
-      case 'pm':
-        return `${getStat('pm') > 0 ? '+' : ''}${getStat('pm')}`;
-      default:
-        return '';
+        case 'player':
+          return getDisplayName(p);
+        case 'min':
+          return minutes;
+        case 'pts':
+          return getStat('pts');
+        case 'fgm-a':
+          return `${getStat('fgm')}-${getStat('fga')}`;
+        case 'fg%':
+          return formatPercentage(getStat('fgm'), getStat('fga'));
+        case '3pm-a':
+          return `${getStat('tpm')}-${getStat('tpa')}`;
+        case '3p%':
+          return formatPercentage(getStat('tpm'), getStat('tpa'));
+        case 'ftm-a':
+          return `${getStat('ftm')}-${getStat('fta')}`;
+        case 'ft%':
+          return formatPercentage(getStat('ftm'), getStat('fta'));
+        case 'reb':
+          return getStat('oreb') + getStat('dreb');
+        case 'oreb':
+          return getStat('oreb');
+        case 'dreb':
+          return getStat('dreb');
+        case 'ast':
+          return getStat('ast');
+        case 'stl':
+          return getStat('stl');
+        case 'blk':
+          return getStat('blk');
+        case 'to':
+          return getStat('to');
+        case 'pf':
+          return getStat('pf');
+        case 'pm':
+          return `${getStat('pm') > 0 ? '+' : ''}${getStat('pm')}`;
+        default:
+          return '';
       }
     };
     return (
-      <div key={rowKey} className={ "rowGrid stat " + (i % 2 === 0 ? "even" : "odd") }>
+      <div key={rowKey} className={'rowGrid stat ' + (i % 2 === 0 ? 'even' : 'odd')}>
         {columnOrder.map((key) => (
           <span key={`${rowKey}-${key}`} className={getCellClassName(key)}>
             {getPlayerValue(key)}
@@ -300,61 +315,64 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
   const pt3 = formatPercentage(teamTotals.tpm, teamTotals.tpa);
   const ft = formatPercentage(teamTotals.ftm, teamTotals.fta);
   const totalRow = playerRows && (
-    <div key="team-total-row" className={ "rowGrid stat " + (playerRows.length % 2 === 0 ? 'even' : 'odd')}>
+    <div
+      key="team-total-row"
+      className={'rowGrid stat ' + (playerRows.length % 2 === 0 ? 'even' : 'odd')}
+    >
       {columnOrder.map((key) => {
         let value = '';
         switch (key) {
-        case 'player':
-          value = 'TEAM';
-          break;
-        case 'pts':
-          value = teamTotals.pts;
-          break;
-        case 'fgm-a':
-          value = `${teamTotals.fgm}-${teamTotals.fga}`;
-          break;
-        case 'fg%':
-          value = fg;
-          break;
-        case '3pm-a':
-          value = `${teamTotals.tpm}-${teamTotals.tpa}`;
-          break;
-        case '3p%':
-          value = pt3;
-          break;
-        case 'ftm-a':
-          value = `${teamTotals.ftm}-${teamTotals.fta}`;
-          break;
-        case 'ft%':
-          value = ft;
-          break;
-        case 'reb':
-          value = teamTotals.oreb + teamTotals.dreb;
-          break;
-        case 'oreb':
-          value = teamTotals.oreb;
-          break;
-        case 'dreb':
-          value = teamTotals.dreb;
-          break;
-        case 'ast':
-          value = teamTotals.ast;
-          break;
-        case 'stl':
-          value = teamTotals.stl;
-          break;
-        case 'blk':
-          value = teamTotals.blk;
-          break;
-        case 'to':
-          value = teamTotals.to;
-          break;
-        case 'pf':
-          value = teamTotals.pf;
-          break;
-        default:
-          value = '';
-          break;
+          case 'player':
+            value = 'TEAM';
+            break;
+          case 'pts':
+            value = teamTotals.pts;
+            break;
+          case 'fgm-a':
+            value = `${teamTotals.fgm}-${teamTotals.fga}`;
+            break;
+          case 'fg%':
+            value = fg;
+            break;
+          case '3pm-a':
+            value = `${teamTotals.tpm}-${teamTotals.tpa}`;
+            break;
+          case '3p%':
+            value = pt3;
+            break;
+          case 'ftm-a':
+            value = `${teamTotals.ftm}-${teamTotals.fta}`;
+            break;
+          case 'ft%':
+            value = ft;
+            break;
+          case 'reb':
+            value = teamTotals.oreb + teamTotals.dreb;
+            break;
+          case 'oreb':
+            value = teamTotals.oreb;
+            break;
+          case 'dreb':
+            value = teamTotals.dreb;
+            break;
+          case 'ast':
+            value = teamTotals.ast;
+            break;
+          case 'stl':
+            value = teamTotals.stl;
+            break;
+          case 'blk':
+            value = teamTotals.blk;
+            break;
+          case 'to':
+            value = teamTotals.to;
+            break;
+          case 'pf':
+            value = teamTotals.pf;
+            break;
+          default:
+            value = '';
+            break;
         }
         return (
           <span key={`team-${key}`} className={getCellClassName(key)}>
@@ -373,7 +391,9 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
           type="button"
           className={`${getCellClassName(key)} statHeadingButton${sortConfig?.key === key ? ' isActive' : ''}`}
           onClick={() => onSort?.(key)}
-          data-indicator={sortConfig?.key === key ? (sortConfig?.direction === 'desc' ? '▼' : '▲') : undefined}
+          data-indicator={
+            sortConfig?.key === key ? (sortConfig?.direction === 'desc' ? '▼' : '▲') : undefined
+          }
         >
           {COLUMN_LABELS[key]}
         </button>
@@ -390,7 +410,7 @@ export default function(team, showButton, showMore, setShowMore, tableWrapperRef
         <div className="team">
           <span style={teamColor ? { color: teamColor } : undefined}>{team?.name}</span>
           {showButton && (
-            <div className='showMore'>
+            <div className="showMore">
               <IconButton
                 aria-label={showMore ? 'Show fewer stats' : 'Show more stats'}
                 onClick={() => setShowMore(!showMore)}

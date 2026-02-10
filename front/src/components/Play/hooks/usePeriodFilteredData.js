@@ -44,7 +44,7 @@ export function usePeriodFilteredData({
       Object.entries(displayAwayPlayers || {}).map(([name, actions]) => [
         name,
         (actions || []).filter((action) => Number(action.period) === activePeriod),
-      ])
+      ]),
     );
   }, [displayAwayPlayers, activePeriod]);
 
@@ -54,7 +54,7 @@ export function usePeriodFilteredData({
       Object.entries(displayHomePlayers || {}).map(([name, actions]) => [
         name,
         (actions || []).filter((action) => Number(action.period) === activePeriod),
-      ])
+      ]),
     );
   }, [displayHomePlayers, activePeriod]);
 
@@ -64,7 +64,7 @@ export function usePeriodFilteredData({
       Object.entries(displayAwayPlayerTimeline || {}).map(([name, timeline]) => [
         name,
         (timeline || []).filter((entry) => Number(entry.period) === activePeriod),
-      ])
+      ]),
     );
   }, [displayAwayPlayerTimeline, activePeriod]);
 
@@ -74,7 +74,7 @@ export function usePeriodFilteredData({
       Object.entries(displayHomePlayerTimeline || {}).map(([name, timeline]) => [
         name,
         (timeline || []).filter((entry) => Number(entry.period) === activePeriod),
-      ])
+      ]),
     );
   }, [displayHomePlayerTimeline, activePeriod]);
 

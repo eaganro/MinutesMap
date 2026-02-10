@@ -13,7 +13,7 @@ import { usePlayPointerHandlers } from './hooks/usePlayPointerHandlers';
 import Player from './Player/Player';
 import ScoreGraph from './ScoreGraph';
 import PlayTooltip from './PlayTooltip';
-import TimelineGrid from './TimelineGrid'; 
+import TimelineGrid from './TimelineGrid';
 
 // Custom Hook
 import { usePlayInteraction } from './usePlayInteraction';
@@ -23,29 +23,29 @@ import './Play.scss';
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
 
-export default function Play({ 
+export default function Play({
   gameId,
   nbaGameId,
   gameStatus,
   gameDate,
   box,
-  awayTeamNames, 
-  homeTeamNames, 
-  awayPlayers, 
+  awayTeamNames,
+  homeTeamNames,
+  awayPlayers,
   awayPlayersAll,
-  homePlayers, 
+  homePlayers,
   homePlayersAll,
-  allActions, 
-  scoreTimeline, 
-  awayPlayerTimeline, 
-  homePlayerTimeline, 
-  numQs, 
-  sectionWidth, 
-  lastAction, 
-  isLoading, 
-  statusMessage, 
+  allActions,
+  scoreTimeline,
+  awayPlayerTimeline,
+  homePlayerTimeline,
+  numQs,
+  sectionWidth,
+  lastAction,
+  isLoading,
+  statusMessage,
   showScoreDiff = true,
-  statOn
+  statOn,
 }) {
   const playRef = useRef(null);
   const [showLoadingText, setShowLoadingText] = useState(false);
@@ -176,13 +176,13 @@ export default function Play({
     setDescriptionArray,
     setHighlightActionIds,
     updateHoverAt,
-    resetInteraction
+    resetInteraction,
   } = usePlayInteraction({
     leftMargin,
     timelineWidth: width,
     timelineWindow,
     allActions: filteredAllActions,
-    playRef
+    playRef,
   });
 
   useEffect(() => {
@@ -216,8 +216,12 @@ export default function Play({
   });
 
   // --- Visual Data Prep ---
-  const teamColors = getMatchupColors(displayAwayTeamNames.abr, displayHomeTeamNames.abr, isDarkMode);
-  
+  const teamColors = getMatchupColors(
+    displayAwayTeamNames.abr,
+    displayHomeTeamNames.abr,
+    isDarkMode,
+  );
+
   const awayColor = teamColors.away ? getSafeBackground(teamColors.away, isDarkMode) : '';
   const homeColor = teamColors.home ? getSafeBackground(teamColors.home, isDarkMode) : '';
 
@@ -225,7 +229,7 @@ export default function Play({
   const { maxLead, maxY } = useMemo(() => {
     let max = 0;
     if (displayScoreTimeline) {
-      displayScoreTimeline.forEach(t => {
+      displayScoreTimeline.forEach((t) => {
         const scoreDiff = Math.abs(Number(t.away) - Number(t.home));
         if (scoreDiff > max) max = scoreDiff;
       });
@@ -233,10 +237,9 @@ export default function Play({
     return {
       maxLead: max,
       // Round to nearest 5 and add padding for the chart ceiling
-      maxY: Math.floor(max / 5) * 5 + 10
+      maxY: Math.floor(max / 5) * 5 + 10,
     };
   }, [displayScoreTimeline]);
-
 
   const showQuarterSwitcher = isQuarterView && periodOptions.length > 0 && hasDisplayData;
   const quarterSwitcher = showQuarterSwitcher ? (
@@ -263,8 +266,8 @@ export default function Play({
     return (
       <div className="playWrapper">
         {quarterSwitcher}
-        <div className='play'>
-          <div className='loadingIndicator'>
+        <div className="play">
+          <div className="loadingIndicator">
             <CircularProgress size={24} thickness={5} />
             <span>Loading play-by-play...</span>
           </div>
@@ -278,8 +281,8 @@ export default function Play({
       <div className="playWrapper">
         {quarterSwitcher}
         <div className={`play ${isDataLoading ? 'isLoading' : ''}`}>
-          <div className='playContent'>
-            <div className='statusMessage'>{displayStatusMessage}</div>
+          <div className="playContent">
+            <div className="statusMessage">{displayStatusMessage}</div>
           </div>
         </div>
       </div>
@@ -339,7 +342,7 @@ export default function Play({
       >
         {/* Floating Tooltip */}
         {!isDataLoading && (
-          <PlayTooltip 
+          <PlayTooltip
             descriptionArray={descriptionArray}
             focusActionMeta={focusActionMeta}
             mousePosition={mousePosition}
@@ -359,16 +362,16 @@ export default function Play({
         )}
 
         {showLoadingOverlay && (
-          <div className='loadingOverlay'>
+          <div className="loadingOverlay">
             <CircularProgress size={20} thickness={5} />
             <span>Loading play-by-play...</span>
           </div>
         )}
 
-        <div className='playContent'>
+        <div className="playContent">
           {/* Main SVG Visualization (Grid + Graph + MouseLine) */}
-          <svg height="600" width={sectionWidth} className='line playGrid'>
-            <TimelineGrid 
+          <svg height="600" width={sectionWidth} className="line playGrid">
+            <TimelineGrid
               width={width}
               leftMargin={leftMargin}
               qWidth={qWidth}
@@ -382,8 +385,8 @@ export default function Play({
               isQuarterView={isQuarterFocus}
               activePeriodLabel={activePeriodLabel}
             />
-            
-            <ScoreGraph 
+
+            <ScoreGraph
               scoreTimeline={filteredScoreTimeline}
               lastAction={filteredLastAction}
               width={width}
@@ -397,29 +400,31 @@ export default function Play({
             />
 
             {mouseLinePos !== null && (
-              <line 
-                x1={mouseLinePos} y1={10} 
-                x2={mouseLinePos} y2={590} 
-                style={{ stroke: 'var(--mouse-line-color)', strokeWidth: 1 }} 
+              <line
+                x1={mouseLinePos}
+                y1={10}
+                x2={mouseLinePos}
+                y2={590}
+                style={{ stroke: 'var(--mouse-line-color)', strokeWidth: 1 }}
               />
             )}
           </svg>
 
           {/* Player Rows - Away */}
-          <div className="teamName" style={{color: teamColors.away}}>
+          <div className="teamName" style={{ color: teamColors.away }}>
             {displayAwayTeamNames.name}
           </div>
-          <div className='teamSection'>
-            {Object.keys(filteredAwayPlayers).map(name => (
-              <Player 
-                key={name} 
-                actions={filteredAwayPlayers[name]} 
+          <div className="teamSection">
+            {Object.keys(filteredAwayPlayers).map((name) => (
+              <Player
+                key={name}
+                actions={filteredAwayPlayers[name]}
                 timeline={filteredAwayPlayerTimeline[name]}
-                name={name} 
-                width={width} 
-                rightMargin={rightMargin} 
+                name={name}
+                width={width}
+                rightMargin={rightMargin}
                 heightDivide={Object.keys(filteredAwayPlayers).length}
-                highlight={highlightActionIds} 
+                highlight={highlightActionIds}
                 leftMargin={leftMargin}
                 timelineWindow={timelineWindow}
               />
@@ -427,20 +432,20 @@ export default function Play({
           </div>
 
           {/* Player Rows - Home */}
-          <div className="teamName" style={{color: teamColors.home}}>
+          <div className="teamName" style={{ color: teamColors.home }}>
             {displayHomeTeamNames.name}
           </div>
-          <div className='teamSection'>
-            {Object.keys(filteredHomePlayers).map(name => (
-              <Player 
-                key={name} 
-                actions={filteredHomePlayers[name]} 
+          <div className="teamSection">
+            {Object.keys(filteredHomePlayers).map((name) => (
+              <Player
+                key={name}
+                actions={filteredHomePlayers[name]}
                 timeline={filteredHomePlayerTimeline[name]}
-                name={name} 
-                width={width} 
-                rightMargin={rightMargin} 
+                name={name}
+                width={width}
+                rightMargin={rightMargin}
                 heightDivide={Object.keys(filteredHomePlayers).length}
-                highlight={highlightActionIds} 
+                highlight={highlightActionIds}
                 leftMargin={leftMargin}
                 timelineWindow={timelineWindow}
               />

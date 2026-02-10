@@ -33,7 +33,13 @@ export function useWebSocketGate({
     let dateConnectAt = null;
     let gameConnectAt = null;
 
-    if (date && date === nbaToday && schedule && schedule.length > 0 && scheduleMatchesDate(schedule, date)) {
+    if (
+      date &&
+      date === nbaToday &&
+      schedule &&
+      schedule.length > 0 &&
+      scheduleMatchesDate(schedule, date)
+    ) {
       const allFinal = schedule.every((game) => parseGameStatus(game?.status).isFinal);
       if (!allFinal) {
         let earliestStart = null;
@@ -85,9 +91,7 @@ export function useWebSocketGate({
     const resolvedGameDate = matchedGameDate ?? (metaMatchesGame ? selectedGameDate : null);
 
     if (gameId && resolvedGameDate && resolvedGameDate === nbaToday) {
-      const isFinal = resolvedStatus
-        ? parseGameStatus(resolvedStatus).isFinal
-        : false;
+      const isFinal = resolvedStatus ? parseGameStatus(resolvedStatus).isFinal : false;
       if (!isFinal) {
         const status = resolvedStatus ? parseGameStatus(resolvedStatus) : null;
         if (status?.isLive) {

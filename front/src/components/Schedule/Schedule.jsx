@@ -7,7 +7,6 @@ import { parseGameStatus } from '../../helpers/gameSelectionUtils';
 import { formatStatusText } from '../../helpers/utils';
 import { trackFeatureUse } from '../../helpers/analytics';
 
-
 import './Schedule.scss';
 
 const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
@@ -39,7 +38,7 @@ function TeamLogo({ team }) {
         width="16"
         draggable={false}
         loading="lazy"
-        className='teamLogo'
+        className="teamLogo"
         src={buildLogoSrc(team)}
         alt={team}
         onLoad={() => setIsLoaded(true)}
@@ -49,8 +48,14 @@ function TeamLogo({ team }) {
   );
 }
 
-export default function Schedule({ games, date, changeDate, changeGame, isLoading, selectedGameId }) {
-
+export default function Schedule({
+  games,
+  date,
+  changeDate,
+  changeGame,
+  isLoading,
+  selectedGameId,
+}) {
   const scrollRef = useRef(null);
   const isDragging = useRef(false);
   const startX = useRef(0);
@@ -65,9 +70,9 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   const handleGameClick = (id) => {
     if (dragMoved.current) return; // suppress click if user dragged
     changeGame(id);
-  }
+  };
 
-  const gamesList = (games || []).map(g => {
+  const gamesList = (games || []).map((g) => {
     const { isLive, isUpcoming } = parseGameStatus(g.status);
     const isSelected = g.id === selectedGameId;
     const gameClassName = `game${isSelected ? ' selected' : ''}`;
@@ -76,57 +81,58 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
     if (!isUpcoming) {
       return (
         <div className={gameClassName} key={g.id} onClick={() => handleGameClick(g.id)}>
-          <div className='iconRow'>
+          <div className="iconRow">
             <TeamLogo team={g.awayteam} />
             {g.awayteam} - {g.hometeam}
             <TeamLogo team={g.hometeam} />
           </div>
-          <div>{g.awayscore} - {g.homescore}</div>
-          <div className='statusRow'>
-            <span className='statusText'>{statusText}</span>
+          <div>
+            {g.awayscore} - {g.homescore}
+          </div>
+          <div className="statusRow">
+            <span className="statusText">{statusText}</span>
             {isLive && (
-              <span className='liveDotIndicator' role='img' aria-label='Live game'>
-                <span className='liveDot' />
+              <span className="liveDotIndicator" role="img" aria-label="Live game">
+                <span className="liveDot" />
               </span>
             )}
           </div>
         </div>
-      )
+      );
     } else {
       return (
         <div className={gameClassName} key={g.id} onClick={() => handleGameClick(g.id)}>
-          <div className='iconRow'>
+          <div className="iconRow">
             <TeamLogo team={g.awayteam} />
             {g.awayteam} - {g.hometeam}
             <TeamLogo team={g.hometeam} />
           </div>
-          <div className='recordRow'>
+          <div className="recordRow">
             {/* <span>{g.awayrecord}</span>
             <span>{g.homerecord}</span> */}
           </div>
-          <div className='statusRow'>
-            <span className='statusText'>{statusText}</span>
+          <div className="statusRow">
+            <span className="statusText">{statusText}</span>
             {isLive && (
-              <span className='liveDotIndicator' role='img' aria-label='Live game'>
-                <span className='liveDot' />
+              <span className="liveDotIndicator" role="img" aria-label="Live game">
+                <span className="liveDot" />
               </span>
             )}
           </div>
         </div>
-      )
+      );
     }
-
   });
   const scrollScheduleRight = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft += 100;
     }
-  }
+  };
   const scrollScheduleLeft = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft -= 100;
     }
-  }
+  };
 
   const dateDown = () => {
     trackDateFeatureUse();
@@ -140,12 +146,12 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
     if (day < 10) {
       day = '0' + day;
     }
-    let val = `${downdate.getFullYear()}-${month}-${day}`
-    changeDate({ target: { value: val }});
+    let val = `${downdate.getFullYear()}-${month}-${day}`;
+    changeDate({ target: { value: val } });
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = 0;
     }
-  }
+  };
   const dateUp = () => {
     trackDateFeatureUse();
     const update = new Date(date);
@@ -158,12 +164,12 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
     if (day < 10) {
       day = '0' + day;
     }
-    let val = `${update.getFullYear()}-${month}-${day}`
-    changeDate({ target: { value: val }})
+    let val = `${update.getFullYear()}-${month}-${day}`;
+    changeDate({ target: { value: val } });
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = 0;
     }
-  }
+  };
 
   const onMouseDown = (e) => {
     if (!scrollRef.current) return;
@@ -209,7 +215,7 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   const onTouchMove = (e) => {
     if (!isDragging.current || !scrollRef.current) return;
     if (e.cancelable) {
-       e.preventDefault();
+      e.preventDefault();
     }
     const touch = e.touches[0];
     const x = touch.pageX - scrollRef.current.offsetLeft;
@@ -219,16 +225,18 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
   };
 
   return (
-    <div className='schedule'>
-      <div className='scheduleContent'>
-        <div className='datePick'>
-          <label className='visuallyHidden' htmlFor='scheduleDate'>Select game date</label>
-          <IconButton className='scheduleButton' onClick={dateDown} aria-label='Previous date'>
+    <div className="schedule">
+      <div className="scheduleContent">
+        <div className="datePick">
+          <label className="visuallyHidden" htmlFor="scheduleDate">
+            Select game date
+          </label>
+          <IconButton className="scheduleButton" onClick={dateDown} aria-label="Previous date">
             <NavigateBefore />
           </IconButton>
           <input
-            id='scheduleDate'
-            className='dateInput'
+            id="scheduleDate"
+            className="dateInput"
             type="date"
             value={date}
             onChange={(e) => {
@@ -236,22 +244,26 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
               changeDate(e);
             }}
           />
-          <IconButton className='scheduleButton' onClick={dateUp} aria-label='Next date'>
+          <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
             <NavigateNext />
           </IconButton>
         </div>
-        <div className='gamePick'>
-          <IconButton className='scheduleButton' onClick={scrollScheduleLeft} aria-label='Scroll games left'>
+        <div className="gamePick">
+          <IconButton
+            className="scheduleButton"
+            onClick={scrollScheduleLeft}
+            aria-label="Scroll games left"
+          >
             <NavigateBefore />
           </IconButton>
           {isLoading ? (
-            <div className='loadingIndicator'>
+            <div className="loadingIndicator">
               <CircularProgress size={24} thickness={5} />
               <span>Loading games...</span>
             </div>
           ) : gamesList.length ? (
             <div
-              className='games'
+              className="games"
               ref={scrollRef}
               onMouseDown={onMouseDown}
               onMouseLeave={onMouseLeave}
@@ -264,9 +276,13 @@ export default function Schedule({ games, date, changeDate, changeGame, isLoadin
               {gamesList}
             </div>
           ) : (
-            <div className='noGames'>No Games Scheduled</div>
+            <div className="noGames">No Games Scheduled</div>
           )}
-          <IconButton className='scheduleButton end' onClick={scrollScheduleRight} aria-label='Scroll games right'>
+          <IconButton
+            className="scheduleButton end"
+            onClick={scrollScheduleRight}
+            aria-label="Scroll games right"
+          >
             <NavigateNext />
           </IconButton>
         </div>

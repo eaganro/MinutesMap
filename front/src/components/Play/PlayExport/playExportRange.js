@@ -1,4 +1,9 @@
-import { getGameTotalSeconds, getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../../helpers/playTimeline';
+import {
+  getGameTotalSeconds,
+  getPeriodDurationSeconds,
+  getPeriodStartSeconds,
+  getSecondsElapsed,
+} from '../../../helpers/playTimeline';
 import { formatClock, formatStatusText } from '../../../helpers/utils';
 
 export const formatPeriodLabel = (period) => {
@@ -54,8 +59,8 @@ export const buildGameStatusLabel = ({
   const rangeEndValue = Number(periodRange?.end);
   if (!isFullGameRange && Number.isFinite(rangeEndValue)) {
     const rangeLabel = formatPeriodLabel(rangeEndValue);
-    const shouldShowRangeEnd = isFinal
-      || (Number.isFinite(currentPeriodValue) && currentPeriodValue > rangeEndValue);
+    const shouldShowRangeEnd =
+      isFinal || (Number.isFinite(currentPeriodValue) && currentPeriodValue > rangeEndValue);
     if (shouldShowRangeEnd) {
       return rangeLabel ? `End ${rangeLabel}` : statusText || '';
     }
@@ -91,18 +96,21 @@ export const buildExportRangeData = ({
   };
   const exportTimelineWindow = hasRangeWindow
     ? {
-      startSeconds: getPeriodStartSeconds(rangeStart),
-      durationSeconds: Math.max(
-        1,
-        getPeriodStartSeconds(rangeEnd) + getPeriodDurationSeconds(rangeEnd) - getPeriodStartSeconds(rangeStart)
-      ),
-    }
+        startSeconds: getPeriodStartSeconds(rangeStart),
+        durationSeconds: Math.max(
+          1,
+          getPeriodStartSeconds(rangeEnd) +
+            getPeriodDurationSeconds(rangeEnd) -
+            getPeriodStartSeconds(rangeStart),
+        ),
+      }
     : timelineWindow;
   const totalGameSeconds = getGameTotalSeconds(numPeriods);
-  const durationRatio = totalGameSeconds > 0
-    ? exportTimelineWindow.durationSeconds / totalGameSeconds
-    : 1;
-  const exportScoreTimeline = (displayScoreTimeline || []).filter((entry) => isInRange(entry?.period));
+  const durationRatio =
+    totalGameSeconds > 0 ? exportTimelineWindow.durationSeconds / totalGameSeconds : 1;
+  const exportScoreTimeline = (displayScoreTimeline || []).filter((entry) =>
+    isInRange(entry?.period),
+  );
   const exportStatusLabel = buildGameStatusLabel({
     lastAction: displayLastAction,
     gameStatus,
@@ -115,38 +123,38 @@ export const buildExportRangeData = ({
     Object.entries(displayAwayPlayers || {}).map(([name, actions]) => [
       name,
       (actions || []).filter((action) => isInRange(action?.period)),
-    ])
+    ]),
   );
   const exportHomePlayers = Object.fromEntries(
     Object.entries(displayHomePlayers || {}).map(([name, actions]) => [
       name,
       (actions || []).filter((action) => isInRange(action?.period)),
-    ])
+    ]),
   );
   const exportAwayPlayerTimeline = Object.fromEntries(
     Object.entries(displayAwayPlayerTimeline || {}).map(([name, timeline]) => [
       name,
       (timeline || []).filter((entry) => isInRange(entry?.period)),
-    ])
+    ]),
   );
   const exportHomePlayerTimeline = Object.fromEntries(
     Object.entries(displayHomePlayerTimeline || {}).map(([name, timeline]) => [
       name,
       (timeline || []).filter((entry) => isInRange(entry?.period)),
-    ])
+    ]),
   );
   const exportStartScoreDiff = hasRangeWindow
     ? (() => {
-      const startSeconds = exportTimelineWindow.startSeconds;
-      let diff = 0;
-      (displayScoreTimeline || []).forEach((entry) => {
-        const elapsed = getSecondsElapsed(entry.period, entry.clock);
-        if (elapsed <= startSeconds) {
-          diff = Number(entry.away) - Number(entry.home);
-        }
-      });
-      return diff;
-    })()
+        const startSeconds = exportTimelineWindow.startSeconds;
+        let diff = 0;
+        (displayScoreTimeline || []).forEach((entry) => {
+          const elapsed = getSecondsElapsed(entry.period, entry.clock);
+          if (elapsed <= startSeconds) {
+            diff = Number(entry.away) - Number(entry.home);
+          }
+        });
+        return diff;
+      })()
     : 0;
   const exportScoreStats = (() => {
     let max = Math.abs(exportStartScoreDiff || 0);

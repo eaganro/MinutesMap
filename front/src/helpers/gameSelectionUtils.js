@@ -43,7 +43,7 @@ function getTimeZoneOffset(date, timeZone) {
     parts.day,
     parts.hour,
     parts.minute,
-    parts.second
+    parts.second,
   );
   return (asUtc - date.getTime()) / 60000;
 }
@@ -162,10 +162,15 @@ export function shiftDateString(dateString, offset) {
 export function parseGameStatus(status) {
   const trimmed = (status || '').trim();
   const lower = trimmed.toLowerCase();
-  const isFinal = trimmed.startsWith('Final') || lower.startsWith('postponed') || lower.startsWith('cancelled') || lower.startsWith('canceled') || lower.startsWith('ppd');
+  const isFinal =
+    trimmed.startsWith('Final') ||
+    lower.startsWith('postponed') ||
+    lower.startsWith('cancelled') ||
+    lower.startsWith('canceled') ||
+    lower.startsWith('ppd');
   const isUpcoming = trimmed.endsWith('ET');
   const isLive = !!trimmed && !isFinal && !isUpcoming;
-  
+
   return { isFinal, isUpcoming, isLive, status: trimmed };
 }
 
@@ -182,9 +187,9 @@ export function compareGamesForSelection(a, b) {
   const safeTimeB = Number.isFinite(timeB) ? timeB : 0;
 
   // Bucket: 0 = live, 1 = upcoming, 2 = final
-  const bucketA = statusA.isLive ? 0 : (statusA.isUpcoming ? 1 : (statusA.isFinal ? 2 : 1));
-  const bucketB = statusB.isLive ? 0 : (statusB.isUpcoming ? 1 : (statusB.isFinal ? 2 : 1));
-  
+  const bucketA = statusA.isLive ? 0 : statusA.isUpcoming ? 1 : statusA.isFinal ? 2 : 1;
+  const bucketB = statusB.isLive ? 0 : statusB.isUpcoming ? 1 : statusB.isFinal ? 2 : 1;
+
   if (bucketA < bucketB) return -1;
   if (bucketA > bucketB) return 1;
 
@@ -224,8 +229,10 @@ export function scheduleMatchesDate(games, dateValue) {
  */
 export function findFirstStartedOrCompletedGame(games = [], alreadySorted = false) {
   const list = alreadySorted ? games : sortGamesForSelection(games);
-  return list.find((game) => {
-    const { status } = parseGameStatus(game?.status);
-    return status && !status.endsWith('ET');
-  }) || null;
+  return (
+    list.find((game) => {
+      const { status } = parseGameStatus(game?.status);
+      return status && !status.endsWith('ET');
+    }) || null
+  );
 }

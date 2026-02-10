@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 
-const hasPlayData = (data) => Boolean(
-  data &&
-  (
-    (data.allActions && data.allActions.length) ||
-    (data.scoreTimeline && data.scoreTimeline.length) ||
-    Object.keys(data.awayPlayers || {}).length ||
-    Object.keys(data.homePlayers || {}).length
-  )
-);
+const hasPlayData = (data) =>
+  Boolean(
+    data &&
+      ((data.allActions && data.allActions.length) ||
+        (data.scoreTimeline && data.scoreTimeline.length) ||
+        Object.keys(data.awayPlayers || {}).length ||
+        Object.keys(data.homePlayers || {}).length),
+  );
 
 const buildDisplayData = ({
   awayTeamNames,
@@ -58,35 +57,39 @@ export function useStablePlayData({
   lastAction,
   gameDate,
 }) {
-  const incomingData = useMemo(() => buildDisplayData({
-    awayTeamNames,
-    homeTeamNames,
-    awayPlayers,
-    awayPlayersAll,
-    homePlayers,
-    homePlayersAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numQs,
-    lastAction,
-    gameDate,
-  }), [
-    awayTeamNames,
-    homeTeamNames,
-    awayPlayers,
-    awayPlayersAll,
-    homePlayers,
-    homePlayersAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numQs,
-    lastAction,
-    gameDate,
-  ]);
+  const incomingData = useMemo(
+    () =>
+      buildDisplayData({
+        awayTeamNames,
+        homeTeamNames,
+        awayPlayers,
+        awayPlayersAll,
+        homePlayers,
+        homePlayersAll,
+        allActions,
+        scoreTimeline,
+        awayPlayerTimeline,
+        homePlayerTimeline,
+        numQs,
+        lastAction,
+        gameDate,
+      }),
+    [
+      awayTeamNames,
+      homeTeamNames,
+      awayPlayers,
+      awayPlayersAll,
+      homePlayers,
+      homePlayersAll,
+      allActions,
+      scoreTimeline,
+      awayPlayerTimeline,
+      homePlayerTimeline,
+      numQs,
+      lastAction,
+      gameDate,
+    ],
+  );
 
   const lastStableRef = useRef({
     awayTeamNames,
@@ -131,9 +134,8 @@ export function useStablePlayData({
     homePlayers,
   });
 
-  const displayStatusMessage = (isLoading || isBlurred)
-    ? lastStatusMessageRef.current
-    : statusMessage;
+  const displayStatusMessage =
+    isLoading || isBlurred ? lastStatusMessageRef.current : statusMessage;
   const showStatusMessage = Boolean(displayStatusMessage) && !hasDisplayData;
   const isDataLoading = isBlurred && (hasDisplayData || hasIncomingData || showStatusMessage);
 

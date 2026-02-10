@@ -1,7 +1,7 @@
 // Theme CSS Custom Properties
 // Light mode (default)
 :root,
-[data-theme="light"] {
+[data-theme='light'] {
   // Page backgrounds
   --bg-page: rgb(234, 235, 237);
   --bg-card: #fafafa;
@@ -9,27 +9,29 @@
   --bg-footer: #f0f0f0;
 
   // Typography
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  
+  --font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Open Sans', 'Helvetica Neue', sans-serif;
+
   // Text colors
   --text-primary: #222;
   --text-secondary: #444;
   --text-tertiary: #666;
   --text-muted: #6c6d6f;
   --text-heading: #374151;
-  
+
   // Borders and dividers
   --border-light: #bbb;
   --border-medium: #e0e0e0;
   --border-strong: #e5e7eb;
   --divider: #e5e7eb;
-  
+
   // Interactive elements
   --bg-hover: rgba(0, 0, 0, 0.05);
   --bg-selected: #e7f1ff;
   --bg-game: rgb(240, 240, 240);
   --bg-game-hover: rgb(230, 231, 233);
-  
+
   // Table colors
   --bg-table-header: rgb(255, 255, 255);
   --bg-table-odd: rgb(255, 255, 255);
@@ -37,11 +39,11 @@
   --bg-table-hover: rgb(229, 236, 246);
   --bg-highlight-col: rgba(59, 130, 246, 0.06);
   --bg-highlight-col-header: rgba(59, 130, 246, 0.12);
-  
+
   // Tooltip/popup
   --bg-tooltip: #fff;
   --tooltip-shadow: rgba(0, 0, 0, 0.15);
-  
+
   // Play area specific
   --bg-play: rgb(250, 250, 250);
   --line-color: black;
@@ -49,74 +51,76 @@
   --mouse-line-color: grey;
   --quarter-label-color: #666;
   --playline-hover: #a0a11b;
-  
+
   // Score area colors (SVG fills)
   --score-fill-away: currentColor;
   --score-fill-home: currentColor;
-  
+
   // Focus ring
   --focus-ring-color: rgba(59, 130, 246, 0.5);
-  
+
   // Stat button label
   --stat-label-color: #374151;
   --stat-label-off: #475569;
-  --score-diff-icon-color: #6366F1;
+  --score-diff-icon-color: #6366f1;
 
   // Live indicator
   --live-color: #22c55e;
   --live-ring: rgba(34, 197, 94, 0.45);
-  
+
   // Stat event colors - these stay vibrant in both modes
   // but we define them here for potential tweaking
-  --event-point: #F59E0B;
+  --event-point: #f59e0b;
   --event-miss: #475569;
-  --event-rebound: #2563EB;
+  --event-rebound: #2563eb;
   --event-assist: #059669;
-  --event-turnover: #DC2626;
-  --event-block: #7C3AED;
-  --event-steal: #0891B2;
+  --event-turnover: #dc2626;
+  --event-block: #7c3aed;
+  --event-steal: #0891b2;
   --event-foul: #111827;
-  --event-3pt-marker: #DC2626;
-  
+  --event-3pt-marker: #dc2626;
+
   // Input/form elements
   --input-bg: #fff;
   --input-border: #ccc;
   --input-text: #333;
-  
+
   // MUI overrides
   --circular-progress-color: #6c6d6f;
 }
 
 // Dark mode
-[data-theme="dark"] {
+[data-theme='dark'] {
   // Page backgrounds
   --bg-page: #121212;
   --bg-card: #1e1e1e;
   --bg-card-alt: #1e1e1e;
 
   // Typography
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    'Open Sans', 'Helvetica Neue', sans-serif;
   --bg-footer: #181818;
-  
+
   // Text colors
   --text-primary: #e8e8e8;
   --text-secondary: #c4c4c4;
   --text-tertiary: #a0a0a0;
   --text-muted: #8a8a8a;
   --text-heading: #d1d5db;
-  
+
   // Borders and dividers
   --border-light: #444;
   --border-medium: #3a3a3a;
   --border-strong: #333;
   --divider: #333;
-  
+
   // Interactive elements
   --bg-hover: rgba(255, 255, 255, 0.08);
   --bg-selected: rgba(59, 130, 246, 0.25);
   --bg-game: #2a2a2a;
   --bg-game-hover: #333;
-  
+
   // Table colors (hover color stays opaque to avoid bleed on sticky player column)
   --bg-table-header: #252525;
   --bg-table-odd: #1e1e1e;
@@ -124,11 +128,11 @@
   --bg-table-hover: #253041;
   --bg-highlight-col: #242b37;
   --bg-highlight-col-header: #29384f;
-  
+
   // Tooltip/popup
   --bg-tooltip: #2a2a2a;
   --tooltip-shadow: rgba(0, 0, 0, 0.4);
-  
+
   // Play area specific
   --bg-play: #1e1e1e;
   --line-color: #888;
@@ -136,35 +140,35 @@
   --mouse-line-color: #aaa;
   --quarter-label-color: #999;
   --playline-hover: #dadb39;
-  
+
   // Focus ring
   --focus-ring-color: rgba(96, 165, 250, 0.5);
-  
+
   // Stat button label
   --stat-label-color: #d1d5db;
   --stat-label-off: #9ca3af;
-  --score-diff-icon-color: #818CF8;
+  --score-diff-icon-color: #818cf8;
 
   // Live indicator
   --live-color: #4ade80;
   --live-ring: rgba(74, 222, 128, 0.55);
-  
+
   // Stat event colors - brighten slightly for dark mode visibility
-  --event-point: #FBBF24;
-  --event-miss: #64748B;
-  --event-rebound: #3B82F6;
-  --event-assist: #10B981;
-  --event-turnover: #EF4444;
-  --event-block: #8B5CF6;
-  --event-steal: #22D3EE;
-  --event-foul: #9CA3AF;
-  --event-3pt-marker: #EF4444;
-  
+  --event-point: #fbbf24;
+  --event-miss: #64748b;
+  --event-rebound: #3b82f6;
+  --event-assist: #10b981;
+  --event-turnover: #ef4444;
+  --event-block: #8b5cf6;
+  --event-steal: #22d3ee;
+  --event-foul: #9ca3af;
+  --event-3pt-marker: #ef4444;
+
   // Input/form elements
   --input-bg: #2a2a2a;
   --input-border: #444;
   --input-text: #e0e0e0;
-  
+
   // MUI overrides
   --circular-progress-color: #888;
 }
@@ -191,9 +195,15 @@ body {
 }
 
 @keyframes livePulse {
-  0% { box-shadow: 0 0 0 0 var(--live-ring); }
-  70% { box-shadow: 0 0 0 4px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0% {
+    box-shadow: 0 0 0 0 var(--live-ring);
+  }
+  70% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -203,23 +213,23 @@ body {
 }
 
 // Date input styling for dark mode
-[data-theme="dark"] {
-  input[type="date"] {
+[data-theme='dark'] {
+  input[type='date'] {
     background-color: var(--input-bg);
     color: var(--input-text);
     border: 1px solid var(--input-border);
     border-radius: 4px;
-    
+
     &::-webkit-calendar-picker-indicator {
       filter: invert(0.8);
     }
   }
-  
+
   // MUI Icon buttons
   .MuiIconButton-root {
     color: var(--text-secondary);
   }
-  
+
   // MUI Circular Progress
   .MuiCircularProgress-root {
     color: var(--circular-progress-color) !important;

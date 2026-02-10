@@ -27,9 +27,11 @@
     align-items: center;
     gap: 2px;
     filter: blur(0px);
-    transition: filter 0.15s ease, opacity 0.15s ease;
+    transition:
+      filter 0.15s ease,
+      opacity 0.15s ease;
   }
-  
+
   .scoreArea {
     display: grid;
     grid-template-columns: 1fr auto auto auto 1fr;
@@ -46,7 +48,7 @@
     // Target the last element (Right Score)
     > div:last-child {
       text-align: left;
-      padding-left: 15px;  // Space between score and logo
+      padding-left: 15px; // Space between score and logo
     }
 
     // The "AT" text in the middle
@@ -72,10 +74,14 @@
       position: absolute;
       inset: 6px;
       border-radius: 50%;
-      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.08)), var(--bg-table-even);
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.08)),
+        var(--bg-table-even);
       border: 1px solid var(--divider);
       opacity: 0;
-      transition: opacity 0.2s ease, filter 0.2s ease;
+      transition:
+        opacity 0.2s ease,
+        filter 0.2s ease;
     }
 
     .logoWrapper.isPending::before {
@@ -86,7 +92,9 @@
     .teamLogo {
       display: block;
       object-fit: contain;
-      transition: opacity 0.2s ease, filter 0.2s ease;
+      transition:
+        opacity 0.2s ease,
+        filter 0.2s ease;
     }
 
     .logoWrapper.isPending .teamLogo {

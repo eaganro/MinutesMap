@@ -10,7 +10,6 @@ import { trackFeatureUse } from '../../helpers/analytics';
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;
 
-
 export default function Boxscore({ box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'min', direction: 'desc' });
@@ -24,11 +23,9 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const isSyncingScrollRef = useRef(false);
   const syncRafRef = useRef(null);
   const featureUseTrackedRef = useRef(false);
-  const [isCompact, setIsCompact] = useState(() => (
-    typeof window !== 'undefined'
-      ? window.matchMedia('(max-width: 640px)').matches
-      : false
-  ));
+  const [isCompact, setIsCompact] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 640px)').matches : false,
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -60,8 +57,9 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     lastStatusMessageRef.current = statusMessage;
   }, [statusMessage, isLoading, isBlurred]);
 
-  const displayBox = (isLoading || isBlurred) ? lastStableBoxRef.current : box;
-  const displayStatusMessage = (isLoading || isBlurred) ? lastStatusMessageRef.current : statusMessage;
+  const displayBox = isLoading || isBlurred ? lastStableBoxRef.current : box;
+  const displayStatusMessage =
+    isLoading || isBlurred ? lastStatusMessageRef.current : statusMessage;
   const hasBoxData = displayBox && Object.keys(displayBox).length > 0;
   const hasIncomingBoxData = box && Object.keys(box).length > 0;
   const showStatusMessage = Boolean(displayStatusMessage) && !hasBoxData;
@@ -69,7 +67,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const matchupColors = getMatchupColors(
     displayBox?.teams?.away?.abbr,
     displayBox?.teams?.home?.abbr,
-    isDarkMode
+    isDarkMode,
   );
 
   useEffect(() => {
@@ -129,7 +127,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     isCompact,
     matchupColors?.away,
     sortConfig,
-    handleSort
+    handleSort,
   );
   const homeBox = processTeamStats(
     displayBox?.teams?.home,
@@ -141,7 +139,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     isCompact,
     matchupColors?.home,
     sortConfig,
-    handleSort
+    handleSort,
   );
 
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
@@ -158,22 +156,22 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
       onTouchStart={handleTrackFeatureUse}
     >
       {showLoadingOverlay && (
-        <div className='loadingOverlay'>
+        <div className="loadingOverlay">
           <CircularProgress size={20} thickness={5} />
           <span>Loading box score...</span>
         </div>
       )}
       {showLoadingIndicator ? (
-        <div className='loadingIndicator'>
+        <div className="loadingIndicator">
           <CircularProgress size={24} thickness={5} />
           <span>Loading box score...</span>
         </div>
       ) : showStatusMessage ? (
-        <div className='boxContent'>
-          <div className='statusMessage'>{displayStatusMessage}</div>
+        <div className="boxContent">
+          <div className="statusMessage">{displayStatusMessage}</div>
         </div>
       ) : (
-        <div className='boxContent'>
+        <div className="boxContent">
           {awayBox}
           {homeBox}
         </div>

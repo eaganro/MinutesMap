@@ -42,10 +42,7 @@ describe('gameSelectionUtils', () => {
   });
 
   it('matches a schedule by start-date prefix', () => {
-    const games = [
-      { starttime: '2026-02-03T00:10:00Z' },
-      { starttime: '2026-02-04T01:00:00Z' },
-    ];
+    const games = [{ starttime: '2026-02-03T00:10:00Z' }, { starttime: '2026-02-04T01:00:00Z' }];
 
     expect(scheduleMatchesDate(games, '2026-02-03')).toBe(true);
     expect(scheduleMatchesDate(games, '2026-02-05')).toBe(false);

@@ -77,12 +77,13 @@ export function useActivePeriodSelection({
     });
   }, [isQuarterView, numPeriods, defaultPeriod, hasPeriodData, isFinal]);
 
-  const resolvedSelectedPeriod = pendingGameChangeRef.current && !isShowingStableData
-    ? defaultPeriod
-    : selectedPeriod;
+  const resolvedSelectedPeriod =
+    pendingGameChangeRef.current && !isShowingStableData ? defaultPeriod : selectedPeriod;
 
   const activePeriod = isQuarterView
-    ? (resolvedSelectedPeriod !== null ? resolvedSelectedPeriod : defaultPeriod)
+    ? resolvedSelectedPeriod !== null
+      ? resolvedSelectedPeriod
+      : defaultPeriod
     : null;
 
   const isQuarterFocus = isQuarterView && activePeriod !== 0;

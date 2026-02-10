@@ -13,7 +13,9 @@
 
   .boxContent {
     filter: blur(0px);
-    transition: filter 0.15s ease, opacity 0.15s ease;
+    transition:
+      filter 0.15s ease,
+      opacity 0.15s ease;
   }
 
   .rowGrid {
@@ -36,12 +38,15 @@
     color: var(--text-heading);
     border-bottom: 2px solid var(--divider);
     background-color: var(--bg-table-header);
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-    
+    transition:
+      background-color 0.3s ease,
+      border-color 0.3s ease,
+      color 0.3s ease;
+
     .playerNameCol {
       background-color: var(--bg-table-header);
     }
-    
+
     .highlight-col {
       background-color: var(--bg-highlight-col-header);
     }
@@ -92,19 +97,21 @@
 
   .stat {
     color: var(--text-secondary);
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
 
     &:hover {
       background-color: var(--bg-table-hover);
-      
+
       span {
         background-color: transparent;
       }
-      
+
       .playerNameCol {
         background-color: var(--bg-table-hover);
       }
-      
+
       .highlight-col {
         background-color: var(--bg-table-hover);
       }
@@ -120,7 +127,7 @@
 
   .even {
     background-color: var(--bg-table-even);
-    
+
     .playerNameCol {
       background-color: var(--bg-table-even);
     }
@@ -128,7 +135,7 @@
 
   .odd {
     background-color: var(--bg-table-odd);
-    
+
     .playerNameCol {
       background-color: var(--bg-table-odd);
     }
@@ -161,7 +168,10 @@
 
     .MuiIconButton-root {
       color: inherit;
-      transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+      transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        box-shadow 0.2s ease;
     }
 
     .MuiIconButton-root:hover {
@@ -212,7 +222,9 @@
 
   @media (max-width: 640px) {
     .rowGrid {
-      grid-template-columns: minmax(90px, 90px) 75px 55px 55px 55px 70px 55px 70px 55px 70px 55px repeat(7, 55px);
+      grid-template-columns:
+        minmax(90px, 90px)
+        75px 55px 55px 55px 70px 55px 70px 55px 70px 55px repeat(7, 55px);
     }
 
     .rowGrid .playerNameCol {

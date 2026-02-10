@@ -6,11 +6,11 @@ const ThemeContext = createContext();
 function getSystemPreference() {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
   const prefersLight = window.matchMedia('(prefers-color-scheme: light)');
-  
+
   // If user has explicitly set a system preference, use it
   if (prefersDark.matches) return true;
   if (prefersLight.matches) return false;
-  
+
   // No system preference set, default to dark mode
   return true;
 }
@@ -45,13 +45,11 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const toggleDarkMode = useCallback(() => {
-    setIsDarkMode(prev => !prev);
+    setIsDarkMode((prev) => !prev);
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode }}>
-      {children}
-    </ThemeContext.Provider>
+    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode }}>{children}</ThemeContext.Provider>
   );
 }
 
@@ -62,4 +60,3 @@ export function useTheme() {
   }
   return context;
 }
-

@@ -14,10 +14,20 @@ import './App.scss';
 export default function App() {
   const {
     // Schedule
-    games, date, gameId, changeDate, changeGame, isScheduleLoading,
+    games,
+    date,
+    gameId,
+    changeDate,
+    changeGame,
+    isScheduleLoading,
 
     // Score
-    homeTeam, awayTeam, currentScore, gameDate, gameStatusMessage, isGameDataLoading,
+    homeTeam,
+    awayTeam,
+    currentScore,
+    gameDate,
+    gameStatusMessage,
+    isGameDataLoading,
 
     // Play-by-play
     awayTeamName,
@@ -40,42 +50,39 @@ export default function App() {
     nbaGameId,
 
     // Stat controls
-    statOn, changeStatOn, setShowScoreDiff,
+    statOn,
+    changeStatOn,
+    setShowScoreDiff,
 
     // Box score
-    box, isBoxLoading,
+    box,
+    isBoxLoading,
 
     // Lineups
     lineupStats,
   } = useMinutesMap();
 
   return (
-    <div className='topLevel'>
-      <header className='appHeader'>
-        <a className='appBranding' href="/" aria-label="MinutesMap home">
+    <div className="topLevel">
+      <header className="appHeader">
+        <a className="appBranding" href="/" aria-label="MinutesMap home">
           <picture>
-            <source
-              type="image/avif"
-              srcSet="/logo-70.avif 1x, /logo-140.avif 2x"
-            />
-            <source
-              type="image/webp"
-              srcSet="/logo-70.webp 1x, /logo-140.webp 2x"
-            />
+            <source type="image/avif" srcSet="/logo-70.avif 1x, /logo-140.avif 2x" />
+            <source type="image/webp" srcSet="/logo-70.webp 1x, /logo-140.webp 2x" />
             <img
               src="/logo-70.png"
               srcSet="/logo-70.png 1x, /logo-140.png 2x"
               width="70"
               height="70"
               alt="MinutesMap logo"
-              className='appLogo'
+              className="appLogo"
             />
           </picture>
-          <span className='appName'>MinutesMap</span>
+          <span className="appName">MinutesMap</span>
         </a>
-        <div className='appHeaderActions'>
+        <div className="appHeaderActions">
           <a
-            className='appSocialLink'
+            className="appSocialLink"
             href="https://x.com/intent/follow?screen_name=MinutesMap"
             target="_blank"
             rel="noreferrer"
@@ -87,7 +94,7 @@ export default function App() {
           <DarkModeToggle />
         </div>
       </header>
-      <main className='appMain'>
+      <main className="appMain">
         <Schedule
           games={games}
           date={date}
@@ -96,7 +103,7 @@ export default function App() {
           isLoading={isScheduleLoading}
           selectedGameId={gameId}
         />
-        
+
         <Score
           homeTeam={homeTeam}
           awayTeam={awayTeam}
@@ -108,8 +115,8 @@ export default function App() {
           lastAction={lastAction}
           gameStatus={gameStatus}
         />
-        
-        <div className='playByPlaySection' ref={playByPlaySectionRef}>
+
+        <div className="playByPlaySection" ref={playByPlaySectionRef}>
           <Play
             gameId={gameId}
             nbaGameId={nbaGameId}
@@ -143,12 +150,8 @@ export default function App() {
             statusMessage={gameStatusMessage}
           />
         </div>
-        
-        <Boxscore 
-          box={box} 
-          isLoading={isBoxLoading} 
-          statusMessage={gameStatusMessage} 
-        />
+
+        <Boxscore box={box} isLoading={isBoxLoading} statusMessage={gameStatusMessage} />
         <Lineups
           awayTeam={awayTeamName}
           homeTeam={homeTeamName}

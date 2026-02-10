@@ -162,8 +162,5 @@ export const sortLineups = (lineups, sortConfig) => {
 // Toggle direction when re-clicking the same sort key, else default to desc.
 export const getNextSortConfig = (previousConfig, nextKey) => ({
   key: nextKey,
-  direction:
-    previousConfig.key === nextKey && previousConfig.direction === 'desc'
-      ? 'asc'
-      : 'desc',
+  direction: previousConfig.key === nextKey && previousConfig.direction === 'desc' ? 'asc' : 'desc',
 });

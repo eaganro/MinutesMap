@@ -42,10 +42,7 @@ function filterActions(a, statOn) {
     desc.includes('free throw');
 
   const isMiss =
-    result === 'x' ||
-    result === 'miss' ||
-    type.includes('miss') ||
-    isMissDescription(desc);
+    result === 'x' || result === 'miss' || type.includes('miss') || isMissDescription(desc);
 
   const isMake = result === 'm' || result === 'make' || (isShotType && !isMiss);
 
@@ -93,7 +90,7 @@ function filterPlayerActions(playerMap, statOn) {
     Object.entries(playerMap).map(([name, actions]) => [
       name,
       (actions || []).filter((a) => filterActions(a, statOn)),
-    ])
+    ]),
   );
 }
 
@@ -118,10 +115,8 @@ function normalizeCompactActionMap(playerMap, side) {
   return Object.fromEntries(
     Object.entries(playerMap).map(([name, actions]) => [
       name,
-      (actions || [])
-        .map((action) => normalizeCompactAction(action, side))
-        .filter(Boolean),
-    ])
+      (actions || []).map((action) => normalizeCompactAction(action, side)).filter(Boolean),
+    ]),
   );
 }
 
@@ -144,14 +139,14 @@ function normalizeCompactTimeline(timelineMap) {
         start: segment?.start,
         end: segment?.end,
       })),
-    ])
+    ]),
   );
 }
 
 /**
  * Hook for transforming raw play-by-play data into UI-ready timelines and actions.
  * Extracts heavy data processing logic from the view component.
- * 
+ *
  * @param {Array|Object} playByPlay - Raw play-by-play array OR pre-processed payload from S3
  * @param {number|null} homeTeamId - ID of the home team
  * @param {number|null} awayTeamId - ID of the away team

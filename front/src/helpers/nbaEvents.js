@@ -49,28 +49,31 @@ export function resolveVideoAction(action, allActions) {
   const isFreeThrow = isFreeThrowAction(action.description, action.actionType);
 
   if (isFreeThrow) {
-    const pointAction = actions.find((entry) =>
-      entry.clock === action.clock
-      && entry.period === action.period
-      && getEventType(entry.description, entry.actionType, entry.result) === 'point'
+    const pointAction = actions.find(
+      (entry) =>
+        entry.clock === action.clock &&
+        entry.period === action.period &&
+        getEventType(entry.description, entry.actionType, entry.result) === 'point',
     );
     if (pointAction) return pointAction;
   }
 
   if (eventType === 'block') {
-    const missAction = actions.find((entry) =>
-      entry.clock === action.clock
-      && entry.period === action.period
-      && getEventType(entry.description, entry.actionType, entry.result) === 'miss'
+    const missAction = actions.find(
+      (entry) =>
+        entry.clock === action.clock &&
+        entry.period === action.period &&
+        getEventType(entry.description, entry.actionType, entry.result) === 'miss',
     );
     if (missAction) return missAction;
   }
 
   if (eventType === 'steal') {
-    const turnoverAction = actions.find((entry) =>
-      entry.clock === action.clock
-      && entry.period === action.period
-      && getEventType(entry.description, entry.actionType, entry.result) === 'turnover'
+    const turnoverAction = actions.find(
+      (entry) =>
+        entry.clock === action.clock &&
+        entry.period === action.period &&
+        getEventType(entry.description, entry.actionType, entry.result) === 'turnover',
     );
     if (turnoverAction) return turnoverAction;
   }

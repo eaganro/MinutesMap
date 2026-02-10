@@ -1,19 +1,18 @@
 import { useMemo } from 'react';
 import { getSecondsElapsed } from '../../helpers/playTimeline';
 
-export default function ScoreGraph({ 
-  scoreTimeline, 
+export default function ScoreGraph({
+  scoreTimeline,
   lastAction,
-  width, 
-  leftMargin, 
+  width,
+  leftMargin,
   timelineWindow,
-  maxY, 
-  showScoreDiff, 
-  awayColor, 
+  maxY,
+  showScoreDiff,
+  awayColor,
   homeColor,
-  startScoreDiff = 0
+  startScoreDiff = 0,
 }) {
-
   const { pospoints, negpoints } = useMemo(() => {
     if (!showScoreDiff) {
       return { pospoints: '', negpoints: '' };
@@ -53,7 +52,7 @@ export default function ScoreGraph({
       let y1 = starty;
       // Calculate Y based on score differential, scaled to max lead
       // 300 is the center point of the 600px height SVG
-      let y2 = scoreDiff * -300 / maxY;
+      let y2 = (scoreDiff * -300) / maxY;
 
       // Logic to handle crossing the x-axis (lead change)
       if (y1 <= 0) {
@@ -90,13 +89,12 @@ export default function ScoreGraph({
     // Close the shape at the last recorded action
     const endX = lastAction ? getXForAction(lastAction) : width;
     if (Number.isFinite(endX)) {
-
       // Extend the graph to the final second
       if (pos) {
         pospointsArr.push(`${leftMargin + endX},${300 + starty}`);
         pospointsArr.push(`${leftMargin + endX},300`);
         // Push "off-screen" to ensure fill closes cleanly if needed, though usually not required for polyline
-        negpointsArr.push(`2000,300`); 
+        negpointsArr.push(`2000,300`);
       } else {
         negpointsArr.push(`${leftMargin + endX},${300 + starty}`);
         negpointsArr.push(`${leftMargin + endX},300`);
@@ -104,11 +102,20 @@ export default function ScoreGraph({
       }
     }
 
-    return { 
-      pospoints: pospointsArr.join(' '), 
-      negpoints: negpointsArr.join(' ') 
+    return {
+      pospoints: pospointsArr.join(' '),
+      negpoints: negpointsArr.join(' '),
     };
-  }, [scoreTimeline, lastAction, width, leftMargin, maxY, showScoreDiff, timelineWindow, startScoreDiff]);
+  }, [
+    scoreTimeline,
+    lastAction,
+    width,
+    leftMargin,
+    maxY,
+    showScoreDiff,
+    timelineWindow,
+    startScoreDiff,
+  ]);
 
   if (!showScoreDiff) {
     return null;

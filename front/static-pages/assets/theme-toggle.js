@@ -14,9 +14,10 @@
   }
 
   const stored = localStorage.getItem('darkMode');
-  const isDark = stored !== null
-    ? JSON.parse(stored)
-    : document.documentElement.getAttribute('data-theme') === 'dark';
+  const isDark =
+    stored !== null
+      ? JSON.parse(stored)
+      : document.documentElement.getAttribute('data-theme') === 'dark';
   setToggleState(isDark);
 
   toggle.addEventListener('click', function () {

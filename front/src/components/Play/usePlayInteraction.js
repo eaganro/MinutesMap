@@ -7,7 +7,7 @@ export const usePlayInteraction = ({
   leftMargin,
   timelineWidth,
   timelineWindow,
-  playRef // We need the ref to calculate mouse offsets correctly
+  playRef, // We need the ref to calculate mouse offsets correctly
 }) => {
   const [descriptionArray, setDescriptionArray] = useState([]);
   const [mouseLinePos, setMouseLinePos] = useState(null);
@@ -25,55 +25,67 @@ export const usePlayInteraction = ({
   }, [allActions, highlightActionIds, descriptionArray]);
 
   // HELPER: Calculate X Position on Timeline
-  const calculateXPosition = useCallback((clock, period) => {
-    if (!timelineWindow || timelineWindow.durationSeconds <= 0) {
-      return leftMargin;
-    }
-    const elapsed = getSecondsElapsed(period, clock);
-    const windowOffset = elapsed - timelineWindow.startSeconds;
-    const ratio = windowOffset / timelineWindow.durationSeconds;
-    const rawPos = Math.max(0, Math.min(timelineWidth, ratio * timelineWidth));
-    return rawPos + leftMargin;
-  }, [timelineWindow, timelineWidth, leftMargin]);
+  const calculateXPosition = useCallback(
+    (clock, period) => {
+      if (!timelineWindow || timelineWindow.durationSeconds <= 0) {
+        return leftMargin;
+      }
+      const elapsed = getSecondsElapsed(period, clock);
+      const windowOffset = elapsed - timelineWindow.startSeconds;
+      const ratio = windowOffset / timelineWindow.durationSeconds;
+      const rawPos = Math.max(0, Math.min(timelineWidth, ratio * timelineWidth));
+      return rawPos + leftMargin;
+    },
+    [timelineWindow, timelineWidth, leftMargin],
+  );
 
-  const applyActionSelection = useCallback((action) => {
-    if (!action) return false;
-    const sameTimeActions = allActions.filter((a) =>
-      a.clock === action.clock && a.period === action.period
-    );
-    const newActionIds = sameTimeActions.map((a) => a.actionNumber);
-    const newX = calculateXPosition(action.clock, action.period);
-    setHighlightActionIds(newActionIds);
-    setDescriptionArray(sameTimeActions);
-    setMouseLinePos(newX);
-    setFocusActionMeta({
-      actionNumber: action.actionNumber ?? null,
-    });
-    return true;
-  }, [allActions, calculateXPosition]);
+  const applyActionSelection = useCallback(
+    (action) => {
+      if (!action) return false;
+      const sameTimeActions = allActions.filter(
+        (a) => a.clock === action.clock && a.period === action.period,
+      );
+      const newActionIds = sameTimeActions.map((a) => a.actionNumber);
+      const newX = calculateXPosition(action.clock, action.period);
+      setHighlightActionIds(newActionIds);
+      setDescriptionArray(sameTimeActions);
+      setMouseLinePos(newX);
+      setFocusActionMeta({
+        actionNumber: action.actionNumber ?? null,
+      });
+      return true;
+    },
+    [allActions, calculateXPosition],
+  );
 
-  const getAdjacentAction = useCallback((direction) => {
-    if (!allActions || allActions.length === 0) return null;
-    const currentIndex = getCurrentActionIndex();
-    if (currentIndex < 0) return null;
-    const currentAction = allActions[currentIndex];
-    let newIndex = currentIndex + direction;
-    while (
-      newIndex >= 0 &&
-      newIndex < allActions.length &&
-      allActions[newIndex].clock === currentAction.clock &&
-      allActions[newIndex].period === currentAction.period
-    ) {
-      newIndex += direction;
-    }
-    if (newIndex < 0 || newIndex >= allActions.length) return null;
-    return allActions[newIndex];
-  }, [allActions, getCurrentActionIndex]);
+  const getAdjacentAction = useCallback(
+    (direction) => {
+      if (!allActions || allActions.length === 0) return null;
+      const currentIndex = getCurrentActionIndex();
+      if (currentIndex < 0) return null;
+      const currentAction = allActions[currentIndex];
+      let newIndex = currentIndex + direction;
+      while (
+        newIndex >= 0 &&
+        newIndex < allActions.length &&
+        allActions[newIndex].clock === currentAction.clock &&
+        allActions[newIndex].period === currentAction.period
+      ) {
+        newIndex += direction;
+      }
+      if (newIndex < 0 || newIndex >= allActions.length) return null;
+      return allActions[newIndex];
+    },
+    [allActions, getCurrentActionIndex],
+  );
 
-  const navigateAction = useCallback((direction) => {
-    const nextAction = getAdjacentAction(direction);
-    return applyActionSelection(nextAction);
-  }, [getAdjacentAction, applyActionSelection]);
+  const navigateAction = useCallback(
+    (direction) => {
+      const nextAction = getAdjacentAction(direction);
+      return applyActionSelection(nextAction);
+    },
+    [getAdjacentAction, applyActionSelection],
+  );
 
   const hasPrevAction = useMemo(() => Boolean(getAdjacentAction(-1)), [getAdjacentAction]);
   const hasNextAction = useMemo(() => Boolean(getAdjacentAction(1)), [getAdjacentAction]);
@@ -112,13 +124,13 @@ export const usePlayInteraction = ({
       if (!infoLocked) return;
       const container = playRef.current;
       if (!container) return;
-      
+
       // If clicking outside the container, reset everything
       if (!container.contains(ev.target)) {
         closeLockedTooltip();
       }
     };
-    
+
     document.addEventListener('mousedown', handleOutside, { passive: true });
     document.addEventListener('touchstart', handleOutside, { passive: true });
     return () => {
@@ -128,111 +140,116 @@ export const usePlayInteraction = ({
   }, [infoLocked, playRef, closeLockedTooltip]);
 
   // LOGIC: Main Hover Handler
-  const updateHoverAt = useCallback((clientX, clientY, targetEl, force = false) => {
-    if ((infoLocked && !force) || !playRef.current) return;
+  const updateHoverAt = useCallback(
+    (clientX, clientY, targetEl, force = false) => {
+      if ((infoLocked && !force) || !playRef.current) return;
 
-    // Calculate position relative to the play container
-    const rect = playRef.current.getBoundingClientRect();
-    const rawPos = clientX - rect.left - leftMargin;
-    const width = timelineWidth;
+      // Calculate position relative to the play container
+      const rect = playRef.current.getBoundingClientRect();
+      const rawPos = clientX - rect.left - leftMargin;
+      const width = timelineWidth;
 
-    // Update global mouse position for tooltip placement
-    setMousePosition({ x: clientX, y: clientY });
+      // Update global mouse position for tooltip placement
+      setMousePosition({ x: clientX, y: clientY });
 
-    // Tolerance check (if mouse drifted too far left/right)
-    const hoverPadding = 5;
-    if (rawPos < -hoverPadding || rawPos > width + hoverPadding) {
-      setMouseLinePos(null);
-      setDescriptionArray([]);
-      setHighlightActionIds([]);
-      setFocusActionMeta(null);
-      return;
-    }
+      // Tolerance check (if mouse drifted too far left/right)
+      const hoverPadding = 5;
+      if (rawPos < -hoverPadding || rawPos > width + hoverPadding) {
+        setMouseLinePos(null);
+        setDescriptionArray([]);
+        setHighlightActionIds([]);
+        setFocusActionMeta(null);
+        return;
+      }
 
-    // Clamp position for calculation
-    let pos = Math.max(0, Math.min(rawPos, width));
+      // Clamp position for calculation
+      let pos = Math.max(0, Math.min(rawPos, width));
 
-    // Check for direct hover on a specific shape/icon
-    let hoveredActionNumber = null;
-    let checkEl = targetEl;
-    
-    // Traverse up to find data-action-number (handles SVG nesting)
-    while (checkEl && hoveredActionNumber === null && checkEl !== playRef.current) {
-      if (checkEl.dataset) {
-        if (checkEl.dataset.actionNumber) {
-          hoveredActionNumber = checkEl.dataset.actionNumber;
+      // Check for direct hover on a specific shape/icon
+      let hoveredActionNumber = null;
+      let checkEl = targetEl;
+
+      // Traverse up to find data-action-number (handles SVG nesting)
+      while (checkEl && hoveredActionNumber === null && checkEl !== playRef.current) {
+        if (checkEl.dataset) {
+          if (checkEl.dataset.actionNumber) {
+            hoveredActionNumber = checkEl.dataset.actionNumber;
+          }
         }
+        if (checkEl.tagName === 'svg') break; // Optimization boundary
+        checkEl = checkEl.parentElement;
       }
-      if (checkEl.tagName === 'svg') break; // Optimization boundary
-      checkEl = checkEl.parentElement;
-    }
 
-    if (hoveredActionNumber !== null) {
-      let hoveredAction = null;
       if (hoveredActionNumber !== null) {
-        hoveredAction = allActions.find(a => String(a.actionNumber) === String(hoveredActionNumber));
-      }
-      
-      if (hoveredAction) {
-        const eventType = getEventType(
-          hoveredAction.description,
-          hoveredAction.actionType,
-          hoveredAction.result
-        );
-        const isFreeThrow = isFreeThrowAction(hoveredAction.description, hoveredAction.actionType);
-
-        let hoverActions = [hoveredAction];
-        
-        // Special case: Group Points and Free Throws visually
-        if (eventType === 'point' || isFreeThrow) {
-          hoverActions = allActions.filter(a => 
-            a.clock === hoveredAction.clock && 
-            a.period === hoveredAction.period &&
-            (
-              getEventType(a.description, a.actionType, a.result) === 'point'
-              || isFreeThrowAction(a.description, a.actionType)
-            )
+        let hoveredAction = null;
+        if (hoveredActionNumber !== null) {
+          hoveredAction = allActions.find(
+            (a) => String(a.actionNumber) === String(hoveredActionNumber),
           );
         }
 
-        const hoverIds = hoverActions.map(a => a.actionNumber);
-        const actionX = calculateXPosition(hoveredAction.clock, hoveredAction.period);
+        if (hoveredAction) {
+          const eventType = getEventType(
+            hoveredAction.description,
+            hoveredAction.actionType,
+            hoveredAction.result,
+          );
+          const isFreeThrow = isFreeThrowAction(
+            hoveredAction.description,
+            hoveredAction.actionType,
+          );
 
-        setHighlightActionIds(hoverIds);
-        setDescriptionArray(hoverActions);
-        setMouseLinePos(actionX);
-        setFocusActionMeta({
-          actionNumber: hoveredAction.actionNumber ?? null,
-        });
-        return; // Exit early if we found a direct target
+          let hoverActions = [hoveredAction];
+
+          // Special case: Group Points and Free Throws visually
+          if (eventType === 'point' || isFreeThrow) {
+            hoverActions = allActions.filter(
+              (a) =>
+                a.clock === hoveredAction.clock &&
+                a.period === hoveredAction.period &&
+                (getEventType(a.description, a.actionType, a.result) === 'point' ||
+                  isFreeThrowAction(a.description, a.actionType)),
+            );
+          }
+
+          const hoverIds = hoverActions.map((a) => a.actionNumber);
+          const actionX = calculateXPosition(hoveredAction.clock, hoveredAction.period);
+
+          setHighlightActionIds(hoverIds);
+          setDescriptionArray(hoverActions);
+          setMouseLinePos(actionX);
+          setFocusActionMeta({
+            actionNumber: hoveredAction.actionNumber ?? null,
+          });
+          return; // Exit early if we found a direct target
+        }
       }
-    }
 
-    // Fallback: Find closest action by X-Axis position
-    // Iterate to find where the mouse `pos` lands in the timeline
-    let actionIndex = 0;
-    let found = false;
-    
-    for (let i = 1; i < allActions.length && !found; i++) {
-      const currentActionX = calculateXPosition(allActions[i].clock, allActions[i].period);
-      
-      // Adjust comparison to account for leftMargin
-      if ((currentActionX - leftMargin) > pos) {
-        found = true;
-      } else {
-        // Check if time is identical to previous, group them
-        actionIndex = i;
+      // Fallback: Find closest action by X-Axis position
+      // Iterate to find where the mouse `pos` lands in the timeline
+      let actionIndex = 0;
+      let found = false;
+
+      for (let i = 1; i < allActions.length && !found; i++) {
+        const currentActionX = calculateXPosition(allActions[i].clock, allActions[i].period);
+
+        // Adjust comparison to account for leftMargin
+        if (currentActionX - leftMargin > pos) {
+          found = true;
+        } else {
+          // Check if time is identical to previous, group them
+          actionIndex = i;
+        }
       }
-    }
 
-    const matchedAction = allActions[actionIndex];
-    if (matchedAction) {
+      const matchedAction = allActions[actionIndex];
+      if (matchedAction) {
         // Collect all actions occurring at this exact timestamp
-        const sameTimeActions = allActions.filter(a => 
-            a.clock === matchedAction.clock && a.period === matchedAction.period
+        const sameTimeActions = allActions.filter(
+          (a) => a.clock === matchedAction.clock && a.period === matchedAction.period,
         );
-        
-        const sameTimeIds = sameTimeActions.map(a => a.actionNumber);
+
+        const sameTimeIds = sameTimeActions.map((a) => a.actionNumber);
 
         setHighlightActionIds(sameTimeIds);
         setDescriptionArray(sameTimeActions);
@@ -240,27 +257,25 @@ export const usePlayInteraction = ({
         setFocusActionMeta({
           actionNumber: matchedAction.actionNumber ?? null,
         });
-    } else {
-      setFocusActionMeta(null);
-    }
-  }, [
-    infoLocked, 
-    playRef, 
-    leftMargin, 
-    timelineWidth, 
-    allActions, 
-    calculateXPosition
-  ]);
+      } else {
+        setFocusActionMeta(null);
+      }
+    },
+    [infoLocked, playRef, leftMargin, timelineWidth, allActions, calculateXPosition],
+  );
 
   // Exposed Reset Function
-  const resetInteraction = useCallback((force = false) => {
-    if (!infoLocked || force) {
-      setMouseLinePos(null);
-      setDescriptionArray([]);
-      setHighlightActionIds([]);
-      setFocusActionMeta(null);
-    }
-  }, [infoLocked]);
+  const resetInteraction = useCallback(
+    (force = false) => {
+      if (!infoLocked || force) {
+        setMouseLinePos(null);
+        setDescriptionArray([]);
+        setHighlightActionIds([]);
+        setFocusActionMeta(null);
+      }
+    },
+    [infoLocked],
+  );
 
   return {
     descriptionArray,
@@ -278,6 +293,6 @@ export const usePlayInteraction = ({
     setDescriptionArray,
     setHighlightActionIds,
     updateHoverAt,
-    resetInteraction
+    resetInteraction,
   };
 };

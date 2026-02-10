@@ -4,7 +4,9 @@
   border-top: 1px solid var(--divider);
   margin-top: 40px;
   padding: 40px 20px 32px;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .footerContent {
@@ -34,7 +36,11 @@
 }
 
 .footerName {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -64,7 +70,7 @@
   }
 
   li:not(:last-child)::after {
-    content: "|";
+    content: '|';
     margin: 0 12px;
     color: var(--text-muted);
   }
@@ -103,7 +109,7 @@
   }
 
   .footerLinkList li:not(:last-child)::after {
-    content: "";
+    content: '';
     margin: 0;
   }
 

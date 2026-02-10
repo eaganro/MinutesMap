@@ -1,5 +1,15 @@
-import { getPeriodDurationSeconds, getPeriodStartSeconds, getSecondsElapsed } from '../../../helpers/playTimeline';
-import { EVENT_TYPES, getEventType, isFreeThrowAction, isMissDescription, isThreePointAction } from '../../../helpers/eventStyles.jsx';
+import {
+  getPeriodDurationSeconds,
+  getPeriodStartSeconds,
+  getSecondsElapsed,
+} from '../../../helpers/playTimeline';
+import {
+  EVENT_TYPES,
+  getEventType,
+  isFreeThrowAction,
+  isMissDescription,
+  isThreePointAction,
+} from '../../../helpers/eventStyles.jsx';
 
 export const DESKTOP_EXPORT_WIDTH = 1235;
 export const MOBILE_EXPORT_MAX_WIDTH = 1024;
@@ -8,20 +18,16 @@ const WATERMARK_TEXT = 'MinutesMap.com';
 const EXPORT_RENDER_SCALE = 2.5;
 const EXPORT_MAX_SCALE = 3;
 
-const getExportScale = () => (
-  Math.min(EXPORT_MAX_SCALE, (window.devicePixelRatio || 1) * EXPORT_RENDER_SCALE)
-);
+const getExportScale = () =>
+  Math.min(EXPORT_MAX_SCALE, (window.devicePixelRatio || 1) * EXPORT_RENDER_SCALE);
 
-const sanitizeFilePart = (value) => (
+const sanitizeFilePart = (value) =>
   String(value || '')
     .trim()
     .replace(/[^a-z0-9-_]+/gi, '_')
-    .replace(/^_+|_+$/g, '')
-);
+    .replace(/^_+|_+$/g, '');
 
-const isTransparentColor = (value) => (
-  value === 'transparent' || value === 'rgba(0, 0, 0, 0)'
-);
+const isTransparentColor = (value) => value === 'transparent' || value === 'rgba(0, 0, 0, 0)';
 
 const resolveExportBackground = (element) => {
   let current = element;
@@ -40,7 +46,7 @@ export const buildPlayExportFileName = ({
   homeTeamNames,
   rangeLabel,
   isFullGameRange,
-  gameId
+  gameId,
 }) => {
   const away = awayTeamNames?.abr || 'Away';
   const home = homeTeamNames?.abr || 'Home';
@@ -175,7 +181,7 @@ const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
         { x: cx, y: cy - size },
         { x: cx + size, y: cy },
         { x: cx, y: cy + size },
-        { x: cx - size, y: cy }
+        { x: cx - size, y: cy },
       ]);
       break;
     }
@@ -183,7 +189,7 @@ const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
       drawPolygon(ctx, [
         { x: cx - size * 0.6, y: cy - size },
         { x: cx + size, y: cy },
-        { x: cx - size * 0.6, y: cy + size }
+        { x: cx - size * 0.6, y: cy + size },
       ]);
       break;
     }
@@ -191,7 +197,7 @@ const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
       drawPolygon(ctx, [
         { x: cx, y: cy + size },
         { x: cx - size, y: cy - size * 0.7 },
-        { x: cx + size, y: cy - size * 0.7 }
+        { x: cx + size, y: cy - size * 0.7 },
       ]);
       break;
     }
@@ -199,7 +205,7 @@ const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
       drawPolygon(ctx, [
         { x: cx, y: cy - size },
         { x: cx - size, y: cy + size * 0.7 },
-        { x: cx + size, y: cy + size * 0.7 }
+        { x: cx + size, y: cy + size * 0.7 },
       ]);
       break;
     }
@@ -233,7 +239,16 @@ const drawEventShape = (ctx, eventType, cx, cy, size, computedStyle, is3PT) => {
   }
 };
 
-const drawFreeThrowRing = (ctx, cx, cy, size, description, subType, computedStyle, isAnd1 = false) => {
+const drawFreeThrowRing = (
+  ctx,
+  cx,
+  cy,
+  size,
+  description,
+  subType,
+  computedStyle,
+  isAnd1 = false,
+) => {
   if (!ctx) return;
   const isMiss = isMissDescription(description);
   const { attempt, total } = getFreeThrowAttempt(description, subType);
@@ -367,7 +382,7 @@ const drawLegend = (
   showScoreDiff,
   includeScoreLead = true,
   legendScale = 1,
-  forceWrapAfterGroupIndex = null
+  forceWrapAfterGroupIndex = null,
 ) => {
   if (!ctx) return startY;
   const normalizedLegendScale = Number.isFinite(legendScale) && legendScale > 0 ? legendScale : 1;
@@ -428,32 +443,80 @@ const drawLegend = (
     };
 
     const pointGroup = buildGroup([
-      createItem('2PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, false), !isStatOn(0)),
-      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, true), !isStatOn(0)),
-      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, false), !isStatOn(0)),
+      createItem(
+        '2PT',
+        (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(0),
+      ),
+      createItem(
+        '3PT',
+        (cx, cy) => drawEventShape(ctx, 'point', cx, cy, iconSize, computedStyle, true),
+        !isStatOn(0),
+      ),
+      createItem(
+        'FT',
+        (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, false),
+        !isStatOn(0),
+      ),
     ]);
     const missGroup = buildGroup([
-      createItem('Miss', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, false), !isStatOn(1)),
-      createItem('3PT', (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, true), !isStatOn(1)),
-      createItem('FT', (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, true), !isStatOn(1)),
+      createItem(
+        'Miss',
+        (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(1),
+      ),
+      createItem(
+        '3PT',
+        (cx, cy) => drawEventShape(ctx, 'miss', cx, cy, iconSize, computedStyle, true),
+        !isStatOn(1),
+      ),
+      createItem(
+        'FT',
+        (cx, cy) => drawFreeThrowLegendRing(ctx, cx, cy, iconSize * 0.95, computedStyle, true),
+        !isStatOn(1),
+      ),
     ]);
     const reboundGroup = buildGroup([
-      createItem('Rebound', (cx, cy) => drawEventShape(ctx, 'rebound', cx, cy, iconSize, computedStyle, false), !isStatOn(2)),
+      createItem(
+        'Rebound',
+        (cx, cy) => drawEventShape(ctx, 'rebound', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(2),
+      ),
     ]);
     const assistGroup = buildGroup([
-      createItem('Assist', (cx, cy) => drawEventShape(ctx, 'assist', cx, cy, iconSize, computedStyle, false), !isStatOn(3)),
+      createItem(
+        'Assist',
+        (cx, cy) => drawEventShape(ctx, 'assist', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(3),
+      ),
     ]);
     const turnoverGroup = buildGroup([
-      createItem('Turnover', (cx, cy) => drawEventShape(ctx, 'turnover', cx, cy, iconSize, computedStyle, false), !isStatOn(4)),
+      createItem(
+        'Turnover',
+        (cx, cy) => drawEventShape(ctx, 'turnover', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(4),
+      ),
     ]);
     const blockGroup = buildGroup([
-      createItem('Block', (cx, cy) => drawEventShape(ctx, 'block', cx, cy, iconSize, computedStyle, false), !isStatOn(5)),
+      createItem(
+        'Block',
+        (cx, cy) => drawEventShape(ctx, 'block', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(5),
+      ),
     ]);
     const stealGroup = buildGroup([
-      createItem('Steal', (cx, cy) => drawEventShape(ctx, 'steal', cx, cy, iconSize, computedStyle, false), !isStatOn(6)),
+      createItem(
+        'Steal',
+        (cx, cy) => drawEventShape(ctx, 'steal', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(6),
+      ),
     ]);
     const foulGroup = buildGroup([
-      createItem('Foul', (cx, cy) => drawEventShape(ctx, 'foul', cx, cy, iconSize, computedStyle, false), !isStatOn(7)),
+      createItem(
+        'Foul',
+        (cx, cy) => drawEventShape(ctx, 'foul', cx, cy, iconSize, computedStyle, false),
+        !isStatOn(7),
+      ),
     ]);
     const groups = [
       pointGroup,
@@ -467,13 +530,18 @@ const drawLegend = (
     ];
     if (includeScoreLead) {
       const scoreLeadGroup = buildGroup([
-        createItem('Score Lead', (cx, cy) => drawScoreLeadIcon(ctx, cx, cy, iconSize, computedStyle), !isScoreLeadOn),
+        createItem(
+          'Score Lead',
+          (cx, cy) => drawScoreLeadIcon(ctx, cx, cy, iconSize, computedStyle),
+          !isScoreLeadOn,
+        ),
       ]);
       groups.push(scoreLeadGroup);
     }
 
-    const rowWidth = groups.reduce((sum, group) => sum + group.width, 0)
-      + groupGap * Math.max(0, groups.length - 1);
+    const rowWidth =
+      groups.reduce((sum, group) => sum + group.width, 0) +
+      groupGap * Math.max(0, groups.length - 1);
 
     return { groups, rowWidth, drawGroup, groupGap };
   };
@@ -482,14 +550,14 @@ const drawLegend = (
     iconSize: 6 * normalizedLegendScale,
     fontSize: 11 * normalizedLegendScale,
     itemGap: 10 * normalizedLegendScale,
-    groupGap: 16 * normalizedLegendScale
+    groupGap: 16 * normalizedLegendScale,
   });
   if (rowConfig.rowWidth > maxWidth && !allowWrap) {
     rowConfig = buildRow({
       iconSize: 5 * normalizedLegendScale,
       fontSize: 10 * normalizedLegendScale,
       itemGap: 8 * normalizedLegendScale,
-      groupGap: 12 * normalizedLegendScale
+      groupGap: 12 * normalizedLegendScale,
     });
   }
 
@@ -561,7 +629,7 @@ const measureLegendHeight = (
   showScoreDiff,
   includeScoreLead = true,
   legendScale = 1,
-  forceWrapAfterGroupIndex = null
+  forceWrapAfterGroupIndex = null,
 ) => {
   if (!ctx) return 0;
   const normalizedLegendScale = Number.isFinite(legendScale) && legendScale > 0 ? legendScale : 1;
@@ -602,24 +670,12 @@ const measureLegendHeight = (
       createItem('3PT', !isStatOn(1)),
       createItem('FT', !isStatOn(1)),
     ]);
-    const reboundGroup = buildGroup([
-      createItem('Rebound', !isStatOn(2)),
-    ]);
-    const assistGroup = buildGroup([
-      createItem('Assist', !isStatOn(3)),
-    ]);
-    const turnoverGroup = buildGroup([
-      createItem('Turnover', !isStatOn(4)),
-    ]);
-    const blockGroup = buildGroup([
-      createItem('Block', !isStatOn(5)),
-    ]);
-    const stealGroup = buildGroup([
-      createItem('Steal', !isStatOn(6)),
-    ]);
-    const foulGroup = buildGroup([
-      createItem('Foul', !isStatOn(7)),
-    ]);
+    const reboundGroup = buildGroup([createItem('Rebound', !isStatOn(2))]);
+    const assistGroup = buildGroup([createItem('Assist', !isStatOn(3))]);
+    const turnoverGroup = buildGroup([createItem('Turnover', !isStatOn(4))]);
+    const blockGroup = buildGroup([createItem('Block', !isStatOn(5))]);
+    const stealGroup = buildGroup([createItem('Steal', !isStatOn(6))]);
+    const foulGroup = buildGroup([createItem('Foul', !isStatOn(7))]);
     const groups = [
       pointGroup,
       missGroup,
@@ -631,14 +687,13 @@ const measureLegendHeight = (
       foulGroup,
     ];
     if (includeScoreLead) {
-      const scoreLeadGroup = buildGroup([
-        createItem('Score Lead', !isScoreLeadOn),
-      ]);
+      const scoreLeadGroup = buildGroup([createItem('Score Lead', !isScoreLeadOn)]);
       groups.push(scoreLeadGroup);
     }
 
-    const rowWidth = groups.reduce((sum, group) => sum + group.width, 0)
-      + groupGap * Math.max(0, groups.length - 1);
+    const rowWidth =
+      groups.reduce((sum, group) => sum + group.width, 0) +
+      groupGap * Math.max(0, groups.length - 1);
 
     return { groups, rowWidth, groupGap };
   };
@@ -647,14 +702,14 @@ const measureLegendHeight = (
     iconSize: 6 * normalizedLegendScale,
     fontSize: 11 * normalizedLegendScale,
     itemGap: 10 * normalizedLegendScale,
-    groupGap: 16 * normalizedLegendScale
+    groupGap: 16 * normalizedLegendScale,
   });
   if (rowConfig.rowWidth > maxWidth && !allowWrap) {
     rowConfig = buildRow({
       iconSize: 5 * normalizedLegendScale,
       fontSize: 10 * normalizedLegendScale,
       itemGap: 8 * normalizedLegendScale,
-      groupGap: 12 * normalizedLegendScale
+      groupGap: 12 * normalizedLegendScale,
     });
   }
 
@@ -744,7 +799,9 @@ const drawStepScoreDiff = ({
   });
 
   const hasSteps = steps.length > 0;
-  const lastStepX = hasSteps ? Math.min(endX, Math.max(chartLeft, steps[steps.length - 1].x)) : endX;
+  const lastStepX = hasSteps
+    ? Math.min(endX, Math.max(chartLeft, steps[steps.length - 1].x))
+    : endX;
   let finalFillEndX = endX;
   let shouldDropToZero = false;
   if (Number.isFinite(endAtSeconds)) {
@@ -807,14 +864,22 @@ const drawBoxScoreTable = (ctx, computedStyle, columns, startX, startY, maxWidth
     });
     const totalWeight = statWeights.reduce((sum, weight) => sum + weight, 0);
     const minWeight = Math.min(...statWeights);
-    if (Number.isFinite(totalWeight) && totalWeight > 0 && Number.isFinite(minWeight) && minWeight > 0) {
+    if (
+      Number.isFinite(totalWeight) &&
+      totalWeight > 0 &&
+      Number.isFinite(minWeight) &&
+      minWeight > 0
+    ) {
       let availableWidth = maxWidth - playerWidth;
       const requiredAvailable = (minStatWidth * totalWeight) / minWeight;
       if (availableWidth < requiredAvailable) {
         playerWidth = Math.max(minPlayerWidth, maxWidth - requiredAvailable);
         availableWidth = maxWidth - playerWidth;
       }
-      widths = [playerWidth, ...statWeights.map((weight) => (availableWidth * weight) / totalWeight)];
+      widths = [
+        playerWidth,
+        ...statWeights.map((weight) => (availableWidth * weight) / totalWeight),
+      ];
     }
   }
 
@@ -855,9 +920,8 @@ const drawBoxScoreTable = (ctx, computedStyle, columns, startX, startY, maxWidth
 
     ctx.font = BOX_TABLE_FONT_VALUE;
     ctx.fillStyle = index === 0 ? textSecondary : textPrimary;
-    const valueText = index === 0
-      ? truncateText(ctx, col.value, width - BOX_TABLE_PADDING_X * 2)
-      : col.value;
+    const valueText =
+      index === 0 ? truncateText(ctx, col.value, width - BOX_TABLE_PADDING_X * 2) : col.value;
     const valueX = index === 0 ? cursorX + BOX_TABLE_PADDING_X : cursorX + width / 2;
     ctx.fillText(valueText, valueX, rowTop + BOX_TABLE_ROW_HEIGHT / 2);
 
@@ -963,16 +1027,19 @@ const computePlayerBoxScore = ({
   });
 
   if (teamKey) {
-    const segments = (timeline || []).map((entry) => {
-      if (!entry?.start || !entry?.end) return null;
-      const start = getSecondsElapsed(entry.period, entry.start);
-      const end = getSecondsElapsed(entry.period, entry.end);
-      if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
-      const s = Math.min(start, end);
-      const e = Math.max(start, end);
-      return { start: s, end: e };
-    }).filter(Boolean);
-    const isOnCourt = (elapsed) => segments.some((seg) => elapsed >= seg.start && elapsed <= seg.end);
+    const segments = (timeline || [])
+      .map((entry) => {
+        if (!entry?.start || !entry?.end) return null;
+        const start = getSecondsElapsed(entry.period, entry.start);
+        const end = getSecondsElapsed(entry.period, entry.end);
+        if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+        const s = Math.min(start, end);
+        const e = Math.max(start, end);
+        return { start: s, end: e };
+      })
+      .filter(Boolean);
+    const isOnCourt = (elapsed) =>
+      segments.some((seg) => elapsed >= seg.start && elapsed <= seg.end);
 
     const rangeStart = Number(periodRange?.start);
     const rangeEnd = Number(periodRange?.end);
@@ -981,9 +1048,10 @@ const computePlayerBoxScore = ({
       ? getPeriodStartSeconds(rangeEnd) + getPeriodDurationSeconds(rangeEnd)
       : Infinity;
 
-    const scoreSource = (displayScoreTimeline && displayScoreTimeline.length)
-      ? displayScoreTimeline
-      : (scoreTimeline || []);
+    const scoreSource =
+      displayScoreTimeline && displayScoreTimeline.length
+        ? displayScoreTimeline
+        : scoreTimeline || [];
     const scored = (scoreSource || [])
       .map((entry) => {
         const elapsed = getSecondsElapsed(entry.period, entry.clock);
@@ -1011,7 +1079,7 @@ const computePlayerBoxScore = ({
         const deltaHome = Number(entry.home) - Number(prev.home);
         if (deltaAway || deltaHome) {
           if (isOnCourt(entry.elapsed)) {
-            stats.pm += teamKey === 'away' ? (deltaAway - deltaHome) : (deltaHome - deltaAway);
+            stats.pm += teamKey === 'away' ? deltaAway - deltaHome : deltaHome - deltaAway;
           }
         }
         prev = entry;
@@ -1022,7 +1090,7 @@ const computePlayerBoxScore = ({
 };
 
 const buildBoxScoreColumns = (stats, playerName, includeAttempts) => {
-  const plusMinus = stats.pm === 0 ? '0' : (stats.pm > 0 ? `+${stats.pm}` : `${stats.pm}`);
+  const plusMinus = stats.pm === 0 ? '0' : stats.pm > 0 ? `+${stats.pm}` : `${stats.pm}`;
   const columns = [
     { key: 'player', label: 'PLAYER', value: playerName || 'Player' },
     { key: 'min', label: 'MIN', value: formatMinutesSeconds(stats.seconds) },
