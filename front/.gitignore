@@ -17,3 +17,6 @@ dist
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Vitest coverage output
+/coverage/

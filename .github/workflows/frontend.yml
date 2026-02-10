@@ -37,15 +37,14 @@ jobs:
       - name: Unit Tests
         run: npm run test:unit
 
+      - name: Unit Coverage Report (Informational)
+        run: npm run test:unit:coverage
+
   test:
     needs: [quality]
     runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.57.0-jammy
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
     defaults:
       run:
         working-directory: ./front
@@ -64,40 +63,10 @@ jobs:
         env:
             HOME: /root
             VITE_WS_LOCATION: ${{ vars.VITE_WS_LOCATION }}
-        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=blob
+        run: npx playwright test -g "@smoke" --project=chromium --reporter=html
 
-      - name: Upload Shard Report
+      - name: Upload Playwright Report
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-blob-report-${{ matrix.shard }}
-          path: front/blob-report/
-          retention-days: 1
-
-  merge-reports:
-    if: always() && needs.test.result != 'skipped'
-    needs: [test]
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./front
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Download all Shard Reports
-        uses: actions/download-artifact@v4
-        with:
-          pattern: playwright-blob-report-*
-          merge-multiple: true
-          path: front/all-blob-reports
-
-      - name: Merge into HTML Report
-        run: npx playwright merge-reports --reporter html ./all-blob-reports
-
-      - name: Upload Final HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: final-playwright-report

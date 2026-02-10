@@ -284,12 +284,14 @@ This project uses **GitHub Actions** to automate testing, infrastructure provisi
 
 Triggered on changes to `front/**`.
 
-* **Automated Testing:** Runs **Playwright** end-to-end tests across **4 parallel shards** to minimize execution time.
-* **Report Generation:** Merges test results into a single HTML report artifact.
+* **Quality Gate:** Runs frontend **lint**, **format check**, **unit tests**, and an **informational unit coverage report**.
+* **Automated Browser Smoke Tests:** Runs **Playwright smoke tests** (`@smoke`) on **Chromium** in a single job.
+* **Report Generation:** Uploads a single Playwright HTML report artifact.
 * **Continuous Deployment:** If tests pass on `main`:
     1.  Builds the Vite application.
     2.  Syncs static assets to **S3**.
     3.  Invalidates the **CloudFront** cache to ensure users see the latest version immediately.
+* **Testing Reference:** See `front/TESTING.md` for unit/integration/E2E policy and impact map.
 
 ### 2. Infrastructure Pipeline (`infra.yml`)
 
@@ -319,13 +321,14 @@ flowchart LR
         end
 
         subgraph Front_Job["Frontend Deploy"]
-            Test["Playwright Tests - 4 Shards"]:::action
+            Quality["Lint/Format/Unit/Coverage"]:::action
+            Test["Playwright Smoke - Chromium"]:::action
             Build["Vite Build"]:::action
             Sync["S3 Sync and CF Invalidation"]:::action
-            Test --> Build --> Sync
+            Quality --> Test --> Build --> Sync
         end
     end
 
     Push -->|terraform/**| PyTest
-    Push -->|front/**| Test
+    Push -->|front/**| Quality
 ```
