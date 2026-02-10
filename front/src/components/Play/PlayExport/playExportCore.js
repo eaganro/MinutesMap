@@ -21,12 +21,6 @@ const EXPORT_MAX_SCALE = 3;
 const getExportScale = () =>
   Math.min(EXPORT_MAX_SCALE, (window.devicePixelRatio || 1) * EXPORT_RENDER_SCALE);
 
-const sanitizeFilePart = (value) =>
-  String(value || '')
-    .trim()
-    .replace(/[^a-z0-9-_]+/gi, '_')
-    .replace(/^_+|_+$/g, '');
-
 const isTransparentColor = (value) => value === 'transparent' || value === 'rgba(0, 0, 0, 0)';
 
 const resolveExportBackground = (element) => {
@@ -39,51 +33,6 @@ const resolveExportBackground = (element) => {
     current = current.parentElement;
   }
   return '#ffffff';
-};
-
-export const buildPlayExportFileName = ({
-  awayTeamNames,
-  homeTeamNames,
-  rangeLabel,
-  isFullGameRange,
-  gameId,
-}) => {
-  const away = awayTeamNames?.abr || 'Away';
-  const home = homeTeamNames?.abr || 'Home';
-  const periodLabel = rangeLabel || (isFullGameRange ? 'Game' : 'Range');
-  const base = periodLabel ? `${away}-vs-${home}-${periodLabel}` : `${away}-vs-${home}`;
-  const safeBase = sanitizeFilePart(base) || 'play-by-play';
-  const suffix = gameId ? `-${sanitizeFilePart(gameId)}` : '';
-  return `${safeBase}${suffix}.png`;
-};
-
-export const dataUrlToBlob = (dataUrl) => {
-  if (!dataUrl) return null;
-  if (typeof atob === 'undefined') return null;
-  const parts = dataUrl.split(',');
-  if (parts.length < 2) return null;
-  const header = parts[0];
-  const data = parts[1];
-  const match = header.match(/data:(.*?);base64/);
-  const mime = match ? match[1] : 'image/png';
-  const binary = atob(data);
-  const buffer = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    buffer[i] = binary.charCodeAt(i);
-  }
-  return new Blob([buffer], { type: mime });
-};
-
-export const canvasToBlob = (canvas) => {
-  if (!canvas) return Promise.resolve(null);
-  if (canvas.toBlob) {
-    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-  }
-  try {
-    return Promise.resolve(dataUrlToBlob(canvas.toDataURL('image/png')));
-  } catch (_err) {
-    return Promise.resolve(null);
-  }
 };
 
 const getCssVar = (computedStyle, varName, fallback) => {
