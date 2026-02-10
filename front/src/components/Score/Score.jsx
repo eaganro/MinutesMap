@@ -18,7 +18,6 @@ export default function Score({
   date,
   changeDate,
   isLoading,
-  statusMessage,
   lastAction,
   gameStatus,
 }) {

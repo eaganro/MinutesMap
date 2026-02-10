@@ -6,8 +6,6 @@ export default function TimelineGrid({
   maxLead,
   maxY,
   showScoreDiff,
-  awayTeamName,
-  homeTeamName,
   teamColors,
   isQuarterView,
   activePeriodLabel,

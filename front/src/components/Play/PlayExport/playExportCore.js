@@ -81,7 +81,7 @@ export const canvasToBlob = (canvas) => {
   }
   try {
     return Promise.resolve(dataUrlToBlob(canvas.toDataURL('image/png')));
-  } catch (err) {
+  } catch (_err) {
     return Promise.resolve(null);
   }
 };

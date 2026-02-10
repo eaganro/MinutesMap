@@ -77,9 +77,6 @@ test.describe('MinutesMap App', () => {
     const datePicker = page.locator('input[type="date"]');
     await expect(datePicker).toBeVisible();
 
-    // Get current date value
-    const currentDate = await datePicker.inputValue();
-
     // Set a new date (yesterday)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);

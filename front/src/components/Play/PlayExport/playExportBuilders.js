@@ -38,7 +38,6 @@ const buildLiteExportCanvas = ({
   legendShouldWrap,
   rangeLabel,
   periodRange,
-  leftMargin,
   rightMargin,
   playRef,
   gameDate,
@@ -61,7 +60,6 @@ const buildLiteExportCanvas = ({
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
   const outerPadding = 12;
   const baseWidth = contentWidth + outerPadding * 2;
-  const leftPad = leftMargin;
   const rightPad = rightMargin;
   const headerHeight = 54;
   const footerHeight = 32;
@@ -217,7 +215,6 @@ const buildSinglePlayerExportCanvas = ({
   legendShouldWrap,
   rangeLabel,
   periodRange,
-  leftMargin,
   rightMargin,
   playRef,
   gameDate,
@@ -242,7 +239,6 @@ const buildSinglePlayerExportCanvas = ({
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
   const outerPadding = 12;
   const baseWidth = contentWidth + outerPadding * 2;
-  const leftPad = leftMargin;
   const rightPad = rightMargin;
   const headerHeight = 60;
   const playAreaTop = headerHeight + 8;
@@ -530,7 +526,6 @@ const buildSinglePlayerStackedExportCanvas = ({
   legendShouldWrap,
   rangeLabel,
   periodRange,
-  leftMargin,
   rightMargin,
   playRef,
   gameDate,
@@ -554,12 +549,10 @@ const buildSinglePlayerStackedExportCanvas = ({
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
   const outerPadding = 12;
   const baseWidth = contentWidth + outerPadding * 2;
-  const leftPad = leftMargin;
   const rightPad = rightMargin;
   const headerHeight = 60;
   const playAreaTop = headerHeight + 8;
   const topPadding = 8;
-  const teamLabelHeight = 0;
   const quarterLabelHeight = 16;
   const rowHeight = 32;
   const sectionGap = 10;

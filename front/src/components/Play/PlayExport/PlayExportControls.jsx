@@ -446,7 +446,7 @@ export default function PlayExportControls({
       let file = null;
       try {
         file = new File([blob], fileName, { type: 'image/png' });
-      } catch (err) {
+      } catch (_err) {
         setExportError('Share unavailable: File constructor failed on this device.');
       }
       let canShareFiles = false;
@@ -456,7 +456,7 @@ export default function PlayExportControls({
         } else {
           try {
             canShareFiles = navigator.canShare({ files: [file] });
-          } catch (err) {
+          } catch (_err) {
             canShareFiles = false;
             setExportError('Share unavailable: browser rejected file sharing.');
           }

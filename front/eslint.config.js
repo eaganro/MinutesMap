@@ -5,7 +5,10 @@ import reactHooks from 'eslint-plugin-react-hooks';
 const baseRules = {
   'no-undef': 'error',
   'no-unreachable': 'error',
-  'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+  'no-unused-vars': [
+    'warn',
+    { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+  ],
 };
 
 export default [
@@ -45,6 +48,7 @@ export default [
     rules: {
       ...baseRules,
       'react-hooks/rules-of-hooks': 'error',
+      'react/jsx-uses-vars': 'error',
       'react/react-in-jsx-scope': 'off',
     },
   },
