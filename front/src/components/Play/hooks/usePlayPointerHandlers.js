@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildNbaEventUrl, resolveVideoAction } from '../../../helpers/nbaEvents';
-import { trackFeatureUse } from '../../../helpers/analytics';
+import { useTrackFeatureUseOnce } from '../../hooks/useTrackFeatureUseOnce';
 
 const TOUCH_AXIS_LOCK_PX = 8;
 
@@ -35,19 +35,13 @@ export function usePlayPointerHandlers({
   const touchAxisRef = useRef(null);
   const touchMovedRef = useRef(false);
   const touchClickGuardUntilRef = useRef(0);
-  const playFeatureTrackedRef = useRef(false);
+  const trackPlayFeatureUse = useTrackFeatureUseOnce('play-by-play');
   const [isHoveringIcon, setIsHoveringIcon] = useState(false);
   const [canOpenVideoOnClick, setCanOpenVideoOnClick] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia('(hover: hover) and (pointer: fine)').matches
       : true,
   );
-
-  const trackPlayFeatureUse = useCallback(() => {
-    if (playFeatureTrackedRef.current) return;
-    playFeatureTrackedRef.current = true;
-    trackFeatureUse('play-by-play');
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) {

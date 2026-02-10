@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
-import { trackFeatureUse } from '../../helpers/analytics';
+import { useTrackFeatureUseOnce } from '../hooks/useTrackFeatureUseOnce';
 import LineupsTeamPanel from './LineupsTeamPanel';
 import {
   buildLastNameCounts,
@@ -29,14 +29,8 @@ export default function Lineups({
   const [awaySelectionMode, setAwaySelectionMode] = useState('filter');
   const [homeSelectionMode, setHomeSelectionMode] = useState('filter');
   const { isDarkMode } = useTheme();
-  const featureUseTrackedRef = useRef(false);
+  const trackLineupsFeatureUse = useTrackFeatureUseOnce('lineups');
   const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode);
-
-  const handleTrackFeatureUse = () => {
-    if (featureUseTrackedRef.current) return;
-    featureUseTrackedRef.current = true;
-    trackFeatureUse('lineups');
-  };
 
   const awayOptions = useMemo(() => buildPlayerOptions(awayLineups), [awayLineups]);
   const homeOptions = useMemo(() => buildPlayerOptions(homeLineups), [homeLineups]);
@@ -74,7 +68,7 @@ export default function Lineups({
   const showStatusMessage = Boolean(statusMessage) && !hasData;
 
   return (
-    <div className="lineups" onClick={handleTrackFeatureUse} onTouchStart={handleTrackFeatureUse}>
+    <div className="lineups" onClick={trackLineupsFeatureUse} onTouchStart={trackLineupsFeatureUse}>
       <div className="lineupsHeader">
         <div className="lineupsTitle">
           <span>Lineups</span>

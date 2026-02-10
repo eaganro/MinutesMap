@@ -3,6 +3,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/useTheme'; // Adjust path
 import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
+import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../hooks/loadingUiTimings';
 import PlayExportControls from './PlayExport/PlayExportControls';
 import { useStablePlayData } from './hooks/useStablePlayData';
 import { useActivePeriodSelection } from './hooks/useActivePeriodSelection';
@@ -19,9 +20,6 @@ import TimelineGrid from './TimelineGrid';
 import { usePlayInteraction } from './usePlayInteraction';
 
 import './Play.scss';
-
-const LOADING_TEXT_DELAY_MS = 500;
-const MIN_BLUR_MS = 300;
 
 export default function Play({
   gameId,

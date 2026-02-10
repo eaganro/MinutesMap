@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
+import { useStableWhileLoading } from '../../hooks/useStableWhileLoading';
 
 const hasPlayData = (data) =>
   Boolean(
@@ -90,52 +91,14 @@ export function useStablePlayData({
       gameDate,
     ],
   );
-
-  const lastStableRef = useRef({
-    awayTeamNames,
-    homeTeamNames,
-    awayPlayers,
-    awayPlayersAll,
-    homePlayers,
-    homePlayersAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numQs,
-    lastAction,
-    gameDate,
+  const { displayData, displayStatusMessage, isShowingStableData } = useStableWhileLoading({
+    data: incomingData,
+    statusMessage,
+    isLoading,
+    isBlurred,
   });
-  const lastStatusMessageRef = useRef(statusMessage);
-
-  useEffect(() => {
-    if (isLoading || isBlurred) {
-      return;
-    }
-    lastStableRef.current = incomingData;
-  }, [isLoading, isBlurred, incomingData]);
-
-  useEffect(() => {
-    if (isLoading || isBlurred) {
-      return;
-    }
-    lastStatusMessageRef.current = statusMessage;
-  }, [statusMessage, isLoading, isBlurred]);
-
-  const showStableData = (isLoading || isBlurred) && lastStableRef.current;
-  const displayData = showStableData ? lastStableRef.current : incomingData;
-
-  const isShowingStableData = Boolean(showStableData);
   const hasDisplayData = hasPlayData(displayData);
-  const hasIncomingData = hasPlayData({
-    allActions,
-    scoreTimeline,
-    awayPlayers,
-    homePlayers,
-  });
-
-  const displayStatusMessage =
-    isLoading || isBlurred ? lastStatusMessageRef.current : statusMessage;
+  const hasIncomingData = hasPlayData(incomingData);
   const showStatusMessage = Boolean(displayStatusMessage) && !hasDisplayData;
   const isDataLoading = isBlurred && (hasDisplayData || hasIncomingData || showStatusMessage);
 

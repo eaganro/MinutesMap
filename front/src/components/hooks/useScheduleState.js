@@ -71,9 +71,10 @@ export function useScheduleState({
   }, [date, gameId, isScheduleLoading, sortedGames, setGameId]);
 
   const changeDate = useCallback(
-    (e) => {
-      const newDate = e.target.value;
-      if (newDate === date) return;
+    (newDate) => {
+      if (!newDate || newDate === date) {
+        return;
+      }
       setDate(newDate);
     },
     [date],
