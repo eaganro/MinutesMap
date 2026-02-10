@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavigateNext, NavigateBefore } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
-import { dateAdd, dateMinus, ASSET_PREFIX } from '../../environment';
+import { ASSET_PREFIX } from '../../environment';
 import { parseGameStatus } from '../../domain/game-selection/status';
 import { formatStatusText } from '../../helpers/utils';
 import { useDateInputState } from '../hooks/useDateInputState';
@@ -13,6 +13,7 @@ import './Schedule.scss';
 
 const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
 const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
+const DATE_NAVIGATION_STEP_DAYS = 1;
 
 function TeamLogo({ team }) {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -131,11 +132,11 @@ export default function Schedule({
   };
 
   const dateDown = () => {
-    shiftDate(-dateMinus);
+    shiftDate(-DATE_NAVIGATION_STEP_DAYS);
     resetScrollPosition();
   };
   const dateUp = () => {
-    shiftDate(dateAdd);
+    shiftDate(DATE_NAVIGATION_STEP_DAYS);
     resetScrollPosition();
   };
 

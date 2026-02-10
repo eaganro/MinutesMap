@@ -87,8 +87,8 @@ describe('Schedule', () => {
     fireEvent.click(screen.getByLabelText('Previous date'));
     fireEvent.click(screen.getByLabelText('Next date'));
 
-    expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(1, -0);
-    expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(2, 2);
+    expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(1, -1);
+    expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(2, 1);
     expect(mocks.resetScrollPositionMock).toHaveBeenCalledTimes(2);
   });
 
