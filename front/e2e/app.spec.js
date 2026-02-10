@@ -1,5 +1,100 @@
 import { test, expect } from '@playwright/test';
 
+const SMOKE_GAME_ID = '2025-01-15-phi-gsw';
+
+const SMOKE_INIT_STATE = {
+  date: '2025-01-15',
+  autoSelectGameId: SMOKE_GAME_ID,
+};
+
+const SMOKE_SCHEDULE = [
+  {
+    id: SMOKE_GAME_ID,
+    awayteam: 'PHI',
+    hometeam: 'GSW',
+    status: 'Final',
+    starttime: '2025-01-15T03:00:00Z',
+    awayscore: 102,
+    homescore: 98,
+  },
+];
+
+const SMOKE_GAMEPACK = {
+  nbaGameId: '0022400001',
+  box: {
+    id: SMOKE_GAME_ID,
+    start: '2025-01-15T03:00:00Z',
+    teams: {
+      away: {
+        id: 1610612755,
+        abbr: 'PHI',
+        name: 'Philadelphia 76ers',
+        players: [{ first: 'Joel', last: 'Embiid' }],
+      },
+      home: {
+        id: 1610612744,
+        abbr: 'GSW',
+        name: 'Golden State Warriors',
+        players: [{ first: 'Stephen', last: 'Curry' }],
+      },
+    },
+  },
+  flow: {
+    v: 2,
+    periods: 4,
+    last: {
+      quarter: 4,
+      time: '00:00',
+      awayScore: 102,
+      homeScore: 98,
+    },
+    score: [
+      { quarter: 1, time: '12:00', awayScore: 0, homeScore: 0 },
+      { quarter: 1, time: '11:30', awayScore: 2, homeScore: 0 },
+      { quarter: 1, time: '11:00', awayScore: 2, homeScore: 2 },
+      { quarter: 4, time: '00:00', awayScore: 102, homeScore: 98 },
+    ],
+    players: {
+      away: {
+        'Joel Embiid': [
+          {
+            quarter: 1,
+            time: '11:30',
+            type: '2PT',
+            text: 'Joel Embiid makes 2-pt shot',
+            result: 'make',
+            seq: 1,
+            awayScore: 2,
+            homeScore: 0,
+          },
+        ],
+      },
+      home: {
+        'Stephen Curry': [
+          {
+            quarter: 1,
+            time: '11:00',
+            type: '2PT',
+            text: 'Stephen Curry makes 2-pt shot',
+            result: 'make',
+            seq: 2,
+            awayScore: 2,
+            homeScore: 2,
+          },
+        ],
+      },
+    },
+    segments: {
+      away: {
+        'Joel Embiid': [{ quarter: 1, start: '12:00', end: '00:00' }],
+      },
+      home: {
+        'Stephen Curry': [{ quarter: 1, start: '12:00', end: '00:00' }],
+      },
+    },
+  },
+};
+
 async function blockAnalytics(page) {
   const analyticsPatterns = [
     '**/analytics.minutesmap.com/**',
@@ -14,6 +109,36 @@ async function blockAnalytics(page) {
   );
 }
 
+async function mockGameData(page) {
+  await page.route('**/data/init.json*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(SMOKE_INIT_STATE),
+    }),
+  );
+
+  await page.route('**/schedule/*.json.gz*', (route) => {
+    const requestUrl = new URL(route.request().url());
+    const match = requestUrl.pathname.match(/\/schedule\/(\d{4}-\d{2}-\d{2})\.json\.gz$/);
+    const date = match ? match[1] : null;
+    const payload = date === '2025-01-15' ? SMOKE_SCHEDULE : [];
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(payload),
+    });
+  });
+
+  await page.route('**/data/gamepack/*.json.gz*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(SMOKE_GAMEPACK),
+    }),
+  );
+}
+
 async function waitForAppReady(page) {
   await expect(page.locator('.topLevel')).toBeVisible();
   await expect(page.locator('input[type="date"]')).toBeVisible();
@@ -22,6 +147,7 @@ async function waitForAppReady(page) {
 
 test.beforeEach(async ({ page }) => {
   await blockAnalytics(page);
+  await mockGameData(page);
 });
 
 test.describe('MinutesMap Smoke', () => {
