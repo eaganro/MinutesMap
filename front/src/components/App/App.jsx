@@ -12,55 +12,7 @@ import Footer from '../Footer/Footer';
 import './App.scss';
 
 export default function App() {
-  const {
-    // Schedule
-    games,
-    date,
-    gameId,
-    changeDate,
-    changeGame,
-    isScheduleLoading,
-
-    // Score
-    homeTeam,
-    awayTeam,
-    currentScore,
-    gameDate,
-    gameStatusMessage,
-    isGameDataLoading,
-
-    // Play-by-play
-    awayTeamName,
-    homeTeamName,
-    awayActions,
-    awayActionsAll,
-    homeActions,
-    homeActionsAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numQs,
-    lastAction,
-    playByPlaySectionRef,
-    playByPlaySectionWidth,
-    isPlayLoading,
-    showScoreDiff,
-    gameStatus,
-    nbaGameId,
-
-    // Stat controls
-    statOn,
-    changeStatOn,
-    setShowScoreDiff,
-
-    // Box score
-    box,
-    isBoxLoading,
-
-    // Lineups
-    lineupStats,
-  } = useMinutesMap();
+  const { scheduleVm, scoreVm, playVm, statControlsVm, boxVm, lineupsVm } = useMinutesMap();
 
   return (
     <div className="topLevel">
@@ -96,69 +48,69 @@ export default function App() {
       </header>
       <main className="appMain">
         <Schedule
-          games={games}
-          date={date}
-          changeDate={changeDate}
-          changeGame={changeGame}
-          isLoading={isScheduleLoading}
-          selectedGameId={gameId}
+          games={scheduleVm.games}
+          date={scheduleVm.date}
+          changeDate={scheduleVm.changeDate}
+          changeGame={scheduleVm.changeGame}
+          isLoading={scheduleVm.isLoading}
+          selectedGameId={scheduleVm.gameId}
         />
 
         <Score
-          homeTeam={homeTeam}
-          awayTeam={awayTeam}
-          score={currentScore}
-          date={gameDate}
-          changeDate={changeDate}
-          isLoading={isGameDataLoading}
-          statusMessage={gameStatusMessage}
-          lastAction={lastAction}
-          gameStatus={gameStatus}
+          homeTeam={scoreVm.homeTeam}
+          awayTeam={scoreVm.awayTeam}
+          score={scoreVm.currentScore}
+          date={scoreVm.gameDate}
+          changeDate={scheduleVm.changeDate}
+          isLoading={scoreVm.isLoading}
+          statusMessage={scoreVm.gameStatusMessage}
+          lastAction={scoreVm.lastAction}
+          gameStatus={scoreVm.gameStatus}
         />
 
-        <div className="playByPlaySection" ref={playByPlaySectionRef}>
+        <div className="playByPlaySection" ref={playVm.playByPlaySectionRef}>
           <Play
-            gameId={gameId}
-            nbaGameId={nbaGameId}
-            gameStatus={gameStatus}
-            gameDate={gameDate}
-            box={box}
-            awayTeamNames={awayTeamName}
-            homeTeamNames={homeTeamName}
-            awayPlayers={awayActions}
-            awayPlayersAll={awayActionsAll}
-            homePlayers={homeActions}
-            homePlayersAll={homeActionsAll}
-            allActions={allActions}
-            scoreTimeline={scoreTimeline}
-            awayPlayerTimeline={awayPlayerTimeline}
-            homePlayerTimeline={homePlayerTimeline}
-            numQs={numQs}
-            sectionWidth={playByPlaySectionWidth}
-            lastAction={lastAction}
-            isLoading={isPlayLoading}
-            statusMessage={gameStatusMessage}
-            showScoreDiff={showScoreDiff}
-            statOn={statOn}
+            gameId={playVm.gameId}
+            nbaGameId={playVm.nbaGameId}
+            gameStatus={playVm.gameStatus}
+            gameDate={playVm.gameDate}
+            box={playVm.box}
+            awayTeamNames={playVm.awayTeamName}
+            homeTeamNames={playVm.homeTeamName}
+            awayPlayers={playVm.awayActions}
+            awayPlayersAll={playVm.awayActionsAll}
+            homePlayers={playVm.homeActions}
+            homePlayersAll={playVm.homeActionsAll}
+            allActions={playVm.allActions}
+            scoreTimeline={playVm.scoreTimeline}
+            awayPlayerTimeline={playVm.awayPlayerTimeline}
+            homePlayerTimeline={playVm.homePlayerTimeline}
+            numQs={playVm.numQs}
+            sectionWidth={playVm.playByPlaySectionWidth}
+            lastAction={playVm.lastAction}
+            isLoading={playVm.isLoading}
+            statusMessage={playVm.statusMessage}
+            showScoreDiff={playVm.showScoreDiff}
+            statOn={playVm.statOn}
           />
           <StatButtons
-            statOn={statOn}
-            changeStatOn={changeStatOn}
-            showScoreDiff={showScoreDiff}
-            setShowScoreDiff={setShowScoreDiff}
-            isLoading={isPlayLoading}
-            statusMessage={gameStatusMessage}
+            statOn={statControlsVm.statOn}
+            changeStatOn={statControlsVm.changeStatOn}
+            showScoreDiff={statControlsVm.showScoreDiff}
+            setShowScoreDiff={statControlsVm.setShowScoreDiff}
+            isLoading={statControlsVm.isLoading}
+            statusMessage={statControlsVm.statusMessage}
           />
         </div>
 
-        <Boxscore box={box} isLoading={isBoxLoading} statusMessage={gameStatusMessage} />
+        <Boxscore box={boxVm.box} isLoading={boxVm.isLoading} statusMessage={boxVm.statusMessage} />
         <Lineups
-          awayTeam={awayTeamName}
-          homeTeam={homeTeamName}
-          awayLineups={lineupStats?.away || []}
-          homeLineups={lineupStats?.home || []}
-          isLoading={isPlayLoading}
-          statusMessage={gameStatusMessage}
+          awayTeam={lineupsVm.awayTeam}
+          homeTeam={lineupsVm.homeTeam}
+          awayLineups={lineupsVm.awayLineups}
+          homeLineups={lineupsVm.homeLineups}
+          isLoading={lineupsVm.isLoading}
+          statusMessage={lineupsVm.statusMessage}
         />
       </main>
       <Footer />

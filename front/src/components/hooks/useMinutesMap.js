@@ -202,30 +202,37 @@ export function useMinutesMap() {
   const isPlayVisible = isPlayLoading;
   const isBoxVisible = isBoxLoading;
 
-  // === PUBLIC API ===
-  return {
-    // Schedule
+  const scheduleVm = {
     games: sortedGames,
-    date: date || '', // Guard against null during init
+    date: date || '',
     gameId,
     changeDate,
     changeGame,
-    isScheduleLoading: isScheduleVisible,
+    isLoading: isScheduleVisible,
+  };
 
-    // Score
+  const scoreVm = {
     homeTeam: scoreHomeTeam,
     awayTeam: scoreAwayTeam,
     currentScore: scoreTimeline[scoreTimeline.length - 1],
     gameDate: scoreGameDate,
     gameStatusMessage,
-    isGameDataLoading: isGameDataVisible,
+    isLoading: isGameDataVisible,
+    lastAction,
+    gameStatus: currentScheduleGameStatus,
+  };
 
-    // Play-by-play
+  const playVm = {
+    gameId,
+    nbaGameId,
+    gameStatus: currentScheduleGameStatus,
+    gameDate: scoreGameDate,
+    box,
     awayTeamName,
     homeTeamName,
     awayActions,
-    homeActions,
     awayActionsAll,
+    homeActions,
     homeActionsAll,
     allActions,
     scoreTimeline,
@@ -235,21 +242,44 @@ export function useMinutesMap() {
     lastAction,
     playByPlaySectionRef,
     playByPlaySectionWidth,
-    isPlayLoading: isPlayVisible,
+    isLoading: isPlayVisible,
+    statusMessage: gameStatusMessage,
     showScoreDiff,
-    gameStatus: currentScheduleGameStatus,
-    nbaGameId,
+    statOn,
+  };
 
-    // Stat controls
+  const statControlsVm = {
     statOn,
     changeStatOn,
+    showScoreDiff,
     setShowScoreDiff,
+    isLoading: isPlayVisible,
+    statusMessage: gameStatusMessage,
+  };
 
-    // Box score
+  const boxVm = {
     box,
-    isBoxLoading: isBoxVisible,
+    isLoading: isBoxVisible,
+    statusMessage: gameStatusMessage,
+  };
 
-    // Lineups
-    lineupStats,
+  const lineupsVm = {
+    awayTeam: awayTeamName,
+    homeTeam: homeTeamName,
+    awayLineups: lineupStats?.away || [],
+    homeLineups: lineupStats?.home || [],
+    isLoading: isPlayVisible,
+    statusMessage: gameStatusMessage,
+  };
+
+  // === PUBLIC API ===
+  // Stage 2 app boundary: grouped VMs are the stable contract for consumers.
+  return {
+    scheduleVm,
+    scoreVm,
+    playVm,
+    statControlsVm,
+    boxVm,
+    lineupsVm,
   };
 }

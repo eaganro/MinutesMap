@@ -162,51 +162,73 @@ describe('useMinutesMap', () => {
     const { result } = renderHook(() => useMinutesMap());
 
     expect(Object.keys(result.current).sort()).toEqual(
-      [
-        'allActions',
-        'awayActions',
-        'awayActionsAll',
-        'awayPlayerTimeline',
-        'awayTeam',
-        'awayTeamName',
-        'box',
-        'changeDate',
-        'changeGame',
-        'changeStatOn',
-        'currentScore',
-        'date',
-        'gameDate',
-        'gameId',
-        'gameStatus',
-        'gameStatusMessage',
-        'games',
-        'homeActions',
-        'homeActionsAll',
-        'homePlayerTimeline',
-        'homeTeam',
-        'homeTeamName',
-        'isBoxLoading',
-        'isGameDataLoading',
-        'isPlayLoading',
-        'isScheduleLoading',
-        'lastAction',
-        'lineupStats',
-        'nbaGameId',
-        'numQs',
-        'playByPlaySectionRef',
-        'playByPlaySectionWidth',
-        'scoreTimeline',
-        'setShowScoreDiff',
-        'showScoreDiff',
-        'statOn',
-      ].sort(),
+      ['scheduleVm', 'scoreVm', 'playVm', 'statControlsVm', 'boxVm', 'lineupsVm'].sort(),
     );
 
-    expect(result.current.date).toBe('2026-02-03');
-    expect(result.current.gameId).toBe('2026-02-03-phi-gsw');
-    expect(result.current.currentScore).toEqual({ scoreAway: 12, scoreHome: 14 });
-    expect(result.current.homeTeam).toBe('GSW');
-    expect(result.current.awayTeam).toBe('PHI');
+    expect(result.current.scheduleVm).toEqual(
+      expect.objectContaining({
+        date: '2026-02-03',
+        gameId: '2026-02-03-phi-gsw',
+        changeDate: mocks.changeDateMock,
+        changeGame: mocks.changeGameMock,
+      }),
+    );
+    expect(result.current.scoreVm).toEqual(
+      expect.objectContaining({
+        homeTeam: 'GSW',
+        awayTeam: 'PHI',
+        currentScore: { scoreAway: 12, scoreHome: 14 },
+        gameDate: '2026-02-03T20:00:00',
+        gameStatusMessage: null,
+        gameStatus: 'Q2 09:00',
+      }),
+    );
+    expect(result.current.playVm).toEqual(
+      expect.objectContaining({
+        gameId: '2026-02-03-phi-gsw',
+        nbaGameId: '0022500001',
+        awayActions: { AwayA: [] },
+        homeActions: { HomeA: [] },
+        scoreTimeline: [
+          { scoreAway: 0, scoreHome: 0 },
+          { scoreAway: 12, scoreHome: 14 },
+        ],
+        playByPlaySectionRef: mocks.playRef,
+        playByPlaySectionWidth: 640,
+        statusMessage: null,
+        showScoreDiff: true,
+        statOn: [true, false, true, true, false, false, false, false],
+      }),
+    );
+    expect(result.current.statControlsVm).toEqual(
+      expect.objectContaining({
+        statOn: [true, false, true, true, false, false, false, false],
+        changeStatOn: expect.any(Function),
+        showScoreDiff: true,
+        setShowScoreDiff: mocks.setShowScoreDiffMock,
+        statusMessage: null,
+      }),
+    );
+    expect(result.current.boxVm).toEqual(
+      expect.objectContaining({
+        box: expect.objectContaining({
+          teams: expect.objectContaining({
+            away: expect.objectContaining({ abbr: 'PHI' }),
+            home: expect.objectContaining({ abbr: 'GSW' }),
+          }),
+        }),
+        statusMessage: null,
+      }),
+    );
+    expect(result.current.lineupsVm).toEqual(
+      expect.objectContaining({
+        awayTeam: { name: 'Philadelphia 76ers', abr: 'PHI' },
+        homeTeam: { name: 'Golden State Warriors', abr: 'GSW' },
+        awayLineups: [],
+        homeLineups: [],
+        statusMessage: null,
+      }),
+    );
 
     expect(mocks.useResumeRefreshMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -229,7 +251,7 @@ describe('useMinutesMap', () => {
     );
 
     act(() => {
-      result.current.changeStatOn(2);
+      result.current.statControlsVm.changeStatOn(2);
     });
 
     expect(mocks.setStatOnMock).toHaveBeenCalledTimes(1);
