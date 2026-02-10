@@ -1,0 +1,239 @@
+import { renderHook, act } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { useMinutesMap } from './useMinutesMap';
+
+const mocks = vi.hoisted(() => ({
+  updateQueryParamsMock: vi.fn(),
+  changeDateMock: vi.fn(),
+  changeGameMock: vi.fn(),
+  setStatOnMock: vi.fn(),
+  setShowScoreDiffMock: vi.fn(),
+  fetchGamePackWithReasonMock: vi.fn(),
+  fetchScheduleWithReasonMock: vi.fn(),
+  lastGamePackFetchRef: { current: { at: 0, reason: null } },
+  lastScheduleFetchRef: { current: { at: 0, reason: null } },
+  useResumeRefreshMock: vi.fn(),
+  useAnalyticsSignalsMock: vi.fn(),
+  playRef: { current: null },
+}));
+
+vi.mock('./useQueryParams', () => ({
+  useQueryParams: () => ({
+    getInitialParams: () => ({ date: '2026-02-03', gameId: '2026-02-03-phi-gsw' }),
+    updateQueryParams: mocks.updateQueryParamsMock,
+  }),
+}));
+
+vi.mock('./useLocalStorageState', () => ({
+  useLocalStorageState: (key, defaultValue) => {
+    if (key === 'statOn') {
+      return [defaultValue, mocks.setStatOnMock];
+    }
+    return [true, mocks.setShowScoreDiffMock];
+  },
+}));
+
+vi.mock('./useGameData', () => ({
+  useGameData: () => ({
+    schedule: [
+      {
+        id: '2026-02-03-phi-gsw',
+        status: 'Q2 09:00',
+        hometeam: 'GSW',
+        awayteam: 'PHI',
+        starttime: '2026-02-03T20:00:00',
+      },
+    ],
+    fetchSchedule: vi.fn(),
+    isScheduleLoading: false,
+    box: {
+      start: '2026-02-03T20:00:00',
+      teams: {
+        away: { id: 1, name: 'Philadelphia 76ers', abbr: 'PHI' },
+        home: { id: 2, name: 'Golden State Warriors', abbr: 'GSW' },
+      },
+    },
+    playByPlay: { v: 2, actions: [] },
+    awayTeamId: 1,
+    homeTeamId: 2,
+    nbaGameId: '0022500001',
+    numQs: 4,
+    lastAction: { period: 2, clock: 'PT09M00.00S' },
+    gameStatusMessage: null,
+    isBoxLoading: false,
+    isPlayLoading: false,
+    fetchGamePack: vi.fn(),
+    setGameNotStarted: vi.fn(),
+    resetLoadingStates: vi.fn(),
+  }),
+}));
+
+vi.mock('./useSelectedGameState', () => ({
+  useSelectedGameState: () => ({
+    gameId: '2026-02-03-phi-gsw',
+    setGameId: vi.fn(),
+    changeGame: mocks.changeGameMock,
+    selectedScheduleGame: {
+      id: '2026-02-03-phi-gsw',
+      status: 'Q2 09:00',
+      hometeam: 'GSW',
+      awayteam: 'PHI',
+      starttime: '2026-02-03T20:00:00',
+    },
+    stableGameMeta: {
+      id: '2026-02-03-phi-gsw',
+      status: 'Q2 09:00',
+      hometeam: 'GSW',
+      awayteam: 'PHI',
+      starttime: '2026-02-03T20:00:00',
+    },
+    currentScheduleGameStatus: 'Q2 09:00',
+    isSelectedGameUpcoming: false,
+    isSelectedGameFinal: false,
+  }),
+}));
+
+vi.mock('./useScheduleState', () => ({
+  useScheduleState: () => ({
+    date: '2026-02-03',
+    isInitLoading: false,
+    changeDate: mocks.changeDateMock,
+    sortedGames: [
+      {
+        id: '2026-02-03-phi-gsw',
+      },
+    ],
+  }),
+}));
+
+vi.mock('./useGamePackSync', () => ({
+  useGamePackSync: () => ({
+    fetchGamePackWithReason: mocks.fetchGamePackWithReasonMock,
+    fetchScheduleWithReason: mocks.fetchScheduleWithReasonMock,
+    lastGamePackFetchRef: mocks.lastGamePackFetchRef,
+    lastScheduleFetchRef: mocks.lastScheduleFetchRef,
+  }),
+}));
+
+vi.mock('./useLiveUpdates', () => ({
+  useLiveUpdates: () => ({
+    ws: { readyState: 1 },
+  }),
+}));
+
+vi.mock('./useResumeRefresh', () => ({
+  useResumeRefresh: mocks.useResumeRefreshMock,
+}));
+
+vi.mock('./useAnalyticsSignals', () => ({
+  useAnalyticsSignals: mocks.useAnalyticsSignalsMock,
+}));
+
+vi.mock('./useGameTimeline', () => ({
+  useGameTimeline: () => ({
+    scoreTimeline: [
+      { scoreAway: 0, scoreHome: 0 },
+      { scoreAway: 12, scoreHome: 14 },
+    ],
+    homePlayerTimeline: { HomeA: [] },
+    awayPlayerTimeline: { AwayA: [] },
+    allActions: [{ actionNumber: 1 }],
+    awayActions: { AwayA: [] },
+    homeActions: { HomeA: [] },
+    awayActionsAll: { AwayA: [] },
+    homeActionsAll: { HomeA: [] },
+  }),
+}));
+
+vi.mock('./useElementWidth', () => ({
+  useElementWidth: () => [mocks.playRef, 640],
+}));
+
+vi.mock('./useLineupStats', () => ({
+  useLineupStats: () => ({ away: [], home: [] }),
+}));
+
+describe('useMinutesMap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('keeps the App-facing return contract stable and wires orchestration hooks', () => {
+    const { result } = renderHook(() => useMinutesMap());
+
+    expect(Object.keys(result.current).sort()).toEqual(
+      [
+        'allActions',
+        'awayActions',
+        'awayActionsAll',
+        'awayPlayerTimeline',
+        'awayTeam',
+        'awayTeamName',
+        'box',
+        'changeDate',
+        'changeGame',
+        'changeStatOn',
+        'currentScore',
+        'date',
+        'gameDate',
+        'gameId',
+        'gameStatus',
+        'gameStatusMessage',
+        'games',
+        'homeActions',
+        'homeActionsAll',
+        'homePlayerTimeline',
+        'homeTeam',
+        'homeTeamName',
+        'isBoxLoading',
+        'isGameDataLoading',
+        'isPlayLoading',
+        'isScheduleLoading',
+        'lastAction',
+        'lineupStats',
+        'nbaGameId',
+        'numQs',
+        'playByPlaySectionRef',
+        'playByPlaySectionWidth',
+        'scoreTimeline',
+        'setShowScoreDiff',
+        'showScoreDiff',
+        'statOn',
+      ].sort(),
+    );
+
+    expect(result.current.date).toBe('2026-02-03');
+    expect(result.current.gameId).toBe('2026-02-03-phi-gsw');
+    expect(result.current.currentScore).toEqual({ scoreAway: 12, scoreHome: 14 });
+    expect(result.current.homeTeam).toBe('GSW');
+    expect(result.current.awayTeam).toBe('PHI');
+
+    expect(mocks.useResumeRefreshMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        date: '2026-02-03',
+        gameId: '2026-02-03-phi-gsw',
+        isSelectedGameFinal: false,
+        isWebSocketOpen: true,
+        lastGamePackFetchRef: mocks.lastGamePackFetchRef,
+        lastScheduleFetchRef: mocks.lastScheduleFetchRef,
+      }),
+    );
+
+    expect(mocks.useAnalyticsSignalsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        date: '2026-02-03',
+        gameId: '2026-02-03-phi-gsw',
+        currentScheduleGameStatus: 'Q2 09:00',
+        isInitLoading: false,
+      }),
+    );
+
+    act(() => {
+      result.current.changeStatOn(2);
+    });
+
+    expect(mocks.setStatOnMock).toHaveBeenCalledTimes(1);
+    const updater = mocks.setStatOnMock.mock.calls[0][0];
+    expect(typeof updater).toBe('function');
+  });
+});
