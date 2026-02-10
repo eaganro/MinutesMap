@@ -56,6 +56,19 @@ describe('playExportTransport', () => {
     ).toEqual({ canShareFiles: true, errorMessage: null });
   });
 
+  it('reports canShare=false without throwing when browser rejects files', () => {
+    const file = new File([new Blob(['x'])], 'chart.png', { type: 'image/png' });
+    expect(
+      detectShareSupport({
+        file,
+        navigatorRef: {
+          share: vi.fn(),
+          canShare: vi.fn(() => false),
+        },
+      }),
+    ).toEqual({ canShareFiles: false, errorMessage: null });
+  });
+
   it('shares files when navigator.share succeeds', async () => {
     const file = new File([new Blob(['x'])], 'chart.png', { type: 'image/png' });
     const share = vi.fn().mockResolvedValue(undefined);
@@ -73,6 +86,41 @@ describe('playExportTransport', () => {
       url: 'https://minutesmap.com/game',
     });
     expect(result).toEqual({ shared: true, aborted: false, error: null });
+  });
+
+  it('marks aborted shares when navigator.share throws AbortError', async () => {
+    const file = new File([new Blob(['x'])], 'chart.png', { type: 'image/png' });
+    const error = new Error('share cancelled');
+    error.name = 'AbortError';
+    const share = vi.fn().mockRejectedValue(error);
+
+    const result = await shareFile({
+      file,
+      title: 'Title',
+      text: 'Text',
+      url: 'https://minutesmap.com/game',
+      navigatorRef: { share },
+    });
+
+    expect(result).toEqual({ shared: false, aborted: true, error });
+  });
+
+  it('returns a clear error when File constructor fails', () => {
+    const originalFile = globalThis.File;
+    const failingFile = vi.fn(() => {
+      throw new Error('unsupported');
+    });
+    vi.stubGlobal('File', failingFile);
+
+    const result = createPngFile({
+      blob: new Blob(['x'], { type: 'image/png' }),
+      fileName: 'chart.png',
+    });
+
+    expect(result.file).toBeNull();
+    expect(result.errorMessage).toContain('File constructor failed');
+
+    vi.stubGlobal('File', originalFile);
   });
 
   it('downloads and schedules object URL cleanup', () => {

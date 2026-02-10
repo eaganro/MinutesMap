@@ -64,11 +64,24 @@ describe('game selection status utils', () => {
   });
 
   it('matches schedules by start-date prefix', () => {
-    const games = [{ starttime: '2026-02-03T00:10:00Z' }, { starttime: '2026-02-04T01:00:00Z' }];
+    const games = [
+      { starttime: ' 2026-02-03T00:10:00Z ' },
+      { starttime: '2026-02-04T01:00:00Z' },
+      { starttime: 'malformed' },
+    ];
 
     expect(scheduleMatchesDate(games, '2026-02-03')).toBe(true);
     expect(scheduleMatchesDate(games, '2026-02-05')).toBe(false);
     expect(scheduleMatchesDate([], '2026-02-03')).toBe(false);
+  });
+
+  it('uses hometeam as deterministic tie-break when start times are missing', () => {
+    const games = [
+      { id: 'b', status: '8:00 PM ET', starttime: null, hometeam: 'BOS' },
+      { id: 'a', status: '8:00 PM ET', starttime: '', hometeam: 'ATL' },
+    ];
+
+    expect(sortGamesForSelection(games).map((game) => game.id)).toEqual(['a', 'b']);
   });
 
   it('finds the first started/completed game from sorted selection order', () => {

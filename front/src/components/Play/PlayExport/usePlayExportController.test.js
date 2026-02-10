@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createPngFile: vi.fn(),
   detectShareSupport: vi.fn(),
   createObjectUrl: vi.fn(),
+  revokeObjectUrl: vi.fn(),
   shareFile: vi.fn(),
   trackFeatureUse: vi.fn(),
 }));
@@ -23,6 +24,7 @@ vi.mock('./playExportTransport', async () => {
     createPngFile: mocks.createPngFile,
     detectShareSupport: mocks.detectShareSupport,
     createObjectUrl: mocks.createObjectUrl,
+    revokeObjectUrl: mocks.revokeObjectUrl,
     shareFile: mocks.shareFile,
   };
 });
@@ -91,7 +93,13 @@ describe('usePlayExportController', () => {
     vi.clearAllMocks();
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
-      value: vi.fn().mockReturnValue({ matches: false }),
+      value: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      }),
     });
     mocks.renderExportCanvas.mockReturnValue({
       toDataURL: () => 'data:image/png;base64,SGVsbG8=',
@@ -103,6 +111,7 @@ describe('usePlayExportController', () => {
     });
     mocks.detectShareSupport.mockReturnValue({ canShareFiles: false, errorMessage: null });
     mocks.createObjectUrl.mockReturnValue('blob:preview-url');
+    mocks.revokeObjectUrl.mockImplementation(() => {});
     mocks.shareFile.mockResolvedValue({ shared: true, aborted: false, error: null });
   });
 
@@ -122,6 +131,10 @@ describe('usePlayExportController', () => {
   });
 
   it('auto-refreshes preview when export settings change', async () => {
+    mocks.createObjectUrl.mockReset();
+    mocks.createObjectUrl.mockReturnValueOnce('blob:first-preview');
+    mocks.createObjectUrl.mockReturnValueOnce('blob:second-preview');
+
     const { result } = renderHook(() => usePlayExportController(buildProps()));
 
     await act(async () => {
@@ -137,5 +150,79 @@ describe('usePlayExportController', () => {
     await waitFor(() => {
       expect(mocks.renderExportCanvas).toHaveBeenCalledTimes(2);
     });
+    expect(mocks.revokeObjectUrl).toHaveBeenCalledWith('blob:first-preview');
+  });
+
+  it('exposes exporting state while image generation is pending', async () => {
+    let resolveBlob;
+    mocks.canvasToBlob.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveBlob = resolve;
+        }),
+    );
+
+    const { result } = renderHook(() => usePlayExportController(buildProps()));
+
+    let exportPromise;
+    await act(async () => {
+      exportPromise = result.current.handleExportImage();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isExporting).toBe(true);
+    });
+
+    await act(async () => {
+      resolveBlob(new Blob(['png'], { type: 'image/png' }));
+      await exportPromise;
+    });
+
+    expect(result.current.isExporting).toBe(false);
+    expect(result.current.exportPreview?.url).toBe('blob:preview-url');
+  });
+
+  it('surfaces errors and supports retry to a successful preview', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { result } = renderHook(() => usePlayExportController(buildProps()));
+
+      mocks.renderExportCanvas.mockReturnValueOnce(null);
+
+      await act(async () => {
+        await result.current.handleExportImage();
+      });
+
+      expect(errorSpy).toHaveBeenCalled();
+      expect(result.current.exportError).toContain('unable to build image');
+      expect(result.current.exportPreview).toBeNull();
+
+      await act(async () => {
+        await result.current.handleExportImage();
+      });
+
+      expect(result.current.exportError).toBeNull();
+      expect(result.current.exportPreview?.url).toBe('blob:preview-url');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('shares preview from the share-capable branch and closes modal on success', async () => {
+    mocks.detectShareSupport.mockReturnValue({ canShareFiles: true, errorMessage: null });
+    const { result } = renderHook(() => usePlayExportController(buildProps()));
+
+    await act(async () => {
+      await result.current.handleExportImage();
+    });
+
+    expect(result.current.exportPreview?.canShare).toBe(true);
+
+    await act(async () => {
+      await result.current.handleSharePreview();
+    });
+
+    expect(mocks.shareFile).toHaveBeenCalledTimes(1);
+    expect(result.current.exportPreview).toBeNull();
   });
 });

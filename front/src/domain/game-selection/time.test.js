@@ -20,8 +20,13 @@ describe('game selection time utils', () => {
     );
   });
 
+  it('parses space-delimited and no-seconds ET timestamps', () => {
+    expect(parseStartTimeEt('2026-02-03 19:30')?.toISOString()).toBe('2026-02-04T00:30:00.000Z');
+  });
+
   it('returns null for invalid start times', () => {
     expect(parseStartTimeEt('')).toBeNull();
+    expect(parseStartTimeEt('   ')).toBeNull();
     expect(parseStartTimeEt('not-a-date')).toBeNull();
   });
 
