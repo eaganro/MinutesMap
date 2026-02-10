@@ -1,23 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildNbaEventUrl, resolveVideoAction } from '../../../helpers/nbaEvents';
 import { useTrackFeatureUseOnce } from '../../hooks/useTrackFeatureUseOnce';
+import { findActionMetaFromTarget } from '../model/interactionModel';
 
 const TOUCH_AXIS_LOCK_PX = 8;
-
-const findActionMetaFromTarget = (targetEl, containerEl) => {
-  let checkEl = targetEl;
-  while (checkEl && checkEl !== containerEl) {
-    if (checkEl.dataset) {
-      const actionNumber = checkEl.dataset.actionNumber ?? null;
-      if (actionNumber) {
-        return { actionNumber };
-      }
-    }
-    if (checkEl.tagName === 'svg') break;
-    checkEl = checkEl.parentElement;
-  }
-  return null;
-};
 
 export function usePlayPointerHandlers({
   playRef,

@@ -1,24 +1,13 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-import { useTheme } from '../hooks/useTheme';
-import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors';
-import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
-import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../hooks/loadingUiTimings';
 import PlayExportControls from './PlayExport/PlayExportControls';
-import { useStablePlayData } from './hooks/useStablePlayData';
-import { useActivePeriodSelection } from './hooks/useActivePeriodSelection';
-import { usePeriodFilteredData } from './hooks/usePeriodFilteredData';
 import { usePlayPointerHandlers } from './hooks/usePlayPointerHandlers';
-
-// Sub-components
+import { usePlayViewModel } from './hooks/usePlayViewModel';
 import Player from './Player/Player';
 import ScoreGraph from './ScoreGraph';
 import PlayTooltip from './PlayTooltip';
 import TimelineGrid from './TimelineGrid';
-
-// Custom Hook
 import { usePlayInteraction } from './usePlayInteraction';
-
 import './Play.scss';
 
 export default function Play({
@@ -45,22 +34,57 @@ export default function Play({
   showScoreDiff = true,
   statOn,
 }) {
-  const playRef = useRef(null);
-  const [showLoadingText, setShowLoadingText] = useState(false);
-  const { isDarkMode } = useTheme();
-  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
-
   const {
-    displayData,
-    isShowingStableData,
-    hasDisplayData,
+    playRef,
+    leftMargin,
+    rightMargin,
+    width,
+    qWidth,
+    numPeriods,
+    isFinal,
+    activePeriod,
+    isQuarterFocus,
+    activePeriodLabel,
+    latestStartedPeriod,
+    selectPeriod,
+    showQuarterSwitcher,
+    periodOptions,
+    showLoadingIndicator,
+    showLoadingOverlay,
     displayStatusMessage,
     showStatusMessage,
     isDataLoading,
-  } = useStablePlayData({
-    isLoading,
-    isBlurred,
-    statusMessage,
+    hasDisplayData,
+    displayAwayTeamNames,
+    displayHomeTeamNames,
+    displayAwayPlayers,
+    displayAwayPlayersAll,
+    displayHomePlayers,
+    displayHomePlayersAll,
+    displayScoreTimeline,
+    displayAwayPlayerTimeline,
+    displayHomePlayerTimeline,
+    displayNumQs,
+    displayLastAction,
+    displayGameDate,
+    filteredAllActions,
+    filteredScoreTimeline,
+    filteredAwayPlayers,
+    filteredHomePlayers,
+    filteredAwayPlayerTimeline,
+    filteredHomePlayerTimeline,
+    filteredLastAction,
+    timelineWindow,
+    startScoreDiff,
+    teamColors,
+    awayColor,
+    homeColor,
+    maxLead,
+    maxY,
+  } = usePlayViewModel({
+    gameId,
+    gameStatus,
+    gameDate,
     awayTeamNames,
     homeTeamNames,
     awayPlayers,
@@ -72,92 +96,12 @@ export default function Play({
     awayPlayerTimeline,
     homePlayerTimeline,
     numQs,
-    lastAction,
-    gameDate,
-  });
-
-  const {
-    awayTeamNames: displayAwayTeamNames,
-    homeTeamNames: displayHomeTeamNames,
-    awayPlayers: displayAwayPlayers,
-    awayPlayersAll: displayAwayPlayersAll,
-    homePlayers: displayHomePlayers,
-    homePlayersAll: displayHomePlayersAll,
-    allActions: displayAllActions,
-    scoreTimeline: displayScoreTimeline,
-    awayPlayerTimeline: displayAwayPlayerTimeline,
-    homePlayerTimeline: displayHomePlayerTimeline,
-    numQs: displayNumQs,
-    lastAction: displayLastAction,
-    gameDate: displayGameDate,
-  } = displayData;
-
-  useEffect(() => {
-    if (isLoading && hasDisplayData) {
-      const timer = setTimeout(() => setShowLoadingText(true), LOADING_TEXT_DELAY_MS);
-      return () => clearTimeout(timer);
-    }
-    setShowLoadingText(false);
-  }, [isLoading, hasDisplayData]);
-
-  const showLoadingOverlay = isLoading && hasDisplayData && showLoadingText;
-
-  // --- Layout Constants ---
-  const leftMargin = 96;
-  const rightMargin = 10;
-  // Timeline draw width excludes margins
-  const width = Math.max(0, sectionWidth - (leftMargin + rightMargin));
-
-  // Calculate Quarter Width (Dynamic based on Overtime)
-  const qWidth = useMemo(() => {
-    if (displayNumQs > 4) {
-      return width * (12 / (12 * 4 + 5 * (displayNumQs - 4)));
-    }
-    return width / 4;
-  }, [width, displayNumQs]);
-
-  const numPeriods = Number(displayNumQs) || 0;
-  const {
-    isQuarterView,
-    periodOptions,
-    isFinal,
-    activePeriod,
-    isQuarterFocus,
-    activePeriodLabel,
-    latestStartedPeriod,
-    selectPeriod,
-  } = useActivePeriodSelection({
-    gameId,
-    gameStatus,
-    displayLastAction,
-    numPeriods,
     sectionWidth,
-    isShowingStableData,
+    lastAction,
+    isLoading,
+    statusMessage,
   });
 
-  const {
-    timelineWindow,
-    filteredAllActions,
-    filteredScoreTimeline,
-    filteredAwayPlayers,
-    filteredHomePlayers,
-    filteredAwayPlayerTimeline,
-    filteredHomePlayerTimeline,
-    filteredLastAction,
-    startScoreDiff,
-  } = usePeriodFilteredData({
-    activePeriod,
-    numPeriods,
-    displayAllActions,
-    displayScoreTimeline,
-    displayAwayPlayers,
-    displayHomePlayers,
-    displayAwayPlayerTimeline,
-    displayHomePlayerTimeline,
-    displayLastAction,
-  });
-
-  // --- Custom Hook for Logic ---
   const {
     descriptionArray,
     mouseLinePos,
@@ -203,7 +147,7 @@ export default function Play({
   } = usePlayPointerHandlers({
     playRef,
     nbaGameId,
-    displayAllActions,
+    displayAllActions: filteredAllActions,
     isDataLoading,
     infoLocked,
     descriptionArray,
@@ -213,33 +157,6 @@ export default function Play({
     resetInteraction,
   });
 
-  // --- Visual Data Prep ---
-  const teamColors = getMatchupColors(
-    displayAwayTeamNames.abr,
-    displayHomeTeamNames.abr,
-    isDarkMode,
-  );
-
-  const awayColor = teamColors.away ? getSafeBackground(teamColors.away, isDarkMode) : '';
-  const homeColor = teamColors.home ? getSafeBackground(teamColors.home, isDarkMode) : '';
-
-  // Max Score Lead & Y-Axis Scale
-  const { maxLead, maxY } = useMemo(() => {
-    let max = 0;
-    if (displayScoreTimeline) {
-      displayScoreTimeline.forEach((t) => {
-        const scoreDiff = Math.abs(Number(t.away) - Number(t.home));
-        if (scoreDiff > max) max = scoreDiff;
-      });
-    }
-    return {
-      maxLead: max,
-      // Round to nearest 5 and add padding for the chart ceiling
-      maxY: Math.floor(max / 5) * 5 + 10,
-    };
-  }, [displayScoreTimeline]);
-
-  const showQuarterSwitcher = isQuarterView && periodOptions.length > 0 && hasDisplayData;
   const quarterSwitcher = showQuarterSwitcher ? (
     <div className="playQuarterSwitcher" style={{ width: sectionWidth }}>
       {periodOptions.map(({ period, label }) => (
@@ -257,9 +174,6 @@ export default function Play({
     </div>
   ) : null;
 
-  const showLoadingIndicator = isLoading && !hasDisplayData && !showStatusMessage;
-
-  // --- Render Loading/Error States ---
   if (showLoadingIndicator) {
     return (
       <div className="playWrapper">
@@ -287,7 +201,6 @@ export default function Play({
     );
   }
 
-  // --- Main Render ---
   return (
     <div className="playWrapper">
       {quarterSwitcher}
@@ -328,17 +241,15 @@ export default function Play({
       <div
         ref={playRef}
         className={`play ${isDataLoading ? 'isLoading' : ''}`}
-        style={{ width: sectionWidth }} // Use full section width including margins
+        style={{ width: sectionWidth }}
         onMouseMove={isDataLoading ? undefined : handleMouseMove}
         onMouseLeave={isDataLoading ? undefined : handleMouseLeave}
         onClick={isDataLoading ? undefined : handleClick}
-        // Touch support
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
       >
-        {/* Floating Tooltip */}
         {!isDataLoading && (
           <PlayTooltip
             descriptionArray={descriptionArray}
@@ -367,7 +278,6 @@ export default function Play({
         )}
 
         <div className="playContent">
-          {/* Main SVG Visualization (Grid + Graph + MouseLine) */}
           <svg height="600" width={sectionWidth} className="line playGrid">
             <TimelineGrid
               width={width}
@@ -408,7 +318,6 @@ export default function Play({
             )}
           </svg>
 
-          {/* Player Rows - Away */}
           <div className="teamName" style={{ color: teamColors.away }}>
             {displayAwayTeamNames.name}
           </div>
@@ -429,7 +338,6 @@ export default function Play({
             ))}
           </div>
 
-          {/* Player Rows - Home */}
           <div className="teamName" style={{ color: teamColors.home }}>
             {displayHomeTeamNames.name}
           </div>

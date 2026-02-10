@@ -28,8 +28,17 @@ const allActions = [
 ];
 
 const buildHook = () =>
-  renderHook(() =>
-    usePlayInteraction({
+  renderHook(() => {
+    const container = document.createElement('div');
+    container.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: 600,
+      bottom: 300,
+      width: 600,
+      height: 300,
+    });
+    return usePlayInteraction({
       allActions,
       leftMargin: 96,
       timelineWidth: 500,
@@ -37,9 +46,9 @@ const buildHook = () =>
         startSeconds: 0,
         durationSeconds: 2880,
       },
-      playRef: { current: document.createElement('div') },
-    }),
-  );
+      playRef: { current: container },
+    });
+  });
 
 describe('usePlayInteraction', () => {
   it('navigates across distinct timestamps and keeps grouped same-time actions together', () => {
@@ -92,5 +101,40 @@ describe('usePlayInteraction', () => {
     expect(result.current.descriptionArray).toEqual([]);
     expect(result.current.highlightActionIds).toEqual([]);
     expect(result.current.mouseLinePos).toBeNull();
+  });
+
+  it('selects the closest grouped timestamp on hover fallback when no marker is targeted', () => {
+    const { result } = buildHook();
+    const target = document.createElement('div');
+
+    act(() => {
+      result.current.updateHoverAt(108, 90, target);
+    });
+
+    expect(result.current.highlightActionIds).toEqual([1, 2]);
+    expect(result.current.descriptionArray.map((entry) => entry.actionNumber)).toEqual([1, 2]);
+  });
+
+  it('supports keyboard navigation while info is locked', () => {
+    const { result } = buildHook();
+
+    act(() => {
+      result.current.setInfoLocked(true);
+      result.current.setHighlightActionIds([1]);
+      result.current.setDescriptionArray([allActions[0]]);
+    });
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    });
+
+    expect(result.current.highlightActionIds).toEqual([3]);
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+
+    expect(result.current.infoLocked).toBe(false);
+    expect(result.current.descriptionArray).toEqual([]);
   });
 });
