@@ -34,8 +34,6 @@ export function useMinutesMap() {
     isScheduleLoading,
     box,
     playByPlay,
-    awayTeamId,
-    homeTeamId,
     nbaGameId,
     numQs,
     lastAction,
@@ -120,7 +118,7 @@ export function useMinutesMap() {
     homeActions,
     awayActionsAll,
     homeActionsAll,
-  } = useGameTimeline(playByPlay, homeTeamId, awayTeamId, lastAction, statOn);
+  } = useGameTimeline(playByPlay, statOn);
 
   const lineupStats = useLineupStats({
     awayPlayerTimeline,

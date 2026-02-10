@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-import { useTheme } from '../hooks/useTheme'; // Adjust path
-import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors'; // Adjust path
+import { useTheme } from '../hooks/useTheme';
+import { getMatchupColors, getSafeBackground } from '../../helpers/teamColors';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../hooks/loadingUiTimings';
 import PlayExportControls from './PlayExport/PlayExportControls';

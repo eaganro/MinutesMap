@@ -129,7 +129,6 @@ export function useWebSocket({
     setWs(newWs);
 
     newWs.onopen = () => {
-      console.log('Connected to WebSocket');
       resetReconnectState();
       sendSubscriptions();
     };
@@ -155,7 +154,6 @@ export function useWebSocket({
     };
 
     newWs.onclose = () => {
-      console.log('Disconnected from WebSocket');
       lastFollowDateRef.current = null;
       lastFollowGameRef.current = null;
       wsRef.current = null;

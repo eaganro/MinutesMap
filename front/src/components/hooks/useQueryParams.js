@@ -58,7 +58,7 @@ export function useQueryParams() {
   /**
    * Update the URL without page reload (path preferred, query preserved)
    */
-  const updateQueryParams = useCallback((newDate, newGameId) => {
+  const updateQueryParams = useCallback((_newDate, newGameId) => {
     const params = new URLSearchParams(window.location.search);
     params.delete('date');
     params.delete('gameid');

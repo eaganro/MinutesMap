@@ -125,7 +125,6 @@ export default function Player({
   const playTimeLines = timeline
     ?.filter((t) => {
       if (!t.end) {
-        console.log('PLAYER TIMELINE ERROR', name);
         return false;
       }
       return true;

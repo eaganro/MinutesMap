@@ -7,13 +7,10 @@ import { normalizePlayByPlay } from '../../domain/game-data/normalizePlayByPlay'
  * Extracts heavy data processing logic from the view component.
  *
  * @param {Array|Object} playByPlay - Raw play-by-play array OR pre-processed payload from S3
- * @param {number|null} _homeTeamId - ID of the home team (unused compatibility parameter)
- * @param {number|null} _awayTeamId - ID of the away team (unused compatibility parameter)
- * @param {Object|null} _lastAction - The last action in the play-by-play data (unused compatibility parameter)
  * @param {boolean[]} statOn - Array of stat filter toggles
  * @returns {Object} Processed timeline and action data
  */
-export function useGameTimeline(playByPlay, _homeTeamId, _awayTeamId, _lastAction, statOn) {
+export function useGameTimeline(playByPlay, statOn) {
   return useMemo(() => {
     const normalized = normalizePlayByPlay(playByPlay);
 

@@ -12,7 +12,7 @@ const STAT_ON = [true, false, true, true, false, false, false, false];
 
 describe('useGameTimeline', () => {
   it('returns the empty contract for unsupported payloads', () => {
-    const { result } = renderHook(() => useGameTimeline([], null, null, null, STAT_ON));
+    const { result } = renderHook(() => useGameTimeline([], STAT_ON));
 
     expect(result.current).toEqual({
       scoreTimeline: [],
@@ -27,9 +27,7 @@ describe('useGameTimeline', () => {
   });
 
   it('keeps legacy payload output contract stable', () => {
-    const { result } = renderHook(() =>
-      useGameTimeline(legacyPlayByPlayPayload, null, null, null, STAT_ON),
-    );
+    const { result } = renderHook(() => useGameTimeline(legacyPlayByPlayPayload, STAT_ON));
 
     expect(result.current.scoreTimeline).toEqual(expectedLegacyNormalized.scoreTimeline);
     expect(result.current.awayPlayerTimeline).toEqual(expectedLegacyNormalized.awayPlayerTimeline);
@@ -68,9 +66,7 @@ describe('useGameTimeline', () => {
   });
 
   it('keeps compact payload output contract stable', () => {
-    const { result } = renderHook(() =>
-      useGameTimeline(compactPlayByPlayPayload, null, null, null, STAT_ON),
-    );
+    const { result } = renderHook(() => useGameTimeline(compactPlayByPlayPayload, STAT_ON));
 
     expect(result.current.scoreTimeline).toEqual(expectedCompactNormalized.scoreTimeline);
     expect(result.current.awayPlayerTimeline).toEqual(expectedCompactNormalized.awayPlayerTimeline);
