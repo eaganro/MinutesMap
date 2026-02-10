@@ -3,7 +3,7 @@ import { NavigateNext, NavigateBefore } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import { dateAdd, dateMinus, ASSET_PREFIX } from '../../environment';
-import { parseGameStatus } from '../../helpers/gameSelectionUtils';
+import { parseGameStatus } from '../../domain/game-selection/status';
 import { formatStatusText } from '../../helpers/utils';
 import { trackFeatureUse } from '../../helpers/analytics';
 

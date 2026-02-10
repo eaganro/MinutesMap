@@ -10,7 +10,8 @@ Canonical paths after domain extraction:
 - `front/src/domain/events/classification.js` owns event parsing/classification.
 - `front/src/ui/eventShapes.jsx` owns React SVG rendering helpers.
 
-Compatibility layers retained to minimize churn:
+Cleanup follow-up on this branch:
 
-- `front/src/helpers/gameSelectionUtils.js` re-exports from `domain/game-selection/*`.
-- `front/src/helpers/eventStyles.jsx` re-exports from `domain/events/classification` and `ui/eventShapes.jsx`.
+- Removed `front/src/helpers/gameSelectionUtils.js` compatibility re-export.
+- Removed `front/src/helpers/eventStyles.jsx` compatibility re-export.
+- Updated call sites to import directly from domain/UI modules.

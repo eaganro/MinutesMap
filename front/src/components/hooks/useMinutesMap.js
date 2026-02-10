@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  getNbaTodayString,
   parseGameStatus,
   parseGameSlug,
   scheduleMatchesDate,
   sortGamesForSelection,
-} from '../../helpers/gameSelectionUtils';
+} from '../../domain/game-selection/status';
+import { getNbaTodayString } from '../../domain/game-selection/time';
 import { PREFIX } from '../../environment';
 
 import { useQueryParams } from './useQueryParams';

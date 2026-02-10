@@ -4,7 +4,7 @@ import './Score.scss';
 import { ASSET_PREFIX } from '../../environment';
 import { formatClock, formatPeriod, formatStatusText } from '../../helpers/utils';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
-import { parseGameStatus } from '../../helpers/gameSelectionUtils';
+import { parseGameStatus } from '../../domain/game-selection/status';
 
 const LOADING_TEXT_DELAY_MS = 500;
 const MIN_BLUR_MS = 300;

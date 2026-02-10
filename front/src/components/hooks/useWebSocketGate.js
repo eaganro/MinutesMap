@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  getNbaTodayString,
-  parseGameStatus,
-  parseStartTimeEt,
-  scheduleMatchesDate,
-} from '../../helpers/gameSelectionUtils';
+import { parseGameStatus, scheduleMatchesDate } from '../../domain/game-selection/status';
+import { getNbaTodayString, parseStartTimeEt } from '../../domain/game-selection/time';
 
 export function useWebSocketGate({
   date,
