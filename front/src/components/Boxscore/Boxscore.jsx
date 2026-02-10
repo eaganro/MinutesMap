@@ -5,16 +5,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
 import { useTheme } from '../hooks/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
-import { trackFeatureUse } from '../../helpers/analytics';
-
-const LOADING_TEXT_DELAY_MS = 500;
-const MIN_BLUR_MS = 300;
+import { useStableWhileLoading } from '../hooks/useStableWhileLoading';
+import { useTrackFeatureUseOnce } from '../hooks/useTrackFeatureUseOnce';
+import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../hooks/loadingUiTimings';
 
 export default function Boxscore({ box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: 'min', direction: 'desc' });
-  const lastStableBoxRef = useRef(box);
-  const lastStatusMessageRef = useRef(statusMessage);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
   const { isDarkMode } = useTheme();
@@ -22,7 +19,7 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const homeTableRef = useRef(null);
   const isSyncingScrollRef = useRef(false);
   const syncRafRef = useRef(null);
-  const featureUseTrackedRef = useRef(false);
+  const trackBoxscoreFeatureUse = useTrackFeatureUseOnce('boxscore');
   const [isCompact, setIsCompact] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 640px)').matches : false,
   );
@@ -43,23 +40,12 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
     return () => mediaQuery.removeListener(handleChange);
   }, []);
 
-  useEffect(() => {
-    if (isLoading || isBlurred) {
-      return;
-    }
-    lastStableBoxRef.current = box;
-  }, [box, isLoading, isBlurred]);
-
-  useEffect(() => {
-    if (isLoading || isBlurred) {
-      return;
-    }
-    lastStatusMessageRef.current = statusMessage;
-  }, [statusMessage, isLoading, isBlurred]);
-
-  const displayBox = isLoading || isBlurred ? lastStableBoxRef.current : box;
-  const displayStatusMessage =
-    isLoading || isBlurred ? lastStatusMessageRef.current : statusMessage;
+  const { displayData: displayBox, displayStatusMessage } = useStableWhileLoading({
+    data: box,
+    statusMessage,
+    isLoading,
+    isBlurred,
+  });
   const hasBoxData = displayBox && Object.keys(displayBox).length > 0;
   const hasIncomingBoxData = box && Object.keys(box).length > 0;
   const showStatusMessage = Boolean(displayStatusMessage) && !hasBoxData;
@@ -143,17 +129,12 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   );
 
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
-  const handleTrackFeatureUse = () => {
-    if (featureUseTrackedRef.current) return;
-    featureUseTrackedRef.current = true;
-    trackFeatureUse('boxscore');
-  };
 
   return (
     <div
       className={`box ${isDataLoading ? 'isLoading' : ''}`}
-      onClick={handleTrackFeatureUse}
-      onTouchStart={handleTrackFeatureUse}
+      onClick={trackBoxscoreFeatureUse}
+      onTouchStart={trackBoxscoreFeatureUse}
     >
       {showLoadingOverlay && (
         <div className="loadingOverlay">

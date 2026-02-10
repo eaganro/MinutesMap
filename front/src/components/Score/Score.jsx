@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import './Score.scss';
 import { ASSET_PREFIX } from '../../environment';
 import { formatClock, formatPeriod, formatStatusText } from '../../helpers/utils';
 import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
+import { useStableWhileLoading } from '../hooks/useStableWhileLoading';
+import { toDateInputValue } from '../hooks/useDateInputState';
+import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../hooks/loadingUiTimings';
 import { parseGameStatus } from '../../domain/game-selection/status';
-
-const LOADING_TEXT_DELAY_MS = 500;
-const MIN_BLUR_MS = 300;
 const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
 const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
 
@@ -21,14 +21,6 @@ export default function Score({
   lastAction,
   gameStatus,
 }) {
-  const [displayData, setDisplayData] = useState(() => ({
-    homeTeam,
-    awayTeam,
-    score,
-    date,
-    lastAction,
-    gameStatus,
-  }));
   const [awayLogoLoaded, setAwayLogoLoaded] = useState(false);
   const [homeLogoLoaded, setHomeLogoLoaded] = useState(false);
   const [showLoadingText, setShowLoadingText] = useState(false);
@@ -36,12 +28,23 @@ export default function Score({
   const homeImgRef = useRef(null);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
-  useEffect(() => {
-    if (isLoading || isBlurred) {
-      return;
-    }
-    setDisplayData({ homeTeam, awayTeam, score, date, lastAction, gameStatus });
-  }, [homeTeam, awayTeam, score, date, lastAction, gameStatus, isLoading, isBlurred]);
+  const incomingData = useMemo(
+    () => ({
+      homeTeam,
+      awayTeam,
+      score,
+      date,
+      lastAction,
+      gameStatus,
+    }),
+    [homeTeam, awayTeam, score, date, lastAction, gameStatus],
+  );
+
+  const { displayData } = useStableWhileLoading({
+    data: incomingData,
+    isLoading,
+    isBlurred,
+  });
 
   useEffect(() => {
     setAwayLogoLoaded(false);
@@ -65,7 +68,9 @@ export default function Score({
   const hasDisplayData = Boolean(
     displayData?.homeTeam || displayData?.awayTeam || displayData?.score || displayData?.date,
   );
-  const hasIncomingData = Boolean(homeTeam || awayTeam || score || date);
+  const hasIncomingData = Boolean(
+    incomingData?.homeTeam || incomingData?.awayTeam || incomingData?.score || incomingData?.date,
+  );
   const awayLogoPending = Boolean(displayData.awayTeam) && !awayLogoLoaded;
   const homeLogoPending = Boolean(displayData.homeTeam) && !homeLogoLoaded;
   const isDataLoading = isBlurred && (hasDisplayData || hasIncomingData);
@@ -108,19 +113,11 @@ export default function Score({
   }
 
   const changeToGameDate = () => {
-    if (!gameDate) {
+    const nextDate = toDateInputValue(displayData.date);
+    if (!nextDate) {
       return;
     }
-    let month = gameDate.getMonth() + 1;
-    if (month < 10) {
-      month = '0' + month;
-    }
-    let day = gameDate.getDate();
-    if (day < 10) {
-      day = '0' + day;
-    }
-    let val = `${gameDate.getFullYear()}-${month}-${day}`;
-    changeDate({ target: { value: val } });
+    changeDate(nextDate);
   };
 
   return (

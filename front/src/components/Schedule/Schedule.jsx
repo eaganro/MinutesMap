@@ -5,7 +5,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { dateAdd, dateMinus, ASSET_PREFIX } from '../../environment';
 import { parseGameStatus } from '../../domain/game-selection/status';
 import { formatStatusText } from '../../helpers/utils';
-import { trackFeatureUse } from '../../helpers/analytics';
+import { useDateInputState } from '../hooks/useDateInputState';
+import { useHorizontalDragScroll } from '../hooks/useHorizontalDragScroll';
+import { useTrackFeatureUseOnce } from '../hooks/useTrackFeatureUseOnce';
 
 import './Schedule.scss';
 
@@ -56,19 +58,17 @@ export default function Schedule({
   isLoading,
   selectedGameId,
 }) {
-  const scrollRef = useRef(null);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const startScrollLeft = useRef(0);
-  const dragMoved = useRef(false);
-  const dateFeatureTrackedRef = useRef(false);
-  const trackDateFeatureUse = () => {
-    if (dateFeatureTrackedRef.current) return;
-    dateFeatureTrackedRef.current = true;
-    trackFeatureUse('date-selector');
-  };
+  const trackDateFeatureUse = useTrackFeatureUseOnce('date-selector');
+  const { handleDateChange, shiftDate } = useDateInputState({
+    date,
+    onDateChange: changeDate,
+    onDateInteract: trackDateFeatureUse,
+  });
+  const { scrollRef, dragHandlers, didDrag, scrollBy, resetScrollPosition } =
+    useHorizontalDragScroll();
+
   const handleGameClick = (id) => {
-    if (dragMoved.current) return; // suppress click if user dragged
+    if (didDrag()) return; // suppress click if user dragged
     changeGame(id);
   };
 
@@ -124,104 +124,19 @@ export default function Schedule({
     }
   });
   const scrollScheduleRight = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft += 100;
-    }
+    scrollBy(100);
   };
   const scrollScheduleLeft = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft -= 100;
-    }
+    scrollBy(-100);
   };
 
   const dateDown = () => {
-    trackDateFeatureUse();
-    const downdate = new Date(date);
-    downdate.setDate(downdate.getDate() - dateMinus);
-    let month = downdate.getMonth() + 1;
-    if (month < 10) {
-      month = '0' + month;
-    }
-    let day = downdate.getDate();
-    if (day < 10) {
-      day = '0' + day;
-    }
-    let val = `${downdate.getFullYear()}-${month}-${day}`;
-    changeDate({ target: { value: val } });
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = 0;
-    }
+    shiftDate(-dateMinus);
+    resetScrollPosition();
   };
   const dateUp = () => {
-    trackDateFeatureUse();
-    const update = new Date(date);
-    update.setDate(update.getDate() + dateAdd);
-    let month = update.getMonth() + 1;
-    if (month < 10) {
-      month = '0' + month;
-    }
-    let day = update.getDate();
-    if (day < 10) {
-      day = '0' + day;
-    }
-    let val = `${update.getFullYear()}-${month}-${day}`;
-    changeDate({ target: { value: val } });
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = 0;
-    }
-  };
-
-  const onMouseDown = (e) => {
-    if (!scrollRef.current) return;
-    isDragging.current = true;
-    dragMoved.current = false;
-    startX.current = e.pageX - scrollRef.current.offsetLeft;
-    startScrollLeft.current = scrollRef.current.scrollLeft;
-    scrollRef.current.classList.add('dragging');
-  };
-  const onMouseLeave = () => {
-    if (!scrollRef.current) return;
-    isDragging.current = false;
-    scrollRef.current.classList.remove('dragging');
-  };
-  const onMouseUp = () => {
-    if (!scrollRef.current) return;
-    isDragging.current = false;
-    scrollRef.current.classList.remove('dragging');
-  };
-  const onMouseMove = (e) => {
-    if (!isDragging.current || !scrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = x - startX.current;
-    if (Math.abs(walk) > 3) dragMoved.current = true;
-    scrollRef.current.scrollLeft = startScrollLeft.current - walk;
-  };
-
-  const onTouchStart = (e) => {
-    if (!scrollRef.current) return;
-    isDragging.current = true;
-    dragMoved.current = false;
-    const touch = e.touches[0];
-    startX.current = touch.pageX - scrollRef.current.offsetLeft;
-    startScrollLeft.current = scrollRef.current.scrollLeft;
-    scrollRef.current.classList.add('dragging');
-  };
-  const onTouchEnd = () => {
-    if (!scrollRef.current) return;
-    isDragging.current = false;
-    scrollRef.current.classList.remove('dragging');
-  };
-  const onTouchMove = (e) => {
-    if (!isDragging.current || !scrollRef.current) return;
-    if (e.cancelable) {
-      e.preventDefault();
-    }
-    const touch = e.touches[0];
-    const x = touch.pageX - scrollRef.current.offsetLeft;
-    const walk = x - startX.current;
-    if (Math.abs(walk) > 3) dragMoved.current = true;
-    scrollRef.current.scrollLeft = startScrollLeft.current - walk;
+    shiftDate(dateAdd);
+    resetScrollPosition();
   };
 
   return (
@@ -239,10 +154,7 @@ export default function Schedule({
             className="dateInput"
             type="date"
             value={date}
-            onChange={(e) => {
-              trackDateFeatureUse();
-              changeDate(e);
-            }}
+            onChange={(e) => handleDateChange(e.target.value)}
           />
           <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
             <NavigateNext />
@@ -265,13 +177,14 @@ export default function Schedule({
             <div
               className="games"
               ref={scrollRef}
-              onMouseDown={onMouseDown}
-              onMouseLeave={onMouseLeave}
-              onMouseUp={onMouseUp}
-              onMouseMove={onMouseMove}
-              onTouchStart={onTouchStart}
-              onTouchEnd={onTouchEnd}
-              onTouchMove={onTouchMove}
+              onMouseDown={dragHandlers.onMouseDown}
+              onMouseLeave={dragHandlers.onMouseLeave}
+              onMouseUp={dragHandlers.onMouseUp}
+              onMouseMove={dragHandlers.onMouseMove}
+              onTouchStart={dragHandlers.onTouchStart}
+              onTouchEnd={dragHandlers.onTouchEnd}
+              onTouchCancel={dragHandlers.onTouchCancel}
+              onTouchMove={dragHandlers.onTouchMove}
             >
               {gamesList}
             </div>

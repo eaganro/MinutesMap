@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { useScheduleState } from './useScheduleState';
 
@@ -67,5 +67,25 @@ describe('useScheduleState', () => {
     );
 
     expect(setGameId).toHaveBeenCalledWith('2026-02-03-lal-bos');
+  });
+
+  it('exposes a value-based changeDate API', () => {
+    const { result } = renderHook(() =>
+      useScheduleState({
+        initialDate: '2026-02-03',
+        initialGameId: null,
+        gameId: '2026-02-03-lal-bos',
+        setGameId: vi.fn(),
+        schedule: [],
+        isScheduleLoading: false,
+        fetchScheduleWithReason: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      result.current.changeDate('2026-02-05');
+    });
+
+    expect(result.current.date).toBe('2026-02-05');
   });
 });
