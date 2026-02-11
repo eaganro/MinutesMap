@@ -49,6 +49,16 @@ Run the smallest relevant checks first.
   - `terraform -chdir=terraform fmt <touched_file>.tf` (target only changed files)
   - `terraform -chdir=terraform validate` (run when local provider plugins are available; otherwise note skip and rely on CI)
 
+## Sandbox notes (Codex/agents)
+- In restricted sandboxes, frontend dev server/E2E commands may fail with:
+  - `Error: listen EPERM: operation not permitted 127.0.0.1:5173`
+  - `Process from config.webServer was not able to start. Exit code: 1`
+- If this occurs, rerun the frontend command with escalated permissions (outside sandbox network restrictions).
+- Commands that may need escalation:
+  - `npm --prefix front run dev`
+  - `npm --prefix front test`
+  - `npm --prefix front test -- --project=chromium -g "<pattern>"`
+
 ## Build commands
 - Frontend production build (local): `npm --prefix front run build`
 - Rebuild TypeScript Lambda bundles: `npm --prefix functions run build:lambdas`
