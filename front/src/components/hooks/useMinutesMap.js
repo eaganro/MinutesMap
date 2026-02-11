@@ -35,7 +35,7 @@ export function useMinutesMap() {
     box,
     playByPlay,
     nbaGameId,
-    numQs,
+    numPeriods,
     lastAction,
     gameStatusMessage,
     isBoxLoading,
@@ -124,7 +124,7 @@ export function useMinutesMap() {
     awayPlayerTimeline,
     homePlayerTimeline,
     scoreTimeline,
-    numPeriods: numQs,
+    numPeriods,
   });
 
   // === LAYOUT ===
@@ -238,7 +238,8 @@ export function useMinutesMap() {
     scoreTimeline,
     awayPlayerTimeline,
     homePlayerTimeline,
-    numQs,
+    numPeriods,
+    numQs: numPeriods,
     lastAction,
     playByPlaySectionRef,
     playByPlaySectionWidth,

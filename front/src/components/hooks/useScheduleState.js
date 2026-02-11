@@ -5,6 +5,8 @@ import {
   sortGamesForSelection,
 } from '../../domain/game-selection/status';
 import { PREFIX } from '../../environment';
+import { classifyFetchResult, fetchJson } from '../../data/apiClient';
+import { normalizeInitPayload } from '../../data/scheduleAdapter';
 
 export function useScheduleState({
   initialDate,
@@ -22,24 +24,28 @@ export function useScheduleState({
   useEffect(() => {
     if (date) return;
 
+    const fallbackDate = new Date().toISOString().split('T')[0];
+
     const fetchInitState = async () => {
       try {
-        const res = await fetch(`${PREFIX}/data/init.json`);
-        if (res.ok) {
-          const data = await res.json();
-          setDate(data.date);
-          if (data.autoSelectGameId && !initialGameId) {
-            const slugParams = parseGameSlug(data.autoSelectGameId);
+        const result = await fetchJson(`${PREFIX}/data/init.json`);
+        const outcome = classifyFetchResult(result);
+
+        if (outcome === 'success') {
+          const normalizedInit = normalizeInitPayload(result.data, { fallbackDate });
+          setDate(normalizedInit.date);
+          if (normalizedInit.autoSelectGameId && !initialGameId) {
+            const slugParams = parseGameSlug(normalizedInit.autoSelectGameId);
             if (slugParams) {
               setGameId(slugParams.gameId);
             }
           }
-        } else {
-          setDate(new Date().toISOString().split('T')[0]);
+          return;
         }
+        setDate(fallbackDate);
       } catch (err) {
         console.error('Init fetch failed:', err);
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(fallbackDate);
       } finally {
         setIsInitLoading(false);
       }

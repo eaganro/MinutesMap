@@ -3,6 +3,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { useScheduleState } from './useScheduleState';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -87,5 +88,39 @@ describe('useScheduleState', () => {
     });
 
     expect(result.current.date).toBe('2026-02-05');
+  });
+
+  it('falls back to today when init payload date is invalid', async () => {
+    const setGameId = vi.fn();
+    const fetchScheduleWithReason = vi.fn();
+    const today = new Date().toISOString().split('T')[0];
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        date: '02/11/2026',
+        autoSelectGameId: '',
+      }),
+    });
+
+    const { result } = renderHook(() =>
+      useScheduleState({
+        initialDate: null,
+        initialGameId: null,
+        gameId: null,
+        setGameId,
+        schedule: [],
+        isScheduleLoading: false,
+        fetchScheduleWithReason,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.date).toBe(today);
+      expect(result.current.isInitLoading).toBe(false);
+    });
+
+    expect(setGameId).not.toHaveBeenCalled();
+    expect(fetchScheduleWithReason).toHaveBeenCalledWith(today, 'date-change');
   });
 });

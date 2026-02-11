@@ -44,7 +44,7 @@ describe('useGameData', () => {
       expect(result.current.homeTeamId).toBeNull();
       expect(result.current.nbaGameId).toBeNull();
       expect(result.current.lastAction).toBeNull();
-      expect(result.current.numQs).toBe(4);
+      expect(result.current.numPeriods).toBe(4);
       expect(result.current.isBoxLoading).toBe(false);
       expect(result.current.isPlayLoading).toBe(false);
     },
@@ -197,7 +197,7 @@ describe('useGameData', () => {
     });
 
     expect(result.current.nbaGameId).toBe('22500001');
-    expect(result.current.numQs).toBe(5);
+    expect(result.current.numPeriods).toBe(5);
     expect(result.current.lastAction).toEqual({
       period: 5,
       clock: 'PT01M02.00S',
@@ -216,7 +216,7 @@ describe('useGameData', () => {
     });
 
     expect(result.current.nbaGameId).toBe('0022500002');
-    expect(result.current.numQs).toBe(3);
+    expect(result.current.numPeriods).toBe(3);
     expect(result.current.lastAction).toEqual({
       period: 3,
       clock: 'PT00M20.00S',
@@ -245,7 +245,7 @@ describe('useGameData', () => {
     );
     expect(result.current.awayTeamId).toBe(10);
     expect(result.current.homeTeamId).toBe(20);
-    expect(result.current.numQs).toBe(4);
+    expect(result.current.numPeriods).toBe(4);
     expect(result.current.lastAction).toEqual({
       period: 2,
       clock: 'PT07M00.00S',

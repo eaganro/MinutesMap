@@ -1,10 +1,10 @@
 .schedule {
   background-color: var(--bg-card);
-  width: 1235px;
-  max-width: 90%;
-  padding: 10px;
-  border-radius: 20px;
-  margin-bottom: 20px;
+  width: var(--layout-content-width);
+  max-width: var(--layout-content-max-width);
+  padding: var(--layout-card-padding);
+  border-radius: var(--layout-card-radius);
+  margin-bottom: var(--layout-card-gap);
   box-sizing: border-box;
   transition: background-color 0.3s ease;
 

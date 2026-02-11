@@ -1,21 +1,23 @@
+@use '../../styles/layoutTokens' as layout;
+
 .siteFooter {
   width: 100%;
   background-color: var(--bg-footer);
   border-top: 1px solid var(--divider);
-  margin-top: 40px;
-  padding: 40px 20px 32px;
+  margin-top: var(--layout-footer-gap);
+  padding: var(--layout-footer-padding);
   transition:
     background-color 0.3s ease,
     border-color 0.3s ease;
 }
 
 .footerContent {
-  width: 1235px;
-  max-width: 90%;
+  width: var(--layout-content-width);
+  max-width: var(--layout-content-max-width);
   margin: 0 auto;
   display: flex;
   flex-wrap: nowrap;
-  gap: 40px;
+  gap: var(--layout-footer-gap);
   justify-content: space-between;
   align-items: center;
 }
@@ -89,9 +91,9 @@
 }
 
 // Responsive: stack on smaller screens
-@media (max-width: 605px) {
+@media (max-width: layout.$breakpoint-compact) {
   .siteFooter {
-    padding: 32px 16px 24px;
+    padding: var(--layout-footer-padding-compact);
   }
 
   .footerContent {

@@ -1,3 +1,5 @@
+@use './styles/layoutTokens' as layout;
+
 // Theme CSS Custom Properties
 // Light mode (default)
 :root,
@@ -87,6 +89,17 @@
 
   // MUI overrides
   --circular-progress-color: #6c6d6f;
+
+  // Shared layout tokens
+  --layout-content-width: #{layout.$content-width};
+  --layout-content-max-width: #{layout.$content-max-width};
+  --layout-card-padding: #{layout.$card-padding};
+  --layout-card-radius: #{layout.$card-radius};
+  --layout-card-gap: #{layout.$card-gap};
+  --layout-header-height: #{layout.$header-height};
+  --layout-footer-gap: #{layout.$footer-gap};
+  --layout-footer-padding: #{layout.$footer-padding};
+  --layout-footer-padding-compact: #{layout.$footer-padding-compact};
 }
 
 // Dark mode
