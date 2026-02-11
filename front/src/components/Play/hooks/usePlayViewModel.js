@@ -17,20 +17,8 @@ import {
 export function usePlayViewModel({
   gameId,
   gameStatus,
-  gameDate,
-  awayTeamNames,
-  homeTeamNames,
-  awayPlayers,
-  awayPlayersAll,
-  homePlayers,
-  homePlayersAll,
-  allActions,
-  scoreTimeline,
-  awayPlayerTimeline,
-  homePlayerTimeline,
-  numQs,
+  playData,
   sectionWidth,
-  lastAction,
   isLoading,
   statusMessage,
 }) {
@@ -40,9 +28,9 @@ export function usePlayViewModel({
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
   const {
-    displayData,
+    stablePlayData,
     isShowingStableData,
-    hasDisplayData,
+    hasStablePlayData,
     displayStatusMessage,
     showStatusMessage,
     isDataLoading,
@@ -50,36 +38,22 @@ export function usePlayViewModel({
     isLoading,
     isBlurred,
     statusMessage,
-    awayTeamNames,
-    homeTeamNames,
-    awayPlayers,
-    awayPlayersAll,
-    homePlayers,
-    homePlayersAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numQs,
-    lastAction,
-    gameDate,
+    playData,
   });
 
-  const {
-    awayTeamNames: displayAwayTeamNames,
-    homeTeamNames: displayHomeTeamNames,
-    awayPlayers: displayAwayPlayers,
-    awayPlayersAll: displayAwayPlayersAll,
-    homePlayers: displayHomePlayers,
-    homePlayersAll: displayHomePlayersAll,
-    allActions: displayAllActions,
-    scoreTimeline: displayScoreTimeline,
-    awayPlayerTimeline: displayAwayPlayerTimeline,
-    homePlayerTimeline: displayHomePlayerTimeline,
-    numQs: displayNumQs,
-    lastAction: displayLastAction,
-    gameDate: displayGameDate,
-  } = displayData;
+  const displayAwayTeamNames = stablePlayData.awayTeamNames;
+  const displayHomeTeamNames = stablePlayData.homeTeamNames;
+  const displayAwayPlayers = stablePlayData.playerActions.away.filtered;
+  const displayAwayPlayersAll = stablePlayData.playerActions.away.all;
+  const displayHomePlayers = stablePlayData.playerActions.home.filtered;
+  const displayHomePlayersAll = stablePlayData.playerActions.home.all;
+  const displayScoreTimeline = stablePlayData.scoreTimeline;
+  const displayAwayPlayerTimeline = stablePlayData.awayPlayerTimeline;
+  const displayHomePlayerTimeline = stablePlayData.homePlayerTimeline;
+  const displayNumQs = stablePlayData.numQs;
+  const displayLastAction = stablePlayData.lastAction;
+  const displayGameDate = stablePlayData.gameDate;
+  const hasDisplayData = hasStablePlayData;
 
   useEffect(() => {
     if (isLoading && hasDisplayData) {
@@ -116,27 +90,20 @@ export function usePlayViewModel({
     isShowingStableData,
   });
 
-  const {
-    timelineWindow,
-    filteredAllActions,
-    filteredScoreTimeline,
-    filteredAwayPlayers,
-    filteredHomePlayers,
-    filteredAwayPlayerTimeline,
-    filteredHomePlayerTimeline,
-    filteredLastAction,
-    startScoreDiff,
-  } = usePeriodFilteredData({
+  const { periodData } = usePeriodFilteredData({
     activePeriod,
     numPeriods,
-    displayAllActions,
-    displayScoreTimeline,
-    displayAwayPlayers,
-    displayHomePlayers,
-    displayAwayPlayerTimeline,
-    displayHomePlayerTimeline,
-    displayLastAction,
+    stablePlayData,
   });
+  const timelineWindow = periodData.timelineWindow;
+  const filteredAllActions = periodData.allActions;
+  const filteredScoreTimeline = periodData.scoreTimeline;
+  const filteredAwayPlayers = periodData.awayPlayers;
+  const filteredHomePlayers = periodData.homePlayers;
+  const filteredAwayPlayerTimeline = periodData.awayPlayerTimeline;
+  const filteredHomePlayerTimeline = periodData.homePlayerTimeline;
+  const filteredLastAction = periodData.lastAction;
+  const startScoreDiff = periodData.startScoreDiff;
 
   const teamColors = getMatchupColors(
     displayAwayTeamNames.abr,
@@ -155,6 +122,8 @@ export function usePlayViewModel({
   const showLoadingIndicator = isLoading && !hasDisplayData && !showStatusMessage;
 
   return {
+    stablePlayData,
+    periodData,
     playRef,
     leftMargin,
     rightMargin,

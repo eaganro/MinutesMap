@@ -138,10 +138,10 @@ vi.mock('./useGameTimeline', () => ({
     homePlayerTimeline: { HomeA: [] },
     awayPlayerTimeline: { AwayA: [] },
     allActions: [{ actionNumber: 1 }],
-    awayActions: { AwayA: [] },
-    homeActions: { HomeA: [] },
-    awayActionsAll: { AwayA: [] },
-    homeActionsAll: { HomeA: [] },
+    playerActions: {
+      away: { filtered: { AwayA: [] }, all: { AwayA: [] } },
+      home: { filtered: { HomeA: [] }, all: { HomeA: [] } },
+    },
   }),
 }));
 
@@ -187,16 +187,26 @@ describe('useMinutesMap', () => {
       expect.objectContaining({
         gameId: '2026-02-03-phi-gsw',
         nbaGameId: '0022500001',
-        awayActions: { AwayA: [] },
-        homeActions: { HomeA: [] },
-        scoreTimeline: [
-          { scoreAway: 0, scoreHome: 0 },
-          { scoreAway: 12, scoreHome: 14 },
-        ],
+        playData: {
+          awayTeamNames: { name: 'Philadelphia 76ers', abr: 'PHI' },
+          homeTeamNames: { name: 'Golden State Warriors', abr: 'GSW' },
+          playerActions: {
+            away: { filtered: { AwayA: [] }, all: { AwayA: [] } },
+            home: { filtered: { HomeA: [] }, all: { HomeA: [] } },
+          },
+          allActions: [{ actionNumber: 1 }],
+          scoreTimeline: [
+            { scoreAway: 0, scoreHome: 0 },
+            { scoreAway: 12, scoreHome: 14 },
+          ],
+          awayPlayerTimeline: { AwayA: [] },
+          homePlayerTimeline: { HomeA: [] },
+          numQs: 4,
+          lastAction: { period: 2, clock: 'PT09M00.00S' },
+          gameDate: '2026-02-03T20:00:00',
+        },
         playByPlaySectionRef: mocks.playRef,
         playByPlaySectionWidth: 640,
-        numPeriods: 4,
-        numQs: 4,
         statusMessage: null,
         showScoreDiff: true,
         statOn: [true, false, true, true, false, false, false, false],

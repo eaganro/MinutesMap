@@ -19,10 +19,10 @@ describe('useGameTimeline', () => {
       homePlayerTimeline: {},
       awayPlayerTimeline: {},
       allActions: [],
-      awayActions: {},
-      homeActions: {},
-      awayActionsAll: {},
-      homeActionsAll: {},
+      playerActions: {
+        away: { filtered: {}, all: {} },
+        home: { filtered: {}, all: {} },
+      },
     });
   });
 
@@ -33,10 +33,10 @@ describe('useGameTimeline', () => {
     expect(result.current.awayPlayerTimeline).toEqual(expectedLegacyNormalized.awayPlayerTimeline);
     expect(result.current.homePlayerTimeline).toEqual(expectedLegacyNormalized.homePlayerTimeline);
     expect(result.current.allActions).toEqual(expectedLegacyNormalized.allActions);
-    expect(result.current.awayActionsAll).toEqual(expectedLegacyNormalized.awayActionsAll);
-    expect(result.current.homeActionsAll).toEqual(expectedLegacyNormalized.homeActionsAll);
+    expect(result.current.playerActions.away.all).toEqual(expectedLegacyNormalized.awayActionsAll);
+    expect(result.current.playerActions.home.all).toEqual(expectedLegacyNormalized.homeActionsAll);
 
-    expect(result.current.awayActions).toEqual({
+    expect(result.current.playerActions.away.filtered).toEqual({
       'Away One': [
         {
           period: 1,
@@ -59,7 +59,7 @@ describe('useGameTimeline', () => {
       'Away Two': [],
     });
 
-    expect(result.current.homeActions).toEqual({
+    expect(result.current.playerActions.home.filtered).toEqual({
       'Home One': [],
       'Home Two': [],
     });
@@ -72,10 +72,10 @@ describe('useGameTimeline', () => {
     expect(result.current.awayPlayerTimeline).toEqual(expectedCompactNormalized.awayPlayerTimeline);
     expect(result.current.homePlayerTimeline).toEqual(expectedCompactNormalized.homePlayerTimeline);
     expect(result.current.allActions).toEqual(expectedCompactNormalized.allActions);
-    expect(result.current.awayActionsAll).toEqual(expectedCompactNormalized.awayActionsAll);
-    expect(result.current.homeActionsAll).toEqual(expectedCompactNormalized.homeActionsAll);
+    expect(result.current.playerActions.away.all).toEqual(expectedCompactNormalized.awayActionsAll);
+    expect(result.current.playerActions.home.all).toEqual(expectedCompactNormalized.homeActionsAll);
 
-    expect(result.current.awayActions).toEqual({
+    expect(result.current.playerActions.away.filtered).toEqual({
       'Away Guard': [
         {
           period: 1,
@@ -92,7 +92,7 @@ describe('useGameTimeline', () => {
       ],
     });
 
-    expect(result.current.homeActions).toEqual({
+    expect(result.current.playerActions.home.filtered).toEqual({
       'Home Wing': [
         {
           period: 1,

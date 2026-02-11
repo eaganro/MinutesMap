@@ -39,7 +39,6 @@ const buildProps = () => ({
   playRef: { current: document.createElement('div') },
   gameId: '2026-02-03-phi-gsw',
   gameStatus: 'Q1 10:00',
-  gameDate: '2026-02-03',
   box: {
     teams: {
       away: {
@@ -48,43 +47,63 @@ const buildProps = () => ({
       home: { players: [] },
     },
   },
-  hasDisplayData: true,
-  isDataLoading: false,
-  isFinal: false,
-  numPeriods: 4,
-  timelineWindow: { startSeconds: 0, durationSeconds: 2880 },
-  leftMargin: 96,
-  rightMargin: 10,
-  showScoreDiff: true,
-  statOn: 0,
-  teamColors: { away: '#f00', home: '#00f' },
-  awayColor: '#f00',
-  homeColor: '#00f',
-  displayAwayTeamNames: { abr: 'PHI', name: '76ers' },
-  displayHomeTeamNames: { abr: 'GSW', name: 'Warriors' },
-  displayAwayPlayers: {
-    'J. Brown': [
-      {
-        period: 1,
-        clock: 'PT10M00.00S',
-        actionType: '2pt',
-        description: 'Jump Shot',
-        result: 'made',
+  exportData: {
+    stablePlayData: {
+      gameDate: '2026-02-03',
+      awayTeamNames: { abr: 'PHI', name: '76ers' },
+      homeTeamNames: { abr: 'GSW', name: 'Warriors' },
+      playerActions: {
+        away: {
+          filtered: {
+            'J. Brown': [
+              {
+                period: 1,
+                clock: 'PT10M00.00S',
+                actionType: '2pt',
+                description: 'Jump Shot',
+                result: 'made',
+              },
+            ],
+          },
+          all: {
+            'J. Brown': [
+              {
+                period: 1,
+                clock: 'PT10M00.00S',
+                actionType: '2pt',
+                description: 'Jump Shot',
+                result: 'made',
+              },
+            ],
+          },
+        },
+        home: { filtered: {}, all: {} },
       },
-    ],
+      awayPlayerTimeline: {
+        'J. Brown': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
+      },
+      homePlayerTimeline: {},
+      scoreTimeline: [
+        { period: 1, clock: 'PT12M00.00S', away: 0, home: 0 },
+        { period: 1, clock: 'PT10M00.00S', away: 2, home: 0 },
+      ],
+      lastAction: { period: 1, clock: 'PT10M00.00S' },
+    },
+    periodData: {
+      timelineWindow: { startSeconds: 0, durationSeconds: 2880 },
+    },
+    hasDisplayData: true,
+    isDataLoading: false,
+    isFinal: false,
+    numPeriods: 4,
+    leftMargin: 96,
+    rightMargin: 10,
+    showScoreDiff: true,
+    statOn: [true, false, true, true, false, false, false, false],
+    teamColors: { away: '#f00', home: '#00f' },
+    awayColor: '#f00',
+    homeColor: '#00f',
   },
-  displayAwayPlayersAll: null,
-  displayHomePlayers: {},
-  displayHomePlayersAll: null,
-  displayAwayPlayerTimeline: {
-    'J. Brown': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
-  },
-  displayHomePlayerTimeline: {},
-  displayScoreTimeline: [
-    { period: 1, clock: 'PT12M00.00S', away: 0, home: 0 },
-    { period: 1, clock: 'PT10M00.00S', away: 2, home: 0 },
-  ],
-  displayLastAction: { period: 1, clock: 'PT10M00.00S' },
   onExportInteractionStart: vi.fn(),
 });
 

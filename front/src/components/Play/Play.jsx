@@ -14,21 +14,9 @@ export default function Play({
   gameId,
   nbaGameId,
   gameStatus,
-  gameDate,
   box,
-  awayTeamNames,
-  homeTeamNames,
-  awayPlayers,
-  awayPlayersAll,
-  homePlayers,
-  homePlayersAll,
-  allActions,
-  scoreTimeline,
-  awayPlayerTimeline,
-  homePlayerTimeline,
-  numQs,
+  playData,
   sectionWidth,
-  lastAction,
   isLoading,
   statusMessage,
   showScoreDiff = true,
@@ -57,16 +45,7 @@ export default function Play({
     hasDisplayData,
     displayAwayTeamNames,
     displayHomeTeamNames,
-    displayAwayPlayers,
-    displayAwayPlayersAll,
-    displayHomePlayers,
-    displayHomePlayersAll,
-    displayScoreTimeline,
-    displayAwayPlayerTimeline,
-    displayHomePlayerTimeline,
     displayNumQs,
-    displayLastAction,
-    displayGameDate,
     filteredAllActions,
     filteredScoreTimeline,
     filteredAwayPlayers,
@@ -81,23 +60,13 @@ export default function Play({
     homeColor,
     maxLead,
     maxY,
+    stablePlayData,
+    periodData,
   } = usePlayViewModel({
     gameId,
     gameStatus,
-    gameDate,
-    awayTeamNames,
-    homeTeamNames,
-    awayPlayers,
-    awayPlayersAll,
-    homePlayers,
-    homePlayersAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numQs,
+    playData,
     sectionWidth,
-    lastAction,
     isLoading,
     statusMessage,
   });
@@ -208,30 +177,22 @@ export default function Play({
         playRef={playRef}
         gameId={gameId}
         gameStatus={gameStatus}
-        gameDate={displayGameDate}
         box={box}
-        hasDisplayData={hasDisplayData}
-        isDataLoading={isDataLoading}
-        isFinal={isFinal}
-        numPeriods={numPeriods}
-        timelineWindow={timelineWindow}
-        leftMargin={leftMargin}
-        rightMargin={rightMargin}
-        showScoreDiff={showScoreDiff}
-        statOn={statOn}
-        teamColors={teamColors}
-        awayColor={awayColor}
-        homeColor={homeColor}
-        displayAwayTeamNames={displayAwayTeamNames}
-        displayHomeTeamNames={displayHomeTeamNames}
-        displayAwayPlayers={displayAwayPlayers}
-        displayAwayPlayersAll={displayAwayPlayersAll}
-        displayHomePlayers={displayHomePlayers}
-        displayHomePlayersAll={displayHomePlayersAll}
-        displayAwayPlayerTimeline={displayAwayPlayerTimeline}
-        displayHomePlayerTimeline={displayHomePlayerTimeline}
-        displayScoreTimeline={displayScoreTimeline}
-        displayLastAction={displayLastAction}
+        exportData={{
+          stablePlayData,
+          periodData,
+          hasDisplayData,
+          isDataLoading,
+          isFinal,
+          numPeriods,
+          leftMargin,
+          rightMargin,
+          showScoreDiff,
+          statOn,
+          teamColors,
+          awayColor,
+          homeColor,
+        }}
         onExportInteractionStart={() => {
           setInfoLocked(false);
           clearHoverIcon();

@@ -13,16 +13,24 @@ import { normalizePlayByPlay } from '../../../domain/game-data/normalizePlayByPl
 export function useGameTimeline(playByPlay, statOn) {
   return useMemo(() => {
     const normalized = normalizePlayByPlay(playByPlay);
+    const awayFilteredActions = filterPlayerActions(normalized.awayActionsAll, statOn);
+    const homeFilteredActions = filterPlayerActions(normalized.homeActionsAll, statOn);
 
     return {
       scoreTimeline: normalized.scoreTimeline,
       homePlayerTimeline: normalized.homePlayerTimeline,
       awayPlayerTimeline: normalized.awayPlayerTimeline,
       allActions: normalized.allActions,
-      awayActions: filterPlayerActions(normalized.awayActionsAll, statOn),
-      homeActions: filterPlayerActions(normalized.homeActionsAll, statOn),
-      awayActionsAll: normalized.awayActionsAll,
-      homeActionsAll: normalized.homeActionsAll,
+      playerActions: {
+        away: {
+          filtered: awayFilteredActions,
+          all: normalized.awayActionsAll,
+        },
+        home: {
+          filtered: homeFilteredActions,
+          all: normalized.homeActionsAll,
+        },
+      },
     };
   }, [playByPlay, statOn]);
 }

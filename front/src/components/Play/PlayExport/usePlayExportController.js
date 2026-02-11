@@ -31,32 +31,40 @@ export const usePlayExportController = ({
   playRef,
   gameId,
   gameStatus,
-  gameDate,
   box,
-  hasDisplayData,
-  isDataLoading,
-  isFinal,
-  numPeriods,
-  timelineWindow,
-  leftMargin,
-  rightMargin,
-  showScoreDiff,
-  statOn,
-  teamColors,
-  awayColor,
-  homeColor,
-  displayAwayTeamNames,
-  displayHomeTeamNames,
-  displayAwayPlayers,
-  displayAwayPlayersAll,
-  displayHomePlayers,
-  displayHomePlayersAll,
-  displayAwayPlayerTimeline,
-  displayHomePlayerTimeline,
-  displayScoreTimeline,
-  displayLastAction,
+  exportData,
   onExportInteractionStart,
 }) => {
+  const {
+    stablePlayData,
+    periodData,
+    hasDisplayData,
+    isDataLoading,
+    isFinal,
+    numPeriods,
+    leftMargin,
+    rightMargin,
+    showScoreDiff,
+    statOn,
+    teamColors,
+    awayColor,
+    homeColor,
+  } = exportData;
+  const awayPlayerActions = stablePlayData.playerActions.away;
+  const homePlayerActions = stablePlayData.playerActions.home;
+  const gameDate = stablePlayData.gameDate;
+  const displayAwayTeamNames = stablePlayData.awayTeamNames;
+  const displayHomeTeamNames = stablePlayData.homeTeamNames;
+  const displayAwayPlayers = awayPlayerActions.filtered;
+  const displayAwayPlayersAll = awayPlayerActions.all;
+  const displayHomePlayers = homePlayerActions.filtered;
+  const displayHomePlayersAll = homePlayerActions.all;
+  const displayAwayPlayerTimeline = stablePlayData.awayPlayerTimeline;
+  const displayHomePlayerTimeline = stablePlayData.homePlayerTimeline;
+  const displayScoreTimeline = stablePlayData.scoreTimeline;
+  const displayLastAction = stablePlayData.lastAction;
+  const timelineWindow = periodData.timelineWindow;
+
   const [isExporting, setIsExporting] = useState(false);
   const [exportPreview, setExportPreview] = useState(null);
   const [exportError, setExportError] = useState(null);

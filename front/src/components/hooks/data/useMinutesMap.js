@@ -109,16 +109,8 @@ export function useMinutesMap() {
   }, [date, gameId, updateQueryParams]);
 
   // === PROCESSED TIMELINES ===
-  const {
-    scoreTimeline,
-    homePlayerTimeline,
-    awayPlayerTimeline,
-    allActions,
-    awayActions,
-    homeActions,
-    awayActionsAll,
-    homeActionsAll,
-  } = useGameTimeline(playByPlay, statOn);
+  const { scoreTimeline, homePlayerTimeline, awayPlayerTimeline, allActions, playerActions } =
+    useGameTimeline(playByPlay, statOn);
 
   const lineupStats = useLineupStats({
     awayPlayerTimeline,
@@ -226,21 +218,19 @@ export function useMinutesMap() {
     gameId,
     nbaGameId,
     gameStatus: currentScheduleGameStatus,
-    gameDate: scoreGameDate,
     box,
-    awayTeamName,
-    homeTeamName,
-    awayActions,
-    awayActionsAll,
-    homeActions,
-    homeActionsAll,
-    allActions,
-    scoreTimeline,
-    awayPlayerTimeline,
-    homePlayerTimeline,
-    numPeriods,
-    numQs: numPeriods,
-    lastAction,
+    playData: {
+      awayTeamNames: awayTeamName,
+      homeTeamNames: homeTeamName,
+      playerActions,
+      allActions,
+      scoreTimeline,
+      awayPlayerTimeline,
+      homePlayerTimeline,
+      numQs: numPeriods,
+      lastAction,
+      gameDate: scoreGameDate,
+    },
     playByPlaySectionRef,
     playByPlaySectionWidth,
     isLoading: isPlayVisible,
