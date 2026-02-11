@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { getNbaTodayString } from '../../domain/game-selection/time';
+import { getNbaTodayString } from '../../../domain/game-selection/time';
 import { useResumeRefresh } from './useResumeRefresh';
 
 afterEach(() => {

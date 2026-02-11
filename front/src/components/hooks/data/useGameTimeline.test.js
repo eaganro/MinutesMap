@@ -6,7 +6,7 @@ import {
   expectedCompactNormalized,
   expectedLegacyNormalized,
   legacyPlayByPlayPayload,
-} from '../../domain/game-data/__fixtures__/playByPlayFixtures';
+} from '../../../domain/game-data/__fixtures__/playByPlayFixtures';
 
 const STAT_ON = [true, false, true, true, false, false, false, false];
 

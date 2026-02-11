@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '../../hooks/useTheme';
+import { useTheme } from '../../hooks/ui/useTheme';
 import { getMatchupColors, getSafeBackground } from '../../../helpers/teamColors';
-import { useMinimumLoadingState } from '../../hooks/useMinimumLoadingState';
-import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../../hooks/loadingUiTimings';
+import { useMinimumLoadingState } from '../../hooks/ui/useMinimumLoadingState';
+import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../../constants/loadingUiTimings';
 import { useStablePlayData } from './useStablePlayData';
 import { useActivePeriodSelection } from './useActivePeriodSelection';
 import { usePeriodFilteredData } from './usePeriodFilteredData';

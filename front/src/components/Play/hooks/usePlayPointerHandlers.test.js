@@ -13,7 +13,7 @@ vi.mock('../../../helpers/nbaEvents', () => ({
   resolveVideoAction: mocks.resolveVideoActionMock,
 }));
 
-vi.mock('../../hooks/useTrackFeatureUseOnce', () => ({
+vi.mock('../../hooks/analytics/useTrackFeatureUseOnce', () => ({
   useTrackFeatureUseOnce: () => mocks.trackFeatureUseOnceMock,
 }));
 

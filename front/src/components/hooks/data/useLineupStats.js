@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { timeToSeconds } from '../../helpers/utils';
+import { timeToSeconds } from '../../../helpers/utils';
 
 const REGULATION_PERIOD_SECONDS = 12 * 60;
 const OVERTIME_PERIOD_SECONDS = 5 * 60;

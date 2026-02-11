@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { shiftDateString } from '../../domain/game-selection/time';
+import { shiftDateString } from '../../../domain/game-selection/time';
 
 const DATE_INPUT_PREFIX_PATTERN = /^(\d{4}-\d{2}-\d{2})/;
 

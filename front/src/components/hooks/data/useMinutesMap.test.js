@@ -17,14 +17,14 @@ const mocks = vi.hoisted(() => ({
   playRef: { current: null },
 }));
 
-vi.mock('./useQueryParams', () => ({
+vi.mock('../schedule/useQueryParams', () => ({
   useQueryParams: () => ({
     getInitialParams: () => ({ date: '2026-02-03', gameId: '2026-02-03-phi-gsw' }),
     updateQueryParams: mocks.updateQueryParamsMock,
   }),
 }));
 
-vi.mock('./useLocalStorageState', () => ({
+vi.mock('../state/useLocalStorageState', () => ({
   useLocalStorageState: (key, defaultValue) => {
     if (key === 'statOn') {
       return [defaultValue, mocks.setStatOnMock];
@@ -68,7 +68,7 @@ vi.mock('./useGameData', () => ({
   }),
 }));
 
-vi.mock('./useSelectedGameState', () => ({
+vi.mock('../schedule/useSelectedGameState', () => ({
   useSelectedGameState: () => ({
     gameId: '2026-02-03-phi-gsw',
     setGameId: vi.fn(),
@@ -93,7 +93,7 @@ vi.mock('./useSelectedGameState', () => ({
   }),
 }));
 
-vi.mock('./useScheduleState', () => ({
+vi.mock('../schedule/useScheduleState', () => ({
   useScheduleState: () => ({
     date: '2026-02-03',
     isInitLoading: false,
@@ -115,17 +115,17 @@ vi.mock('./useGamePackSync', () => ({
   }),
 }));
 
-vi.mock('./useLiveUpdates', () => ({
+vi.mock('../realtime/useLiveUpdates', () => ({
   useLiveUpdates: () => ({
     ws: { readyState: 1 },
   }),
 }));
 
-vi.mock('./useResumeRefresh', () => ({
+vi.mock('../realtime/useResumeRefresh', () => ({
   useResumeRefresh: mocks.useResumeRefreshMock,
 }));
 
-vi.mock('./useAnalyticsSignals', () => ({
+vi.mock('../analytics/useAnalyticsSignals', () => ({
   useAnalyticsSignals: mocks.useAnalyticsSignalsMock,
 }));
 
@@ -145,7 +145,7 @@ vi.mock('./useGameTimeline', () => ({
   }),
 }));
 
-vi.mock('./useElementWidth', () => ({
+vi.mock('../ui/useElementWidth', () => ({
   useElementWidth: () => [mocks.playRef, 640],
 }));
 

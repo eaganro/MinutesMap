@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
-import { PREFIX } from '../../environment';
-import { GAME_NOT_STARTED_MESSAGE } from '../../domain/game-selection/status';
-import { classifyFetchResult, fetchJson } from '../../data/apiClient';
-import { adaptGamePackPayload, DEFAULT_GAMEPACK_STATE } from '../../data/gamepackAdapter';
-import { normalizeSchedulePayload } from '../../data/scheduleAdapter';
+import { PREFIX } from '../../../environment';
+import { GAME_NOT_STARTED_MESSAGE } from '../../../domain/game-selection/status';
+import { classifyFetchResult, fetchJson } from '../../../data/apiClient';
+import { adaptGamePackPayload, DEFAULT_GAMEPACK_STATE } from '../../../data/gamepackAdapter';
+import { normalizeSchedulePayload } from '../../../data/scheduleAdapter';
 
 /**
  * Hook for fetching and managing game data (box score, play-by-play, and schedule)

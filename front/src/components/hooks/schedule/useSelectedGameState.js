@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { parseGameStatus } from '../../domain/game-selection/status';
+import { parseGameStatus } from '../../../domain/game-selection/status';
 
 export function useSelectedGameState({ initialGameId, schedule, resetLoadingStates }) {
   const [gameId, setGameId] = useState(initialGameId || null);

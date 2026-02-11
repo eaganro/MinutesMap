@@ -3,10 +3,10 @@ import {
   parseGameSlug,
   scheduleMatchesDate,
   sortGamesForSelection,
-} from '../../domain/game-selection/status';
-import { PREFIX } from '../../environment';
-import { classifyFetchResult, fetchJson } from '../../data/apiClient';
-import { normalizeInitPayload } from '../../data/scheduleAdapter';
+} from '../../../domain/game-selection/status';
+import { PREFIX } from '../../../environment';
+import { classifyFetchResult, fetchJson } from '../../../data/apiClient';
+import { normalizeInitPayload } from '../../../data/scheduleAdapter';
 
 export function useScheduleState({
   initialDate,

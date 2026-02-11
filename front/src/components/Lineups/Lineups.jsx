@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
-import { useTrackFeatureUseOnce } from '../hooks/useTrackFeatureUseOnce';
+import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
 import LineupsTeamPanel from './LineupsTeamPanel';
 import {
   buildLastNameCounts,

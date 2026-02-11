@@ -2,12 +2,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import './Boxscore.scss';
 import processTeamStats from './processTeamStats';
 import { useState, useEffect, useRef } from 'react';
-import { useMinimumLoadingState } from '../hooks/useMinimumLoadingState';
-import { useTheme } from '../hooks/useTheme';
+import { useMinimumLoadingState } from '../hooks/ui/useMinimumLoadingState';
+import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
-import { useStableWhileLoading } from '../hooks/useStableWhileLoading';
-import { useTrackFeatureUseOnce } from '../hooks/useTrackFeatureUseOnce';
-import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../hooks/loadingUiTimings';
+import { useStableWhileLoading } from '../hooks/ui/useStableWhileLoading';
+import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
+import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../constants/loadingUiTimings';
 
 export default function Boxscore({ box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);

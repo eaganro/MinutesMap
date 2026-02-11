@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useStableWhileLoading } from '../../hooks/useStableWhileLoading';
+import { useStableWhileLoading } from '../../hooks/ui/useStableWhileLoading';
 
 const hasPlayData = (data) =>
   Boolean(

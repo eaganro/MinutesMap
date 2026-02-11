@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useQueryParams } from './useQueryParams';
-import { useLocalStorageState } from './useLocalStorageState';
+import { useQueryParams } from '../schedule/useQueryParams';
+import { useLocalStorageState } from '../state/useLocalStorageState';
 import { useGameData } from './useGameData';
 import { useGameTimeline } from './useGameTimeline';
-import { useElementWidth } from './useElementWidth';
+import { useElementWidth } from '../ui/useElementWidth';
 import { useLineupStats } from './useLineupStats';
-import { useScheduleState } from './useScheduleState';
-import { useSelectedGameState } from './useSelectedGameState';
+import { useScheduleState } from '../schedule/useScheduleState';
+import { useSelectedGameState } from '../schedule/useSelectedGameState';
 import { useGamePackSync } from './useGamePackSync';
-import { useLiveUpdates } from './useLiveUpdates';
-import { useResumeRefresh } from './useResumeRefresh';
-import { useAnalyticsSignals } from './useAnalyticsSignals';
+import { useLiveUpdates } from '../realtime/useLiveUpdates';
+import { useResumeRefresh } from '../realtime/useResumeRefresh';
+import { useAnalyticsSignals } from '../analytics/useAnalyticsSignals';
 
 const DEFAULT_STAT_ON = [true, false, true, true, false, false, false, false];
 const LOADING_DELAY_MS = 500;

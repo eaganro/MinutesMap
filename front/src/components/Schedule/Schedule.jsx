@@ -5,9 +5,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { ASSET_PREFIX } from '../../environment';
 import { parseGameStatus } from '../../domain/game-selection/status';
 import { formatStatusText } from '../../helpers/utils';
-import { useDateInputState } from '../hooks/useDateInputState';
-import { useHorizontalDragScroll } from '../hooks/useHorizontalDragScroll';
-import { useTrackFeatureUseOnce } from '../hooks/useTrackFeatureUseOnce';
+import { useDateInputState } from '../hooks/schedule/useDateInputState';
+import { useHorizontalDragScroll } from '../hooks/ui/useHorizontalDragScroll';
+import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
 
 import './Schedule.scss';
 

@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { useGameData } from './useGameData';
-import { GAME_NOT_STARTED_MESSAGE } from '../../domain/game-selection/status';
+import { GAME_NOT_STARTED_MESSAGE } from '../../../domain/game-selection/status';
 
 function createDeferred() {
   let resolve;

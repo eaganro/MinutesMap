@@ -8,11 +8,11 @@ vi.mock('./processTeamStats', () => ({
   )),
 }));
 
-vi.mock('../hooks/useTheme', () => ({
+vi.mock('../hooks/ui/useTheme', () => ({
   useTheme: () => ({ isDarkMode: false }),
 }));
 
-vi.mock('../hooks/useTrackFeatureUseOnce', () => ({
+vi.mock('../hooks/analytics/useTrackFeatureUseOnce', () => ({
   useTrackFeatureUseOnce: () => vi.fn(),
 }));
 

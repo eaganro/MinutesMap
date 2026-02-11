@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { wsLocation } from '../../environment';
+import { wsLocation } from '../../../environment';
 
 /**
  * Hook for managing WebSocket connection to the game server

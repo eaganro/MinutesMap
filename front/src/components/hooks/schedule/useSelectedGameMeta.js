@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { parseStartTimeEt } from '../../domain/game-selection/time';
+import { parseStartTimeEt } from '../../../domain/game-selection/time';
 
 export function useSelectedGameMeta({ gameId, date, schedule }) {
   const [selectedGameDate, setSelectedGameDate] = useState(null);

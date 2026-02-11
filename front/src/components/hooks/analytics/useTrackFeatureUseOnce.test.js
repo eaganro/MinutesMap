@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   trackFeatureUseMock: vi.fn(),
 }));
 
-vi.mock('../../helpers/analytics', () => ({
+vi.mock('../../../helpers/analytics', () => ({
   trackFeatureUse: mocks.trackFeatureUseMock,
 }));
 

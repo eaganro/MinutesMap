@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { trackFeatureUse } from '../../helpers/analytics';
+import { trackFeatureUse } from '../../../helpers/analytics';
 
 /**
  * Returns a callback that tracks a feature only on first invocation.

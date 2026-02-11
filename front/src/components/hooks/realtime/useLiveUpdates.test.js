@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   useWebSocketMock: vi.fn(),
 }));
 
-vi.mock('./useSelectedGameMeta', () => ({
+vi.mock('../schedule/useSelectedGameMeta', () => ({
   useSelectedGameMeta: mocks.useSelectedGameMetaMock,
 }));
 

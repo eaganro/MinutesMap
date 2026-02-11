@@ -1,6 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { getNbaTodayString, shiftDateString } from '../../domain/game-selection/time';
+import { getNbaTodayString, shiftDateString } from '../../../domain/game-selection/time';
 import { useLiveUpdates } from './useLiveUpdates';
 
 const mocks = vi.hoisted(() => ({

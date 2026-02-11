@@ -1,4 +1,4 @@
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../hooks/ui/useTheme';
 import './DarkModeToggle.scss';
 
 export default function DarkModeToggle() {

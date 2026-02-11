@@ -13,15 +13,15 @@ const mocks = vi.hoisted(() => ({
   resetScrollPositionMock: vi.fn(),
 }));
 
-vi.mock('../hooks/useDateInputState', () => ({
+vi.mock('../hooks/schedule/useDateInputState', () => ({
   useDateInputState: mocks.useDateInputStateMock,
 }));
 
-vi.mock('../hooks/useHorizontalDragScroll', () => ({
+vi.mock('../hooks/ui/useHorizontalDragScroll', () => ({
   useHorizontalDragScroll: mocks.useHorizontalDragScrollMock,
 }));
 
-vi.mock('../hooks/useTrackFeatureUseOnce', () => ({
+vi.mock('../hooks/analytics/useTrackFeatureUseOnce', () => ({
   useTrackFeatureUseOnce: () => mocks.trackDateFeatureUseMock,
 }));
 

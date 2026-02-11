@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildNbaEventUrl, resolveVideoAction } from '../../../helpers/nbaEvents';
-import { useTrackFeatureUseOnce } from '../../hooks/useTrackFeatureUseOnce';
+import { useTrackFeatureUseOnce } from '../../hooks/analytics/useTrackFeatureUseOnce';
 import { findActionMetaFromTarget } from '../model/interactionModel';
 
 const TOUCH_AXIS_LOCK_PX = 8;

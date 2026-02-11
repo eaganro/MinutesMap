@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   nbaToday: '2026-02-03',
 }));
 
-vi.mock('../../domain/game-selection/time', async () => {
-  const actual = await vi.importActual('../../domain/game-selection/time');
+vi.mock('../../../domain/game-selection/time', async () => {
+  const actual = await vi.importActual('../../../domain/game-selection/time');
   return {
     ...actual,
     getNbaTodayString: () => mocks.nbaToday,

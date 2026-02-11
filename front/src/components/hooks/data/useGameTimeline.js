@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { filterPlayerActions } from '../../domain/game-data/filterActions';
-import { normalizePlayByPlay } from '../../domain/game-data/normalizePlayByPlay';
+import { filterPlayerActions } from '../../../domain/game-data/filterActions';
+import { normalizePlayByPlay } from '../../../domain/game-data/normalizePlayByPlay';
 
 /**
  * Hook for transforming raw play-by-play data into UI-ready timelines and actions.

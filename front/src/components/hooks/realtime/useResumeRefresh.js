@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { getNbaTodayString } from '../../domain/game-selection/time';
+import { getNbaTodayString } from '../../../domain/game-selection/time';
 
 const DEFAULT_RESUME_REFRESH_COOLDOWN_MS = 30000;
 const DEFAULT_RESUME_REFRESH_WS_COOLDOWN_MS = 60000;

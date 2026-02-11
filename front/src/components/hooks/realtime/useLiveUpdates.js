@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { PREFIX } from '../../environment';
-import { useSelectedGameMeta } from './useSelectedGameMeta';
+import { PREFIX } from '../../../environment';
+import { useSelectedGameMeta } from '../schedule/useSelectedGameMeta';
 import { useWebSocket } from './useWebSocket';
 import { useWebSocketGate } from './useWebSocketGate';
 
