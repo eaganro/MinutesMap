@@ -47,26 +47,23 @@ export function useGameData() {
     applyGameDataState(DEFAULT_GAMEPACK_STATE);
   }, [applyGameDataState]);
 
-  const transitionGameSuccess = useCallback(
-    (payload) => {
-      const adapted = adaptGamePackPayload(payload);
-      setGameStatusMessage(null);
-      setNbaGameId(adapted.nbaGameId);
+  const transitionGameSuccess = useCallback((payload) => {
+    const adapted = adaptGamePackPayload(payload);
+    setGameStatusMessage(null);
+    setNbaGameId(adapted.nbaGameId);
 
-      if (adapted.hasBoxData) {
-        setBox(adapted.boxData);
-        setAwayTeamId(adapted.awayTeamId);
-        setHomeTeamId(adapted.homeTeamId);
-      }
+    if (adapted.hasBoxData) {
+      setBox(adapted.boxData);
+      setAwayTeamId(adapted.awayTeamId);
+      setHomeTeamId(adapted.homeTeamId);
+    }
 
-      if (adapted.hasPlayData) {
-        setNumPeriods(adapted.numPeriods);
-        setLastAction(adapted.lastAction);
-        setPlayByPlay(adapted.playData);
-      }
-    },
-    [],
-  );
+    if (adapted.hasPlayData) {
+      setNumPeriods(adapted.numPeriods);
+      setLastAction(adapted.lastAction);
+      setPlayByPlay(adapted.playData);
+    }
+  }, []);
 
   const transitionGameError = useCallback((errorLike) => {
     console.error('Error in fetchGamePack:', errorLike);
@@ -100,7 +97,10 @@ export function useGameData() {
         return;
       }
 
-      console.error('Error in fetchSchedule:', result.error || `Schedule fetch failed: ${result.status}`);
+      console.error(
+        'Error in fetchSchedule:',
+        result.error || `Schedule fetch failed: ${result.status}`,
+      );
       setSchedule([]);
     } finally {
       setIsScheduleLoading(false);
@@ -132,7 +132,13 @@ export function useGameData() {
         completeGameLoading(showLoading);
       }
     },
-    [completeGameLoading, transitionGameError, transitionGameLoading, transitionGameNotStarted, transitionGameSuccess],
+    [
+      completeGameLoading,
+      transitionGameError,
+      transitionGameLoading,
+      transitionGameNotStarted,
+      transitionGameSuccess,
+    ],
   );
 
   const setGameNotStarted = useCallback(() => {

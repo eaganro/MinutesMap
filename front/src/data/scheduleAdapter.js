@@ -5,15 +5,17 @@ export const normalizeSchedulePayload = (payload) => {
     return [];
   }
 
-  return payload.filter((entry) => entry && typeof entry === 'object').map((entry) => {
-    if (entry.id === undefined || entry.id === null) {
-      return entry;
-    }
-    return {
-      ...entry,
-      id: String(entry.id),
-    };
-  });
+  return payload
+    .filter((entry) => entry && typeof entry === 'object')
+    .map((entry) => {
+      if (entry.id === undefined || entry.id === null) {
+        return entry;
+      }
+      return {
+        ...entry,
+        id: String(entry.id),
+      };
+    });
 };
 
 export const normalizeInitPayload = (payload, { fallbackDate }) => {
