@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { buildExportRangeData, buildRangeLabel } from './playExportRange';
 import { useExportRange } from './useExportRange';
 import {
-  buildExportDimensions,
   buildExportPlayerOptions,
   buildExportPreviewKey,
   buildExportRangeOptions,
-  buildPlayExportFileName,
-  buildShareMetadata,
   DEFAULT_EXPORT_VIEW,
   EXPORT_VIEW_OPTIONS,
   resolveFullNameFromRoster,
 } from './playExportModel';
+import { buildExportRequestSnapshot } from './model/exportRangeModel';
+import { buildExportRenderRequest } from './model/exportRequestModel';
+import { buildExportOutputMetadata, buildExportPreviewState } from './model/exportPreviewModel';
 import { renderExportCanvas } from './playExportRenderer';
 import {
   canvasToBlob,
@@ -19,7 +18,6 @@ import {
   createPngFile,
   dataUrlToBlob,
   detectShareSupport,
-  downloadBlob,
   revokeObjectUrl,
   shareFile,
   withTimeout,
@@ -177,100 +175,47 @@ export const usePlayExportController = ({
       );
       const exportTimeoutMs = isMobileViewport ? 30000 : EXPORT_TIMEOUT_MS;
 
-      const exportRangeSnapshot = resolvedExportRange;
-      exportPreviewKeyRef.current = buildExportPreviewKey({
-        exportRange: exportRangeSnapshot,
+      const snapshot = buildExportRequestSnapshot({
+        resolvedExportRange,
         exportView,
         exportPlayerKey,
+        isFinal,
       });
-      const exportIsFullGameRange = exportRangeSnapshot.isFullGame;
-      const exportRangeLabel = buildRangeLabel(exportRangeSnapshot);
-      const legendShouldWrap = exportView === 'player-stacked' ? true : !exportIsFullGameRange;
-      const endAtLastScore = !isFinal;
+      exportPreviewKeyRef.current = snapshot.exportPreviewKey;
 
       try {
         onExportInteractionStart?.();
 
-        const {
-          durationRatio,
-          exportAwayPlayers,
-          exportAwayPlayerTimeline,
-          exportEndAtSeconds,
-          exportHomePlayers,
-          exportHomePlayerTimeline,
-          exportScoreStats,
-          exportScoreTimeline,
-          exportStartScoreDiff,
-          exportStatusLabel,
-          exportTimelineWindow,
-        } = buildExportRangeData({
-          displayAwayPlayers,
-          displayAwayPlayerTimeline,
-          displayHomePlayers,
-          displayHomePlayerTimeline,
-          displayLastAction,
-          displayScoreTimeline,
-          exportRangeSnapshot,
-          gameStatus,
-          isFinal,
-          numPeriods,
-          timelineWindow,
-        });
-        const { exportAwayPlayers: exportAwayPlayersAll, exportHomePlayers: exportHomePlayersAll } =
-          buildExportRangeData({
-            displayAwayPlayers: displayAwayPlayersAll || displayAwayPlayers,
-            displayAwayPlayerTimeline,
-            displayHomePlayers: displayHomePlayersAll || displayHomePlayers,
-            displayHomePlayerTimeline,
-            displayLastAction,
-            displayScoreTimeline,
-            exportRangeSnapshot,
-            gameStatus,
-            isFinal,
-            numPeriods,
-            timelineWindow,
-          });
-        const { exportWidth } = buildExportDimensions({
+        const { renderInput, exportRangeLabel, exportIsFullGameRange } = buildExportRenderRequest({
+          snapshot,
           exportView,
-          isFullGameRange: exportIsFullGameRange,
-          durationRatio,
-        });
-
-        const outputCanvas = renderExportCanvas({
-          exportView,
-          selectedPlayer: selectedExportPlayer,
-          playerDisplayName: exportPlayerDisplayName,
-          exportWidth,
-          legendShouldWrap,
-          rangeLabel: exportRangeLabel,
-          periodRange: exportRangeSnapshot,
+          selectedExportPlayer,
+          exportPlayerDisplayName,
           leftMargin,
           rightMargin,
           playRef,
           gameDate,
           displayAwayTeamNames,
           displayHomeTeamNames,
-          filteredAwayPlayers: exportAwayPlayers,
-          filteredHomePlayers: exportHomePlayers,
-          boxScoreAwayPlayers: exportAwayPlayersAll,
-          boxScoreHomePlayers: exportHomePlayersAll,
-          filteredAwayPlayerTimeline: exportAwayPlayerTimeline,
-          filteredHomePlayerTimeline: exportHomePlayerTimeline,
-          filteredScoreTimeline: exportScoreTimeline,
+          displayAwayPlayers,
+          displayAwayPlayersAll,
+          displayAwayPlayerTimeline,
+          displayHomePlayers,
+          displayHomePlayersAll,
+          displayHomePlayerTimeline,
+          displayLastAction,
           displayScoreTimeline,
-          statusLabel: exportStatusLabel,
-          endAtLastScore,
-          endAtSeconds: exportEndAtSeconds,
-          startScoreDiff: exportStartScoreDiff,
-          timelineWindow: exportTimelineWindow,
-          maxY: exportScoreStats.maxY,
-          maxLead: exportScoreStats.maxLead,
-          showScoreDiff: exportView !== 'full' ? false : showScoreDiff,
+          gameStatus,
+          isFinal,
+          numPeriods,
+          timelineWindow,
+          showScoreDiff,
           statOn,
           teamColors,
           awayColor,
           homeColor,
         });
+        const outputCanvas = renderExportCanvas(renderInput);
 
         if (!outputCanvas) {
           throw new Error('Export failed: unable to build image.');
@@ -291,13 +236,15 @@ export const usePlayExportController = ({
           return;
         }
 
-        const fileName = buildPlayExportFileName({
+        const { fileName, shareMetadata } = buildExportOutputMetadata({
           awayTeamNames: displayAwayTeamNames,
           homeTeamNames: displayHomeTeamNames,
           rangeLabel: exportRangeLabel,
           isFullGameRange: exportIsFullGameRange,
           gameId,
+          origin: window.location?.origin || '',
         });
+
         const { file, errorMessage: fileError } = createPngFile({ blob, fileName });
         if (fileError && isCurrentRequest()) {
           setExportError(fileError);
@@ -307,59 +254,24 @@ export const usePlayExportController = ({
           setExportError(shareError);
         }
 
-        const origin = window.location?.origin || '';
-        const {
-          title: shareTitle,
-          text: shareText,
-          url: shareUrl,
-        } = buildShareMetadata({
-          awayTeamNames: displayAwayTeamNames,
-          homeTeamNames: displayHomeTeamNames,
-          rangeLabel: exportRangeLabel,
-          gameId,
-          origin,
-        });
-
-        const shouldShowPreview = true;
-        if (shouldShowPreview) {
-          const url = createObjectUrl(blob);
-          if (!url) {
-            throw new Error('Export failed: unable to build preview URL.');
-          }
-          if (!isCurrentRequest()) {
-            revokeObjectUrl(url);
-            return;
-          }
-          setExportPreviewState({
+        const url = createObjectUrl(blob);
+        if (!url) {
+          throw new Error('Export failed: unable to build preview URL.');
+        }
+        if (!isCurrentRequest()) {
+          revokeObjectUrl(url);
+          return;
+        }
+        setExportPreviewState(
+          buildExportPreviewState({
             url,
             fileName,
             file,
             canShare: canShareFiles,
-            shareTitle,
-            shareText,
-            shareUrl,
+            shareMetadata,
             isUpdating: false,
-          });
-          return;
-        }
-
-        let shared = false;
-        if (canShareFiles && file) {
-          const shareResult = await shareFile({
-            file,
-            title: shareTitle,
-            text: shareText,
-            url: shareUrl,
-          });
-          shared = shareResult.shared;
-          if (shareResult.error && !shareResult.aborted) {
-            console.error('Play export share failed.', shareResult.error);
-          }
-        }
-
-        if (!shared) {
-          downloadBlob({ blob, fileName });
-        }
+          }),
+        );
       } catch (err) {
         if (!isCurrentRequest()) return;
         const message = err?.message || 'Play export failed.';
@@ -382,8 +294,10 @@ export const usePlayExportController = ({
       isFinal,
       onExportInteractionStart,
       displayAwayPlayers,
+      displayAwayPlayersAll,
       displayAwayPlayerTimeline,
       displayHomePlayers,
+      displayHomePlayersAll,
       displayHomePlayerTimeline,
       displayLastAction,
       displayScoreTimeline,

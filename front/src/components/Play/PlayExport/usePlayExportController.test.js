@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   renderExportCanvas: vi.fn(),
@@ -89,6 +89,10 @@ const buildProps = () => ({
 });
 
 describe('usePlayExportController', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(window, 'matchMedia', {
@@ -224,5 +228,79 @@ describe('usePlayExportController', () => {
 
     expect(mocks.shareFile).toHaveBeenCalledTimes(1);
     expect(result.current.exportPreview).toBeNull();
+  });
+
+  it('falls back to data URL blob creation when canvasToBlob returns null', async () => {
+    mocks.canvasToBlob.mockResolvedValue(null);
+    mocks.renderExportCanvas.mockReturnValue({
+      toDataURL: () => 'data:image/png;base64,SGVsbG8=',
+    });
+
+    const { result } = renderHook(() => usePlayExportController(buildProps()));
+
+    await act(async () => {
+      await result.current.handleExportImage();
+    });
+
+    expect(mocks.createObjectUrl).toHaveBeenCalledTimes(1);
+    expect(result.current.exportPreview?.url).toBe('blob:preview-url');
+    expect(result.current.exportError).toBeNull();
+  });
+
+  it('surfaces timeout errors from long-running blob conversion', async () => {
+    vi.useFakeTimers();
+    mocks.canvasToBlob.mockImplementation(
+      () =>
+        new Promise(() => {
+          // Never resolves; withTimeout should reject.
+        }),
+    );
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { result } = renderHook(() => usePlayExportController(buildProps()));
+      let exportPromise;
+
+      await act(async () => {
+        exportPromise = result.current.handleExportImage();
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(15000);
+        await exportPromise;
+      });
+
+      expect(errorSpy).toHaveBeenCalled();
+      expect(result.current.exportError).toContain('timed out');
+      expect(result.current.isExporting).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('ignores stale request completion after unmount', async () => {
+    let resolveBlob;
+    mocks.canvasToBlob.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveBlob = resolve;
+        }),
+    );
+
+    const { result, unmount } = renderHook(() => usePlayExportController(buildProps()));
+    let exportPromise;
+
+    await act(async () => {
+      exportPromise = result.current.handleExportImage();
+    });
+
+    unmount();
+
+    await act(async () => {
+      resolveBlob(new Blob(['late'], { type: 'image/png' }));
+      await exportPromise;
+    });
+
+    expect(mocks.createObjectUrl).not.toHaveBeenCalled();
   });
 });
