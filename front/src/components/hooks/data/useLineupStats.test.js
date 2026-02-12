@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { useLineupStats } from './useLineupStats';
 
 describe('useLineupStats', () => {
-  it('keeps only valid 5-player intervals when building lineups', () => {
+  it('retains non-5-player intervals when building lineups', () => {
     const awayPlayerTimeline = {
       A: [{ period: 1, start: '1200.00', end: '0000.00' }],
       B: [{ period: 1, start: '1200.00', end: '0000.00' }],
@@ -29,17 +29,16 @@ describe('useLineupStats', () => {
     );
 
     const awayLineups = result.current.away;
-    expect(awayLineups).toHaveLength(2);
-    expect(awayLineups.every((lineup) => lineup.players.length === 5)).toBe(true);
+    expect(awayLineups).toHaveLength(4);
     expect(
       awayLineups
         .map((lineup) => lineup.players.join('|'))
         .sort((a, b) => a.localeCompare(b)),
-    ).toEqual(['A|B|C|D|F', 'A|B|C|D|G']);
+    ).toEqual(['A|B|C|D', 'A|B|C|D|E|F', 'A|B|C|D|F', 'A|B|C|D|G']);
     expect(
       awayLineups
         .map((lineup) => lineup.seconds)
         .sort((a, b) => a - b),
-    ).toEqual([120, 240]);
+    ).toEqual([120, 120, 240, 240]);
   });
 });
