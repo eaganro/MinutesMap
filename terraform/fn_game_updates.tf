@@ -87,25 +87,25 @@ data "archive_file" "zip_game_date_updates" {
 
 resource "aws_lambda_function" "game_date_updates" {
   function_name = "gameDateUpdates"
-  
-  role          = aws_iam_role.game_date_updates_role.arn
-  
-  handler       = "lambda_function.handler"
-  runtime       = "nodejs20.x"
-  timeout       = 60
-  publish       = false
+
+  role = aws_iam_role.game_date_updates_role.arn
+
+  handler = "lambda_function.handler"
+  runtime = "nodejs22.x"
+  timeout = 60
+  publish = false
 
   filename         = data.archive_file.zip_game_date_updates.output_path
   source_code_hash = data.archive_file.zip_game_date_updates.output_base64sha256
 
   environment {
     variables = {
-      DATE_CONN_TABLE = aws_dynamodb_table.date_connections.name
-      DATE_INDEX_NAME = "date-index"
-      SCHEDULE_PREFIX = "schedule/"
-      SEND_BATCH_SIZE = "50"
+      DATE_CONN_TABLE      = aws_dynamodb_table.date_connections.name
+      DATE_INDEX_NAME      = "date-index"
+      SCHEDULE_PREFIX      = "schedule/"
+      SEND_BATCH_SIZE      = "50"
       SEND_MAX_CONCURRENCY = "10"
-      
+
       WS_API_ENDPOINT = "${replace(aws_apigatewayv2_api.websocket_api.api_endpoint, "wss://", "https://")}/production"
     }
   }
@@ -117,5 +117,5 @@ resource "aws_lambda_permission" "allow_s3_game_date_updates" {
   function_name = aws_lambda_function.game_date_updates.function_name
   principal     = "s3.amazonaws.com"
 
-  source_arn    = aws_s3_bucket.data_bucket.arn
+  source_arn = aws_s3_bucket.data_bucket.arn
 }

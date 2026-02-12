@@ -88,22 +88,22 @@ data "archive_file" "zip_ws_send_update" {
 
 resource "aws_lambda_function" "ws_send_update" {
   function_name = "ws-sendGameUpdate-handler"
-  
-  role          = aws_iam_role.ws_send_update_role.arn
-  
-  handler       = "lambda_function.handler"
-  runtime       = "nodejs20.x"
-  timeout       = 60
-  publish       = false
+
+  role = aws_iam_role.ws_send_update_role.arn
+
+  handler = "lambda_function.handler"
+  runtime = "nodejs22.x"
+  timeout = 60
+  publish = false
 
   filename         = data.archive_file.zip_ws_send_update.output_path
   source_code_hash = data.archive_file.zip_ws_send_update.output_base64sha256
 
   environment {
     variables = {
-      CONN_TABLE      = aws_dynamodb_table.game_connections.name
-      WS_API_ENDPOINT = "${replace(aws_apigatewayv2_api.websocket_api.api_endpoint, "wss://", "https://")}/production"
-      SEND_BATCH_SIZE = "50"
+      CONN_TABLE           = aws_dynamodb_table.game_connections.name
+      WS_API_ENDPOINT      = "${replace(aws_apigatewayv2_api.websocket_api.api_endpoint, "wss://", "https://")}/production"
+      SEND_BATCH_SIZE      = "50"
       SEND_MAX_CONCURRENCY = "10"
     }
   }
@@ -117,5 +117,5 @@ resource "aws_lambda_permission" "allow_s3_trigger" {
   function_name = aws_lambda_function.ws_send_update.function_name
   principal     = "s3.amazonaws.com"
 
-  source_arn    = aws_s3_bucket.data_bucket.arn 
+  source_arn = aws_s3_bucket.data_bucket.arn
 }
