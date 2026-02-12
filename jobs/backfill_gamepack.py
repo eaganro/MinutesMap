@@ -15,7 +15,12 @@ sys.path.insert(0, os.path.join(ROOT, "functions", "nba-game-poller"))
 
 from nba_game_poller.nba_api import fetch_nba_data_urllib  # noqa: E402
 from nba_game_poller.playbyplay_processing import process_playbyplay_payload  # noqa: E402
-from nba_game_poller.gamepack_utils import build_box_payload  # noqa: E402
+from nba_game_poller.gamepack_utils import (  # noqa: E402
+    build_box_payload,
+    build_player_label_map,
+    extract_oncourt_ids,
+    extract_oncourt_names,
+)
 from nba_game_poller.storage import upload_json_to_s3  # noqa: E402
 
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
@@ -401,8 +406,16 @@ def backfill_gamepack_for_game(game_key, nba_game_id, s3_client, bucket, prefix,
         actions=actions,
         away_team_id=away_team_id,
         home_team_id=home_team_id,
+        away_player_labels=build_player_label_map(box_game.get("awayTeam")),
+        home_player_labels=build_player_label_map(box_game.get("homeTeam")),
         include_actions=False,
         include_all_actions=False,
+        seed_home=extract_oncourt_names(box_game.get("homeTeam")),
+        seed_away=extract_oncourt_names(box_game.get("awayTeam")),
+        seed_home_ids=extract_oncourt_ids(box_game.get("homeTeam")),
+        seed_away_ids=extract_oncourt_ids(box_game.get("awayTeam")),
+        seed_clock=(actions[-1].get("clock") if actions else None) or box_game.get("gameClock"),
+        seed_period=(actions[-1].get("period") if actions else None) or 1,
     )
     slim_box = build_box_payload(box_game)
 

@@ -18,6 +18,8 @@ from nba_game_poller.playbyplay_processing import (  # noqa: E402
 from nba_game_poller.gamepack_utils import (  # noqa: E402
     build_box_payload,
     build_game_key,
+    build_player_label_map,
+    extract_oncourt_ids,
     extract_oncourt_names,
 )
 from nba_game_poller.storage import upload_json_to_s3  # noqa: E402
@@ -181,19 +183,29 @@ def main():
     seed_clock = (last_action or {}).get("clock") or box_game.get("gameClock")
     seed_home = []
     seed_away = []
+    seed_home_ids = []
+    seed_away_ids = []
+    home_player_labels = build_player_label_map(box_game.get("homeTeam"))
+    away_player_labels = build_player_label_map(box_game.get("awayTeam"))
     if not args.no_seed and seed_period == 1:
         seed_home = extract_oncourt_names(box_game.get("homeTeam"))
         seed_away = extract_oncourt_names(box_game.get("awayTeam"))
+        seed_home_ids = extract_oncourt_ids(box_game.get("homeTeam"))
+        seed_away_ids = extract_oncourt_ids(box_game.get("awayTeam"))
 
     processed = process_playbyplay_payload(
         game_id=game_id,
         actions=actions,
         away_team_id=away_team_id,
         home_team_id=home_team_id,
+        away_player_labels=away_player_labels,
+        home_player_labels=home_player_labels,
         include_actions=args.include_feed,
         include_all_actions=not args.exclude_events,
         seed_home=seed_home,
         seed_away=seed_away,
+        seed_home_ids=seed_home_ids,
+        seed_away_ids=seed_away_ids,
         seed_clock=seed_clock,
         seed_period=seed_period,
     )
