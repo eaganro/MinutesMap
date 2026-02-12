@@ -591,6 +591,8 @@ def _seed_playtimes(playtimes, seed_names, seed_ids, seed_clock, seed_period):
 
 def _should_skip_off_court_action(action):
     action_type = _clean_phrase(action.get("actionType"))
+    if action_type == "ejection":
+        return True
     if "foul" not in action_type:
         return False
     detail = _clean_phrase(action.get("subType"))
