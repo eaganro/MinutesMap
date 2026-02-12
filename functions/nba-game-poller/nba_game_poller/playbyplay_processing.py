@@ -608,6 +608,11 @@ def update_playtime_for_key(player_key, action, playtimes):
     if playtimes[player_key]["on"] is False:
         if _should_skip_off_court_action(action):
             return playtimes
+        on_count = sum(1 for state in (playtimes or {}).values() if state.get("on") is True)
+        # Heuristic auto-starts for sparse feeds should never create an impossible
+        # 6-player on-court state from off-court events.
+        if on_count >= 5:
+            return playtimes
         playtimes[player_key]["on"] = True
         playtimes[player_key]["times"].append(
             {"start": "PT12M00.00S", "period": action.get("period"), "end": action.get("clock")}

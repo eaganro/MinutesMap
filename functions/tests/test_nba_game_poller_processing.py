@@ -294,6 +294,164 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(brown_segments[0]["start"], "1200.00")
         self.assertEqual(brown_segments[0]["end"], "0500.00")
 
+    def test_off_court_personal_foul_does_not_create_sixth_player(self):
+        actions = [
+            {
+                "actionNumber": 1,
+                "actionId": 1,
+                "clock": "PT12M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 201,
+                "playerName": "One",
+                "playerNameI": "P. One",
+                "description": "SUB in: P. One",
+                "actionType": "substitution",
+                "subType": "in",
+                "qualifiers": ["startperiod"],
+            },
+            {
+                "actionNumber": 2,
+                "actionId": 2,
+                "clock": "PT12M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 202,
+                "playerName": "Two",
+                "playerNameI": "P. Two",
+                "description": "SUB in: P. Two",
+                "actionType": "substitution",
+                "subType": "in",
+                "qualifiers": ["startperiod"],
+            },
+            {
+                "actionNumber": 3,
+                "actionId": 3,
+                "clock": "PT12M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 203,
+                "playerName": "Three",
+                "playerNameI": "P. Three",
+                "description": "SUB in: P. Three",
+                "actionType": "substitution",
+                "subType": "in",
+                "qualifiers": ["startperiod"],
+            },
+            {
+                "actionNumber": 4,
+                "actionId": 4,
+                "clock": "PT12M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 204,
+                "playerName": "Four",
+                "playerNameI": "P. Four",
+                "description": "SUB in: P. Four",
+                "actionType": "substitution",
+                "subType": "in",
+                "qualifiers": ["startperiod"],
+            },
+            {
+                "actionNumber": 5,
+                "actionId": 5,
+                "clock": "PT12M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 205,
+                "playerName": "Five",
+                "playerNameI": "P. Five",
+                "description": "SUB in: P. Five",
+                "actionType": "substitution",
+                "subType": "in",
+                "qualifiers": ["startperiod"],
+            },
+            {
+                "actionNumber": 6,
+                "actionId": 6,
+                "clock": "PT10M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 205,
+                "playerName": "Five",
+                "playerNameI": "P. Five",
+                "description": "SUB out: P. Five",
+                "actionType": "substitution",
+                "subType": "out",
+            },
+            {
+                "actionNumber": 7,
+                "actionId": 7,
+                "clock": "PT10M00.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 206,
+                "playerName": "Six",
+                "playerNameI": "P. Six",
+                "description": "SUB in: P. Six",
+                "actionType": "substitution",
+                "subType": "in",
+            },
+            {
+                "actionNumber": 8,
+                "actionId": 8,
+                "clock": "PT09M59.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 205,
+                "playerName": "Five",
+                "playerNameI": "P. Five",
+                "description": "P. Five personal FOUL (2 PF)",
+                "actionType": "foul",
+                "subType": "personal",
+            },
+        ]
+        processed = process_playbyplay_payload(
+            game_id="off-court-foul-cap",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+        )
+
+        five_segments = processed["segments"]["away"].get("P. Five") or []
+        self.assertEqual(len(five_segments), 1)
+        self.assertEqual(five_segments[0]["start"], "1200.00")
+        self.assertEqual(five_segments[0]["end"], "1000.00")
+
+        away_segments = processed["segments"]["away"]
+        boundaries = set()
+        for segments in away_segments.values():
+            for seg in segments or []:
+                boundaries.add(time_to_seconds(seg.get("start")))
+                boundaries.add(time_to_seconds(seg.get("end")))
+        sorted_boundaries = sorted((b for b in boundaries if b is not None), reverse=True)
+        max_on = 0
+        for idx in range(len(sorted_boundaries) - 1):
+            start = sorted_boundaries[idx]
+            end = sorted_boundaries[idx + 1]
+            if start <= end:
+                continue
+            on_count = 0
+            for segments in away_segments.values():
+                is_on = any(
+                    time_to_seconds(seg.get("start")) >= start
+                    and time_to_seconds(seg.get("end")) <= end
+                    for seg in (segments or [])
+                )
+                if is_on:
+                    on_count += 1
+            max_on = max(max_on, on_count)
+
+        self.assertEqual(max_on, 5)
+
     def test_carryover_player_stays_on_next_period(self):
         actions = [
             {
