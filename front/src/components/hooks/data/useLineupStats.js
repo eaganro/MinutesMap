@@ -134,7 +134,11 @@ const buildLineupsForTeam = (playerTimeline, scoreLookup, isHome) => {
         if (isOn) playersOn.push(player);
       });
 
-      if (!playersOn.length) continue;
+      // Lineups are defined as 5 players. Compact segment payloads can
+      // occasionally contain overlap/gap artifacts that create 4/6-man
+      // intervals; skip those malformed intervals instead of surfacing
+      // impossible lineup rows in the UI.
+      if (playersOn.length !== 5) continue;
 
       playersOn.sort((a, b) => a.localeCompare(b));
       const key = playersOn.join(' | ');

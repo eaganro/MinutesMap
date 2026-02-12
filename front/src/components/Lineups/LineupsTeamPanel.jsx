@@ -20,6 +20,7 @@ export default function LineupsTeamPanel({
   selectionMode,
   onSelectionModeChange,
   playerOptions,
+  playerDisplayNames,
   sortConfig,
   onSortChange,
   topSectionRef,
@@ -155,7 +156,7 @@ export default function LineupsTeamPanel({
                         title={player}
                         aria-label={player}
                       >
-                        {formatPlayerName(player, lastNameCounts)}
+                        {formatPlayerName(player, lastNameCounts, playerDisplayNames)}
                       </span>
                     ))}
                   </span>
@@ -193,7 +194,7 @@ export default function LineupsTeamPanel({
                           title={player}
                           aria-label={player}
                         >
-                          {formatPlayerName(player, lastNameCounts)}
+                          {formatPlayerName(player, lastNameCounts, playerDisplayNames)}
                         </span>
                       );
                     })}

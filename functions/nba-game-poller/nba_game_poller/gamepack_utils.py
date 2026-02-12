@@ -30,6 +30,33 @@ def normalize_minutes(raw_minutes):
     return "00:00"
 
 
+def _extract_player_id(player):
+    if not isinstance(player, dict):
+        return None
+    for key in ("personId", "playerId", "id"):
+        value = safe_int(player.get(key))
+        if value > 0:
+            return value
+    return None
+
+
+def _extract_player_label(player):
+    if not isinstance(player, dict):
+        return ""
+    first = (player.get("firstName") or player.get("first") or "").strip()
+    last = (player.get("familyName") or player.get("last") or "").strip()
+    full = f"{first} {last}".strip()
+    if full:
+        return full
+    return (
+        player.get("nameI")
+        or player.get("name")
+        or player.get("familyName")
+        or player.get("last")
+        or ""
+    ).strip()
+
+
 def build_team_payload(team):
     if not isinstance(team, dict):
         return None
@@ -40,6 +67,7 @@ def build_team_payload(team):
         stats = player.get("statistics") or {}
         players.append(
             {
+                "id": _extract_player_id(player),
                 "first": (player.get("firstName") or "").strip(),
                 "last": (player.get("familyName") or "").strip(),
                 "stats": {
@@ -86,43 +114,59 @@ def build_box_payload(box_game):
     }
 
 
-def extract_oncourt_names(team):
+def _extract_oncourt_players(team):
     if not isinstance(team, dict):
         return []
     players = team.get("players") or []
-    names = []
+    selected = []
     seen = set()
+
+    def append_player(player):
+        name = _extract_player_label(player)
+        if not name or name in seen:
+            return
+        seen.add(name)
+        selected.append({"id": _extract_player_id(player), "name": name})
+
     for player in players:
         if not isinstance(player, dict):
             continue
         if str(player.get("oncourt") or "").strip() != "1":
             continue
-        name = (
-            player.get("nameI")
-            or player.get("name")
-            or player.get("familyName")
-            or ""
-        ).strip()
-        if name and name not in seen:
-            seen.add(name)
-            names.append(name)
-    if names:
-        return names
+        append_player(player)
+    if selected:
+        return selected
+
     for player in players:
         if not isinstance(player, dict):
             continue
         if str(player.get("starter") or "").strip() != "1":
             continue
-        name = (
-            player.get("nameI")
-            or player.get("name")
-            or player.get("familyName")
-            or ""
-        ).strip()
-        if name and name not in seen:
-            seen.add(name)
-            names.append(name)
-    return names
+        append_player(player)
+    return selected
+
+
+def extract_oncourt_names(team):
+    return [player.get("name") for player in _extract_oncourt_players(team) if player.get("name")]
+
+
+def extract_oncourt_ids(team):
+    return [player.get("id") for player in _extract_oncourt_players(team) if player.get("id")]
+
+
+def build_player_label_map(team):
+    labels = {}
+    players = team.get("players") if isinstance(team, dict) else []
+    for player in players or []:
+        if not isinstance(player, dict):
+            continue
+        player_id = _extract_player_id(player)
+        if not player_id:
+            continue
+        label = _extract_player_label(player)
+        if label:
+            labels[player_id] = label
+    return labels
 
 
 def _format_game_date(box_game):

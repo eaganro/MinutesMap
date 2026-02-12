@@ -13,6 +13,8 @@ _JUMPBALL_RE = re.compile(
 _SUB_IN_OUT_RE = re.compile(r"SUB\s+(in|out):\s*(.+)", re.IGNORECASE)
 _SUB_FOR_RE = re.compile(r"SUB:\s*(.+?)\s+FOR\s+(.+)", re.IGNORECASE)
 _INITIAL_PREFIX_RE = re.compile(r"^[A-Z]\.")
+_PLAYER_ID_KEY_PREFIX = "pid:"
+_PLAYER_NAME_KEY_PREFIX = "name:"
 
 
 def time_to_seconds(clock):
@@ -79,26 +81,83 @@ def _has_initial_prefix(name):
     return bool(_INITIAL_PREFIX_RE.match(name.strip()))
 
 
-def _resolve_player_name(name, roster):
+def _coerce_person_id(value):
+    try:
+        parsed = int(value)
+    except Exception:
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _player_key_from_person_id(person_id):
+    pid = _coerce_person_id(person_id)
+    if pid is None:
+        return None
+    return f"{_PLAYER_ID_KEY_PREFIX}{pid}"
+
+
+def _player_key_from_name(name):
+    norm = _normalize_match_name(name)
+    if not norm:
+        return None
+    return f"{_PLAYER_NAME_KEY_PREFIX}{norm}"
+
+
+def _person_id_from_player_key(player_key):
+    if not isinstance(player_key, str) or not player_key.startswith(_PLAYER_ID_KEY_PREFIX):
+        return None
+    return _coerce_person_id(player_key[len(_PLAYER_ID_KEY_PREFIX) :])
+
+
+def _display_name_from_action(action, roster_labels=None, fallback_name=None):
+    person_id = _coerce_person_id((action or {}).get("personId"))
+    if person_id is not None and isinstance(roster_labels, dict):
+        label = (roster_labels.get(person_id) or "").strip()
+        if label:
+            return label
+    if isinstance(action, dict):
+        player_name_i = (action.get("playerNameI") or "").strip()
+        if player_name_i:
+            return player_name_i
+        player_name = (action.get("playerName") or "").strip()
+        if player_name:
+            return player_name
+    return (fallback_name or "").strip()
+
+
+def _player_key_from_action(action):
+    player_key = _player_key_from_person_id((action or {}).get("personId"))
+    if player_key:
+        return player_key
+    return _player_key_from_name(fix_player_name(action) if isinstance(action, dict) else "")
+
+
+def _resolve_player_key(name, roster, player_labels=None):
     if not name or not roster:
-        return name
+        return None
     norm_name = _normalize_match_name(name)
     if not norm_name:
-        return name
+        return None
     matches = []
-    for candidate in roster.keys():
-        norm_candidate = _normalize_match_name(candidate)
+    for candidate in (roster or {}).keys():
+        label = (player_labels or {}).get(candidate) or candidate
+        norm_candidate = _normalize_match_name(label)
         if not norm_candidate:
             continue
         if norm_candidate == norm_name or norm_candidate.endswith(f" {norm_name}"):
             matches.append(candidate)
     if len(matches) == 1:
         return matches[0]
-    if name in roster:
-        initial_matches = [c for c in matches if c != name and _has_initial_prefix(c)]
+    if isinstance(name, str):
+        direct_key = _player_key_from_name(name)
+        if direct_key in roster:
+            return direct_key
+        if name in roster:
+            return name
+        initial_matches = [c for c in matches if _has_initial_prefix((player_labels or {}).get(c) or c)]
         if len(initial_matches) == 1:
             return initial_matches[0]
-    return name
+    return None
 
 
 def _normalize_shot_detail(sub_type):
@@ -370,7 +429,7 @@ def parse_assist_name(action):
     return name or None
 
 
-def add_assist_actions(action, players):
+def add_assist_actions(action, players, player_labels=None, roster_labels=None):
     desc = action.get("description") or ""
     name = parse_assist_name(action)
     if not name:
@@ -380,13 +439,22 @@ def add_assist_actions(action, players):
     end_desc = desc.rfind(")")
     assist_desc = desc[start_desc:end_desc] if start_desc > 0 and end_desc > start_desc else desc
 
-    if name not in players:
-        players[name] = []
+    assist_person_id = _coerce_person_id(action.get("assistPersonId"))
+    assist_player_key = _player_key_from_person_id(assist_person_id) or _player_key_from_name(name)
+    if not assist_player_key:
+        return players
 
-    first = players[name][0] if players[name] else {}
+    if assist_player_key not in players:
+        players[assist_player_key] = []
+
+    first = players[assist_player_key][0] if players[assist_player_key] else {}
     base_id = action.get("actionId") or action.get("actionNumber")
     assist_player_name = first.get("playerName") or name
     assist_player_name_i = first.get("playerNameI") or action.get("assistPlayerNameInitial") or name
+    if assist_person_id is not None and isinstance(roster_labels, dict):
+        roster_label = (roster_labels.get(assist_person_id) or "").strip()
+        if roster_label:
+            assist_player_name_i = roster_label
     assist_action = {
         "actionType": "Assist",
         "clock": action.get("clock"),
@@ -402,45 +470,78 @@ def add_assist_actions(action, players):
         "period": action.get("period"),
         "teamTricode": action.get("teamTricode"),
     }
-    players[name].append(assist_action)
+    players[assist_player_key].append(assist_action)
+    if player_labels is not None and assist_player_key not in player_labels:
+        player_labels[assist_player_key] = assist_player_name_i
     return players
 
 
-def create_players(actions, away_team_id, home_team_id):
+def create_players(actions, away_team_id, home_team_id, away_player_labels=None, home_player_labels=None):
     away_players = {}
     home_players = {}
+    away_labels = {}
+    home_labels = {}
 
     for a in actions or []:
-        player_name = fix_player_name(a)
-        if not player_name:
-            continue
-
         team_id = a.get("teamId")
         description = a.get("description") or ""
         action_type = a.get("actionType")
+        player_key = _player_key_from_action(a)
+        player_name = fix_player_name(a)
 
         if team_id == away_team_id:
-            away_players.setdefault(player_name, []).append(a)
+            if player_key:
+                away_players.setdefault(player_key, []).append(a)
+                if player_key not in away_labels:
+                    away_labels[player_key] = _display_name_from_action(
+                        a, roster_labels=away_player_labels, fallback_name=player_name
+                    )
             if "AST" in description:
-                away_players = add_assist_actions(a, away_players)
+                away_players = add_assist_actions(
+                    a,
+                    away_players,
+                    player_labels=away_labels,
+                    roster_labels=away_player_labels,
+                )
             if action_type == "Substitution":
                 start_name = description.find("SUB:") + 5
                 end_name = description.find("FOR") - 1
                 name = description[start_name:end_name]
                 name = _normalize_special_cases(name, a.get("teamTricode"))
-                away_players.setdefault(name, [])
+                incoming_key = _resolve_player_key(name, away_players, away_labels) or _player_key_from_name(name)
+                if incoming_key:
+                    away_players.setdefault(incoming_key, [])
+                    away_labels.setdefault(incoming_key, name)
         elif team_id == home_team_id:
-            home_players.setdefault(player_name, []).append(a)
+            if player_key:
+                home_players.setdefault(player_key, []).append(a)
+                if player_key not in home_labels:
+                    home_labels[player_key] = _display_name_from_action(
+                        a, roster_labels=home_player_labels, fallback_name=player_name
+                    )
             if "AST" in description:
-                home_players = add_assist_actions(a, home_players)
+                home_players = add_assist_actions(
+                    a,
+                    home_players,
+                    player_labels=home_labels,
+                    roster_labels=home_player_labels,
+                )
             if action_type == "Substitution":
                 start_name = description.find("SUB:") + 5
                 end_name = description.find("FOR") - 1
                 name = description[start_name:end_name]
                 name = _normalize_special_cases(name, a.get("teamTricode"))
-                home_players.setdefault(name, [])
+                incoming_key = _resolve_player_key(name, home_players, home_labels) or _player_key_from_name(name)
+                if incoming_key:
+                    home_players.setdefault(incoming_key, [])
+                    home_labels.setdefault(incoming_key, name)
 
-    return {"awayPlayers": away_players, "homePlayers": home_players}
+    return {
+        "awayPlayers": away_players,
+        "homePlayers": home_players,
+        "awayLabels": away_labels,
+        "homeLabels": home_labels,
+    }
 
 
 def create_playtimes(players):
@@ -450,26 +551,40 @@ def create_playtimes(players):
     return playtimes
 
 
-def _ensure_seed_players(players, seed_names):
-    for name in seed_names or []:
-        if not name:
+def _ensure_seed_players(players, player_labels, seed_names, seed_ids=None):
+    seed_ids = list(seed_ids or [])
+    seed_names = list(seed_names or [])
+    max_count = max(len(seed_names), len(seed_ids))
+    for idx in range(max_count):
+        seed_name = seed_names[idx] if idx < len(seed_names) else ""
+        seed_id = seed_ids[idx] if idx < len(seed_ids) else None
+        player_key = _player_key_from_person_id(seed_id) or _player_key_from_name(seed_name) or seed_name
+        if not player_key:
             continue
-        if name not in players:
-            players[name] = []
+        if player_key not in players:
+            players[player_key] = []
+        if player_labels is not None and seed_name:
+            player_labels.setdefault(player_key, seed_name)
 
 
-def _seed_playtimes(playtimes, seed_names, seed_clock, seed_period):
+def _seed_playtimes(playtimes, seed_names, seed_ids, seed_clock, seed_period):
     if seed_period != 1:
         return
-    for name in seed_names or []:
-        if not name:
+    seed_ids = list(seed_ids or [])
+    seed_names = list(seed_names or [])
+    max_count = max(len(seed_names), len(seed_ids))
+    for idx in range(max_count):
+        seed_name = seed_names[idx] if idx < len(seed_names) else ""
+        seed_id = seed_ids[idx] if idx < len(seed_ids) else None
+        player_key = _player_key_from_person_id(seed_id) or _player_key_from_name(seed_name) or seed_name
+        if not player_key:
             continue
-        if name not in playtimes:
-            playtimes[name] = {"times": [], "on": False}
-        if playtimes[name].get("times"):
+        if player_key not in playtimes:
+            playtimes[player_key] = {"times": [], "on": False}
+        if playtimes[player_key].get("times"):
             continue
         if seed_clock:
-            playtimes[name]["times"].append(
+            playtimes[player_key]["times"].append(
                 {"start": "PT12M00.00S", "period": 1, "end": seed_clock}
             )
 
@@ -485,105 +600,135 @@ def _should_skip_off_court_action(action):
     return False
 
 
-def update_playtime_for_name(player_name, action, playtimes):
-    if not player_name or player_name not in playtimes:
+def update_playtime_for_key(player_key, action, playtimes):
+    if not player_key or player_key not in playtimes:
         return playtimes
-    if playtimes[player_name]["on"] is False:
+    if playtimes[player_key]["on"] is False:
         if _should_skip_off_court_action(action):
             return playtimes
-        playtimes[player_name]["on"] = True
-        playtimes[player_name]["times"].append(
+        playtimes[player_key]["on"] = True
+        playtimes[player_key]["times"].append(
             {"start": "PT12M00.00S", "period": action.get("period"), "end": action.get("clock")}
         )
     else:
-        t = playtimes[player_name]["times"]
+        t = playtimes[player_key]["times"]
         if t:
             t[-1]["end"] = action.get("clock")
     return playtimes
 
 
-def update_playtimes_with_action(action, playtimes):
+def update_playtimes_with_action(action, playtimes, player_labels=None):
     player_name = fix_player_name(action)
+    player_key = _player_key_from_action(action)
     action_type = action.get("actionType")
 
     if action_type == "Substitution":
         desc = action.get("description") or ""
         start_name = desc.find("SUB:") + 5
         end_name = desc.find("FOR") - 1
-        name = desc[start_name:end_name]
-        name = _normalize_special_cases(name, action.get("teamTricode"))
-        name = _resolve_player_name(name, playtimes)
+        incoming_name = desc[start_name:end_name]
+        incoming_name = _normalize_special_cases(incoming_name, action.get("teamTricode"))
+        incoming_key = _resolve_player_key(incoming_name, playtimes, player_labels) or _player_key_from_name(
+            incoming_name
+        )
+        if incoming_key is None:
+            return playtimes
 
-        if name not in playtimes:
-            playtimes[name] = {"times": [], "on": False}
-            print("PROBLEM: Player Name Not Found", name)
+        if incoming_key not in playtimes:
+            playtimes[incoming_key] = {"times": [], "on": False}
+            print("PROBLEM: Player Name Not Found", incoming_name)
+        if player_labels is not None and incoming_name:
+            player_labels.setdefault(incoming_key, incoming_name)
 
-        incoming_times = playtimes[name]["times"]
-        if playtimes[name]["on"] is True and incoming_times and incoming_times[-1].get("end") is None:
+        incoming_times = playtimes[incoming_key]["times"]
+        if (
+            playtimes[incoming_key]["on"] is True
+            and incoming_times
+            and incoming_times[-1].get("end") is None
+        ):
             incoming_times[-1]["end"] = action.get("clock")
         if not (
-            playtimes[name]["on"] is True
+            playtimes[incoming_key]["on"] is True
             and incoming_times
             and incoming_times[-1].get("start") == action.get("clock")
             and incoming_times[-1].get("period") == action.get("period")
         ):
             incoming_times.append({"start": action.get("clock"), "period": action.get("period")})
-            playtimes[name]["on"] = True
+            playtimes[incoming_key]["on"] = True
 
-        if player_name and player_name in playtimes:
-            t = playtimes[player_name]["times"]
+        outgoing_key = player_key
+        if outgoing_key is None or outgoing_key not in playtimes:
+            outgoing_key = _resolve_player_key(player_name, playtimes, player_labels) or _player_key_from_name(
+                player_name
+            )
+
+        if outgoing_key and outgoing_key in playtimes:
+            t = playtimes[outgoing_key]["times"]
             if _is_start_period_sub_out(action):
-                if playtimes[player_name]["on"] is True:
+                if playtimes[outgoing_key]["on"] is True:
                     if (
                         t
                         and t[-1].get("start") == action.get("clock")
                         and t[-1].get("period") == action.get("period")
                     ):
                         t.pop()
-                playtimes[player_name]["on"] = False
+                playtimes[outgoing_key]["on"] = False
                 return playtimes
-            if playtimes[player_name]["on"] is False:
+            if playtimes[outgoing_key]["on"] is False:
                 if (action.get("period") or 0) <= 4:
                     t.append({"start": "PT12M00.00S", "period": action.get("period")})
                 else:
                     t.append({"start": "PT05M00.00S", "period": action.get("period")})
 
             t[-1]["end"] = action.get("clock")
-            playtimes[player_name]["on"] = False
+            playtimes[outgoing_key]["on"] = False
 
     elif action_type == "substitution":
         desc = action.get("description") or ""
-        name = desc[desc.find(":") + 2 :]
-        if name == "Yang":
-            name = "Hansen"
-        name = _resolve_player_name(name, playtimes)
+        sub_type = _clean_phrase(action.get("subType"))
+        fallback_name = desc[desc.find(":") + 2 :]
+        if fallback_name == "Yang":
+            fallback_name = "Hansen"
 
-        if name not in playtimes:
-            playtimes[name] = {"times": [], "on": False}
-            print("PROBLEM: Player Name Not Found", name)
+        if player_key is None or player_key not in playtimes:
+            player_key = _resolve_player_key(fallback_name, playtimes, player_labels) or _player_key_from_name(
+                fallback_name
+            )
 
-        t = playtimes[name]["times"]
-        if "out:" in desc:
+        if player_key is None:
+            return playtimes
+
+        if player_key not in playtimes:
+            playtimes[player_key] = {"times": [], "on": False}
+            print("PROBLEM: Player Name Not Found", fallback_name or player_key)
+        if player_labels is not None:
+            player_labels.setdefault(player_key, _display_name_from_action(action, fallback_name=fallback_name))
+
+        t = playtimes[player_key]["times"]
+        is_out = "out" in sub_type or "out:" in _clean_phrase(desc)
+        is_in = "in" in sub_type or "in:" in _clean_phrase(desc)
+
+        if is_out:
             if _is_start_period_sub_out(action):
-                if playtimes[name]["on"] is True:
+                if playtimes[player_key]["on"] is True:
                     if (
                         t
                         and t[-1].get("start") == action.get("clock")
                         and t[-1].get("period") == action.get("period")
                     ):
                         t.pop()
-                    playtimes[name]["on"] = False
+                    playtimes[player_key]["on"] = False
                 return playtimes
-            if playtimes[name]["on"] is False:
+            if playtimes[player_key]["on"] is False:
                 if (action.get("period") or 0) <= 4:
                     t.append({"start": "PT12M00.00S", "period": action.get("period")})
                 else:
                     t.append({"start": "PT05M00.00S", "period": action.get("period")})
             if t:
                 t[-1]["end"] = action.get("clock")
-            playtimes[name]["on"] = False
-        elif "in:" in desc:
-            if playtimes[name]["on"] is True:
+            playtimes[player_key]["on"] = False
+        elif is_in:
+            if playtimes[player_key]["on"] is True:
                 if (
                     t
                     and t[-1].get("start") == action.get("clock")
@@ -592,15 +737,26 @@ def update_playtimes_with_action(action, playtimes):
                     return playtimes
                 if t and t[-1].get("end") is None:
                     t[-1]["end"] = action.get("clock")
-            playtimes[name]["times"].append({"start": action.get("clock"), "period": action.get("period")})
-            playtimes[name]["on"] = True
+            playtimes[player_key]["times"].append({"start": action.get("clock"), "period": action.get("period")})
+            playtimes[player_key]["on"] = True
 
     else:
-        playtimes = update_playtime_for_name(player_name, action, playtimes)
+        if player_key is None or player_key not in playtimes:
+            player_key = _resolve_player_key(player_name, playtimes, player_labels) or _player_key_from_name(
+                player_name
+            )
+        playtimes = update_playtime_for_key(player_key, action, playtimes)
         if action_type not in ("Assist", "assist"):
             assist_name = parse_assist_name(action)
-            if assist_name and assist_name != player_name:
-                playtimes = update_playtime_for_name(assist_name, action, playtimes)
+            if assist_name:
+                assist_person_id = _coerce_person_id(action.get("assistPersonId"))
+                assist_key = _player_key_from_person_id(assist_person_id)
+                if assist_key is None or assist_key not in playtimes:
+                    assist_key = _resolve_player_key(assist_name, playtimes, player_labels) or _player_key_from_name(
+                        assist_name
+                    )
+                if assist_key and assist_key != player_key:
+                    playtimes = update_playtime_for_key(assist_key, action, playtimes)
 
     return playtimes
 
@@ -700,6 +856,41 @@ def sort_actions(actions):
     return sorted(list(actions or []), key=sort_key)
 
 
+def _default_player_label(player_key):
+    if not isinstance(player_key, str):
+        return str(player_key)
+    if player_key.startswith(_PLAYER_ID_KEY_PREFIX):
+        pid = _person_id_from_player_key(player_key)
+        return f"Player {pid}" if pid is not None else player_key
+    if player_key.startswith(_PLAYER_NAME_KEY_PREFIX):
+        raw = player_key[len(_PLAYER_NAME_KEY_PREFIX) :]
+        return re.sub(r"\s+", " ", raw).strip().title()
+    return player_key
+
+
+def _build_output_player_labels(players, player_labels):
+    labels = {}
+    grouped = {}
+
+    for player_key in (players or {}).keys():
+        label = (player_labels or {}).get(player_key) or _default_player_label(player_key)
+        label = re.sub(r"\s+", " ", str(label or "").strip())
+        if not label:
+            label = _default_player_label(player_key)
+        labels[player_key] = label
+        grouped.setdefault(_normalize_match_name(label), []).append(player_key)
+
+    for _, keys in grouped.items():
+        if len(keys) <= 1:
+            continue
+        for player_key in keys:
+            pid = _person_id_from_player_key(player_key)
+            if pid is not None:
+                labels[player_key] = f"{labels[player_key]}#{pid}"
+
+    return labels
+
+
 def _trim_action(action):
     if not isinstance(action, dict):
         return None
@@ -721,9 +912,10 @@ def _trim_action(action):
     return payload
 
 
-def _trim_action_map(players):
+def _trim_action_map(players, output_labels):
     trimmed = {}
-    for name, acts in (players or {}).items():
+    for player_key, acts in (players or {}).items():
+        name = (output_labels or {}).get(player_key) or _default_player_label(player_key)
         filtered = []
         for action in acts or []:
             compact = _trim_action(action)
@@ -751,9 +943,10 @@ def _trim_score_timeline(score_timeline):
     return trimmed
 
 
-def _trim_segments(segments):
+def _trim_segments(segments, output_labels):
     trimmed = {}
-    for name, segs in (segments or {}).items():
+    for player_key, segs in (segments or {}).items():
+        name = (output_labels or {}).get(player_key) or _default_player_label(player_key)
         normalized = []
         for seg in segs or []:
             normalized.append(
@@ -807,10 +1000,14 @@ def process_playbyplay_payload(
     actions,
     away_team_id=None,
     home_team_id=None,
+    away_player_labels=None,
+    home_player_labels=None,
     include_actions=True,
     include_all_actions=True,
     seed_home=None,
     seed_away=None,
+    seed_home_ids=None,
+    seed_away_ids=None,
     seed_clock=None,
     seed_period=None,
 ):
@@ -840,12 +1037,20 @@ def process_playbyplay_payload(
         pass
 
     score_timeline = process_score_timeline(actions)
-    players = create_players(actions, away_team_id, home_team_id)
+    players = create_players(
+        actions,
+        away_team_id,
+        home_team_id,
+        away_player_labels=away_player_labels,
+        home_player_labels=home_player_labels,
+    )
     away_players = players["awayPlayers"]
     home_players = players["homePlayers"]
+    away_labels = players["awayLabels"]
+    home_labels = players["homeLabels"]
 
-    _ensure_seed_players(away_players, seed_away)
-    _ensure_seed_players(home_players, seed_home)
+    _ensure_seed_players(away_players, away_labels, seed_away, seed_away_ids)
+    _ensure_seed_players(home_players, home_labels, seed_home, seed_home_ids)
 
     away_playtimes = create_playtimes(away_players)
     home_playtimes = create_playtimes(home_players)
@@ -859,18 +1064,21 @@ def process_playbyplay_payload(
             current_q = period
 
         if away_team_id is not None and a.get("teamId") == away_team_id:
-            away_playtimes = update_playtimes_with_action(a, away_playtimes)
+            away_playtimes = update_playtimes_with_action(a, away_playtimes, away_labels)
         if home_team_id is not None and a.get("teamId") == home_team_id:
-            home_playtimes = update_playtimes_with_action(a, home_playtimes)
+            home_playtimes = update_playtimes_with_action(a, home_playtimes, home_labels)
 
-    _seed_playtimes(away_playtimes, seed_away, seed_clock, seed_period)
-    _seed_playtimes(home_playtimes, seed_home, seed_clock, seed_period)
+    _seed_playtimes(away_playtimes, seed_away, seed_away_ids, seed_clock, seed_period)
+    _seed_playtimes(home_playtimes, seed_home, seed_home_ids, seed_clock, seed_period)
 
     away_playtimes = end_playtimes(away_playtimes, last_action)
     home_playtimes = end_playtimes(home_playtimes, last_action)
 
-    trimmed_away_players = _trim_action_map(away_players)
-    trimmed_home_players = _trim_action_map(home_players)
+    away_output_labels = _build_output_player_labels(away_players, away_labels)
+    home_output_labels = _build_output_player_labels(home_players, home_labels)
+
+    trimmed_away_players = _trim_action_map(away_players, away_output_labels)
+    trimmed_home_players = _trim_action_map(home_players, home_output_labels)
 
     last_payload = None
     if last_action:
@@ -891,8 +1099,8 @@ def process_playbyplay_payload(
             "home": trimmed_home_players,
         },
         "segments": {
-            "away": _trim_segments(away_playtimes),
-            "home": _trim_segments(home_playtimes),
+            "away": _trim_segments(away_playtimes, away_output_labels),
+            "home": _trim_segments(home_playtimes, home_output_labels),
         },
     }
 

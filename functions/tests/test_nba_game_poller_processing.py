@@ -56,10 +56,14 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         )
 
         # In the fixture: "Murphy III ... (Jones 1 AST)" at actionNumber 11, NOP.
-        away_jones = processed["players"]["away"].get("Jones") or []
+        away_players = processed["players"]["away"].values()
         self.assertTrue(
-            any(a.get("type") == "Assist" and a.get("seq") == "11a" for a in away_jones),
-            "Expected injected assist action '11a' under away player 'Jones'",
+            any(
+                a.get("type") == "Assist" and a.get("seq") == "11a"
+                for player_actions in away_players
+                for a in (player_actions or [])
+            ),
+            "Expected injected assist action '11a' in away player action maps",
         )
 
     def test_assist_only_player_has_timeline(self):
@@ -293,3 +297,59 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(len(q2_segments), 1)
         self.assertEqual(q2_segments[0]["start"], "1200.00")
         self.assertEqual(q2_segments[0]["end"], "0000.00")
+
+    def test_players_with_same_initial_last_name_do_not_merge(self):
+        actions = [
+            {
+                "actionNumber": 1,
+                "actionId": 1,
+                "clock": "PT11M50.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 1631114,
+                "playerName": "Williams",
+                "playerNameI": "J. Williams",
+                "description": "J. Williams 2PT Jump Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "2",
+            },
+            {
+                "actionNumber": 2,
+                "actionId": 2,
+                "clock": "PT11M40.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 1631119,
+                "playerName": "Williams",
+                "playerNameI": "J. Williams",
+                "description": "J. Williams 2PT Jump Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "4",
+            },
+        ]
+
+        processed = process_playbyplay_payload(
+            game_id="same-initials-test",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+            away_player_labels={
+                1631114: "Jalen Williams",
+                1631119: "Jaylin Williams",
+            },
+        )
+
+        away_players = processed["players"]["away"]
+        away_segments = processed["segments"]["away"]
+
+        self.assertIn("Jalen Williams", away_players)
+        self.assertIn("Jaylin Williams", away_players)
+        self.assertIn("Jalen Williams", away_segments)
+        self.assertIn("Jaylin Williams", away_segments)
+        self.assertEqual(len(away_players), 2)

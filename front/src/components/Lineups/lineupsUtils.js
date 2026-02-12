@@ -104,8 +104,87 @@ const clampDisplay = (value) => {
   return `${clipped}.`;
 };
 
+const buildCompactLast = (parts) => {
+  if (!parts?.last) return '';
+  if (parts.last.length <= COMPACT_LAST_NAME_MAX) return parts.last;
+  return `${parts.last.slice(0, COMPACT_LAST_NAME_KEEP)}.`;
+};
+
+const buildUniqueFirstPrefix = (partsList, firstName) => {
+  const first = String(firstName || '').trim();
+  if (!first) return '';
+
+  const normalizedFirst = first.toLowerCase();
+  const normalizedNames = (partsList || [])
+    .map((entry) => String(entry?.first || '').trim().toLowerCase())
+    .filter(Boolean);
+
+  const uniqueNames = new Set(normalizedNames);
+  if (uniqueNames.size <= 1) return first.length === 1 ? `${first}.` : first;
+
+  for (let length = 1; length <= first.length; length += 1) {
+    const prefix = normalizedFirst.slice(0, length);
+    const collisions = normalizedNames.filter((candidate) => candidate.startsWith(prefix));
+    if (collisions.length <= 1) {
+      const token = first.slice(0, length);
+      return length >= first.length ? token : `${token}.`;
+    }
+  }
+
+  return first;
+};
+
+export const buildPlayerDisplayNames = (lineups) => {
+  const uniquePlayers = new Set();
+  (lineups || []).forEach((lineup) => {
+    (lineup?.players || []).forEach((player) => {
+      if (player) uniquePlayers.add(player);
+    });
+  });
+
+  const partsByPlayer = new Map();
+  const playersByLast = new Map();
+
+  uniquePlayers.forEach((player) => {
+    const parts = parseNameParts(player);
+    partsByPlayer.set(player, parts);
+    if (!parts?.baseLast) return;
+    if (!playersByLast.has(parts.baseLast)) {
+      playersByLast.set(parts.baseLast, []);
+    }
+    playersByLast.get(parts.baseLast).push(player);
+  });
+
+  const displayNames = new Map();
+  uniquePlayers.forEach((player) => {
+    const parts = partsByPlayer.get(player);
+    if (!parts?.cleaned || !parts?.last) {
+      displayNames.set(player, player);
+      return;
+    }
+
+    const sameLastPlayers = playersByLast.get(parts.baseLast) || [];
+    const compactLast = buildCompactLast(parts);
+
+    if (sameLastPlayers.length <= 1 || !parts.first) {
+      displayNames.set(player, clampDisplay(compactLast || parts.cleaned));
+      return;
+    }
+
+    const sameLastParts = sameLastPlayers.map((name) => partsByPlayer.get(name));
+    const firstPrefix = buildUniqueFirstPrefix(sameLastParts, parts.first);
+    const display = [firstPrefix, compactLast].filter(Boolean).join(' ');
+    displayNames.set(player, clampDisplay(display || parts.cleaned));
+  });
+
+  return displayNames;
+};
+
 // Render a compact player label, adding first initial when last names collide.
-export const formatPlayerName = (rawName, lastNameCounts) => {
+export const formatPlayerName = (rawName, lastNameCounts, playerDisplayNames) => {
+  if (playerDisplayNames?.has(rawName)) {
+    return clampDisplay(playerDisplayNames.get(rawName));
+  }
   const parts = parseNameParts(rawName);
   if (!parts.cleaned) return '';
   if (!parts.baseLast || !parts.last) return parts.cleaned;
@@ -113,11 +192,7 @@ export const formatPlayerName = (rawName, lastNameCounts) => {
   const count = lastNameCounts?.get(parts.baseLast) || 0;
   const needsInitial = count > 1 && parts.first;
   const firstInitial = needsInitial ? `${parts.first.charAt(0)}.` : '';
-
-  let compactLast = parts.last;
-  if (parts.last.length > COMPACT_LAST_NAME_MAX) {
-    compactLast = `${parts.last.slice(0, COMPACT_LAST_NAME_KEEP)}.`;
-  }
+  const compactLast = buildCompactLast(parts);
 
   const display = [firstInitial, compactLast].filter(Boolean).join(' ');
   return clampDisplay(display);

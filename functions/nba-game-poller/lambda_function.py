@@ -11,7 +11,12 @@ from botocore.exceptions import ClientError
 
 from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
 from nba_game_poller.playbyplay_processing import infer_team_ids_from_actions, process_playbyplay_payload
-from nba_game_poller.gamepack_utils import build_box_payload, extract_oncourt_names
+from nba_game_poller.gamepack_utils import (
+    build_box_payload,
+    build_player_label_map,
+    extract_oncourt_ids,
+    extract_oncourt_names,
+)
 from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
 
 # --- Configuration & Environment ---
@@ -502,6 +507,8 @@ def process_game(game_item, user_agent=None, date_str=None):
 
     home_team_id = home_team_id or game_item.get("homeTeamId")
     away_team_id = away_team_id or game_item.get("awayTeamId")
+    home_player_labels = build_player_label_map(box_game.get("homeTeam")) if box_game else {}
+    away_player_labels = build_player_label_map(box_game.get("awayTeam")) if box_game else {}
 
     # --- 1. Play by Play ---
     if play_data:
@@ -521,11 +528,15 @@ def process_game(game_item, user_agent=None, date_str=None):
 
         seed_home = []
         seed_away = []
+        seed_home_ids = []
+        seed_away_ids = []
         seed_period = (last_action or {}).get('period') or 1
         seed_clock = (last_action or {}).get('clock') or box_game.get('gameClock')
         if seed_period == 1 and box_game:
             seed_home = extract_oncourt_names(box_game.get("homeTeam"))
             seed_away = extract_oncourt_names(box_game.get("awayTeam"))
+            seed_home_ids = extract_oncourt_ids(box_game.get("homeTeam"))
+            seed_away_ids = extract_oncourt_ids(box_game.get("awayTeam"))
 
         if home_team_id and away_team_id and (actions or seed_home or seed_away):
             processed = process_playbyplay_payload(
@@ -533,10 +544,14 @@ def process_game(game_item, user_agent=None, date_str=None):
                 actions=actions,
                 away_team_id=away_team_id,
                 home_team_id=home_team_id,
+                away_player_labels=away_player_labels,
+                home_player_labels=home_player_labels,
                 include_actions=False,
                 include_all_actions=False,
                 seed_home=seed_home,
                 seed_away=seed_away,
+                seed_home_ids=seed_home_ids,
+                seed_away_ids=seed_away_ids,
                 seed_clock=seed_clock,
                 seed_period=seed_period,
             )

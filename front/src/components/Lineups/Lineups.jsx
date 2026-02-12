@@ -6,6 +6,7 @@ import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnc
 import LineupsTeamPanel from './LineupsTeamPanel';
 import {
   buildLastNameCounts,
+  buildPlayerDisplayNames,
   buildPlayerOptions,
   filterLineupsByPlayers,
   sortLineups,
@@ -65,6 +66,8 @@ export default function Lineups({
   );
   const awayLastNameCounts = useMemo(() => buildLastNameCounts(awayFiltered), [awayFiltered]);
   const homeLastNameCounts = useMemo(() => buildLastNameCounts(homeFiltered), [homeFiltered]);
+  const awayPlayerDisplayNames = useMemo(() => buildPlayerDisplayNames(awayLineups), [awayLineups]);
+  const homePlayerDisplayNames = useMemo(() => buildPlayerDisplayNames(homeLineups), [homeLineups]);
 
   const hasData = (awaySorted?.length || 0) > 0 || (homeSorted?.length || 0) > 0;
   const showLoadingIndicator = isLoading && !hasData && !statusMessage;
@@ -152,6 +155,7 @@ export default function Lineups({
             selectionMode={awaySelectionMode}
             onSelectionModeChange={setAwaySelectionMode}
             playerOptions={awayOptions}
+            playerDisplayNames={awayPlayerDisplayNames}
             sortConfig={sortConfig}
             onSortChange={setSortConfig}
             topSectionRef={awayTopRef}
@@ -169,6 +173,7 @@ export default function Lineups({
             selectionMode={homeSelectionMode}
             onSelectionModeChange={setHomeSelectionMode}
             playerOptions={homeOptions}
+            playerDisplayNames={homePlayerDisplayNames}
             sortConfig={sortConfig}
             onSortChange={setSortConfig}
             topSectionRef={homeTopRef}
