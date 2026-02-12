@@ -11,6 +11,19 @@ export function useAnalyticsSignals({
 }) {
   const lastTrackedGameIdRef = useRef(null);
   const closeSignalSentRef = useRef(false);
+  const heartbeatPayloadRef = useRef({
+    gameId: gameId || null,
+    date: date || null,
+    status: currentScheduleGameStatus || null,
+  });
+
+  useEffect(() => {
+    heartbeatPayloadRef.current = {
+      gameId: gameId || null,
+      date: date || null,
+      status: currentScheduleGameStatus || null,
+    };
+  }, [date, gameId, currentScheduleGameStatus]);
 
   useEffect(() => {
     if (isInitLoading) return;
@@ -34,13 +47,14 @@ export function useAnalyticsSignals({
         return;
       }
       if (!window?.umami?.track) return;
+      const payload = heartbeatPayloadRef.current;
       const trackedUrl = `${window.location.pathname}${window.location.search}`;
       window.umami.track('heartbeat', {
         url: trackedUrl,
         title: document.title,
-        gameId: gameId || null,
-        date: date || null,
-        status: currentScheduleGameStatus || null,
+        gameId: payload.gameId,
+        date: payload.date,
+        status: payload.status,
       });
     };
 
@@ -50,7 +64,7 @@ export function useAnalyticsSignals({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [date, gameId, currentScheduleGameStatus, isInitLoading, heartbeatIntervalMs]);
+  }, [isInitLoading, heartbeatIntervalMs]);
 
   useEffect(() => {
     if (isInitLoading) return;

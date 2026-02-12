@@ -91,4 +91,61 @@ describe('useAnalyticsSignals', () => {
 
     expect(track.mock.calls.length).toBe(callCountBeforeUnmount);
   });
+
+  it('keeps heartbeat cadence stable while using latest payload values', () => {
+    vi.useFakeTimers();
+
+    const track = vi.fn();
+    window.umami = { track };
+
+    const { rerender } = renderHook(
+      ({ gameId, status }) =>
+        useAnalyticsSignals({
+          gameId,
+          date: '2026-02-03',
+          currentScheduleGameStatus: status,
+          isInitLoading: false,
+          heartbeatIntervalMs: 1000,
+        }),
+      {
+        initialProps: {
+          gameId: '2026-02-03-phi-gsw',
+          status: 'Q1 08:12',
+        },
+      },
+    );
+
+    const getHeartbeatCalls = () => track.mock.calls.filter((call) => call[0] === 'heartbeat');
+
+    expect(getHeartbeatCalls()).toHaveLength(1);
+    expect(getHeartbeatCalls()[0][1]).toEqual(
+      expect.objectContaining({
+        gameId: '2026-02-03-phi-gsw',
+        status: 'Q1 08:12',
+      }),
+    );
+
+    rerender({
+      gameId: '2026-02-03-phi-gsw',
+      status: 'Q1 08:11',
+    });
+    rerender({
+      gameId: '2026-02-03-lal-bos',
+      status: 'Q1 08:10',
+    });
+
+    expect(getHeartbeatCalls()).toHaveLength(1);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(getHeartbeatCalls()).toHaveLength(2);
+    expect(getHeartbeatCalls()[1][1]).toEqual(
+      expect.objectContaining({
+        gameId: '2026-02-03-lal-bos',
+        status: 'Q1 08:10',
+      }),
+    );
+  });
 });
