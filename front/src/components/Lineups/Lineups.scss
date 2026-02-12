@@ -37,6 +37,12 @@
   gap: 8px;
 }
 
+.lineupsPanelTop {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .lineupsTeamHeader {
   display: flex;
   align-items: center;

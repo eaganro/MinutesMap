@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
@@ -28,6 +28,9 @@ export default function Lineups({
   const [selectedHomePlayers, setSelectedHomePlayers] = useState([]);
   const [awaySelectionMode, setAwaySelectionMode] = useState('filter');
   const [homeSelectionMode, setHomeSelectionMode] = useState('filter');
+  const [topSectionMinHeight, setTopSectionMinHeight] = useState(0);
+  const awayTopRef = useRef(null);
+  const homeTopRef = useRef(null);
   const { isDarkMode } = useTheme();
   const trackLineupsFeatureUse = useTrackFeatureUseOnce('lineups');
   const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode);
@@ -67,6 +70,59 @@ export default function Lineups({
   const showLoadingIndicator = isLoading && !hasData && !statusMessage;
   const showStatusMessage = Boolean(statusMessage) && !hasData;
 
+  useEffect(() => {
+    const awayTop = awayTopRef.current;
+    const homeTop = homeTopRef.current;
+    if (!awayTop || !homeTop) return undefined;
+
+    const isDesktop = () => {
+      if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
+      return window.matchMedia('(min-width: 921px)').matches;
+    };
+
+    const syncTopHeights = () => {
+      if (!isDesktop()) {
+        setTopSectionMinHeight((prev) => (prev === 0 ? prev : 0));
+        return;
+      }
+
+      const prevAwayMinHeight = awayTop.style.minHeight;
+      const prevHomeMinHeight = homeTop.style.minHeight;
+      awayTop.style.minHeight = '0px';
+      homeTop.style.minHeight = '0px';
+
+      const nextHeight = Math.max(
+        Math.ceil(awayTop.getBoundingClientRect().height),
+        Math.ceil(homeTop.getBoundingClientRect().height),
+      );
+
+      awayTop.style.minHeight = prevAwayMinHeight;
+      homeTop.style.minHeight = prevHomeMinHeight;
+
+      setTopSectionMinHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+    };
+
+    syncTopHeights();
+
+    let resizeObserver;
+    if (typeof ResizeObserver === 'function') {
+      resizeObserver = new ResizeObserver(syncTopHeights);
+      resizeObserver.observe(awayTop);
+      resizeObserver.observe(homeTop);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', syncTopHeights);
+    }
+
+    return () => {
+      resizeObserver?.disconnect();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', syncTopHeights);
+      }
+    };
+  }, [showLoadingIndicator, showStatusMessage]);
+
   return (
     <div className="lineups" onClick={trackLineupsFeatureUse} onTouchStart={trackLineupsFeatureUse}>
       <div className="lineupsHeader">
@@ -98,6 +154,8 @@ export default function Lineups({
             playerOptions={awayOptions}
             sortConfig={sortConfig}
             onSortChange={setSortConfig}
+            topSectionRef={awayTopRef}
+            topSectionMinHeight={topSectionMinHeight}
           />
           <LineupsTeamPanel
             teamLabel={homeTeam?.name || homeTeam?.abr || 'Home'}
@@ -113,6 +171,8 @@ export default function Lineups({
             playerOptions={homeOptions}
             sortConfig={sortConfig}
             onSortChange={setSortConfig}
+            topSectionRef={homeTopRef}
+            topSectionMinHeight={topSectionMinHeight}
           />
         </div>
       )}
