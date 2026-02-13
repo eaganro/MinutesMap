@@ -35,6 +35,7 @@
           <span class="appName">MinutesMap</span>
         </a>
         <div class="appHeaderActions">
+          <!--
           <a
             class="appSocialLink"
             href="https://x.com/intent/follow?screen_name=MinutesMap"
@@ -45,6 +46,7 @@
           >
             Follow on X
           </a>
+          -->
           <button
             class="dark-mode-toggle"
             aria-label="Switch to dark mode"
@@ -67,19 +69,21 @@
       <footer class="site-footer">
         <div class="footerContent">
           <div class="footerBranding">
-            <picture>
-              <source type="image/avif" srcset="/logo-70.avif 1x, /logo-140.avif 2x" />
-              <source type="image/webp" srcset="/logo-70.webp 1x, /logo-140.webp 2x" />
-              <img
-                src="/logo-70.png"
-                srcset="/logo-70.png 1x, /logo-140.png 2x"
-                width="40"
-                height="40"
-                alt="MinutesMap logo"
-                class="footerLogo"
-              />
-            </picture>
-            <span class="footerName">MinutesMap</span>
+            <a class="footerBrandingLink" href="/" aria-label="MinutesMap home">
+              <picture>
+                <source type="image/avif" srcset="/logo-70.avif 1x, /logo-140.avif 2x" />
+                <source type="image/webp" srcset="/logo-70.webp 1x, /logo-140.webp 2x" />
+                <img
+                  src="/logo-70.png"
+                  srcset="/logo-70.png 1x, /logo-140.png 2x"
+                  width="40"
+                  height="40"
+                  alt="MinutesMap logo"
+                  class="footerLogo"
+                />
+              </picture>
+              <span class="footerName">MinutesMap</span>
+            </a>
           </div>
           <nav class="footerLinks" aria-label="Footer">
             <ul class="footerLinkList">

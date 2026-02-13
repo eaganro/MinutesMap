@@ -33,6 +33,7 @@ export default function App() {
           <span className="appName">MinutesMap</span>
         </a>
         <div className="appHeaderActions">
+          {/*
           <a
             className="appSocialLink"
             href="https://x.com/intent/follow?screen_name=MinutesMap"
@@ -43,6 +44,7 @@ export default function App() {
           >
             Follow on X
           </a>
+          */}
           <DarkModeToggle />
         </div>
       </header>

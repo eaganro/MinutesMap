@@ -81,6 +81,10 @@ a:hover {
   color: inherit;
 }
 
+.appHeader a:hover {
+  text-decoration: none;
+}
+
 .appLogo {
   width: 45px;
   height: 50px;
@@ -310,10 +314,19 @@ li {
 }
 
 .footerBranding {
+  flex-shrink: 0;
+}
+
+.footerBrandingLink {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.footerBrandingLink:hover {
+  text-decoration: none;
 }
 
 .footerLogo {
