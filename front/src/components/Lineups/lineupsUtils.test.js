@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildLastNameCounts,
-  buildPlayerDisplayNames,
-  formatPlayerName,
-} from './lineupsUtils';
+import { buildLastNameCounts, buildPlayerDisplayNames, formatPlayerName } from './lineupsUtils';
 
 describe('lineupsUtils display names', () => {
   const lineups = [

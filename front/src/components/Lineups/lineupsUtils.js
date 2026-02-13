@@ -116,7 +116,11 @@ const buildUniqueFirstPrefix = (partsList, firstName) => {
 
   const normalizedFirst = first.toLowerCase();
   const normalizedNames = (partsList || [])
-    .map((entry) => String(entry?.first || '').trim().toLowerCase())
+    .map((entry) =>
+      String(entry?.first || '')
+        .trim()
+        .toLowerCase(),
+    )
     .filter(Boolean);
 
   const uniqueNames = new Set(normalizedNames);

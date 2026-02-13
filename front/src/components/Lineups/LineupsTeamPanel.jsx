@@ -56,7 +56,11 @@ export default function LineupsTeamPanel({
         </div>
         <div className="lineupsFilters">
           <span className="lineupsFilterLabel">Filter players (max {MAX_SELECTED_PLAYERS})</span>
-          <div className="lineupsFilterMode" role="group" aria-label={`${teamLabel} selection mode`}>
+          <div
+            className="lineupsFilterMode"
+            role="group"
+            aria-label={`${teamLabel} selection mode`}
+          >
             <button
               type="button"
               className={`lineupsFilterModeButton${selectionMode === 'filter' ? ' isActive' : ''}`}
@@ -72,7 +76,11 @@ export default function LineupsTeamPanel({
               Highlight
             </button>
           </div>
-          <div className="lineupsFilterPills" role="group" aria-label={`${teamLabel} player filters`}>
+          <div
+            className="lineupsFilterPills"
+            role="group"
+            aria-label={`${teamLabel} player filters`}
+          >
             {playerOptions.map((player) => {
               const isSelected = selectedPlayersSet.has(player);
               const isDisabled = !isSelected && selectionLimitReached;

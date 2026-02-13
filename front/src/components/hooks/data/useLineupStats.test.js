@@ -31,14 +31,10 @@ describe('useLineupStats', () => {
     const awayLineups = result.current.away;
     expect(awayLineups).toHaveLength(4);
     expect(
-      awayLineups
-        .map((lineup) => lineup.players.join('|'))
-        .sort((a, b) => a.localeCompare(b)),
+      awayLineups.map((lineup) => lineup.players.join('|')).sort((a, b) => a.localeCompare(b)),
     ).toEqual(['A|B|C|D', 'A|B|C|D|E|F', 'A|B|C|D|F', 'A|B|C|D|G']);
-    expect(
-      awayLineups
-        .map((lineup) => lineup.seconds)
-        .sort((a, b) => a - b),
-    ).toEqual([120, 120, 240, 240]);
+    expect(awayLineups.map((lineup) => lineup.seconds).sort((a, b) => a - b)).toEqual([
+      120, 120, 240, 240,
+    ]);
   });
 });
