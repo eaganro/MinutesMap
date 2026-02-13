@@ -28,16 +28,18 @@ export default function Footer() {
               <a href="/about">About</a>
             </li>
             <li>
-              <a href="mailto:minutesmap.viz@gmail.com">Contact</a>
-            </li>
-            <li>
               <a href="/privacy/">Privacy Policy</a>
             </li>
+            <li>
+              <a href="mailto:minutesmap.viz@gmail.com">Contact</a>
+            </li>
+            {/*
             <li>
               <a href="https://x.com/MinutesMap" target="_blank" rel="noopener noreferrer">
                 Twitter / X
               </a>
             </li>
+            */}
           </ul>
         </nav>
       </div>
