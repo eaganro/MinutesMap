@@ -12,3 +12,6 @@ node_modules/
 front/public/privacy/
 front/public/about/
 front/public/static-pages/
+
+# Local audit/reprocess artifacts
+tmp/
