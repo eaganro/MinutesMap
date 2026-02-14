@@ -573,3 +573,75 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertIn("Jalen Williams", away_segments)
         self.assertIn("Jaylin Williams", away_segments)
         self.assertEqual(len(away_players), 2)
+
+    def test_target_score_games_use_single_period_without_synthetic_segments(self):
+        actions = [
+            {
+                "actionNumber": 2,
+                "actionId": 2,
+                "orderNumber": 1000,
+                "clock": "PT00M00.00S",
+                "timeActual": "2026-02-14T02:00:00.000Z",
+                "period": 1,
+                "isTargetScoreLastPeriod": True,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 1001,
+                "playerName": "Away",
+                "playerNameI": "A. Away",
+                "description": "A. Away 2PT Jump Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "2",
+            },
+            {
+                "actionNumber": 3,
+                "actionId": 3,
+                "orderNumber": 2000,
+                "clock": "PT00M00.00S",
+                "timeActual": "2026-02-14T02:10:00.000Z",
+                "period": 1,
+                "isTargetScoreLastPeriod": True,
+                "teamId": int(self.home_team_id),
+                "teamTricode": "SAS",
+                "personId": 2001,
+                "playerName": "Home",
+                "playerNameI": "H. Home",
+                "description": "H. Home 2PT Jump Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "2",
+                "scoreAway": "2",
+            },
+        ]
+
+        processed = process_playbyplay_payload(
+            game_id="target-score-test",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+            seed_home=["Starter"],
+            seed_away=["Starter"],
+            seed_clock="PT00M00.00S",
+            seed_period=1,
+        )
+
+        self.assertEqual(processed["periods"], 1)
+        self.assertEqual(processed["last"]["quarter"], 1)
+        self.assertEqual(processed["last"]["time"], "000.00")
+        self.assertEqual(processed["score"][0]["time"], "1200.00")
+        self.assertEqual(processed["score"][-1]["time"], "000.00")
+
+        action_times = set()
+        for team_key in ("away", "home"):
+            for actions_for_player in processed["players"][team_key].values():
+                for action in actions_for_player:
+                    action_times.add(action.get("time"))
+        self.assertGreater(len(action_times), 1)
+
+        all_segments = []
+        for team_key in ("away", "home"):
+            for segments in processed["segments"][team_key].values():
+                all_segments.extend(segments or [])
+        self.assertGreater(len(all_segments), 0)

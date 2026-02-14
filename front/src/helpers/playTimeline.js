@@ -19,7 +19,8 @@ export function getPeriodStartSeconds(period) {
 
 export function getGameTotalSeconds(numPeriods) {
   const count = Number(numPeriods);
-  if (!Number.isFinite(count) || count <= 4) return REGULATION_SECONDS;
+  if (!Number.isFinite(count) || count <= 0) return REGULATION_SECONDS;
+  if (count <= 4) return count * REGULATION_PERIOD_SECONDS;
   return REGULATION_SECONDS + (count - 4) * OVERTIME_PERIOD_SECONDS;
 }
 

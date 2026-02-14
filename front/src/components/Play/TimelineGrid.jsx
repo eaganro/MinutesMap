@@ -11,6 +11,9 @@ export default function TimelineGrid({
   activePeriodLabel,
 }) {
   const timelineElements = [];
+  const totalPeriods = Number.isFinite(Number(numQs)) && Number(numQs) > 0 ? Number(numQs) : 4;
+  const regulationPeriods = Math.min(4, totalPeriods);
+  const overtimePeriods = Math.max(0, totalPeriods - 4);
 
   // 1. Horizontal Baseline
   timelineElements.push(
@@ -26,8 +29,8 @@ export default function TimelineGrid({
 
   // 2. Vertical Quarter Lines
   if (!isQuarterView) {
-    // Q1, Q2, Q3
-    for (let i = 1; i <= 3; i++) {
+    // Regulation period separators.
+    for (let i = 1; i < regulationPeriods; i += 1) {
       const x = leftMargin + qWidth * i;
       timelineElements.push(
         <line
@@ -41,8 +44,8 @@ export default function TimelineGrid({
       );
     }
 
-    // Q4/OT Lines
-    for (let q = 4; q < numQs; q += 1) {
+    // OT separators (shorter than regulation periods).
+    for (let q = 4; q < totalPeriods; q += 1) {
       // OT periods are shorter (5 mins vs 12 mins), so they are 5/12th the width
       let x = leftMargin + qWidth * 4 + (5 / 12) * qWidth * (q - 4);
       timelineElements.push(
@@ -78,7 +81,7 @@ export default function TimelineGrid({
       );
     }
   } else {
-    ['Q1', 'Q2', 'Q3', 'Q4'].forEach((label, i) => {
+    Array.from({ length: regulationPeriods }, (_, idx) => `Q${idx + 1}`).forEach((label, i) => {
       timelineElements.push(
         <text
           key={`label-${label}`}
@@ -92,7 +95,7 @@ export default function TimelineGrid({
       );
     });
 
-    for (let ot = 1; ot <= numQs - 4; ot += 1) {
+    for (let ot = 1; ot <= overtimePeriods; ot += 1) {
       const otCenterX = leftMargin + qWidth * 4 + otWidth * (ot - 0.5);
       timelineElements.push(
         <text key={`label-o${ot}`} x={otCenterX} y={labelY} textAnchor="middle" style={labelStyle}>

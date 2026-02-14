@@ -258,7 +258,13 @@ def poller_logic(context, schedule_half=True):
         game_key = game.get("id")
         if game_id_map and game_key and game_key in game_id_map:
             game["nbaGameId"] = game_id_map[game_key]
-        if is_confirmed_terminal_game(game):
+        # Final games can appear late (e.g., bracket finals) without cached ETags yet.
+        # Process those once so we still generate a gamepack.
+        if (
+            is_confirmed_terminal_game(game)
+            and game.get("play_etag")
+            and game.get("box_etag")
+        ):
             continue
         remaining_games += 1
         if has_game_started(game, now_et):

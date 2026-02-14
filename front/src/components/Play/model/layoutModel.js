@@ -17,10 +17,14 @@ export function getTimelineWidth(
 }
 
 export function getQuarterWidth(width, numPeriods) {
-  if (numPeriods > 4) {
-    return width * (12 / (12 * 4 + 5 * (numPeriods - 4)));
+  const count = Number(numPeriods);
+  if (!Number.isFinite(count) || count <= 0) {
+    return width / 4;
   }
-  return width / 4;
+  if (count > 4) {
+    return width * (12 / (12 * 4 + 5 * (count - 4)));
+  }
+  return width / count;
 }
 
 export function getScoreScale(scoreTimeline) {

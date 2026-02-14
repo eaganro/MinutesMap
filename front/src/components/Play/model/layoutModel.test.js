@@ -8,6 +8,7 @@ import {
 
 describe('layoutModel', () => {
   it('computes quarter width and score scale values', () => {
+    expect(getQuarterWidth(400, 1)).toBe(400);
     expect(getQuarterWidth(400, 4)).toBe(100);
     expect(getQuarterWidth(400, 5)).toBeCloseTo(90.56, 1);
 

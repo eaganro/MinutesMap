@@ -120,3 +120,28 @@ class TestNbaGamePollerLambda:
         assert updates["finalConfirmed"] is False
         assert isinstance(updates.get("finalPendingSince"), str)
         assert updates["finalPendingSince"]
+
+    def test_poller_processes_final_games_missing_cached_etags(self):
+        self.module.get_nba_date = MagicMock(return_value="2026-02-13")
+        self.module.get_games_from_s3 = MagicMock(
+            return_value=[
+                {
+                    "id": "2026-02-13-vin-mel",
+                    "status": "Final",
+                    "finalConfirmed": True,
+                    "starttime": "2026-02-13T22:35:00",
+                }
+            ]
+        )
+        self.module.load_game_id_map = MagicMock(return_value={})
+        self.module.has_game_started = MagicMock(return_value=True)
+        self.module.schedule_half_poller = MagicMock(return_value=False)
+        self.module.process_game = MagicMock(return_value=(True, {}))
+        self.module.update_manifest = MagicMock()
+        self.module.upload_schedule_s3 = MagicMock()
+        self.module.upload_init_state = MagicMock()
+        self.module.disable_self = MagicMock()
+
+        self.module.poller_logic(None)
+
+        self.module.process_game.assert_called_once()

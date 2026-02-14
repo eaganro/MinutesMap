@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timezone
 
 
 _CLOCK_RE = re.compile(r"^(?:PT)?(\d+)M(\d+)(?:\.(\d+))?S?$")
@@ -15,6 +16,7 @@ _SUB_FOR_RE = re.compile(r"SUB:\s*(.+?)\s+FOR\s+(.+)", re.IGNORECASE)
 _INITIAL_PREFIX_RE = re.compile(r"^[A-Z]\.")
 _PLAYER_ID_KEY_PREFIX = "pid:"
 _PLAYER_NAME_KEY_PREFIX = "name:"
+_TARGET_SCORE_PERIOD_SECONDS = 12 * 60
 
 
 def time_to_seconds(clock):
@@ -52,6 +54,34 @@ def _trim_clock(clock):
     if "M" in trimmed:
         trimmed = trimmed.replace("M", "")
     return trimmed
+
+
+def _parse_time_actual(action):
+    raw = (action or {}).get("timeActual")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    value = raw.strip()
+    if value.endswith("Z"):
+        value = f"{value[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(value)
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def _seconds_to_clock(seconds):
+    try:
+        total_centis = int(round(float(seconds) * 100))
+    except Exception:
+        total_centis = 0
+    if total_centis < 0:
+        total_centis = 0
+    minutes, remainder = divmod(total_centis, 6000)
+    whole_seconds, centis = divmod(remainder, 100)
+    return f"PT{minutes}M{whole_seconds:02d}.{centis:02d}S"
 
 
 def _normalize_name(action):
@@ -1001,6 +1031,84 @@ def infer_team_ids_from_actions(actions):
     return team_ids[0], team_ids[1]
 
 
+def _is_target_score_game(actions):
+    saw_target_period = False
+    for action in actions or []:
+        if not isinstance(action, dict):
+            continue
+        flag = action.get("isTargetScoreLastPeriod")
+        if flag is True:
+            saw_target_period = True
+        elif flag is False:
+            return False
+    return saw_target_period
+
+
+def _needs_target_score_clock_synthesis(actions):
+    unique_seconds = {
+        time_to_seconds((action or {}).get("clock"))
+        for action in (actions or [])
+        if isinstance(action, dict)
+    }
+    if not unique_seconds:
+        return False
+    return len(unique_seconds) == 1 and next(iter(unique_seconds)) == 0.0
+
+
+def _build_target_score_remaining_seconds(actions):
+    actions = list(actions or [])
+    count = len(actions)
+    if count == 0:
+        return []
+    if count == 1:
+        return [0.0]
+
+    timestamps = [_parse_time_actual(action) for action in actions]
+    valid = [ts for ts in timestamps if ts is not None]
+    remaining = []
+
+    if len(valid) >= 2 and max(valid) > min(valid):
+        min_ts = min(valid)
+        span = max(valid) - min_ts
+        for idx, ts in enumerate(timestamps):
+            if ts is None:
+                progress = idx / (count - 1)
+            else:
+                progress = (ts - min_ts) / span
+            progress = max(0.0, min(1.0, progress))
+            remaining.append(_TARGET_SCORE_PERIOD_SECONDS * (1.0 - progress))
+    else:
+        for idx in range(count):
+            progress = idx / (count - 1)
+            remaining.append(_TARGET_SCORE_PERIOD_SECONDS * (1.0 - progress))
+
+    # Guard against occasional feed jitter where event timestamps are slightly out of order.
+    for idx in range(1, count):
+        if remaining[idx] > remaining[idx - 1]:
+            remaining[idx] = remaining[idx - 1]
+
+    remaining[0] = min(_TARGET_SCORE_PERIOD_SECONDS, max(0.0, remaining[0]))
+    remaining[-1] = 0.0
+    return remaining
+
+
+def _apply_target_score_clocks(actions):
+    actions = list(actions or [])
+    if not actions or not _needs_target_score_clock_synthesis(actions):
+        return actions
+
+    remaining_seconds = _build_target_score_remaining_seconds(actions)
+    normalized = []
+    for action, seconds in zip(actions, remaining_seconds):
+        if not isinstance(action, dict):
+            normalized.append(action)
+            continue
+        next_action = dict(action)
+        next_action["clock"] = _seconds_to_clock(seconds)
+        normalized.append(next_action)
+    return normalized
+
+
 def process_playbyplay_payload(
     *,
     game_id,
@@ -1031,15 +1139,22 @@ def process_playbyplay_payload(
         home_team_id = None
 
     actions = sort_actions_by_order(actions or [])
+    is_target_score_game = _is_target_score_game(actions)
+    if is_target_score_game:
+        actions = _apply_target_score_clocks(actions)
     last_action = actions[-1] if actions else None
     if seed_period is None:
         seed_period = (last_action or {}).get("period") or 1
     if seed_clock is None and last_action:
         seed_clock = last_action.get("clock")
-    num_periods = 4
+    num_periods = 1 if is_target_score_game else 4
     try:
-        if last_action and (last_action.get("period") or 0) > 4:
-            num_periods = int(last_action.get("period"))
+        last_period = int((last_action or {}).get("period") or 0)
+        if last_period > 0:
+            if is_target_score_game:
+                num_periods = max(1, last_period)
+            elif last_period > 4:
+                num_periods = last_period
     except Exception:
         pass
 
@@ -1056,8 +1171,9 @@ def process_playbyplay_payload(
     away_labels = players["awayLabels"]
     home_labels = players["homeLabels"]
 
-    _ensure_seed_players(away_players, away_labels, seed_away, seed_away_ids)
-    _ensure_seed_players(home_players, home_labels, seed_home, seed_home_ids)
+    if not is_target_score_game:
+        _ensure_seed_players(away_players, away_labels, seed_away, seed_away_ids)
+        _ensure_seed_players(home_players, home_labels, seed_home, seed_home_ids)
 
     away_playtimes = create_playtimes(away_players)
     home_playtimes = create_playtimes(home_players)
@@ -1075,8 +1191,9 @@ def process_playbyplay_payload(
         if home_team_id is not None and a.get("teamId") == home_team_id:
             home_playtimes = update_playtimes_with_action(a, home_playtimes, home_labels)
 
-    _seed_playtimes(away_playtimes, seed_away, seed_away_ids, seed_clock, seed_period)
-    _seed_playtimes(home_playtimes, seed_home, seed_home_ids, seed_clock, seed_period)
+    if not is_target_score_game:
+        _seed_playtimes(away_playtimes, seed_away, seed_away_ids, seed_clock, seed_period)
+        _seed_playtimes(home_playtimes, seed_home, seed_home_ids, seed_clock, seed_period)
 
     away_playtimes = end_playtimes(away_playtimes, last_action)
     home_playtimes = end_playtimes(home_playtimes, last_action)
