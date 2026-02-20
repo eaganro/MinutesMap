@@ -381,17 +381,75 @@ def _extract_gemini_text(payload):
     return ""
 
 
+def _extract_first_json_object(text):
+    raw = str(text or "")
+    start = raw.find("{")
+    if start < 0:
+        return ""
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for idx in range(start, len(raw)):
+        ch = raw[idx]
+        if escaped:
+            escaped = False
+            continue
+        if in_string and ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+            continue
+        if ch == "}":
+            depth -= 1
+            if depth == 0:
+                return raw[start : idx + 1]
+            if depth < 0:
+                return ""
+    return ""
+
+
 def _parse_json_payload(raw_text):
-    text = _normalize_space(raw_text)
+    text = str(raw_text or "").strip()
     if not text:
         return None
     if text.startswith("```"):
         text = text.strip("`")
-        text = text.replace("json", "", 1).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
+        text = re.sub(r"^\s*json\s*", "", text, flags=re.IGNORECASE).strip()
+
+    for candidate in (text, _normalize_space(text)):
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    extracted = _extract_first_json_object(text)
+    for candidate in (extracted, _normalize_space(extracted)):
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
+def _preview_raw_response(raw_text, max_chars=260):
+    text = _normalize_space(raw_text)
+    if not text:
+        return "<empty>"
+    if len(text) > max_chars:
+        return text[: max_chars - 1].rstrip() + "…"
+    return text
 
 
 def _canonical_player_name(raw_name, allowed_names):
@@ -488,7 +546,8 @@ def request_period_caption(
     raw_text = _extract_gemini_text(payload)
     parsed = _parse_json_payload(raw_text)
     if not isinstance(parsed, dict):
-        print(f"Caption AI parse failed for {_period_label(period)}")
+        preview = _preview_raw_response(raw_text)
+        print(f"Caption AI parse failed for {_period_label(period)}: {preview}")
         return None
 
     full_caption = _sanitize_caption(parsed.get("full_caption"), max_chars=180)

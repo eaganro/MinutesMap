@@ -102,3 +102,29 @@ def test_build_period_captions_can_detect_closed_periods_from_flow(monkeypatch):
 
     assert merged["periods"]["1"]["full"] == "Generated for period 1."
     assert merged["periods"]["2"]["full"] == "Generated for period 2."
+
+
+def test_parse_json_payload_extracts_first_json_object_from_wrapped_text():
+    raw_text = (
+        "Sure, here is the result.\n"
+        '{"full_caption":"Away team closes Q1 strong.","player_stories":[]}\n'
+        "Hope this helps."
+    )
+
+    parsed = captioning._parse_json_payload(raw_text)
+
+    assert parsed["full_caption"] == "Away team closes Q1 strong."
+    assert parsed["player_stories"] == []
+
+
+def test_parse_json_payload_handles_fenced_json():
+    raw_text = (
+        "```json\n"
+        '{"full_caption":"Game stays tight through halftime.","player_stories":[]}\n'
+        "```"
+    )
+
+    parsed = captioning._parse_json_payload(raw_text)
+
+    assert parsed["full_caption"] == "Game stays tight through halftime."
+    assert parsed["player_stories"] == []
