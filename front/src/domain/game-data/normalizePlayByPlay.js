@@ -122,7 +122,9 @@ export function normalizePlayByPlay(playByPlay) {
       awayActionsAll,
       homeActionsAll,
       captions:
-        playByPlay?.captions && typeof playByPlay.captions === 'object' ? playByPlay.captions : null,
+        playByPlay?.captions && typeof playByPlay.captions === 'object'
+          ? playByPlay.captions
+          : null,
     };
   }
 
