@@ -152,6 +152,7 @@ resource "aws_lambda_function" "nba_poller" {
       POLLER_RULE_NAME        = aws_cloudwatch_event_rule.nba_poller_rule.name
       SCHEDULE_RECONCILE_DAYS = "4"
       GAME_ID_MAP_PREFIX      = "private/gameIdMap/"
+      GEMINI_API_KEY          = var.gemini_api_key
     }
   }
 }
