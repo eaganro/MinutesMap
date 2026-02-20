@@ -11,6 +11,7 @@ import {
 import { buildExportRequestSnapshot } from './model/exportRangeModel';
 import { buildExportRenderRequest } from './model/exportRequestModel';
 import { buildExportOutputMetadata, buildExportPreviewState } from './model/exportPreviewModel';
+import { resolveDefaultExportCaption } from './model/exportCaptionModel';
 import { renderExportCanvas } from './playExportRenderer';
 import {
   canvasToBlob,
@@ -63,6 +64,7 @@ export const usePlayExportController = ({
   const displayHomePlayerTimeline = stablePlayData.homePlayerTimeline;
   const displayScoreTimeline = stablePlayData.scoreTimeline;
   const displayLastAction = stablePlayData.lastAction;
+  const generatedCaptions = stablePlayData.captions;
   const timelineWindow = periodData.timelineWindow;
 
   const [isExporting, setIsExporting] = useState(false);
@@ -252,6 +254,13 @@ export const usePlayExportController = ({
           gameId,
           origin: window.location?.origin || '',
         });
+        const defaultCaption = resolveDefaultExportCaption({
+          captions: generatedCaptions,
+          exportView,
+          exportRange: snapshot.exportRangeSnapshot,
+          selectedPlayer: selectedExportPlayer,
+          playerDisplayName: exportPlayerDisplayName,
+        });
 
         const { file, errorMessage: fileError } = createPngFile({ blob, fileName });
         if (fileError && isCurrentRequest()) {
@@ -277,6 +286,7 @@ export const usePlayExportController = ({
             file,
             canShare: canShareFiles,
             shareMetadata,
+            captionText: defaultCaption,
             isUpdating: false,
           }),
         );
@@ -321,6 +331,7 @@ export const usePlayExportController = ({
       gameDate,
       displayAwayTeamNames,
       displayHomeTeamNames,
+      generatedCaptions,
       showScoreDiff,
       statOn,
       teamColors,
@@ -336,7 +347,7 @@ export const usePlayExportController = ({
     const shareResult = await shareFile({
       file: exportPreview.file,
       title: exportPreview.shareTitle,
-      text: exportPreview.shareText,
+      text: (exportPreview.captionText || '').trim() || undefined,
       url: exportPreview.shareUrl,
     });
     if (shareResult.shared) {
@@ -368,6 +379,19 @@ export const usePlayExportController = ({
     setExportError(null);
   }, []);
 
+  const handleCaptionChange = useCallback(
+    (nextCaption) => {
+      setExportPreviewState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          captionText: String(nextCaption || ''),
+        };
+      });
+    },
+    [setExportPreviewState],
+  );
+
   const exportDisabled = !hasDisplayData || isDataLoading || isExporting;
 
   return {
@@ -382,6 +406,7 @@ export const usePlayExportController = ({
     exportRangeOptions,
     filteredRangeEndOptions,
     previewIsUpdating: Boolean(exportPreview?.isUpdating),
+    captionText: exportPreview?.captionText || '',
     exportDisabled,
     setExportView,
     setExportPlayerKey,
@@ -391,5 +416,6 @@ export const usePlayExportController = ({
     handleSharePreview,
     closeExportPreview,
     clearExportError,
+    handleCaptionChange,
   };
 };

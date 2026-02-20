@@ -7,6 +7,7 @@ export const EMPTY_TIMELINE_DATA = Object.freeze({
   allActions: [],
   awayActionsAll: {},
   homeActionsAll: {},
+  captions: null,
 });
 
 export function isLegacyPlayByPlayPayload(data) {
@@ -120,6 +121,8 @@ export function normalizePlayByPlay(playByPlay) {
       allActions: buildAllActionsFromPlayers(awayActionsAll, homeActionsAll),
       awayActionsAll,
       homeActionsAll,
+      captions:
+        playByPlay?.captions && typeof playByPlay.captions === 'object' ? playByPlay.captions : null,
     };
   }
 
@@ -133,5 +136,6 @@ export function normalizePlayByPlay(playByPlay) {
     allActions: buildAllActionsFromPlayers(awayActionsAll, homeActionsAll),
     awayActionsAll,
     homeActionsAll,
+    captions: null,
   };
 }

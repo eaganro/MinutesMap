@@ -8,6 +8,7 @@ export const DEFAULT_GAMEPACK_STATE = {
   nbaGameId: null,
   numPeriods: DEFAULT_NUM_PERIODS,
   lastAction: null,
+  captions: null,
 };
 
 export const coerceNbaGameId = (value) => {
@@ -31,6 +32,7 @@ export const readPlayMeta = (payload) => {
           }
         : null,
       numPeriods: payload.periods ?? DEFAULT_NUM_PERIODS,
+      captions: payload?.captions && typeof payload.captions === 'object' ? payload.captions : null,
     };
   }
 
@@ -38,12 +40,14 @@ export const readPlayMeta = (payload) => {
     return {
       lastAction: payload.lastAction ?? null,
       numPeriods: payload.numPeriods ?? DEFAULT_NUM_PERIODS,
+      captions: null,
     };
   }
 
   return {
     lastAction: null,
     numPeriods: DEFAULT_NUM_PERIODS,
+    captions: null,
   };
 };
 
@@ -72,7 +76,7 @@ export const unpackGamePackPayload = (payload) => {
 
 export const adaptGamePackPayload = (payload) => {
   const { boxData, playData } = unpackGamePackPayload(payload);
-  const { lastAction, numPeriods } = readPlayMeta(playData);
+  const { lastAction, numPeriods, captions } = readPlayMeta(playData);
 
   return {
     boxData,
@@ -84,5 +88,6 @@ export const adaptGamePackPayload = (payload) => {
     nbaGameId: coerceNbaGameId(payload?.nbaGameId) || coerceNbaGameId(payload?.id),
     lastAction,
     numPeriods,
+    captions,
   };
 };

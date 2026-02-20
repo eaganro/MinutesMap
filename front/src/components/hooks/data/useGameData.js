@@ -16,6 +16,7 @@ export function useGameData() {
   const [nbaGameId, setNbaGameId] = useState(DEFAULT_GAMEPACK_STATE.nbaGameId);
   const [numPeriods, setNumPeriods] = useState(DEFAULT_GAMEPACK_STATE.numPeriods);
   const [lastAction, setLastAction] = useState(DEFAULT_GAMEPACK_STATE.lastAction);
+  const [captions, setCaptions] = useState(DEFAULT_GAMEPACK_STATE.captions);
   const [gameStatusMessage, setGameStatusMessage] = useState(null);
 
   const [schedule, setSchedule] = useState([]);
@@ -32,6 +33,7 @@ export function useGameData() {
     setNbaGameId(state.nbaGameId);
     setNumPeriods(state.numPeriods);
     setLastAction(state.lastAction);
+    setCaptions(state.captions);
   }, []);
 
   const transitionGameLoading = useCallback((showLoading) => {
@@ -62,6 +64,7 @@ export function useGameData() {
       setNumPeriods(adapted.numPeriods);
       setLastAction(adapted.lastAction);
       setPlayByPlay(adapted.playData);
+      setCaptions(adapted.captions);
     }
   }, []);
 
@@ -166,6 +169,7 @@ export function useGameData() {
     nbaGameId,
     numPeriods,
     lastAction,
+    captions,
     gameStatusMessage,
     isBoxLoading,
     isPlayLoading,

@@ -117,6 +117,26 @@
   font-weight: 600;
 }
 
+.playExportOption textarea {
+  border: 1px solid var(--border-light);
+  background: var(--bg-play);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.35;
+  resize: vertical;
+  min-height: 66px;
+  font-family: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.playExportCaptionOption {
+  flex: 1 1 100%;
+}
+
 .playExportPreviewClose {
   border: 1px solid transparent;
   background: transparent;

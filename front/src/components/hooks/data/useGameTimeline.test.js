@@ -19,6 +19,7 @@ describe('useGameTimeline', () => {
       homePlayerTimeline: {},
       awayPlayerTimeline: {},
       allActions: [],
+      captions: null,
       playerActions: {
         away: { filtered: {}, all: {} },
         home: { filtered: {}, all: {} },

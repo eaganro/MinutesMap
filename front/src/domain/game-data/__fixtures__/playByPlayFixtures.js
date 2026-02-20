@@ -148,6 +148,7 @@ export const expectedLegacyNormalized = {
   homePlayerTimeline: legacyPlayByPlayPayload.homePlayerTimeline,
   awayActionsAll: legacyPlayByPlayPayload.awayActions,
   homeActionsAll: legacyPlayByPlayPayload.homeActions,
+  captions: null,
   allActions: [
     {
       period: 1,
@@ -210,6 +211,7 @@ export const expectedCompactNormalized = {
     { period: 1, clock: 'PT11M00.00S', away: 2, home: 0 },
     { period: 2, clock: 'PT11M50.00S', away: 2, home: 3 },
   ],
+  captions: null,
   awayPlayerTimeline: {
     'Away Guard': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
   },

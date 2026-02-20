@@ -21,6 +21,7 @@ export function useGameTimeline(playByPlay, statOn) {
       homePlayerTimeline: normalized.homePlayerTimeline,
       awayPlayerTimeline: normalized.awayPlayerTimeline,
       allActions: normalized.allActions,
+      captions: normalized.captions,
       playerActions: {
         away: {
           filtered: awayFilteredActions,

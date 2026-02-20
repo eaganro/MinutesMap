@@ -36,14 +36,16 @@ export const buildExportPreviewState = ({
   file,
   canShare,
   shareMetadata,
+  captionText = '',
   isUpdating = false,
 }) => ({
   url,
   fileName,
   file,
   canShare,
+  captionText,
   shareTitle: shareMetadata.title,
-  shareText: shareMetadata.text,
+  shareText: captionText || shareMetadata.text || '',
   shareUrl: shareMetadata.url,
   isUpdating,
 });

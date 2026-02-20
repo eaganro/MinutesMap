@@ -17,6 +17,7 @@ from nba_game_poller.gamepack_utils import (
     extract_oncourt_ids,
     extract_oncourt_names,
 )
+from nba_game_poller.captioning import build_period_captions, extract_closed_periods
 from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
 
 # --- Configuration & Environment ---
@@ -43,6 +44,17 @@ SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
 HALF_POLL_SCHEDULE_PREFIX = "NBA_PollerHalf_"
 HALF_POLL_OFFSET_SECONDS = int(os.environ.get("HALF_POLL_OFFSET_SECONDS", "30"))
 POLL_WINDOW_SECONDS = float(os.environ.get("POLL_WINDOW_SECONDS", "15"))
+AI_CAPTIONS_ENABLED = os.environ.get("AI_CAPTIONS_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
+GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
+GEMINI_MODEL = (os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+try:
+    CAPTION_MAX_PLAYERS_PER_TEAM = max(0, int(os.environ.get("CAPTION_MAX_PLAYERS_PER_TEAM", "2")))
+except (TypeError, ValueError):
+    CAPTION_MAX_PLAYERS_PER_TEAM = 2
+try:
+    CAPTION_TIMEOUT_SECONDS = max(2.0, float(os.environ.get("CAPTION_TIMEOUT_SECONDS", "8")))
+except (TypeError, ValueError):
+    CAPTION_TIMEOUT_SECONDS = 8.0
 
 # 3. Security (From Terraform)
 LAMBDA_ARN = os.environ.get('LAMBDA_ARN')
@@ -52,6 +64,7 @@ SCHEDULER_ROLE_ARN = os.environ.get('SCHEDULER_ROLE_ARN')
 s3_client = boto3.client('s3', region_name=REGION)
 events_client = boto3.client('events', region_name=REGION)
 scheduler_client = boto3.client('scheduler', region_name=REGION)
+lambda_client = boto3.client('lambda', region_name=REGION)
 
 ET_ZONE = ZoneInfo("America/New_York")
 UTC_ZONE = ZoneInfo("UTC")
@@ -76,6 +89,8 @@ def main_handler(event, context):
         return poller_logic(context, schedule_half=False)
     elif task == 'poller':
         return poller_logic(context, schedule_half=True)
+    elif task == 'caption_worker':
+        return caption_worker_logic(event)
     else:
         print(f"Unknown task '{task}'. Defaulting to poller.")
         return poller_logic(context, schedule_half=True)
@@ -458,6 +473,82 @@ def disable_self():
     except Exception as e:
         print(f"Poller Error: Failed to disable rule: {e}")
 
+
+def enqueue_caption_worker(*, game_key, latest_closed_period, status_text=""):
+    if not LAMBDA_ARN:
+        return False
+    payload = {
+        "task": "caption_worker",
+        "gameKey": game_key,
+        "closedThrough": latest_closed_period,
+        "status": status_text or "",
+    }
+    try:
+        lambda_client.invoke(
+            FunctionName=LAMBDA_ARN,
+            InvocationType="Event",
+            Payload=json.dumps(payload).encode("utf-8"),
+        )
+        return True
+    except Exception as e:
+        print(f"Caption enqueue error for {game_key}: {e}")
+        return False
+
+
+def caption_worker_logic(event):
+    game_key = (event.get("gameKey") or "").strip()
+    if not game_key:
+        print("CaptionWorker: Missing gameKey.")
+        return
+    if not AI_CAPTIONS_ENABLED:
+        print("CaptionWorker: Disabled by configuration.")
+        return
+    if not GEMINI_API_KEY:
+        print("CaptionWorker: GEMINI_API_KEY not configured.")
+        return
+
+    existing = load_gamepack(game_key)
+    if not isinstance(existing, dict):
+        print(f"CaptionWorker: No gamepack for {game_key}.")
+        return
+
+    flow_payload = existing.get("flow")
+    box_payload = existing.get("box")
+    if not isinstance(flow_payload, dict) or not isinstance(box_payload, dict):
+        print(f"CaptionWorker: Missing flow/box for {game_key}.")
+        return
+
+    existing_captions = flow_payload.get("captions")
+    merged_captions = build_period_captions(
+        actions=None,
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        existing_captions=existing_captions,
+        api_key=GEMINI_API_KEY,
+        model=GEMINI_MODEL,
+        max_players_per_team=CAPTION_MAX_PLAYERS_PER_TEAM,
+        timeout_seconds=CAPTION_TIMEOUT_SECONDS,
+    )
+    if not isinstance(merged_captions, dict):
+        return
+    if isinstance(existing_captions, dict) and merged_captions == existing_captions:
+        return
+
+    next_flow = dict(flow_payload)
+    next_flow["captions"] = merged_captions
+    gamepack = dict(existing)
+    gamepack["flow"] = next_flow
+    status_text = (event.get("status") or "").strip()
+    upload_json_to_s3(
+        s3_client=s3_client,
+        bucket=BUCKET,
+        prefix=PREFIX,
+        key=f"{GAMEPACK_PREFIX}{game_key}.json",
+        data=gamepack,
+        is_final=is_final_status(status_text),
+    )
+    print(f"CaptionWorker: Uploaded captions for {game_key}.")
+
 # ==============================================================================
 # CORE PROCESSING (Fetch -> Upload -> Update)
 # ==============================================================================
@@ -497,6 +588,16 @@ def process_game(game_item, user_agent=None, date_str=None):
     play_final_away_score = None
     processed = None
     slim_box = None
+    actions = []
+    existing_gamepack = None
+    existing_gamepack_loaded = False
+
+    def load_existing_gamepack_once():
+        nonlocal existing_gamepack, existing_gamepack_loaded
+        if not existing_gamepack_loaded:
+            existing_gamepack = load_gamepack(game_key)
+            existing_gamepack_loaded = True
+        return existing_gamepack
 
     # Best-effort team IDs for play-by-play processing (used when box is a 304).
     home_team_id = None
@@ -623,9 +724,23 @@ def process_game(game_item, user_agent=None, date_str=None):
                 updates['homescore'] = existing_home
                 updates['awayscore'] = existing_away
 
+    if processed is not None and AI_CAPTIONS_ENABLED and GEMINI_API_KEY and LAMBDA_ARN:
+        closed_periods = extract_closed_periods(actions)
+        if closed_periods:
+            latest_closed_period = max(closed_periods)
+            requested_through = parse_positive_int(game_item.get("captions_requested_through"), fallback=0)
+            if latest_closed_period > requested_through:
+                status_for_worker = updates.get("status") or game_item.get("status") or ""
+                if enqueue_caption_worker(
+                    game_key=game_key,
+                    latest_closed_period=latest_closed_period,
+                    status_text=status_for_worker,
+                ):
+                    updates["captions_requested_through"] = latest_closed_period
+
     if processed is not None or slim_box is not None:
         if processed is None or slim_box is None:
-            existing = load_gamepack(game_key)
+            existing = load_existing_gamepack_once()
             if processed is None:
                 processed = (existing or {}).get("flow")
             if slim_box is None:

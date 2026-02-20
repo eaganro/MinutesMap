@@ -15,6 +15,7 @@ const EMPTY_PLAY_DATA = Object.freeze({
   numQs: 0,
   lastAction: null,
   gameDate: null,
+  captions: null,
 });
 
 const hasPlayData = (data) =>
@@ -53,6 +54,8 @@ const buildNormalizedPlayData = (playData = EMPTY_PLAY_DATA) => {
     numQs: playData.numQs || EMPTY_PLAY_DATA.numQs,
     lastAction: playData.lastAction || EMPTY_PLAY_DATA.lastAction,
     gameDate: playData.gameDate || EMPTY_PLAY_DATA.gameDate,
+    captions:
+      playData?.captions && typeof playData.captions === 'object' ? playData.captions : null,
   };
 };
 

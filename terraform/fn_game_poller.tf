@@ -9,8 +9,8 @@ resource "aws_iam_role" "nba_poller_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "lambda.amazonaws.com" }
     }]
   })
@@ -24,8 +24,8 @@ resource "aws_iam_role" "nba_scheduler_role" {
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
       Principal = { Service = "scheduler.amazonaws.com" }
     }]
   })
@@ -50,9 +50,9 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
       },
       # 2. S3 Access
       {
-        Sid      = "S3ReadWriteOnlyDataPrefix"
-        Action   = ["s3:PutObject", "s3:GetObject"]
-        Effect   = "Allow"
+        Sid    = "S3ReadWriteOnlyDataPrefix"
+        Action = ["s3:PutObject", "s3:GetObject"]
+        Effect = "Allow"
         Resource = [
           "arn:aws:s3:::roryeagan.com-nba-processed-data/data/*",
           "arn:aws:s3:::roryeagan.com-nba-processed-data/schedule/*",
@@ -83,16 +83,23 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
       },
       # 4. Scheduler Control
       {
-        Sid      = "SchedulerManageOnlyKickoffSchedule"
-        Action   = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
-        Effect   = "Allow"
+        Sid    = "SchedulerManageOnlyKickoffSchedule"
+        Action = ["scheduler:CreateSchedule", "scheduler:DeleteSchedule"]
+        Effect = "Allow"
         Resource = [
           "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_Daily_Kickoff",
           "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_Reconcile_*",
           "arn:aws:scheduler:us-east-1:*:schedule/default/NBA_PollerHalf_*"
         ]
       },
-      # 5. PassRole
+      # 5. Allow async self-invoke for caption workers.
+      {
+        Sid      = "LambdaInvokeSelf"
+        Action   = ["lambda:InvokeFunction"]
+        Effect   = "Allow"
+        Resource = aws_lambda_function.nba_poller.arn
+      },
+      # 6. PassRole
       {
         Sid      = "AllowPassSchedulerRoleToScheduler"
         Action   = "iam:PassRole"
@@ -128,23 +135,23 @@ data "archive_file" "zip_nba_poller" {
 }
 
 resource "aws_lambda_function" "nba_poller" {
-  function_name    = "NBAGamePoller"
-  role             = aws_iam_role.nba_poller_role.arn
-  handler          = "lambda_function.main_handler"
-  runtime          = "python3.11"
-  timeout          = 60
-  
+  function_name = "NBAGamePoller"
+  role          = aws_iam_role.nba_poller_role.arn
+  handler       = "lambda_function.main_handler"
+  runtime       = "python3.11"
+  timeout       = 60
+
   filename         = data.archive_file.zip_nba_poller.output_path
   source_code_hash = data.archive_file.zip_nba_poller.output_base64sha256
 
   environment {
     variables = {
-      LAMBDA_ARN = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
-      SCHEDULER_ROLE_ARN = aws_iam_role.nba_scheduler_role.arn
-      DATA_BUCKET      = aws_s3_bucket.data_bucket.id
-      POLLER_RULE_NAME = aws_cloudwatch_event_rule.nba_poller_rule.name
+      LAMBDA_ARN              = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
+      SCHEDULER_ROLE_ARN      = aws_iam_role.nba_scheduler_role.arn
+      DATA_BUCKET             = aws_s3_bucket.data_bucket.id
+      POLLER_RULE_NAME        = aws_cloudwatch_event_rule.nba_poller_rule.name
       SCHEDULE_RECONCILE_DAYS = "4"
-      GAME_ID_MAP_PREFIX = "private/gameIdMap/"
+      GAME_ID_MAP_PREFIX      = "private/gameIdMap/"
     }
   }
 }

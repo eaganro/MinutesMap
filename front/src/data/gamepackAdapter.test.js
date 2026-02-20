@@ -17,6 +17,7 @@ describe('gamepackAdapter', () => {
       nbaGameId: null,
       numPeriods: 4,
       lastAction: null,
+      captions: null,
     });
   });
 
@@ -24,6 +25,12 @@ describe('gamepackAdapter', () => {
     const metadata = readPlayMeta({
       v: 2,
       periods: 5,
+      captions: {
+        v: 1,
+        periods: {
+          1: { full: 'Quarter recap', players: [] },
+        },
+      },
       last: {
         quarter: 5,
         time: 'PT01M02.00S',
@@ -40,6 +47,12 @@ describe('gamepackAdapter', () => {
         scoreHome: 118,
       },
       numPeriods: 5,
+      captions: {
+        v: 1,
+        periods: {
+          1: { full: 'Quarter recap', players: [] },
+        },
+      },
     });
   });
 
@@ -63,6 +76,7 @@ describe('gamepackAdapter', () => {
         scoreHome: 81,
       },
       numPeriods: 3,
+      captions: null,
     });
   });
 
@@ -97,6 +111,7 @@ describe('gamepackAdapter', () => {
         nbaGameId: '0022500003',
         numPeriods: 4,
         playData: payload.flow,
+        captions: null,
       }),
     );
   });

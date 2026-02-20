@@ -59,6 +59,15 @@ vi.mock('./useGameData', () => ({
     nbaGameId: '0022500001',
     numPeriods: 4,
     lastAction: { period: 2, clock: 'PT09M00.00S' },
+    captions: {
+      v: 1,
+      periods: {
+        1: {
+          full: 'PHI starts quickly and carries momentum through Q1.',
+          players: [],
+        },
+      },
+    },
     gameStatusMessage: null,
     isBoxLoading: false,
     isPlayLoading: false,
@@ -204,6 +213,15 @@ describe('useMinutesMap', () => {
           numQs: 4,
           lastAction: { period: 2, clock: 'PT09M00.00S' },
           gameDate: '2026-02-03T20:00:00',
+          captions: {
+            v: 1,
+            periods: {
+              1: {
+                full: 'PHI starts quickly and carries momentum through Q1.',
+                players: [],
+              },
+            },
+          },
         },
         playByPlaySectionRef: mocks.playRef,
         playByPlaySectionWidth: 640,

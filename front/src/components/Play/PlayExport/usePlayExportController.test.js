@@ -88,6 +88,21 @@ const buildProps = () => ({
         { period: 1, clock: 'PT10M00.00S', away: 2, home: 0 },
       ],
       lastAction: { period: 1, clock: 'PT10M00.00S' },
+      captions: {
+        v: 1,
+        periods: {
+          1: {
+            full: 'Philadelphia controls the opening stretch with pace and pressure.',
+            players: [
+              {
+                team: 'away',
+                player: 'J. Brown',
+                caption: 'Brown attacks early and keeps pressure on the defense.',
+              },
+            ],
+          },
+        },
+      },
     },
     periodData: {
       timelineWindow: { startSeconds: 0, durationSeconds: 2880 },
@@ -150,6 +165,9 @@ describe('usePlayExportController', () => {
     expect(mocks.trackFeatureUse).toHaveBeenCalledWith('image-builder');
     expect(mocks.renderExportCanvas).toHaveBeenCalledTimes(1);
     expect(result.current.exportPreview?.url).toBe('blob:preview-url');
+    expect(result.current.exportPreview?.captionText).toBe(
+      'Philadelphia controls the opening stretch with pace and pressure.',
+    );
     expect(result.current.exportError).toBeNull();
   });
 
@@ -240,12 +258,20 @@ describe('usePlayExportController', () => {
     });
 
     expect(result.current.exportPreview?.canShare).toBe(true);
+    act(() => {
+      result.current.handleCaptionChange('Custom share caption');
+    });
 
     await act(async () => {
       await result.current.handleSharePreview();
     });
 
     expect(mocks.shareFile).toHaveBeenCalledTimes(1);
+    expect(mocks.shareFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'Custom share caption',
+      }),
+    );
     expect(result.current.exportPreview).toBeNull();
   });
 
