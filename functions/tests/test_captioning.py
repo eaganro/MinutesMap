@@ -190,6 +190,28 @@ def test_compute_player_metrics_counts_freethrow_action_type_and_ft_text():
     assert metrics_through_q3["pts"] == 4
 
 
+def test_compute_player_metrics_counts_three_when_only_in_detail():
+    actions = [
+        {
+            "quarter": 3,
+            "type": "Jump Shot",
+            "detail": "3PT Step Back Jump Shot",
+            "r": "m",
+            "text": "L. Doncic make step back",
+        },
+        {
+            "quarter": 3,
+            "type": "Jump Shot",
+            "detail": "Pullup Jump Shot",
+            "r": "m",
+            "text": "L. Doncic make pullup",
+        },
+    ]
+
+    metrics = captioning._compute_player_metrics(actions, period=3)
+    assert metrics["pts"] == 5
+
+
 def test_parse_json_payload_handles_fenced_json():
     raw_text = (
         "```json\n"

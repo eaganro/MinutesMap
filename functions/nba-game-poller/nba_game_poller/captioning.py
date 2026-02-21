@@ -227,6 +227,10 @@ def _compute_player_metrics(actions, period):
         action_type = _normalize_space(action.get("type") or action.get("actionType")).lower()
         result = _normalize_space(action.get("r") or action.get("result")).lower()
         text = _normalize_space(action.get("text") or action.get("description")).lower()
+        detail = _normalize_space(action.get("detail") or action.get("subType")).lower()
+
+        is_three_pointer = "3pt" in action_type or "3pt" in text or "3pt" in detail
+        is_two_pointer = "2pt" in action_type or "2pt" in text or "2pt" in detail
 
         is_free_throw = (
             "freethrow" in action_type
@@ -238,10 +242,10 @@ def _compute_player_metrics(actions, period):
         if result.startswith("m"):
             if is_free_throw:
                 points += 1
-            elif "3" in action_type or "3pt" in text:
+            elif is_three_pointer:
                 points += 3
             elif (
-                "2" in action_type
+                is_two_pointer
                 or "shot" in action_type
                 or "layup" in text
                 or "dunk" in text
