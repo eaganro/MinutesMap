@@ -1,4 +1,5 @@
 import copy
+import base64
 import json
 import re
 import urllib.error
@@ -364,7 +365,8 @@ def _build_prompt(summary, max_players_per_team):
     )
 
 
-def _extract_gemini_text(payload):
+def _extract_gemini_texts(payload):
+    extracted = []
     candidates = payload.get("candidates") if isinstance(payload, dict) else []
     for candidate in candidates or []:
         if not isinstance(candidate, dict):
@@ -378,9 +380,40 @@ def _extract_gemini_text(payload):
             text = part.get("text")
             if isinstance(text, str) and text.strip():
                 text_parts.append(text)
-        if text_parts:
-            return "\n".join(text_parts).strip()
+            inline_data = part.get("inlineData")
+            if isinstance(inline_data, dict):
+                mime_type = _normalize_space(inline_data.get("mimeType")).lower()
+                data = inline_data.get("data")
+                if mime_type == "application/json" and isinstance(data, str) and data.strip():
+                    try:
+                        decoded = base64.b64decode(data).decode("utf-8")
+                    except Exception:
+                        decoded = ""
+                    if decoded.strip():
+                        text_parts.append(decoded)
+        joined = "\n".join(text_parts).strip()
+        if joined:
+            extracted.append(joined)
+    return extracted
+
+
+def _extract_gemini_text(payload):
+    texts = _extract_gemini_texts(payload)
+    if texts:
+        return texts[0]
     return ""
+
+
+def _extract_finish_reasons(payload):
+    reasons = []
+    candidates = payload.get("candidates") if isinstance(payload, dict) else []
+    for candidate in candidates or []:
+        if not isinstance(candidate, dict):
+            continue
+        reason = _normalize_space(candidate.get("finishReason"))
+        if reason:
+            reasons.append(reason)
+    return reasons
 
 
 def _caption_response_schema():
@@ -467,6 +500,26 @@ def _parse_json_payload(raw_text):
     return None
 
 
+def _coerce_caption_payload(parsed):
+    if not isinstance(parsed, dict):
+        return None
+
+    full_caption = parsed.get("full_caption")
+    if full_caption is None:
+        full_caption = parsed.get("fullCaption")
+
+    player_stories = parsed.get("player_stories")
+    if player_stories is None:
+        player_stories = parsed.get("playerStories")
+
+    if full_caption is None and player_stories is None:
+        return None
+    return {
+        "full_caption": full_caption,
+        "player_stories": player_stories if isinstance(player_stories, list) else [],
+    }
+
+
 def _preview_raw_response(raw_text, max_chars=260):
     text = _normalize_space(raw_text)
     if not text:
@@ -537,42 +590,66 @@ def request_period_caption(
         return None
 
     prompt = _build_prompt(summary, max_players_per_team)
-    body = json.dumps(
-        {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.2,
-                "topP": 0.9,
-                "maxOutputTokens": 256,
-                "responseMimeType": "application/json",
-                "responseSchema": _caption_response_schema(),
-            },
-        }
-    ).encode("utf-8")
-
     model_id = urllib.parse.quote(model, safe=".-_")
     api_key_q = urllib.parse.quote(api_key, safe="")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key_q}"
-    req = urllib.request.Request(url, data=body, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "application/json")
+    for attempt in (1, 2):
+        attempt_prompt = prompt
+        if attempt == 2:
+            attempt_prompt += (
+                "\nFinal reminder: Return a single minified JSON object only. "
+                "No prose, no markdown fences."
+            )
 
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
-            raw = response.read().decode("utf-8")
-            payload = json.loads(raw)
-    except urllib.error.HTTPError as err:
-        print(f"Caption AI HTTP error for {_period_label(period)}: {err.code}")
-        return None
-    except Exception as err:
-        print(f"Caption AI request failed for {_period_label(period)}: {err}")
-        return None
+        generation_config = {
+            "temperature": 0.0,
+            "topP": 0.9,
+            "maxOutputTokens": 512,
+            "responseMimeType": "application/json",
+            "responseSchema": _caption_response_schema(),
+        }
+        model_lower = _normalize_space(model).lower()
+        if "2.5" in model_lower:
+            generation_config["thinkingConfig"] = {"thinkingBudget": 0}
 
-    raw_text = _extract_gemini_text(payload)
-    parsed = _parse_json_payload(raw_text)
-    if not isinstance(parsed, dict):
+        body = json.dumps(
+            {
+                "contents": [{"parts": [{"text": attempt_prompt}]}],
+                "generationConfig": generation_config,
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(url, data=body, method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("Accept", "application/json")
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+                payload = json.loads(raw)
+        except urllib.error.HTTPError as err:
+            print(f"Caption AI HTTP error for {_period_label(period)}: {err.code}")
+            return None
+        except Exception as err:
+            print(f"Caption AI request failed for {_period_label(period)}: {err}")
+            return None
+
+        parsed = None
+        raw_text = ""
+        for text in _extract_gemini_texts(payload):
+            raw_text = text
+            parsed = _coerce_caption_payload(_parse_json_payload(text))
+            if parsed:
+                break
+        if parsed:
+            break
+
         preview = _preview_raw_response(raw_text)
-        print(f"Caption AI parse failed for {_period_label(period)}: {preview}")
+        finish_reasons = ",".join(_extract_finish_reasons(payload)) or "unknown"
+        print(
+            f"Caption AI parse failed for {_period_label(period)} "
+            f"(attempt {attempt}/2, finish={finish_reasons}): {preview}"
+        )
+    else:
         return None
 
     full_caption = _sanitize_caption(parsed.get("full_caption"), max_chars=180)
