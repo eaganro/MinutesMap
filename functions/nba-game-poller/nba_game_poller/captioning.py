@@ -23,6 +23,9 @@ _EXCLUDED_EVENT_TYPES = {
     "violation",
 }
 
+FULL_CAPTION_MAX_CHARS = 180
+PLAYER_CAPTION_MAX_CHARS = 150
+
 
 def _safe_int(value, default=None):
     try:
@@ -356,8 +359,8 @@ def _build_prompt(summary, max_players_per_team):
         '- Use double quotes for all keys and string values, and escape any internal quotes.\n'
         "- No emojis.\n"
         "- No hashtags.\n"
-        "- full_caption should be <= 180 chars and focus on the game story up to this checkpoint.\n"
-        "- player_stories should be <= 150 chars each.\n"
+        f"- full_caption should be <= {FULL_CAPTION_MAX_CHARS} chars and focus on the game story up to this checkpoint.\n"
+        f"- player_stories should be <= {PLAYER_CAPTION_MAX_CHARS} chars each.\n"
         f"- At most {max_players_per_team} player stories per team.\n"
         "- Only use player names from playerCandidates.\n"
         "- If no player story is worth posting, return an empty player_stories list.\n"
@@ -559,7 +562,7 @@ def _validate_player_stories(player_stories, candidates_by_team, max_players_per
         player_name = _canonical_player_name(item.get("player"), allowed.get(team) or [])
         if not player_name:
             continue
-        caption = _sanitize_caption(item.get("caption"), max_chars=150)
+        caption = _sanitize_caption(item.get("caption"), max_chars=PLAYER_CAPTION_MAX_CHARS)
         if not caption:
             continue
 
@@ -652,7 +655,7 @@ def request_period_caption(
     else:
         return None
 
-    full_caption = _sanitize_caption(parsed.get("full_caption"), max_chars=180)
+    full_caption = _sanitize_caption(parsed.get("full_caption"), max_chars=FULL_CAPTION_MAX_CHARS)
     player_stories = _validate_player_stories(
         parsed.get("player_stories"),
         summary.get("players"),
@@ -671,6 +674,10 @@ def _initialize_captions(existing_captions, model):
         "provider": "gemini",
         "model": model,
         "updatedAt": "",
+        "limits": {
+            "full": FULL_CAPTION_MAX_CHARS,
+            "player": PLAYER_CAPTION_MAX_CHARS,
+        },
         "periods": {},
     }
     if not isinstance(existing_captions, dict):
@@ -680,6 +687,12 @@ def _initialize_captions(existing_captions, model):
     for key in ("v", "provider", "model", "updatedAt"):
         if key in existing_captions:
             merged[key] = existing_captions.get(key)
+
+    # Always normalize caption limits to backend constants so clients can trust this metadata.
+    merged["limits"] = {
+        "full": FULL_CAPTION_MAX_CHARS,
+        "player": PLAYER_CAPTION_MAX_CHARS,
+    }
 
     raw_periods = existing_captions.get("periods")
     if isinstance(raw_periods, dict):
@@ -711,7 +724,7 @@ def build_period_captions(
         return existing_captions
 
     captions = _initialize_captions(existing_captions, model)
-    changed = False
+    changed = isinstance(existing_captions, dict) and captions != existing_captions
 
     for period in closed_periods:
         period_key = str(period)

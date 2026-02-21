@@ -68,6 +68,10 @@ def test_build_period_captions_merges_existing_checkpoints(monkeypatch):
 
     assert merged["periods"]["1"]["full"] == "Existing first-quarter caption."
     assert merged["periods"]["2"]["full"] == "Generated for period 2."
+    assert merged["limits"] == {
+        "full": captioning.FULL_CAPTION_MAX_CHARS,
+        "player": captioning.PLAYER_CAPTION_MAX_CHARS,
+    }
 
 
 def test_build_period_captions_can_detect_closed_periods_from_flow(monkeypatch):
@@ -104,6 +108,59 @@ def test_build_period_captions_can_detect_closed_periods_from_flow(monkeypatch):
 
     assert merged["periods"]["1"]["full"] == "Generated for period 1."
     assert merged["periods"]["2"]["full"] == "Generated for period 2."
+    assert merged["limits"] == {
+        "full": captioning.FULL_CAPTION_MAX_CHARS,
+        "player": captioning.PLAYER_CAPTION_MAX_CHARS,
+    }
+
+
+def test_build_period_captions_normalizes_limits_even_when_no_new_periods():
+    existing = {
+        "v": 1,
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "updatedAt": "2026-02-01T00:00:00+00:00",
+        "limits": {"full": 999, "player": 999},
+        "periods": {
+            "1": {
+                "generatedAt": "2026-02-01T00:00:00+00:00",
+                "full": "Existing first-quarter caption.",
+                "players": [],
+            }
+        },
+    }
+    flow_payload = {
+        "score": [
+            {"quarter": 1, "awayScore": 26, "homeScore": 23},
+            {"quarter": 2, "awayScore": 50, "homeScore": 49},
+        ],
+        "players": {"away": {}, "home": {}},
+        "events": [],
+    }
+    box_payload = {
+        "teams": {
+            "away": {"abbr": "PHI"},
+            "home": {"abbr": "LAL"},
+        }
+    }
+    actions = [
+        {"period": 1, "clock": "PT00M00.00S"},
+        {"period": 2, "clock": "PT11M59.00S"},
+    ]
+
+    merged = captioning.build_period_captions(
+        actions=actions,
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        existing_captions=existing,
+        api_key="test-key",
+        model="gemini-2.5-flash",
+    )
+
+    assert merged["limits"] == {
+        "full": captioning.FULL_CAPTION_MAX_CHARS,
+        "player": captioning.PLAYER_CAPTION_MAX_CHARS,
+    }
 
 
 def test_parse_json_payload_extracts_first_json_object_from_wrapped_text():
@@ -209,6 +266,9 @@ def test_request_period_caption_includes_response_schema(monkeypatch):
     assert generation_config["responseSchema"]["type"] == "object"
     assert generation_config["responseSchema"]["properties"]["player_stories"]["type"] == "array"
     assert generation_config["thinkingConfig"] == {"thinkingBudget": 0}
+    prompt = captured["body"]["contents"][0]["parts"][0]["text"]
+    assert f"full_caption should be <= {captioning.FULL_CAPTION_MAX_CHARS} chars" in prompt
+    assert f"player_stories should be <= {captioning.PLAYER_CAPTION_MAX_CHARS} chars each" in prompt
 
 
 def test_request_period_caption_retries_parse_failure_once(monkeypatch):

@@ -144,6 +144,19 @@
   gap: 8px;
 }
 
+.playExportCaptionActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playExportCaptionCounter {
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .playExportCaptionApplyButton {
   border: 1px solid var(--border-light);
   background: var(--bg-game);

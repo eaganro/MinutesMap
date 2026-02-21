@@ -8,12 +8,16 @@ import {
   EXPORT_VIEW_OPTIONS,
   resolveFullNameFromRoster,
 } from './playExportModel';
+import { formatPeriodLabel } from './playExportRange';
 import { buildExportRequestSnapshot } from './model/exportRangeModel';
 import { buildExportRenderRequest } from './model/exportRequestModel';
 import { buildExportOutputMetadata, buildExportPreviewState } from './model/exportPreviewModel';
 import {
+  clampExportCaption,
   resolveDefaultExportCaption,
-  resolvePlayerExportCaption,
+  resolveExportCaptionMaxLength,
+  resolveFullCaptionPeriods,
+  resolvePlayerCaptionPeriods,
 } from './model/exportCaptionModel';
 import { renderExportCanvas } from './playExportRenderer';
 import { loadTeamLogosForExport } from './playExportAssets';
@@ -120,17 +124,22 @@ export const usePlayExportController = ({
       const teamKey = option.teamKey === 'away' ? 'away' : 'home';
       const rosterPlayers = box?.teams?.[teamKey]?.players || [];
       const displayName = resolveFullNameFromRoster(option.name, rosterPlayers) || option.name;
-      const caption = resolvePlayerExportCaption({
+      const captionPeriods = resolvePlayerCaptionPeriods({
         captions: generatedCaptions,
-        exportRange: resolvedExportRange,
         selectedPlayer: { name: option.name, teamKey: option.teamKey },
         playerDisplayName: displayName,
       });
-      const hasCaption = Boolean(caption);
+      const captionPeriodLabels = captionPeriods.map((period) => formatPeriodLabel(period)).filter(Boolean);
+      const hasAnyCaption = captionPeriodLabels.length > 0;
+      const hasCaption = captionPeriods.includes(Number(resolvedExportRange?.end));
       return {
         ...option,
         hasCaption,
-        label: hasCaption ? `${option.name} (${option.teamAbr}) [caption]` : option.label,
+        hasAnyCaption,
+        captionPeriods,
+        label: hasAnyCaption
+          ? `${option.name} (${option.teamAbr}) [${captionPeriodLabels.join(', ')}]`
+          : option.label,
         sortIndex: index,
       };
     });
@@ -138,6 +147,9 @@ export const usePlayExportController = ({
     withCaptions.sort((a, b) => {
       if (a.hasCaption !== b.hasCaption) {
         return a.hasCaption ? -1 : 1;
+      }
+      if (a.hasAnyCaption !== b.hasAnyCaption) {
+        return a.hasAnyCaption ? -1 : 1;
       }
       return a.sortIndex - b.sortIndex;
     });
@@ -177,7 +189,9 @@ export const usePlayExportController = ({
     }
     const hasCurrent = exportPlayerOptions.some((option) => option.key === exportPlayerKey);
     if (!hasCurrent) {
-      const preferredOption = exportPlayerOptions.find((option) => option.hasCaption);
+      const preferredOption =
+        exportPlayerOptions.find((option) => option.hasCaption) ||
+        exportPlayerOptions.find((option) => option.hasAnyCaption);
       setExportPlayerKey((preferredOption || exportPlayerOptions[0]).key);
     }
   }, [exportPlayerOptions, exportPlayerKey]);
@@ -245,8 +259,11 @@ export const usePlayExportController = ({
           selectedPlayer: selectedExportPlayer,
           playerDisplayName: exportPlayerDisplayName,
         });
-        const resolvedCaption =
-          typeof captionOverride === 'string' ? captionOverride : String(defaultCaption || '');
+        const resolvedCaption = clampExportCaption({
+          text: typeof captionOverride === 'string' ? captionOverride : String(defaultCaption || ''),
+          exportView,
+          captions: generatedCaptions,
+        });
         const teamLogos = await loadTeamLogosForExport({
           awayTeamAbbr: displayAwayTeamNames?.abr,
           homeTeamAbbr: displayHomeTeamNames?.abr,
@@ -420,9 +437,42 @@ export const usePlayExportController = ({
   }, [exportPreview, exportPreviewKey, handleExportImage]);
 
   const exportRangeOptions = useMemo(() => buildExportRangeOptions(numPeriods), [numPeriods]);
-  const filteredRangeEndOptions = exportRangeOptions.filter(
-    (option) => option.period >= resolvedExportRange.start,
+  const captionedEndPeriods = useMemo(() => {
+    if (exportView === 'full') {
+      return new Set(resolveFullCaptionPeriods({ captions: generatedCaptions }));
+    }
+    return new Set(
+      resolvePlayerCaptionPeriods({
+        captions: generatedCaptions,
+        selectedPlayer: selectedExportPlayer,
+        playerDisplayName: exportPlayerDisplayName,
+      }),
+    );
+  }, [exportView, generatedCaptions, selectedExportPlayer, exportPlayerDisplayName]);
+
+  const filteredRangeEndOptions = useMemo(
+    () =>
+      exportRangeOptions
+        .filter((option) => option.period >= resolvedExportRange.start)
+        .map((option) =>
+          captionedEndPeriods.has(option.period)
+            ? { ...option, label: `${option.label} [caption]` }
+            : option,
+        ),
+    [exportRangeOptions, resolvedExportRange.start, captionedEndPeriods],
   );
+
+  const captionMaxLength = useMemo(
+    () => resolveExportCaptionMaxLength({ exportView, captions: generatedCaptions }),
+    [exportView, generatedCaptions],
+  );
+
+  useEffect(() => {
+    setCaptionDraft((prev) => {
+      const clamped = clampExportCaption({ text: prev, exportView, captions: generatedCaptions });
+      return clamped === prev ? prev : clamped;
+    });
+  }, [exportView, generatedCaptions]);
 
   const closeExportPreview = useCallback(() => {
     activeRequestIdRef.current += 1;
@@ -435,9 +485,13 @@ export const usePlayExportController = ({
   }, []);
 
   const handleCaptionChange = useCallback((nextCaption) => {
-    const resolved = String(nextCaption || '');
+    const resolved = clampExportCaption({
+      text: nextCaption,
+      exportView,
+      captions: generatedCaptions,
+    });
     setCaptionDraft(resolved);
-  }, []);
+  }, [exportView, generatedCaptions]);
 
   const handleApplyCaption = useCallback(() => {
     if (!exportPreview) return;
@@ -462,6 +516,7 @@ export const usePlayExportController = ({
     filteredRangeEndOptions,
     previewIsUpdating: Boolean(exportPreview?.isUpdating),
     captionText: captionDraft,
+    captionMaxLength,
     captionCanApply,
     exportDisabled,
     setExportView,

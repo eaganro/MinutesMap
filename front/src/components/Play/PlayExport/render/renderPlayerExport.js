@@ -40,6 +40,7 @@ export const renderPlayerExportCanvas = ({
   periodRange,
   rightMargin,
   playRef,
+  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredAwayPlayers,
@@ -90,7 +91,7 @@ export const renderPlayerExportCanvas = ({
   });
   const captionTopGap = captionHeight > 0 ? 6 : 0;
   const captionBottomGap = captionHeight > 0 ? 8 : 0;
-  const headerHeight = measureCenteredScoreHeaderHeight({ statusLabel });
+  const headerHeight = measureCenteredScoreHeaderHeight({ gameDate, statusLabel });
   const playAreaTop = headerHeight + captionTopGap + captionHeight + captionBottomGap;
   const chartTop = playAreaTop;
   const chartLeft = rightPad;
@@ -154,6 +155,7 @@ export const renderPlayerExportCanvas = ({
     contentWidth,
     awayLabel,
     homeLabel,
+    gameDate,
     scoreTimelineSource,
     statusLabel,
     textPrimary,

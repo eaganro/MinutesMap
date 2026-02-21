@@ -106,6 +106,16 @@ const buildProps = () => ({
               },
             ],
           },
+          4: {
+            full: 'Philadelphia controls the opening stretch with pace and pressure.',
+            players: [
+              {
+                team: 'away',
+                player: 'J. Brown',
+                caption: 'Brown attacks early and keeps pressure on the defense.',
+              },
+            ],
+          },
         },
       },
     },
@@ -209,7 +219,7 @@ describe('usePlayExportController', () => {
     props.exportData.stablePlayData.captions = {
       v: 1,
       periods: {
-        1: {
+        4: {
           full: 'Philadelphia controls the opening stretch with pace and pressure.',
           players: [
             {
@@ -227,8 +237,30 @@ describe('usePlayExportController', () => {
     await waitFor(() => {
       expect(result.current.exportPlayerOptions[0]?.key).toBe('away:J. Brown');
     });
-    expect(result.current.exportPlayerOptions[0]?.label).toContain('[caption]');
+    expect(result.current.exportPlayerOptions[0]?.label).toContain('[Q4]');
     expect(result.current.exportPlayerKey).toBe('away:J. Brown');
+  });
+
+  it('marks end-quarter options that have captions for full and player views', async () => {
+    const { result } = renderHook(() => usePlayExportController(buildProps()));
+
+    const getEndLabel = (period) =>
+      result.current.filteredRangeEndOptions.find((option) => option.period === period)?.label || '';
+
+    expect(getEndLabel(1)).toContain('[caption]');
+    expect(getEndLabel(2)).toBe('Q2');
+    expect(getEndLabel(4)).toContain('[caption]');
+
+    await act(async () => {
+      result.current.setExportView('player');
+    });
+
+    await waitFor(() => {
+      expect(result.current.exportView).toBe('player');
+    });
+    expect(getEndLabel(1)).toContain('[caption]');
+    expect(getEndLabel(3)).toBe('Q3');
+    expect(getEndLabel(4)).toContain('[caption]');
   });
 
   it('auto-refreshes preview when export settings change', async () => {
@@ -290,6 +322,58 @@ describe('usePlayExportController', () => {
     await waitFor(() => {
       expect(result.current.exportPreview?.url).toBe('blob:caption-preview');
     });
+  });
+
+  it('limits captions by view and clamps oversized captions', async () => {
+    const props = buildProps();
+    const fullLimit = 120;
+    const playerLimit = 90;
+    const fullCaption = 'F'.repeat(fullLimit + 20);
+    const playerCaption = 'P'.repeat(playerLimit + 20);
+    props.exportData.stablePlayData.captions.limits = {
+      full: fullLimit,
+      player: playerLimit,
+    };
+    Object.values(props.exportData.stablePlayData.captions.periods).forEach((period) => {
+      period.full = fullCaption;
+      period.players[0].caption = playerCaption;
+    });
+
+    const { result } = renderHook(() => usePlayExportController(props));
+
+    expect(result.current.captionMaxLength).toBe(fullLimit);
+
+    await act(async () => {
+      await result.current.handleExportImage();
+    });
+
+    expect(result.current.captionText).toHaveLength(fullLimit);
+    expect(mocks.renderExportCanvas).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        captionText: 'F'.repeat(fullLimit),
+      }),
+    );
+
+    await act(async () => {
+      result.current.setExportView('player');
+    });
+
+    await waitFor(() => {
+      expect(result.current.captionMaxLength).toBe(playerLimit);
+    });
+    await waitFor(() => {
+      expect(result.current.captionText).toHaveLength(playerLimit);
+    });
+    expect(mocks.renderExportCanvas).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        captionText: 'P'.repeat(playerLimit),
+      }),
+    );
+
+    act(() => {
+      result.current.handleCaptionChange('X'.repeat(playerLimit + 50));
+    });
+    expect(result.current.captionText).toHaveLength(playerLimit);
   });
 
   it('exposes exporting state while image generation is pending', async () => {

@@ -25,6 +25,7 @@ export default function PlayExportControls({
     filteredRangeEndOptions,
     previewIsUpdating,
     captionText,
+    captionMaxLength,
     captionCanApply,
     exportDisabled,
     setExportView,
@@ -143,31 +144,28 @@ export default function PlayExportControls({
                 ))}
               </select>
             </label>
-            <label className="playExportOption">
-              <span>Player</span>
-              <select
-                value={exportPlayerKey}
-                onChange={(event) => setExportPlayerKey(event.target.value)}
-                disabled={
-                  exportView === 'full' ||
-                  isExporting ||
-                  previewIsUpdating ||
-                  !exportPlayerOptions.length
-                }
-              >
-                {exportPlayerOptions.length ? (
-                  exportPlayerOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
+            {exportView !== 'full' && (
+              <label className="playExportOption">
+                <span>Player</span>
+                <select
+                  value={exportPlayerKey}
+                  onChange={(event) => setExportPlayerKey(event.target.value)}
+                  disabled={isExporting || previewIsUpdating || !exportPlayerOptions.length}
+                >
+                  {exportPlayerOptions.length ? (
+                    exportPlayerOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>
+                      No players
                     </option>
-                  ))
-                ) : (
-                  <option value="" disabled>
-                    No players
-                  </option>
-                )}
-              </select>
-            </label>
+                  )}
+                </select>
+              </label>
+            )}
             {exportRangeOptions.length > 0 && (
               <div className="playExportRange">
                 <label className="playExportOption">
@@ -203,20 +201,26 @@ export default function PlayExportControls({
             <label className="playExportOption playExportCaptionOption">
               <div className="playExportCaptionHeader">
                 <span>Caption</span>
-                <button
-                  type="button"
-                  className="playExportCaptionApplyButton"
-                  onClick={handleApplyCaption}
-                  disabled={isExporting || previewIsUpdating || !captionCanApply}
-                >
-                  Update caption
-                </button>
+                <div className="playExportCaptionActions">
+                  <span className="playExportCaptionCounter">
+                    {captionText.length}/{captionMaxLength}
+                  </span>
+                  <button
+                    type="button"
+                    className="playExportCaptionApplyButton"
+                    onClick={handleApplyCaption}
+                    disabled={isExporting || previewIsUpdating || !captionCanApply}
+                  >
+                    Update caption
+                  </button>
+                </div>
               </div>
               <textarea
                 value={captionText}
                 onChange={(event) => handleCaptionChange(event.target.value)}
                 disabled={isExporting || previewIsUpdating}
                 rows={3}
+                maxLength={captionMaxLength}
                 placeholder="Add a caption"
               />
             </label>

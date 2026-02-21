@@ -159,6 +159,8 @@ export const drawCommonHeaderMeta = ({
 };
 
 const HEADER_TOP_PADDING = 2;
+const HEADER_DATE_HEIGHT = 16;
+const HEADER_DATE_GAP = 2;
 const HEADER_ROW_HEIGHT = 62;
 const HEADER_STATUS_GAP = 4;
 const HEADER_STATUS_HEIGHT = 18;
@@ -167,10 +169,12 @@ const HEADER_BOTTOM_PADDING = 4;
 const hasRenderableLogo = (logo) =>
   Boolean(logo && Number.isFinite(logo.naturalWidth) && logo.naturalWidth > 0);
 
-export const measureCenteredScoreHeaderHeight = ({ statusLabel }) => {
+export const measureCenteredScoreHeaderHeight = ({ gameDate, statusLabel }) => {
+  const hasDate = Boolean(formatGameDate(gameDate));
   const hasStatus = Boolean(String(statusLabel || '').trim());
   return (
     HEADER_TOP_PADDING +
+    (hasDate ? HEADER_DATE_HEIGHT + HEADER_DATE_GAP : 0) +
     HEADER_ROW_HEIGHT +
     (hasStatus ? HEADER_STATUS_GAP + HEADER_STATUS_HEIGHT : 0) +
     HEADER_BOTTOM_PADDING
@@ -182,12 +186,14 @@ export const drawCenteredScoreHeader = ({
   contentWidth,
   awayLabel,
   homeLabel,
+  gameDate,
   scoreTimelineSource,
   statusLabel,
   textPrimary,
   textSecondary,
   teamLogos,
   y = 0,
+  dateFont = '500 15px system-ui, -apple-system, sans-serif',
   statusFont = '600 13px system-ui, -apple-system, sans-serif',
   logoSize = 52,
 }) => {
@@ -203,7 +209,10 @@ export const drawCenteredScoreHeader = ({
   const atLabel = 'AT';
   const hasAwayLogo = hasRenderableLogo(teamLogos?.away);
   const hasHomeLogo = hasRenderableLogo(teamLogos?.home);
-  const rowMidY = y + HEADER_TOP_PADDING + HEADER_ROW_HEIGHT / 2;
+  const formattedGameDate = formatGameDate(gameDate);
+  const hasDate = Boolean(formattedGameDate);
+  const rowTop = y + HEADER_TOP_PADDING + (hasDate ? HEADER_DATE_HEIGHT + HEADER_DATE_GAP : 0);
+  const rowMidY = rowTop + HEADER_ROW_HEIGHT / 2;
   const fontFamily = 'system-ui, -apple-system, sans-serif';
   const maxHeaderWidth = Math.max(0, contentWidth - 12);
 
@@ -300,6 +309,14 @@ export const drawCenteredScoreHeader = ({
   } = resolvedLayout;
   let x = Math.max(6, (contentWidth - totalWidth) / 2);
 
+  if (hasDate) {
+    const dateMidY = y + HEADER_TOP_PADDING + HEADER_DATE_HEIGHT / 2;
+    ctx.fillStyle = textSecondary;
+    ctx.font = dateFont;
+    const dateWidth = ctx.measureText(formattedGameDate).width;
+    ctx.fillText(formattedGameDate, (contentWidth - dateWidth) / 2, dateMidY);
+  }
+
   ctx.fillStyle = textPrimary;
   ctx.font = scaledScoreFont;
   ctx.fillText(awayScore, x, rowMidY);
@@ -345,7 +362,7 @@ export const drawCenteredScoreHeader = ({
   ctx.fillText(homeScore, x, rowMidY);
 
   const statusText = String(statusLabel || '').trim();
-  let bottomY = y + HEADER_TOP_PADDING + HEADER_ROW_HEIGHT;
+  let bottomY = rowTop + HEADER_ROW_HEIGHT;
   if (statusText) {
     const statusY = bottomY + HEADER_STATUS_GAP + HEADER_STATUS_HEIGHT / 2;
     ctx.fillStyle = textSecondary;

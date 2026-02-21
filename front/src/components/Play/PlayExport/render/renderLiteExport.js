@@ -25,6 +25,7 @@ export const renderLiteExportCanvas = ({
   periodRange,
   rightMargin,
   playRef,
+  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredScoreTimeline,
@@ -70,7 +71,7 @@ export const renderLiteExportCanvas = ({
   });
   const captionTopGap = captionHeight > 0 ? 6 : 0;
   const captionBottomGap = captionHeight > 0 ? 8 : 0;
-  const headerHeight = measureCenteredScoreHeaderHeight({ statusLabel });
+  const headerHeight = measureCenteredScoreHeaderHeight({ gameDate, statusLabel });
 
   const chartHeight = 360;
   const chartTop = headerHeight + captionTopGap + captionHeight + captionBottomGap;
@@ -101,6 +102,7 @@ export const renderLiteExportCanvas = ({
     contentWidth,
     awayLabel,
     homeLabel,
+    gameDate,
     scoreTimelineSource,
     statusLabel,
     textPrimary,
