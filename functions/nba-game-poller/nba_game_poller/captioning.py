@@ -228,8 +228,15 @@ def _compute_player_metrics(actions, period):
         result = _normalize_space(action.get("r") or action.get("result")).lower()
         text = _normalize_space(action.get("text") or action.get("description")).lower()
 
+        is_free_throw = (
+            "freethrow" in action_type
+            or "free throw" in action_type
+            or "free throw" in text
+            or bool(re.search(r"\bft\b", text))
+        )
+
         if result.startswith("m"):
-            if "free throw" in action_type or "free throw" in text:
+            if is_free_throw:
                 points += 1
             elif "3" in action_type or "3pt" in text:
                 points += 3

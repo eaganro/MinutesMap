@@ -176,6 +176,20 @@ def test_parse_json_payload_extracts_first_json_object_from_wrapped_text():
     assert parsed["player_stories"] == []
 
 
+def test_compute_player_metrics_counts_freethrow_action_type_and_ft_text():
+    actions = [
+        {"quarter": 2, "type": "freethrow", "r": "m", "text": "L. Doncic ft 1/2 make"},
+        {"quarter": 3, "type": "freethrow", "r": "m", "text": "L. Doncic ft 2/2 make"},
+        {"quarter": 3, "type": "2pt", "r": "m", "text": "L. Doncic make 2pt layup"},
+    ]
+
+    metrics_through_q2 = captioning._compute_player_metrics(actions, period=2)
+    metrics_through_q3 = captioning._compute_player_metrics(actions, period=3)
+
+    assert metrics_through_q2["pts"] == 1
+    assert metrics_through_q3["pts"] == 4
+
+
 def test_parse_json_payload_handles_fenced_json():
     raw_text = (
         "```json\n"
