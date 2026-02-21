@@ -25,6 +25,7 @@ export default function PlayExportControls({
     filteredRangeEndOptions,
     previewIsUpdating,
     captionText,
+    captionCanApply,
     exportDisabled,
     setExportView,
     setExportPlayerKey,
@@ -35,6 +36,7 @@ export default function PlayExportControls({
     closeExportPreview,
     clearExportError,
     handleCaptionChange,
+    handleApplyCaption,
   } = usePlayExportController({
     playRef,
     gameId,
@@ -199,7 +201,17 @@ export default function PlayExportControls({
               </div>
             )}
             <label className="playExportOption playExportCaptionOption">
-              <span>Caption</span>
+              <div className="playExportCaptionHeader">
+                <span>Caption</span>
+                <button
+                  type="button"
+                  className="playExportCaptionApplyButton"
+                  onClick={handleApplyCaption}
+                  disabled={isExporting || previewIsUpdating || !captionCanApply}
+                >
+                  Update caption
+                </button>
+              </div>
               <textarea
                 value={captionText}
                 onChange={(event) => handleCaptionChange(event.target.value)}

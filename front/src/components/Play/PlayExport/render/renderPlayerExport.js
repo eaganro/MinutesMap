@@ -24,22 +24,22 @@ import {
 import {
   buildMarkerLookups,
   createExportCanvasContext,
-  drawCommonHeaderMeta,
-  drawFittedHeaderText,
+  drawCaptionBlock,
+  drawCenteredScoreHeader,
   drawRowMarkers,
   filterRenderableActions,
   getExportComputedStyle,
+  measureCaptionBlockHeight,
+  measureCenteredScoreHeaderHeight,
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
 export const renderPlayerExportCanvas = ({
   exportWidth,
   legendShouldWrap,
-  rangeLabel,
   periodRange,
   rightMargin,
   playRef,
-  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredAwayPlayers,
@@ -50,6 +50,8 @@ export const renderPlayerExportCanvas = ({
   filteredHomePlayerTimeline,
   filteredScoreTimeline,
   displayScoreTimeline,
+  captionText,
+  teamLogos,
   statusLabel,
   timelineWindow,
   statOn,
@@ -60,17 +62,12 @@ export const renderPlayerExportCanvas = ({
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
   const outerPadding = 12;
   const rightPad = rightMargin;
-  const headerHeight = 60;
-  const playAreaTop = headerHeight + 8;
   const topPadding = 8;
   const teamLabelHeight = 0;
   const rowHeight = 48;
   const periodCount = getPeriodCountFromRange(periodRange);
   const bottomPadding = getQuarterAwareLegendGap(periodCount, 6, 12);
   const playAreaHeight = topPadding + teamLabelHeight + 4 + rowHeight + bottomPadding;
-  const chartTop = playAreaTop;
-  const chartLeft = rightPad;
-  const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
   const computed = getExportComputedStyle(playRef);
   if (!computed) return null;
 
@@ -86,6 +83,18 @@ export const renderPlayerExportCanvas = ({
     false,
     legendScale,
   );
+  const captionHeight = measureCaptionBlockHeight({
+    measureCtx: legendMeasureCtx,
+    text: captionText,
+    maxWidth: contentWidth - 24,
+  });
+  const captionTopGap = captionHeight > 0 ? 6 : 0;
+  const captionBottomGap = captionHeight > 0 ? 8 : 0;
+  const headerHeight = measureCenteredScoreHeaderHeight({ statusLabel });
+  const playAreaTop = headerHeight + captionTopGap + captionHeight + captionBottomGap;
+  const chartTop = playAreaTop;
+  const chartLeft = rightPad;
+  const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
 
   const hasPlayer = Boolean(selectedPlayer?.name);
   const isAway =
@@ -140,31 +149,29 @@ export const renderPlayerExportCanvas = ({
   const homeLabel = displayHomeTeamNames?.abr || 'Home';
   const scoreTimelineSource = getScoreTimelineSource(filteredScoreTimeline, displayScoreTimeline);
 
-  const { formattedGameDate } = drawCommonHeaderMeta({
+  drawCenteredScoreHeader({
     ctx,
     contentWidth,
-    rightPad,
     awayLabel,
     homeLabel,
-    rangeLabel,
-    gameDate,
     scoreTimelineSource,
     statusLabel,
     textPrimary,
     textSecondary,
+    teamLogos,
+    y: 0,
   });
-
-  const displayName = playerLabel || 'Select a player';
-  const playerNameMaxWidth = Math.max(0, contentWidth - rightPad - 12);
-  const playerNameY = formattedGameDate ? 54 : 38;
-  drawFittedHeaderText({
-    ctx,
-    text: displayName,
-    x: 6,
-    y: playerNameY,
-    maxWidth: playerNameMaxWidth,
-    color: textPrimary,
-  });
+  if (captionHeight > 0) {
+    drawCaptionBlock({
+      ctx,
+      text: captionText,
+      x: 12,
+      y: headerHeight + captionTopGap,
+      maxWidth: contentWidth - 24,
+      color: textSecondary,
+      textAlign: 'center',
+    });
+  }
 
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
   const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;

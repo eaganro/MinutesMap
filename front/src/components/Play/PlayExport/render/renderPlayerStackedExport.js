@@ -25,22 +25,22 @@ import {
 import {
   buildMarkerLookups,
   createExportCanvasContext,
-  drawCommonHeaderMeta,
-  drawFittedHeaderText,
+  drawCaptionBlock,
+  drawCenteredScoreHeader,
   drawRowMarkers,
   filterRenderableActions,
   getExportComputedStyle,
+  measureCaptionBlockHeight,
+  measureCenteredScoreHeaderHeight,
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
 export const renderPlayerStackedExportCanvas = ({
   exportWidth,
   legendShouldWrap,
-  rangeLabel,
   periodRange,
   rightMargin,
   playRef,
-  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredAwayPlayers,
@@ -51,6 +51,8 @@ export const renderPlayerStackedExportCanvas = ({
   filteredHomePlayerTimeline,
   filteredScoreTimeline,
   displayScoreTimeline,
+  captionText,
+  teamLogos,
   statusLabel,
   statOn,
   showScoreDiff,
@@ -60,8 +62,6 @@ export const renderPlayerStackedExportCanvas = ({
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
   const outerPadding = 12;
   const rightPad = rightMargin;
-  const headerHeight = 60;
-  const playAreaTop = headerHeight + 8;
   const topPadding = 8;
   const quarterLabelHeight = 16;
   const rowHeight = 32;
@@ -82,9 +82,6 @@ export const renderPlayerStackedExportCanvas = ({
     periods.length * sectionHeight +
     Math.max(0, periods.length - 1) * sectionGap +
     bottomPadding;
-  const chartTop = playAreaTop;
-  const chartLeft = rightPad;
-  const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
   const legendGap = 0;
   const computed = getExportComputedStyle(playRef);
   if (!computed) return null;
@@ -103,6 +100,18 @@ export const renderPlayerStackedExportCanvas = ({
     legendScale,
     legendForceWrapAfterGroupIndex,
   );
+  const captionHeight = measureCaptionBlockHeight({
+    measureCtx: legendMeasureCtx,
+    text: captionText,
+    maxWidth: contentWidth - 24,
+  });
+  const captionTopGap = captionHeight > 0 ? 6 : 0;
+  const captionBottomGap = captionHeight > 0 ? 8 : 0;
+  const headerHeight = measureCenteredScoreHeaderHeight({ statusLabel });
+  const playAreaTop = headerHeight + captionTopGap + captionHeight + captionBottomGap;
+  const chartTop = playAreaTop;
+  const chartLeft = rightPad;
+  const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
 
   const hasPlayer = Boolean(selectedPlayer?.name);
   const isAway =
@@ -123,7 +132,7 @@ export const renderPlayerStackedExportCanvas = ({
     periodRange,
     teamKey,
   });
-  const boxScoreItems = buildBoxScoreColumns(boxScoreStats, playerName, true);
+  const boxScoreItems = buildBoxScoreColumns(boxScoreStats, playerLabel, true);
   const boxScoreGap = boxScoreItems.length ? 12 : 0;
   const boxScoreWidth = contentWidth;
   const boxScoreX = Math.max(0, (contentWidth - boxScoreWidth) / 2);
@@ -157,31 +166,29 @@ export const renderPlayerStackedExportCanvas = ({
   const homeLabel = displayHomeTeamNames?.abr || 'Home';
   const scoreTimelineSource = getScoreTimelineSource(filteredScoreTimeline, displayScoreTimeline);
 
-  const { formattedGameDate } = drawCommonHeaderMeta({
+  drawCenteredScoreHeader({
     ctx,
     contentWidth,
-    rightPad,
     awayLabel,
     homeLabel,
-    rangeLabel,
-    gameDate,
     scoreTimelineSource,
     statusLabel,
     textPrimary,
     textSecondary,
+    teamLogos,
+    y: 0,
   });
-
-  const displayName = playerDisplayName || playerLabel || 'Select a player';
-  const playerNameMaxWidth = Math.max(0, contentWidth - rightPad - 12);
-  const playerNameY = formattedGameDate ? 54 : 38;
-  drawFittedHeaderText({
-    ctx,
-    text: displayName,
-    x: 6,
-    y: playerNameY,
-    maxWidth: playerNameMaxWidth,
-    color: textPrimary,
-  });
+  if (captionHeight > 0) {
+    drawCaptionBlock({
+      ctx,
+      text: captionText,
+      x: 12,
+      y: headerHeight + captionTopGap,
+      maxWidth: contentWidth - 24,
+      color: textSecondary,
+      textAlign: 'center',
+    });
+  }
 
   const sectionTop = chartTop + topPadding;
 

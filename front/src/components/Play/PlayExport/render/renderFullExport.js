@@ -20,22 +20,23 @@ import {
 import {
   buildMarkerLookups,
   createExportCanvasContext,
-  drawCommonHeaderMeta,
+  drawCaptionBlock,
+  drawCenteredScoreHeader,
   drawRowMarkers,
   filterRenderableActions,
   getExportComputedStyle,
+  measureCaptionBlockHeight,
+  measureCenteredScoreHeaderHeight,
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
 export const renderFullExportCanvas = ({
   exportWidth,
   legendShouldWrap,
-  rangeLabel,
   periodRange,
   leftMargin,
   rightMargin,
   playRef,
-  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredAwayPlayers,
@@ -44,6 +45,8 @@ export const renderFullExportCanvas = ({
   filteredHomePlayerTimeline,
   filteredScoreTimeline,
   displayScoreTimeline,
+  captionText,
+  teamLogos,
   endAtLastScore,
   endAtSeconds,
   statusLabel,
@@ -61,8 +64,6 @@ export const renderFullExportCanvas = ({
   const outerPadding = 12;
   const leftPad = leftMargin;
   const rightPad = rightMargin;
-  const headerHeight = 44;
-  const playAreaTop = headerHeight + 8;
   const teamLabelHeight = 18;
   const teamSectionHeight = 275;
   const playAreaHeight = 600;
@@ -83,6 +84,15 @@ export const renderFullExportCanvas = ({
     true,
     legendScale,
   );
+  const captionHeight = measureCaptionBlockHeight({
+    measureCtx: legendMeasureCtx,
+    text: captionText,
+    maxWidth: contentWidth - 24,
+  });
+  const captionTopGap = captionHeight > 0 ? 6 : 0;
+  const captionBottomGap = captionHeight > 0 ? 8 : 0;
+  const headerHeight = measureCenteredScoreHeaderHeight({ statusLabel });
+  const playAreaTop = headerHeight + captionTopGap + captionHeight + captionBottomGap;
 
   const chartHeight = playAreaHeight;
   const chartTop = playAreaTop;
@@ -117,19 +127,29 @@ export const renderFullExportCanvas = ({
   const homeLabel = displayHomeTeamNames?.abr || 'Home';
   const scoreTimelineSource = getScoreTimelineSource(filteredScoreTimeline, displayScoreTimeline);
 
-  drawCommonHeaderMeta({
+  drawCenteredScoreHeader({
     ctx,
     contentWidth,
-    rightPad,
     awayLabel,
     homeLabel,
-    rangeLabel,
-    gameDate,
     scoreTimelineSource,
     statusLabel,
     textPrimary,
     textSecondary,
+    teamLogos,
+    y: 0,
   });
+  if (captionHeight > 0) {
+    drawCaptionBlock({
+      ctx,
+      text: captionText,
+      x: 12,
+      y: headerHeight + captionTopGap,
+      maxWidth: contentWidth - 24,
+      color: textSecondary,
+      textAlign: 'center',
+    });
+  }
 
   const baselineY = chartTop + chartHeight / 2;
   ctx.strokeStyle = lineColor;

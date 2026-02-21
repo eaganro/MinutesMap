@@ -11,8 +11,12 @@ import {
 import { buildExportRequestSnapshot } from './model/exportRangeModel';
 import { buildExportRenderRequest } from './model/exportRequestModel';
 import { buildExportOutputMetadata, buildExportPreviewState } from './model/exportPreviewModel';
-import { resolveDefaultExportCaption } from './model/exportCaptionModel';
+import {
+  resolveDefaultExportCaption,
+  resolvePlayerExportCaption,
+} from './model/exportCaptionModel';
 import { renderExportCanvas } from './playExportRenderer';
+import { loadTeamLogosForExport } from './playExportAssets';
 import {
   canvasToBlob,
   createObjectUrl,
@@ -72,6 +76,7 @@ export const usePlayExportController = ({
   const [exportError, setExportError] = useState(null);
   const [exportView, setExportView] = useState(DEFAULT_EXPORT_VIEW);
   const [exportPlayerKey, setExportPlayerKey] = useState('');
+  const [captionDraft, setCaptionDraft] = useState('');
 
   const exportPreviewUrlRef = useRef(null);
   const exportPreviewKeyRef = useRef('1-1');
@@ -103,16 +108,50 @@ export const usePlayExportController = ({
     [],
   );
 
-  const exportPlayerOptions = useMemo(
-    () =>
-      buildExportPlayerOptions({
-        displayAwayPlayers,
-        displayHomePlayers,
-        displayAwayTeamNames,
-        displayHomeTeamNames,
-      }),
-    [displayAwayPlayers, displayHomePlayers, displayAwayTeamNames, displayHomeTeamNames],
-  );
+  const exportPlayerOptions = useMemo(() => {
+    const rawOptions = buildExportPlayerOptions({
+      displayAwayPlayers,
+      displayHomePlayers,
+      displayAwayTeamNames,
+      displayHomeTeamNames,
+    });
+
+    const withCaptions = rawOptions.map((option, index) => {
+      const teamKey = option.teamKey === 'away' ? 'away' : 'home';
+      const rosterPlayers = box?.teams?.[teamKey]?.players || [];
+      const displayName = resolveFullNameFromRoster(option.name, rosterPlayers) || option.name;
+      const caption = resolvePlayerExportCaption({
+        captions: generatedCaptions,
+        exportRange: resolvedExportRange,
+        selectedPlayer: { name: option.name, teamKey: option.teamKey },
+        playerDisplayName: displayName,
+      });
+      const hasCaption = Boolean(caption);
+      return {
+        ...option,
+        hasCaption,
+        label: hasCaption ? `${option.name} (${option.teamAbr}) [caption]` : option.label,
+        sortIndex: index,
+      };
+    });
+
+    withCaptions.sort((a, b) => {
+      if (a.hasCaption !== b.hasCaption) {
+        return a.hasCaption ? -1 : 1;
+      }
+      return a.sortIndex - b.sortIndex;
+    });
+
+    return withCaptions.map(({ sortIndex: _sortIndex, ...option }) => option);
+  }, [
+    displayAwayPlayers,
+    displayHomePlayers,
+    displayAwayTeamNames,
+    displayHomeTeamNames,
+    box,
+    generatedCaptions,
+    resolvedExportRange,
+  ]);
 
   const selectedExportPlayer = useMemo(
     () => exportPlayerOptions.find((option) => option.key === exportPlayerKey) || null,
@@ -136,8 +175,10 @@ export const usePlayExportController = ({
       }
       return;
     }
-    if (!exportPlayerOptions.some((option) => option.key === exportPlayerKey)) {
-      setExportPlayerKey(exportPlayerOptions[0].key);
+    const hasCurrent = exportPlayerOptions.some((option) => option.key === exportPlayerKey);
+    if (!hasCurrent) {
+      const preferredOption = exportPlayerOptions.find((option) => option.hasCaption);
+      setExportPlayerKey((preferredOption || exportPlayerOptions[0]).key);
     }
   }, [exportPlayerOptions, exportPlayerKey]);
 
@@ -146,6 +187,7 @@ export const usePlayExportController = ({
     setExportError(null);
     setExportView(DEFAULT_EXPORT_VIEW);
     setExportPlayerKey('');
+    setCaptionDraft('');
   }, [gameId, setExportPreviewState]);
 
   const exportPreviewKey = useMemo(
@@ -159,7 +201,7 @@ export const usePlayExportController = ({
   );
 
   const handleExportImage = useCallback(
-    async ({ keepPreviewOpen = false } = {}) => {
+    async ({ keepPreviewOpen = false, captionOverride } = {}) => {
       if (!playRef?.current || isExporting) return;
       if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
@@ -196,11 +238,27 @@ export const usePlayExportController = ({
       try {
         onExportInteractionStart?.();
 
+        const defaultCaption = resolveDefaultExportCaption({
+          captions: generatedCaptions,
+          exportView,
+          exportRange: snapshot.exportRangeSnapshot,
+          selectedPlayer: selectedExportPlayer,
+          playerDisplayName: exportPlayerDisplayName,
+        });
+        const resolvedCaption =
+          typeof captionOverride === 'string' ? captionOverride : String(defaultCaption || '');
+        const teamLogos = await loadTeamLogosForExport({
+          awayTeamAbbr: displayAwayTeamNames?.abr,
+          homeTeamAbbr: displayHomeTeamNames?.abr,
+        });
+
         const { renderInput, exportRangeLabel, exportIsFullGameRange } = buildExportRenderRequest({
           snapshot,
           exportView,
           selectedExportPlayer,
           exportPlayerDisplayName,
+          captionText: resolvedCaption,
+          teamLogos,
           leftMargin,
           rightMargin,
           playRef,
@@ -254,14 +312,6 @@ export const usePlayExportController = ({
           gameId,
           origin: window.location?.origin || '',
         });
-        const defaultCaption = resolveDefaultExportCaption({
-          captions: generatedCaptions,
-          exportView,
-          exportRange: snapshot.exportRangeSnapshot,
-          selectedPlayer: selectedExportPlayer,
-          playerDisplayName: exportPlayerDisplayName,
-        });
-
         const { file, errorMessage: fileError } = createPngFile({ blob, fileName });
         if (fileError && isCurrentRequest()) {
           setExportError(fileError);
@@ -286,10 +336,11 @@ export const usePlayExportController = ({
             file,
             canShare: canShareFiles,
             shareMetadata,
-            captionText: defaultCaption,
+            captionText: resolvedCaption,
             isUpdating: false,
           }),
         );
+        setCaptionDraft(resolvedCaption);
       } catch (err) {
         if (!isCurrentRequest()) return;
         const message = err?.message || 'Play export failed.';
@@ -351,7 +402,9 @@ export const usePlayExportController = ({
       url: exportPreview.shareUrl,
     });
     if (shareResult.shared) {
+      activeRequestIdRef.current += 1;
       setExportPreviewState(null);
+      setCaptionDraft('');
       return;
     }
     if (shareResult.error && !shareResult.aborted) {
@@ -372,25 +425,27 @@ export const usePlayExportController = ({
   );
 
   const closeExportPreview = useCallback(() => {
+    activeRequestIdRef.current += 1;
     setExportPreviewState(null);
+    setCaptionDraft('');
   }, [setExportPreviewState]);
 
   const clearExportError = useCallback(() => {
     setExportError(null);
   }, []);
 
-  const handleCaptionChange = useCallback(
-    (nextCaption) => {
-      setExportPreviewState((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          captionText: String(nextCaption || ''),
-        };
-      });
-    },
-    [setExportPreviewState],
-  );
+  const handleCaptionChange = useCallback((nextCaption) => {
+    const resolved = String(nextCaption || '');
+    setCaptionDraft(resolved);
+  }, []);
+
+  const handleApplyCaption = useCallback(() => {
+    if (!exportPreview) return;
+    void handleExportImage({ keepPreviewOpen: true, captionOverride: captionDraft });
+  }, [exportPreview, captionDraft, handleExportImage]);
+
+  const captionCanApply =
+    Boolean(exportPreview) && captionDraft !== (exportPreview?.captionText || '');
 
   const exportDisabled = !hasDisplayData || isDataLoading || isExporting;
 
@@ -406,7 +461,8 @@ export const usePlayExportController = ({
     exportRangeOptions,
     filteredRangeEndOptions,
     previewIsUpdating: Boolean(exportPreview?.isUpdating),
-    captionText: exportPreview?.captionText || '',
+    captionText: captionDraft,
+    captionCanApply,
     exportDisabled,
     setExportView,
     setExportPlayerKey,
@@ -417,5 +473,6 @@ export const usePlayExportController = ({
     closeExportPreview,
     clearExportError,
     handleCaptionChange,
+    handleApplyCaption,
   };
 };

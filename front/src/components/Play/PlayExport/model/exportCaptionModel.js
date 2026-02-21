@@ -56,13 +56,31 @@ export const resolveDefaultExportCaption = ({
     return String(periodEntry.full || '').trim();
   }
 
+  return resolvePlayerExportCaption({
+    captions,
+    exportRange,
+    selectedPlayer,
+    playerDisplayName,
+  });
+};
+
+export const resolvePlayerExportCaption = ({
+  captions,
+  exportRange,
+  selectedPlayer,
+  playerDisplayName,
+}) => {
   if (!selectedPlayer?.name || !selectedPlayer?.teamKey) {
     return '';
   }
 
+  const periodEnd = Number(exportRange?.end);
+  if (!Number.isFinite(periodEnd) || periodEnd <= 0) return '';
+  const periodEntry = resolvePeriodEntry(captions?.periods, periodEnd);
+  if (!periodEntry) return '';
+
   const aliases = normalizePlayerAliases(selectedPlayer.name, playerDisplayName);
   const stories = Array.isArray(periodEntry.players) ? periodEntry.players : [];
-
   const matching = stories.find((story) => {
     if (!story || typeof story !== 'object') return false;
     if (story.team !== selectedPlayer.teamKey) return false;

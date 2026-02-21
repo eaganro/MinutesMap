@@ -11,23 +11,26 @@ import {
 } from '../playExportCore';
 import {
   createExportCanvasContext,
-  drawCommonHeaderMeta,
+  drawCaptionBlock,
+  drawCenteredScoreHeader,
   getExportComputedStyle,
+  measureCaptionBlockHeight,
+  measureCenteredScoreHeaderHeight,
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
 export const renderLiteExportCanvas = ({
   exportWidth,
   legendShouldWrap,
-  rangeLabel,
   periodRange,
   rightMargin,
   playRef,
-  gameDate,
   displayAwayTeamNames,
   displayHomeTeamNames,
   filteredScoreTimeline,
   displayScoreTimeline,
+  captionText,
+  teamLogos,
   statusLabel,
   endAtLastScore,
   endAtSeconds,
@@ -42,7 +45,6 @@ export const renderLiteExportCanvas = ({
   const contentWidth = exportWidth || DESKTOP_EXPORT_WIDTH;
   const outerPadding = 12;
   const rightPad = rightMargin;
-  const headerHeight = 54;
   const footerHeight = 32;
   const computed = getExportComputedStyle(playRef);
   if (!computed) return null;
@@ -61,9 +63,17 @@ export const renderLiteExportCanvas = ({
     true,
     legendScale,
   );
+  const captionHeight = measureCaptionBlockHeight({
+    measureCtx: legendMeasureCtx,
+    text: captionText,
+    maxWidth: contentWidth - 24,
+  });
+  const captionTopGap = captionHeight > 0 ? 6 : 0;
+  const captionBottomGap = captionHeight > 0 ? 8 : 0;
+  const headerHeight = measureCenteredScoreHeaderHeight({ statusLabel });
 
   const chartHeight = 360;
-  const chartTop = headerHeight + 8;
+  const chartTop = headerHeight + captionTopGap + captionHeight + captionBottomGap;
   const chartLeft = rightPad;
   const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
   const contentHeight = chartTop + chartHeight + footerHeight + legendHeight;
@@ -86,24 +96,29 @@ export const renderLiteExportCanvas = ({
   const homeLabel = displayHomeTeamNames?.abr || 'Home';
   const scoreTimelineSource = getScoreTimelineSource(filteredScoreTimeline, displayScoreTimeline);
 
-  drawCommonHeaderMeta({
+  drawCenteredScoreHeader({
     ctx,
     contentWidth,
-    rightPad: 20,
     awayLabel,
     homeLabel,
-    rangeLabel,
-    gameDate,
     scoreTimelineSource,
     statusLabel,
     textPrimary,
     textSecondary,
-    titleY: 24,
-    dateY: 40,
-    scoreY: 24,
-    statusY: 40,
-    titleFont: '600 18px system-ui, -apple-system, sans-serif',
+    teamLogos,
+    y: 0,
   });
+  if (captionHeight > 0) {
+    drawCaptionBlock({
+      ctx,
+      text: captionText,
+      x: 12,
+      y: headerHeight + captionTopGap,
+      maxWidth: contentWidth - 24,
+      color: textSecondary,
+      textAlign: 'center',
+    });
+  }
 
   const baselineY = chartTop + chartHeight / 2;
   ctx.strokeStyle = lineColor;
