@@ -1,3 +1,5 @@
+import json
+
 from nba_game_poller import captioning
 
 
@@ -128,3 +130,67 @@ def test_parse_json_payload_handles_fenced_json():
 
     assert parsed["full_caption"] == "Game stays tight through halftime."
     assert parsed["player_stories"] == []
+
+
+def test_request_period_caption_includes_response_schema(monkeypatch):
+    flow_payload = {
+        "score": [{"quarter": 1, "awayScore": 28, "homeScore": 24}],
+        "players": {"away": {}, "home": {}},
+        "events": [],
+    }
+    box_payload = {
+        "teams": {
+            "away": {"abbr": "DAL"},
+            "home": {"abbr": "MIN"},
+        }
+    }
+
+    captured = {}
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {
+                                        "text": '{"full_caption":"DAL leads after one.","player_stories":[]}'
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(req, timeout=8.0):
+        captured["timeout"] = timeout
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return _FakeResponse()
+
+    monkeypatch.setattr(captioning.urllib.request, "urlopen", fake_urlopen)
+
+    generated = captioning.request_period_caption(
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        period=1,
+        api_key="test-api-key",
+        model="gemini-2.5-flash",
+        max_players_per_team=2,
+        timeout_seconds=7.0,
+    )
+
+    assert generated == {"full": "DAL leads after one.", "players": []}
+
+    generation_config = captured["body"]["generationConfig"]
+    assert generation_config["responseMimeType"] == "application/json"
+    assert generation_config["responseSchema"]["type"] == "object"
+    assert generation_config["responseSchema"]["properties"]["player_stories"]["type"] == "array"

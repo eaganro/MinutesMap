@@ -351,6 +351,8 @@ def _build_prompt(summary, max_players_per_team):
         '"player_stories":[{"team":"away|home","player":"exact candidate name","caption":"string"}]'
         "}\n"
         "Rules:\n"
+        "- Output must be valid minified JSON.\n"
+        '- Use double quotes for all keys and string values, and escape any internal quotes.\n'
         "- No emojis.\n"
         "- No hashtags.\n"
         "- full_caption should be <= 180 chars and focus on the game story up to this checkpoint.\n"
@@ -379,6 +381,28 @@ def _extract_gemini_text(payload):
         if text_parts:
             return "\n".join(text_parts).strip()
     return ""
+
+
+def _caption_response_schema():
+    return {
+        "type": "object",
+        "properties": {
+            "full_caption": {"type": "string"},
+            "player_stories": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "team": {"type": "string", "enum": ["away", "home"]},
+                        "player": {"type": "string"},
+                        "caption": {"type": "string"},
+                    },
+                    "required": ["team", "player", "caption"],
+                },
+            },
+        },
+        "required": ["full_caption", "player_stories"],
+    }
 
 
 def _extract_first_json_object(text):
@@ -517,10 +541,11 @@ def request_period_caption(
         {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "temperature": 0.4,
+                "temperature": 0.2,
                 "topP": 0.9,
-                "maxOutputTokens": 512,
+                "maxOutputTokens": 256,
                 "responseMimeType": "application/json",
+                "responseSchema": _caption_response_schema(),
             },
         }
     ).encode("utf-8")
