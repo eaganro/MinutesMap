@@ -746,6 +746,14 @@ def process_game(game_item, user_agent=None, date_str=None):
             if slim_box is None:
                 slim_box = (existing or {}).get("box")
 
+        if isinstance(processed, dict) and not isinstance(processed.get("captions"), dict):
+            existing = load_existing_gamepack_once()
+            existing_flow = (existing or {}).get("flow")
+            existing_captions = existing_flow.get("captions") if isinstance(existing_flow, dict) else None
+            if isinstance(existing_captions, dict):
+                processed = dict(processed)
+                processed["captions"] = existing_captions
+
         if processed is not None and slim_box is not None:
             gamepack = {
                 "v": 1,
