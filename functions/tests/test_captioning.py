@@ -212,6 +212,59 @@ def test_compute_player_metrics_counts_three_when_only_in_detail():
     assert metrics["pts"] == 5
 
 
+def test_compute_player_metrics_counts_three_point_phrase():
+    actions = [
+        {
+            "quarter": 3,
+            "type": "Jump Shot",
+            "detail": "Three Point Pullup Jump Shot",
+            "r": "m",
+            "text": "L. Doncic makes pullup jumper",
+        }
+    ]
+
+    metrics = captioning._compute_player_metrics(actions, period=3)
+    assert metrics["pts"] == 3
+
+
+def test_compute_player_metrics_falls_back_to_two_for_unlabeled_made_shot():
+    actions = [
+        {
+            "quarter": 3,
+            "type": "Field Goal",
+            "r": "m",
+            "text": "L. Doncic makes it",
+        }
+    ]
+
+    metrics = captioning._compute_player_metrics(actions, period=3)
+    assert metrics["pts"] == 2
+
+
+def test_validate_player_stories_aligns_points_assists_rebounds_to_metrics():
+    player_stories = [
+        {
+            "team": "away",
+            "player": "Luka Doncic",
+            "caption": "Luka Doncic is dominating with 17 points, 9 assists, and 5 rebounds.",
+        }
+    ]
+    candidates_by_team = {
+        "away": [{"name": "Luka Doncic", "pts": 21, "ast": 10, "reb": 6}],
+        "home": [],
+    }
+
+    validated = captioning._validate_player_stories(player_stories, candidates_by_team, max_players_per_team=2)
+
+    assert validated == [
+        {
+            "team": "away",
+            "player": "Luka Doncic",
+            "caption": "Luka Doncic is dominating with 21 points, 10 assists, and 6 rebounds.",
+        }
+    ]
+
+
 def test_parse_json_payload_handles_fenced_json():
     raw_text = (
         "```json\n"

@@ -229,8 +229,17 @@ def _compute_player_metrics(actions, period):
         text = _normalize_space(action.get("text") or action.get("description")).lower()
         detail = _normalize_space(action.get("detail") or action.get("subType")).lower()
 
-        is_three_pointer = "3pt" in action_type or "3pt" in text or "3pt" in detail
-        is_two_pointer = "2pt" in action_type or "2pt" in text or "2pt" in detail
+        scoring_text = f"{action_type} {text} {detail}"
+        is_three_pointer = (
+            "3pt" in scoring_text
+            or "3 pt" in scoring_text
+            or "three point" in scoring_text
+        )
+        is_two_pointer = "2pt" in scoring_text or "2 pt" in scoring_text or "two point" in scoring_text
+        is_field_goal = any(
+            token in scoring_text
+            for token in ("shot", "layup", "dunk", "tip", "hook", "jumper", "floater", "runner", "putback")
+        )
 
         is_free_throw = (
             "freethrow" in action_type
@@ -244,13 +253,11 @@ def _compute_player_metrics(actions, period):
                 points += 1
             elif is_three_pointer:
                 points += 3
-            elif (
-                is_two_pointer
-                or "shot" in action_type
-                or "layup" in text
-                or "dunk" in text
-                or "tip" in text
-            ):
+            elif is_two_pointer or is_field_goal:
+                points += 2
+            else:
+                # Treat remaining made scoring events as 2PT to avoid undercounting
+                # when feed variants omit explicit shot tags.
                 points += 2
 
         if action_type == "assist":
@@ -553,12 +560,46 @@ def _canonical_player_name(raw_name, allowed_names):
     return None
 
 
+def _align_caption_to_player_metrics(caption, metrics):
+    text = _normalize_space(caption)
+    if not text or not isinstance(metrics, dict):
+        return text
+
+    pts = _safe_int(metrics.get("pts"), None)
+    ast = _safe_int(metrics.get("ast"), None)
+    reb = _safe_int(metrics.get("reb"), None)
+
+    if pts is not None:
+        points_label = "point" if pts == 1 else "points"
+        text = re.sub(r"\b\d+\s+points?\b", f"{pts} {points_label}", text, flags=re.IGNORECASE)
+    if ast is not None:
+        assists_label = "assist" if ast == 1 else "assists"
+        text = re.sub(r"\b\d+\s+assists?\b", f"{ast} {assists_label}", text, flags=re.IGNORECASE)
+    if reb is not None:
+        rebounds_label = "rebound" if reb == 1 else "rebounds"
+        text = re.sub(r"\b\d+\s+rebounds?\b", f"{reb} {rebounds_label}", text, flags=re.IGNORECASE)
+
+    return text
+
+
 def _validate_player_stories(player_stories, candidates_by_team, max_players_per_team):
     validated = []
     counts = {"away": 0, "home": 0}
+    team_candidates = {
+        "away": [item for item in (candidates_by_team or {}).get("away", []) if item.get("name")],
+        "home": [item for item in (candidates_by_team or {}).get("home", []) if item.get("name")],
+    }
     allowed = {
-        "away": [item.get("name") for item in (candidates_by_team or {}).get("away", []) if item.get("name")],
-        "home": [item.get("name") for item in (candidates_by_team or {}).get("home", []) if item.get("name")],
+        "away": [item.get("name") for item in team_candidates.get("away", [])],
+        "home": [item.get("name") for item in team_candidates.get("home", [])],
+    }
+    metrics_by_team = {
+        side: {
+            _normalize_player_name_key(item.get("name")): item
+            for item in team_candidates.get(side, [])
+            if item.get("name")
+        }
+        for side in ("away", "home")
     }
 
     for item in player_stories or []:
@@ -573,7 +614,9 @@ def _validate_player_stories(player_stories, candidates_by_team, max_players_per
         player_name = _canonical_player_name(item.get("player"), allowed.get(team) or [])
         if not player_name:
             continue
-        caption = _sanitize_caption(item.get("caption"), max_chars=PLAYER_CAPTION_MAX_CHARS)
+        player_metrics = metrics_by_team.get(team, {}).get(_normalize_player_name_key(player_name)) or {}
+        aligned_caption = _align_caption_to_player_metrics(item.get("caption"), player_metrics)
+        caption = _sanitize_caption(aligned_caption, max_chars=PLAYER_CAPTION_MAX_CHARS)
         if not caption:
             continue
 
