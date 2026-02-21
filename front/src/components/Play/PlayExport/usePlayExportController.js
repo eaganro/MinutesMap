@@ -129,7 +129,9 @@ export const usePlayExportController = ({
         selectedPlayer: { name: option.name, teamKey: option.teamKey },
         playerDisplayName: displayName,
       });
-      const captionPeriodLabels = captionPeriods.map((period) => formatPeriodLabel(period)).filter(Boolean);
+      const captionPeriodLabels = captionPeriods
+        .map((period) => formatPeriodLabel(period))
+        .filter(Boolean);
       const hasAnyCaption = captionPeriodLabels.length > 0;
       const hasCaption = captionPeriods.includes(Number(resolvedExportRange?.end));
       return {
@@ -260,7 +262,8 @@ export const usePlayExportController = ({
           playerDisplayName: exportPlayerDisplayName,
         });
         const resolvedCaption = clampExportCaption({
-          text: typeof captionOverride === 'string' ? captionOverride : String(defaultCaption || ''),
+          text:
+            typeof captionOverride === 'string' ? captionOverride : String(defaultCaption || ''),
           exportView,
           captions: generatedCaptions,
         });
@@ -484,14 +487,17 @@ export const usePlayExportController = ({
     setExportError(null);
   }, []);
 
-  const handleCaptionChange = useCallback((nextCaption) => {
-    const resolved = clampExportCaption({
-      text: nextCaption,
-      exportView,
-      captions: generatedCaptions,
-    });
-    setCaptionDraft(resolved);
-  }, [exportView, generatedCaptions]);
+  const handleCaptionChange = useCallback(
+    (nextCaption) => {
+      const resolved = clampExportCaption({
+        text: nextCaption,
+        exportView,
+        captions: generatedCaptions,
+      });
+      setCaptionDraft(resolved);
+    },
+    [exportView, generatedCaptions],
+  );
 
   const handleApplyCaption = useCallback(() => {
     if (!exportPreview) return;

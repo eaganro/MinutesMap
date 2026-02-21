@@ -245,7 +245,8 @@ describe('usePlayExportController', () => {
     const { result } = renderHook(() => usePlayExportController(buildProps()));
 
     const getEndLabel = (period) =>
-      result.current.filteredRangeEndOptions.find((option) => option.period === period)?.label || '';
+      result.current.filteredRangeEndOptions.find((option) => option.period === period)?.label ||
+      '';
 
     expect(getEndLabel(1)).toContain('[caption]');
     expect(getEndLabel(2)).toBe('Q2');
