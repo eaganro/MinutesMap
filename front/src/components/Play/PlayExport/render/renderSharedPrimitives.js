@@ -5,10 +5,12 @@ export {
   drawCenteredScoreHeader,
   drawCommonHeaderMeta,
   drawFittedHeaderText,
+  drawPlayerFocusHeader,
   drawRowMarkers,
   filterRenderableActions,
   getExportComputedStyle,
   measureCaptionBlockHeight,
   measureCenteredScoreHeaderHeight,
+  measurePlayerFocusHeaderHeight,
   getScoreTimelineSource,
 } from '../playExportBuilders.shared';

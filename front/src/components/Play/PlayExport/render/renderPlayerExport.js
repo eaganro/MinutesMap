@@ -26,11 +26,13 @@ import {
   createExportCanvasContext,
   drawCaptionBlock,
   drawCenteredScoreHeader,
+  drawPlayerFocusHeader,
   drawRowMarkers,
   filterRenderableActions,
   getExportComputedStyle,
   measureCaptionBlockHeight,
   measureCenteredScoreHeaderHeight,
+  measurePlayerFocusHeaderHeight,
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
@@ -72,8 +74,24 @@ export const renderPlayerExportCanvas = ({
   const computed = getExportComputedStyle(playRef);
   if (!computed) return null;
 
+  const hasPlayer = Boolean(selectedPlayer?.name);
+  const isAway =
+    hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
+  const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
+  const playerName = selectedPlayer?.name || '';
+  const playerLabel = playerDisplayName || playerName;
+  const playerTeamAbbr = hasPlayer
+    ? isAway
+      ? displayAwayTeamNames?.abr || 'Away'
+      : displayHomeTeamNames?.abr || 'Home'
+    : '';
+
   const legendScale = getQuarterAwareLegendScale(periodCount);
   const legendMeasureCtx = document.createElement('canvas').getContext('2d');
+  const playerFocusHeight = measurePlayerFocusHeaderHeight({
+    playerLabel,
+    teamAbbr: playerTeamAbbr,
+  });
   const legendHeight = measureLegendHeight(
     legendMeasureCtx,
     computed,
@@ -89,20 +107,23 @@ export const renderPlayerExportCanvas = ({
     text: captionText,
     maxWidth: contentWidth - 24,
   });
-  const captionTopGap = captionHeight > 0 ? 6 : 0;
+  const playerFocusTopGap = 0;
+  const playerFocusBottomGap = playerFocusHeight > 0 ? 6 : 0;
+  const captionTopGap = captionHeight > 0 ? (playerFocusHeight > 0 ? 4 : 6) : 0;
   const captionBottomGap = captionHeight > 0 ? 8 : 0;
   const headerHeight = measureCenteredScoreHeaderHeight({ gameDate, statusLabel });
-  const playAreaTop = headerHeight + captionTopGap + captionHeight + captionBottomGap;
+  const scoreHeaderY = playerFocusTopGap + playerFocusHeight + playerFocusBottomGap;
+  const playAreaTop =
+    playerFocusTopGap +
+    playerFocusHeight +
+    playerFocusBottomGap +
+    headerHeight +
+    captionTopGap +
+    captionHeight +
+    captionBottomGap;
   const chartTop = playAreaTop;
   const chartLeft = rightPad;
   const chartWidth = Math.max(1, contentWidth - chartLeft - rightPad);
-
-  const hasPlayer = Boolean(selectedPlayer?.name);
-  const isAway =
-    hasPlayer && (selectedPlayer?.teamKey === 'away' || selectedPlayer?.team === 'away');
-  const teamKey = hasPlayer ? (isAway ? 'away' : 'home') : null;
-  const playerName = selectedPlayer?.name || '';
-  const playerLabel = playerDisplayName || playerName;
   const actions = (isAway ? filteredAwayPlayers : filteredHomePlayers)?.[playerName] || [];
   const boxScoreActions =
     (isAway ? boxScoreAwayPlayers : boxScoreHomePlayers)?.[playerName] || actions;
@@ -161,14 +182,25 @@ export const renderPlayerExportCanvas = ({
     textPrimary,
     textSecondary,
     teamLogos,
-    y: 0,
+    y: scoreHeaderY,
   });
+  if (playerFocusHeight > 0) {
+    drawPlayerFocusHeader({
+      ctx,
+      contentWidth,
+      y: playerFocusTopGap,
+      playerLabel,
+      teamAbbr: playerTeamAbbr,
+      textPrimary,
+      textSecondary,
+    });
+  }
   if (captionHeight > 0) {
     drawCaptionBlock({
       ctx,
       text: captionText,
       x: 12,
-      y: headerHeight + captionTopGap,
+      y: scoreHeaderY + headerHeight + captionTopGap,
       maxWidth: contentWidth - 24,
       color: textSecondary,
       textAlign: 'center',

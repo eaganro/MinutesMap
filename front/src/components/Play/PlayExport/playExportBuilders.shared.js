@@ -446,6 +446,92 @@ export const measureCaptionBlockHeight = ({
   return paddingTop + lines.length * lineHeight + paddingBottom;
 };
 
+export const measurePlayerFocusHeaderHeight = ({
+  playerLabel,
+  teamAbbr,
+  labelText = '',
+  labelLineHeight = 12,
+  nameLineHeight = 22,
+  gap = 2,
+  paddingTop = 2,
+  paddingBottom = 2,
+}) => {
+  const hasPlayer = Boolean(String(playerLabel || '').trim());
+  const hasTeam = Boolean(String(teamAbbr || '').trim());
+  if (!hasPlayer && !hasTeam) return 0;
+  const hasLabel = Boolean(String(labelText || '').trim());
+  return paddingTop + (hasLabel ? labelLineHeight + gap : 0) + nameLineHeight + paddingBottom;
+};
+
+export const drawPlayerFocusHeader = ({
+  ctx,
+  contentWidth,
+  y,
+  playerLabel,
+  teamAbbr,
+  textPrimary,
+  textSecondary,
+  sidePadding = 12,
+  labelText = '',
+  labelFont = '700 10px system-ui, -apple-system, sans-serif',
+  nameFontFamily = 'system-ui, -apple-system, sans-serif',
+  nameFontWeight = '700',
+  nameMaxFontSize = 19,
+  nameMinFontSize = 13,
+  labelLineHeight = 12,
+  nameLineHeight = 22,
+  gap = 2,
+  paddingTop = 2,
+  paddingBottom = 2,
+}) => {
+  if (!ctx) return 0;
+  const playerText = String(playerLabel || '').trim();
+  const teamText = String(teamAbbr || '').trim();
+  if (!playerText && !teamText) return 0;
+
+  const focusText = teamText ? `${playerText} (${teamText})` : playerText;
+  const maxWidth = Math.max(1, contentWidth - sidePadding * 2);
+  const totalHeight = measurePlayerFocusHeaderHeight({
+    playerLabel: playerText,
+    teamAbbr: teamText,
+    labelText,
+    labelLineHeight,
+    nameLineHeight,
+    gap,
+    paddingTop,
+    paddingBottom,
+  });
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+
+  const hasLabel = Boolean(String(labelText || '').trim());
+  let nameY = y + paddingTop;
+  if (hasLabel) {
+    ctx.fillStyle = textSecondary;
+    ctx.font = labelFont;
+    ctx.fillText(labelText, contentWidth / 2, y + paddingTop);
+    nameY += labelLineHeight + gap;
+  }
+
+  let resolvedFontSize = nameMaxFontSize;
+  ctx.fillStyle = textPrimary;
+  ctx.font = `${nameFontWeight} ${resolvedFontSize}px ${nameFontFamily}`;
+  while (resolvedFontSize > nameMinFontSize && ctx.measureText(focusText).width > maxWidth) {
+    resolvedFontSize -= 1;
+    ctx.font = `${nameFontWeight} ${resolvedFontSize}px ${nameFontFamily}`;
+  }
+  const fittedText =
+    ctx.measureText(focusText).width > maxWidth
+      ? fitLineWithEllipsis({ ctx, text: focusText, maxWidth })
+      : focusText;
+  ctx.fillText(fittedText, contentWidth / 2, nameY);
+
+  ctx.restore();
+  return totalHeight;
+};
+
 export const drawCaptionBlock = ({
   ctx,
   text,
