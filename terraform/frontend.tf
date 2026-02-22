@@ -9,6 +9,52 @@ resource "aws_cloudfront_function" "spa_rewrite" {
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
+  var host = request.headers.host && request.headers.host.value ? request.headers.host.value : '';
+
+  function buildQueryString(query) {
+    if (!query) {
+      return '';
+    }
+
+    var parts = [];
+    for (var key in query) {
+      if (!Object.prototype.hasOwnProperty.call(query, key)) {
+        continue;
+      }
+      var entry = query[key];
+      if (!entry) {
+        continue;
+      }
+      if (entry.multiValue && entry.multiValue.length > 0) {
+        for (var i = 0; i < entry.multiValue.length; i++) {
+          var mv = entry.multiValue[i];
+          if (mv && mv.value !== undefined) {
+            parts.push(key + '=' + mv.value);
+          }
+        }
+        continue;
+      }
+      if (entry.value !== undefined) {
+        parts.push(key + '=' + entry.value);
+      } else {
+        parts.push(key);
+      }
+    }
+
+    return parts.length ? '?' + parts.join('&') : '';
+  }
+
+  if (host === 'www.minutesmap.com') {
+    return {
+      statusCode: 301,
+      statusDescription: 'Moved Permanently',
+      headers: {
+        location: {
+          value: 'https://minutesmap.com' + uri + buildQueryString(request.querystring)
+        }
+      }
+    };
+  }
 
   if (uri.startsWith('/data/') || uri.startsWith('/schedule/')) {
     return request;
@@ -89,7 +135,7 @@ resource "aws_cloudfront_distribution" "main" {
     target_origin_id = aws_s3_bucket.data_bucket.bucket_regional_domain_name
 
     # Use exact same policies as /data/ for consistency
-    cache_policy_id            = "cff81036-bd3d-46a6-8956-eafed459cbae" 
+    cache_policy_id            = "cff81036-bd3d-46a6-8956-eafed459cbae"
     origin_request_policy_id   = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
     response_headers_policy_id = "60669652-455b-4ae9-85a4-c4c02393f86c"
 
@@ -113,7 +159,7 @@ resource "aws_cloudfront_distribution" "main" {
     }
 
     compress               = true
-    viewer_protocol_policy = "allow-all" # Matches your current settings
+    viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
   }
