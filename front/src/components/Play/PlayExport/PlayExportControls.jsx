@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { usePlayExportController } from './usePlayExportController';
 
 export default function PlayExportControls({
@@ -10,6 +10,7 @@ export default function PlayExportControls({
   onExportInteractionStart,
 }) {
   const exportPreviewRef = useRef(null);
+  const captionTextareaId = useId();
   const hasDisplayData = exportData.hasDisplayData;
 
   const {
@@ -38,6 +39,7 @@ export default function PlayExportControls({
     clearExportError,
     handleCaptionChange,
     handleApplyCaption,
+    handleClearCaption,
   } = usePlayExportController({
     playRef,
     gameId,
@@ -198,13 +200,22 @@ export default function PlayExportControls({
                 </label>
               </div>
             )}
-            <label className="playExportOption playExportCaptionOption">
+            <div className="playExportOption playExportCaptionOption">
               <div className="playExportCaptionHeader">
-                <span>Caption</span>
+                <label htmlFor={captionTextareaId}>Caption</label>
                 <div className="playExportCaptionActions">
                   <span className="playExportCaptionCounter">
                     {captionText.length}/{captionMaxLength}
                   </span>
+                  <button
+                    type="button"
+                    className="playExportCaptionClearButton"
+                    onClick={handleClearCaption}
+                    disabled={isExporting || previewIsUpdating || !captionText.length}
+                    aria-label="Clear caption"
+                  >
+                    Clear
+                  </button>
                   <button
                     type="button"
                     className="playExportCaptionApplyButton"
@@ -216,6 +227,7 @@ export default function PlayExportControls({
                 </div>
               </div>
               <textarea
+                id={captionTextareaId}
                 value={captionText}
                 onChange={(event) => handleCaptionChange(event.target.value)}
                 disabled={isExporting || previewIsUpdating}
@@ -223,7 +235,7 @@ export default function PlayExportControls({
                 maxLength={captionMaxLength}
                 placeholder="Add a caption"
               />
-            </label>
+            </div>
           </div>
           <div className="playExportPreviewBody">
             <img src={exportPreview.url} alt="Play-by-play export preview" />

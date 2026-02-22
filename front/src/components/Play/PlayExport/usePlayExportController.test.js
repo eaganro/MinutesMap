@@ -325,6 +325,42 @@ describe('usePlayExportController', () => {
     });
   });
 
+  it('clears the caption and immediately rebuilds the preview image', async () => {
+    mocks.createObjectUrl.mockReset();
+    mocks.createObjectUrl.mockReturnValueOnce('blob:first-preview');
+    mocks.createObjectUrl.mockReturnValueOnce('blob:cleared-preview');
+
+    const { result } = renderHook(() => usePlayExportController(buildProps()));
+
+    await act(async () => {
+      await result.current.handleExportImage();
+    });
+    expect(mocks.renderExportCanvas).toHaveBeenCalledTimes(1);
+    expect(result.current.exportPreview?.captionText).toBe(
+      'Philadelphia controls the opening stretch with pace and pressure.',
+    );
+
+    await act(async () => {
+      result.current.handleClearCaption();
+    });
+
+    await waitFor(() => {
+      expect(mocks.renderExportCanvas).toHaveBeenCalledTimes(2);
+    });
+    expect(mocks.renderExportCanvas).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        captionText: '',
+      }),
+    );
+    await waitFor(() => {
+      expect(result.current.captionText).toBe('');
+    });
+    await waitFor(() => {
+      expect(result.current.exportPreview?.captionText).toBe('');
+    });
+    expect(mocks.revokeObjectUrl).toHaveBeenCalledWith('blob:first-preview');
+  });
+
   it('limits captions by view and clamps oversized captions', async () => {
     const props = buildProps();
     const fullLimit = 120;

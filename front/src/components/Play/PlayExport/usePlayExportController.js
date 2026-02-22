@@ -504,6 +504,12 @@ export const usePlayExportController = ({
     void handleExportImage({ keepPreviewOpen: true, captionOverride: captionDraft });
   }, [exportPreview, captionDraft, handleExportImage]);
 
+  const handleClearCaption = useCallback(() => {
+    setCaptionDraft('');
+    if (!exportPreview) return;
+    void handleExportImage({ keepPreviewOpen: true, captionOverride: '' });
+  }, [exportPreview, handleExportImage]);
+
   const captionCanApply =
     Boolean(exportPreview) && captionDraft !== (exportPreview?.captionText || '');
 
@@ -535,5 +541,6 @@ export const usePlayExportController = ({
     clearExportError,
     handleCaptionChange,
     handleApplyCaption,
+    handleClearCaption,
   };
 };

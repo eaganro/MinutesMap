@@ -157,7 +157,8 @@
   letter-spacing: 0.04em;
 }
 
-.playExportCaptionApplyButton {
+.playExportCaptionApplyButton,
+.playExportCaptionClearButton {
   border: 1px solid var(--border-light);
   background: var(--bg-game);
   color: var(--text-primary);
