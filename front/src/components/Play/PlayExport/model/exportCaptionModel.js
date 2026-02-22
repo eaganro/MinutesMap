@@ -50,6 +50,33 @@ const resolvePeriodEntry = (periods, periodEnd) => {
   return exact && typeof exact === 'object' ? exact : null;
 };
 
+const resolvePeriodEntriesWithPrevious = (periods, periodEnd) => ({
+  current: resolvePeriodEntry(periods, periodEnd),
+  previous: periodEnd > 1 ? resolvePeriodEntry(periods, periodEnd - 1) : null,
+});
+
+const resolveFullCaptionFromPeriodEntry = (periodEntry) => String(periodEntry?.full || '').trim();
+
+const resolveMatchingPlayerCaptionFromPeriodEntry = ({
+  periodEntry,
+  selectedPlayer,
+  playerDisplayName,
+}) => {
+  if (!selectedPlayer?.name || !selectedPlayer?.teamKey) {
+    return '';
+  }
+
+  const aliases = normalizePlayerAliases(selectedPlayer.name, playerDisplayName);
+  const stories = Array.isArray(periodEntry?.players) ? periodEntry.players : [];
+  const matching = stories.find((story) => {
+    if (!story || typeof story !== 'object') return false;
+    if (story.team !== selectedPlayer.teamKey) return false;
+    return aliases.has(normalizeToken(story.player));
+  });
+
+  return matching ? String(matching.caption || '').trim() : '';
+};
+
 export const resolveDefaultExportCaption = ({
   captions,
   exportView,
@@ -61,11 +88,12 @@ export const resolveDefaultExportCaption = ({
   const periodEnd = Number(exportRange?.end);
   if (!Number.isFinite(periodEnd) || periodEnd <= 0) return '';
 
-  const periodEntry = resolvePeriodEntry(periods, periodEnd);
-  if (!periodEntry) return '';
+  const { current, previous } = resolvePeriodEntriesWithPrevious(periods, periodEnd);
 
   if (exportView === 'full') {
-    return String(periodEntry.full || '').trim();
+    const currentCaption = resolveFullCaptionFromPeriodEntry(current);
+    if (currentCaption) return currentCaption;
+    return resolveFullCaptionFromPeriodEntry(previous);
   }
 
   return resolvePlayerExportCaption({
@@ -88,18 +116,20 @@ export const resolvePlayerExportCaption = ({
 
   const periodEnd = Number(exportRange?.end);
   if (!Number.isFinite(periodEnd) || periodEnd <= 0) return '';
-  const periodEntry = resolvePeriodEntry(captions?.periods, periodEnd);
-  if (!periodEntry) return '';
+  const { current, previous } = resolvePeriodEntriesWithPrevious(captions?.periods, periodEnd);
 
-  const aliases = normalizePlayerAliases(selectedPlayer.name, playerDisplayName);
-  const stories = Array.isArray(periodEntry.players) ? periodEntry.players : [];
-  const matching = stories.find((story) => {
-    if (!story || typeof story !== 'object') return false;
-    if (story.team !== selectedPlayer.teamKey) return false;
-    return aliases.has(normalizeToken(story.player));
+  const currentCaption = resolveMatchingPlayerCaptionFromPeriodEntry({
+    periodEntry: current,
+    selectedPlayer,
+    playerDisplayName,
   });
+  if (currentCaption) return currentCaption;
 
-  return matching ? String(matching.caption || '').trim() : '';
+  return resolveMatchingPlayerCaptionFromPeriodEntry({
+    periodEntry: previous,
+    selectedPlayer,
+    playerDisplayName,
+  });
 };
 
 export const resolvePlayerCaptionPeriods = ({ captions, selectedPlayer, playerDisplayName }) => {

@@ -47,7 +47,17 @@ describe('exportCaptionModel', () => {
     ).toBe('Home steadies the game, but away keeps a slim halftime edge.');
   });
 
-  it('returns empty when no exact period checkpoint exists', () => {
+  it('falls back to the previous period caption when the selected period has no full caption', () => {
+    expect(
+      resolveDefaultExportCaption({
+        captions: CAPTIONS,
+        exportView: 'full',
+        exportRange: { start: 1, end: 3 },
+      }),
+    ).toBe('Home steadies the game, but away keeps a slim halftime edge.');
+  });
+
+  it('returns empty when neither the selected nor previous period has a full caption', () => {
     expect(
       resolveDefaultExportCaption({
         captions: CAPTIONS,
@@ -69,7 +79,7 @@ describe('exportCaptionModel', () => {
     ).toBe('Maxey sets the tone early with paint pressure and quick reads.');
   });
 
-  it('returns empty caption when no player story exists for selection', () => {
+  it('falls back to the previous period player caption when the selected period has no match', () => {
     expect(
       resolveDefaultExportCaption({
         captions: CAPTIONS,
@@ -77,6 +87,28 @@ describe('exportCaptionModel', () => {
         exportRange: { start: 1, end: 2 },
         selectedPlayer: { name: 'Tyrese Maxey', teamKey: 'away' },
         playerDisplayName: 'Tyrese Maxey',
+      }),
+    ).toBe('Maxey sets the tone early with paint pressure and quick reads.');
+  });
+
+  it('uses the selected period player caption when available instead of the previous period', () => {
+    expect(
+      resolveDefaultExportCaption({
+        captions: CAPTIONS,
+        exportView: 'player',
+        exportRange: { start: 1, end: 2 },
+        selectedPlayer: { name: 'Stephen Curry', teamKey: 'home' },
+        playerDisplayName: 'Stephen Curry',
+      }),
+    ).toBe('Curry sparks the response with deep range and off-ball movement.');
+  });
+
+  it('does not carry a caption forward more than one period', () => {
+    expect(
+      resolveDefaultExportCaption({
+        captions: CAPTIONS,
+        exportView: 'full',
+        exportRange: { start: 1, end: 4 },
       }),
     ).toBe('');
   });
