@@ -26,11 +26,15 @@
   background: var(--bg-play);
   color: var(--text-secondary);
   border-radius: 10px;
-  width: 34px;
-  height: 34px;
+  min-height: 34px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background-color 0.2s ease,
@@ -51,6 +55,32 @@
   &:focus-visible {
     outline: 2px solid var(--text-primary);
     outline-offset: 2px;
+  }
+}
+
+.playExportButtonIcon {
+  display: none;
+  flex-shrink: 0;
+}
+
+.playExportButtonLabel {
+  display: inline;
+}
+
+@media (min-width: 701px) {
+  .playExportButton.isIconOnlyDesktop {
+    width: 34px;
+    min-height: 34px;
+    height: 34px;
+    padding: 0;
+  }
+
+  .playExportButton.isIconOnlyDesktop .playExportButtonIcon {
+    display: block;
+  }
+
+  .playExportButton.isIconOnlyDesktop .playExportButtonLabel {
+    display: none;
   }
 }
 
@@ -295,6 +325,21 @@
 }
 
 @media (max-width: 700px) {
+  .playExportButton {
+    width: 34px;
+    min-height: 34px;
+    height: 34px;
+    padding: 0;
+  }
+
+  .playExportButtonIcon {
+    display: block;
+  }
+
+  .playExportButtonLabel {
+    display: none;
+  }
+
   .playExportPreview {
     left: 12px;
     right: 12px;

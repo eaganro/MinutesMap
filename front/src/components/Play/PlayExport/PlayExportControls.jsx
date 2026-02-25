@@ -12,6 +12,7 @@ export default function PlayExportControls({
   const exportPreviewRef = useRef(null);
   const captionTextareaId = useId();
   const hasDisplayData = exportData.hasDisplayData;
+  const isOvertimeGame = Number(exportData?.numPeriods) > 4;
 
   const {
     isExporting,
@@ -75,13 +76,14 @@ export default function PlayExportControls({
       {hasDisplayData && (
         <button
           type="button"
-          className="playExportButton"
+          className={`playExportButton${isOvertimeGame ? ' isIconOnlyDesktop' : ''}`}
           onClick={handleExportImage}
           disabled={exportDisabled}
-          aria-label={isExporting ? 'Preparing image export' : 'Export image'}
-          title={isExporting ? 'Preparing image...' : 'Export image'}
+          aria-label={isExporting ? 'Preparing share image' : 'Share image'}
+          title={isExporting ? 'Preparing share image...' : 'Share image'}
         >
           <svg
+            className="playExportButtonIcon"
             width="18"
             height="18"
             viewBox="0 0 24 24"
@@ -96,6 +98,9 @@ export default function PlayExportControls({
             <path d="M8 7l4-4 4 4" />
             <path d="M4 14v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6" />
           </svg>
+          <span className="playExportButtonLabel">
+            {isExporting ? 'Preparing...' : 'Share Image'}
+          </span>
         </button>
       )}
 
