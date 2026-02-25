@@ -17,7 +17,11 @@ from nba_game_poller.gamepack_utils import (
     extract_oncourt_ids,
     extract_oncourt_names,
 )
-from nba_game_poller.captioning import build_period_captions, extract_closed_periods
+from nba_game_poller.captioning import (
+    build_period_captions,
+    extract_closed_periods,
+    select_caption_checkpoint_periods,
+)
 from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
 
 # --- Configuration & Environment ---
@@ -518,6 +522,7 @@ def caption_worker_logic(event):
         print(f"CaptionWorker: Missing flow/box for {game_key}.")
         return
 
+    status_text = (event.get("status") or "").strip()
     existing_captions = flow_payload.get("captions")
     merged_captions = build_period_captions(
         actions=None,
@@ -528,6 +533,7 @@ def caption_worker_logic(event):
         model=GEMINI_MODEL,
         max_players_per_team=CAPTION_MAX_PLAYERS_PER_TEAM,
         timeout_seconds=CAPTION_TIMEOUT_SECONDS,
+        include_final_overtime=is_final_status(status_text),
     )
     if not isinstance(merged_captions, dict):
         return
@@ -538,7 +544,6 @@ def caption_worker_logic(event):
     next_flow["captions"] = merged_captions
     gamepack = dict(existing)
     gamepack["flow"] = next_flow
-    status_text = (event.get("status") or "").strip()
     upload_json_to_s3(
         s3_client=s3_client,
         bucket=BUCKET,
@@ -726,11 +731,15 @@ def process_game(game_item, user_agent=None, date_str=None):
 
     if processed is not None and AI_CAPTIONS_ENABLED and GEMINI_API_KEY and LAMBDA_ARN:
         closed_periods = extract_closed_periods(actions)
-        if closed_periods:
-            latest_closed_period = max(closed_periods)
+        status_for_worker = updates.get("status") or game_item.get("status") or ""
+        caption_checkpoints = select_caption_checkpoint_periods(
+            closed_periods,
+            include_final_overtime=is_final_status(status_for_worker),
+        )
+        if caption_checkpoints:
+            latest_closed_period = max(caption_checkpoints)
             requested_through = parse_positive_int(game_item.get("captions_requested_through"), fallback=0)
             if latest_closed_period > requested_through:
-                status_for_worker = updates.get("status") or game_item.get("status") or ""
                 if enqueue_caption_worker(
                     game_key=game_key,
                     latest_closed_period=latest_closed_period,

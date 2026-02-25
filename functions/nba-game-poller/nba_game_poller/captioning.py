@@ -140,6 +140,29 @@ def extract_closed_periods_from_flow(flow_payload):
     return sorted(closed)
 
 
+def select_caption_checkpoint_periods(closed_periods, include_final_overtime=False):
+    normalized = sorted(
+        {
+            period
+            for period in (_safe_int(value, 0) for value in (closed_periods or []))
+            if period and period > 0
+        }
+    )
+    if not normalized:
+        return []
+
+    selected = []
+    for period in (2, 4):
+        if period in normalized:
+            selected.append(period)
+
+    final_period = normalized[-1]
+    if include_final_overtime and final_period > 4 and final_period not in selected:
+        selected.append(final_period)
+
+    return selected
+
+
 def _score_at_period(score_timeline, period):
     away_score = None
     home_score = None
@@ -766,6 +789,7 @@ def build_period_captions(
     model="gemini-2.5-flash",
     max_players_per_team=2,
     timeout_seconds=8.0,
+    include_final_overtime=False,
 ):
     if not api_key or not isinstance(flow_payload, dict):
         return existing_captions
@@ -776,11 +800,15 @@ def build_period_captions(
         closed_periods = extract_closed_periods_from_flow(flow_payload)
     if not closed_periods:
         return existing_captions
+    selected_periods = select_caption_checkpoint_periods(
+        closed_periods,
+        include_final_overtime=include_final_overtime,
+    )
 
     captions = _initialize_captions(existing_captions, model)
     changed = isinstance(existing_captions, dict) and captions != existing_captions
 
-    for period in closed_periods:
+    for period in selected_periods:
         period_key = str(period)
         if period_key in captions["periods"]:
             continue

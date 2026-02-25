@@ -19,6 +19,20 @@ def test_extract_closed_periods_handles_transitions_and_period_end():
     ) == [1, 2]
 
 
+def test_select_caption_checkpoint_periods_limits_generation_checkpoints():
+    assert captioning.select_caption_checkpoint_periods([1, 2, 3]) == [2]
+    assert captioning.select_caption_checkpoint_periods([1, 2, 3, 4]) == [2, 4]
+    assert captioning.select_caption_checkpoint_periods([1, 2, 3, 4, 5]) == [2, 4]
+    assert captioning.select_caption_checkpoint_periods(
+        [1, 2, 3, 4, 5],
+        include_final_overtime=True,
+    ) == [2, 4, 5]
+    assert captioning.select_caption_checkpoint_periods(
+        [1, 2, 3, 4, 5, 6],
+        include_final_overtime=True,
+    ) == [2, 4, 6]
+
+
 def test_build_period_captions_merges_existing_checkpoints(monkeypatch):
     existing = {
         "v": 1,
@@ -51,8 +65,11 @@ def test_build_period_captions_merges_existing_checkpoints(monkeypatch):
         {"period": 2, "clock": "PT00M00.00S"},
     ]
 
+    requested_periods = []
+
     def fake_request_period_caption(**kwargs):
         period = kwargs.get("period")
+        requested_periods.append(period)
         return {"full": f"Generated for period {period}.", "players": []}
 
     monkeypatch.setattr(captioning, "request_period_caption", fake_request_period_caption)
@@ -68,6 +85,7 @@ def test_build_period_captions_merges_existing_checkpoints(monkeypatch):
 
     assert merged["periods"]["1"]["full"] == "Existing first-quarter caption."
     assert merged["periods"]["2"]["full"] == "Generated for period 2."
+    assert requested_periods == [2]
     assert merged["limits"] == {
         "full": captioning.FULL_CAPTION_MAX_CHARS,
         "player": captioning.PLAYER_CAPTION_MAX_CHARS,
@@ -106,12 +124,55 @@ def test_build_period_captions_can_detect_closed_periods_from_flow(monkeypatch):
         model="gemini-2.5-flash",
     )
 
-    assert merged["periods"]["1"]["full"] == "Generated for period 1."
     assert merged["periods"]["2"]["full"] == "Generated for period 2."
+    assert "1" not in merged["periods"]
     assert merged["limits"] == {
         "full": captioning.FULL_CAPTION_MAX_CHARS,
         "player": captioning.PLAYER_CAPTION_MAX_CHARS,
     }
+
+
+def test_build_period_captions_only_generates_final_overtime_when_final(monkeypatch):
+    flow_payload = {
+        "last": {"quarter": 6, "time": "00:00"},
+        "score": [
+            {"quarter": 1, "awayScore": 26, "homeScore": 23},
+            {"quarter": 2, "awayScore": 50, "homeScore": 49},
+            {"quarter": 3, "awayScore": 74, "homeScore": 75},
+            {"quarter": 4, "awayScore": 102, "homeScore": 102},
+            {"quarter": 5, "awayScore": 112, "homeScore": 112},
+            {"quarter": 6, "awayScore": 121, "homeScore": 118},
+        ],
+        "players": {"away": {}, "home": {}},
+        "events": [],
+    }
+    box_payload = {
+        "teams": {
+            "away": {"abbr": "PHI"},
+            "home": {"abbr": "LAL"},
+        }
+    }
+    requested_periods = []
+
+    def fake_request_period_caption(**kwargs):
+        period = kwargs.get("period")
+        requested_periods.append(period)
+        return {"full": f"Generated for period {period}.", "players": []}
+
+    monkeypatch.setattr(captioning, "request_period_caption", fake_request_period_caption)
+
+    merged = captioning.build_period_captions(
+        actions=None,
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        existing_captions=None,
+        api_key="test-key",
+        model="gemini-2.5-flash",
+        include_final_overtime=True,
+    )
+
+    assert requested_periods == [2, 4, 6]
+    assert set(merged["periods"].keys()) == {"2", "4", "6"}
 
 
 def test_build_period_captions_normalizes_limits_even_when_no_new_periods():
