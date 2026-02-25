@@ -188,7 +188,9 @@ test.describe('MinutesMap Smoke', () => {
     await page.goto('/');
     await waitForAppReady(page);
 
-    const exportButton = page.getByRole('button', { name: 'Export image' });
+    const exportButton = page.getByRole('button', {
+      name: /^(Export image|Share image)$/i,
+    });
     await expect(exportButton).toBeVisible();
     await exportButton.click();
 
