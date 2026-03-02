@@ -284,6 +284,18 @@
   justify-content: center;
 }
 
+.playExportActionButton.isIconOnly {
+  flex: 0 0 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playExportActionIcon {
+  flex-shrink: 0;
+}
+
 .playExportError {
   position: fixed;
   right: 12px;

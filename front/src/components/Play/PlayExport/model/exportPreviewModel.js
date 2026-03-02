@@ -33,6 +33,7 @@ export const buildExportOutputMetadata = ({
 export const buildExportPreviewState = ({
   url,
   fileName,
+  blob,
   file,
   canShare,
   shareMetadata,
@@ -41,6 +42,7 @@ export const buildExportPreviewState = ({
 }) => ({
   url,
   fileName,
+  blob,
   file,
   canShare,
   captionText,

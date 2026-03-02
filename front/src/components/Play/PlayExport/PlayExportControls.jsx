@@ -36,6 +36,7 @@ export default function PlayExportControls({
     handleExportRangeEndChange,
     handleExportImage,
     handleSharePreview,
+    handleDownloadPreview,
     closeExportPreview,
     clearExportError,
     handleCaptionChange,
@@ -259,6 +260,31 @@ export default function PlayExportControls({
             >
               Open image
             </a>
+            <button
+              type="button"
+              className="playExportActionButton isIconOnly"
+              onClick={handleDownloadPreview}
+              disabled={previewIsUpdating}
+              aria-label="Download image"
+              title="Download image"
+            >
+              <svg
+                className="playExportActionIcon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 3v12" />
+                <path d="M8 11l4 4 4-4" />
+                <path d="M4 21h16" />
+              </svg>
+            </button>
           </div>
         </div>
       )}

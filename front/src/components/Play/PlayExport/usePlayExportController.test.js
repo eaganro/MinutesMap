@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   createPngFile: vi.fn(),
   detectShareSupport: vi.fn(),
   createObjectUrl: vi.fn(),
+  downloadBlob: vi.fn(),
   revokeObjectUrl: vi.fn(),
   shareFile: vi.fn(),
   trackFeatureUse: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('./playExportTransport', async () => {
     createPngFile: mocks.createPngFile,
     detectShareSupport: mocks.detectShareSupport,
     createObjectUrl: mocks.createObjectUrl,
+    downloadBlob: mocks.downloadBlob,
     revokeObjectUrl: mocks.revokeObjectUrl,
     shareFile: mocks.shareFile,
   };
@@ -165,6 +167,7 @@ describe('usePlayExportController', () => {
     });
     mocks.detectShareSupport.mockReturnValue({ canShareFiles: false, errorMessage: null });
     mocks.createObjectUrl.mockReturnValue('blob:preview-url');
+    mocks.downloadBlob.mockReturnValue('blob:download-url');
     mocks.revokeObjectUrl.mockImplementation(() => {});
     mocks.shareFile.mockResolvedValue({ shared: true, aborted: false, error: null });
   });
@@ -495,6 +498,26 @@ describe('usePlayExportController', () => {
       }),
     );
     expect(result.current.exportPreview).toBeNull();
+  });
+
+  it('downloads the current preview image with the generated file name', async () => {
+    const { result } = renderHook(() => usePlayExportController(buildProps()));
+
+    await act(async () => {
+      await result.current.handleExportImage();
+    });
+
+    act(() => {
+      result.current.handleDownloadPreview();
+    });
+
+    expect(mocks.downloadBlob).toHaveBeenCalledTimes(1);
+    expect(mocks.downloadBlob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fileName: expect.stringContaining('2026-02-03-phi-gsw'),
+        blob: expect.any(Blob),
+      }),
+    );
   });
 
   it('falls back to data URL blob creation when canvasToBlob returns null', async () => {

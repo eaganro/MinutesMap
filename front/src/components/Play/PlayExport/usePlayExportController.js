@@ -27,6 +27,7 @@ import {
   createPngFile,
   dataUrlToBlob,
   detectShareSupport,
+  downloadBlob,
   revokeObjectUrl,
   shareFile,
   withTimeout,
@@ -353,6 +354,7 @@ export const usePlayExportController = ({
           buildExportPreviewState({
             url,
             fileName,
+            blob,
             file,
             canShare: canShareFiles,
             shareMetadata,
@@ -431,6 +433,17 @@ export const usePlayExportController = ({
       console.error('Play export share failed.', shareResult.error);
     }
   }, [exportPreview, setExportPreviewState]);
+
+  const handleDownloadPreview = useCallback(() => {
+    if (!exportPreview?.blob) return;
+    const url = downloadBlob({
+      blob: exportPreview.blob,
+      fileName: exportPreview.fileName,
+    });
+    if (!url) {
+      setExportError('Download failed: unable to start browser download.');
+    }
+  }, [exportPreview]);
 
   useEffect(() => {
     if (!exportPreview) return;
@@ -537,6 +550,7 @@ export const usePlayExportController = ({
     handleExportRangeEndChange,
     handleExportImage,
     handleSharePreview,
+    handleDownloadPreview,
     closeExportPreview,
     clearExportError,
     handleCaptionChange,
