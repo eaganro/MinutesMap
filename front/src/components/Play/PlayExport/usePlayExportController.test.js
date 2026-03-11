@@ -295,6 +295,33 @@ describe('usePlayExportController', () => {
     expect(mocks.revokeObjectUrl).toHaveBeenCalledWith('blob:first-preview');
   });
 
+  it('defaults to stacked single-player export context when provided', async () => {
+    const props = buildProps();
+    props.exportData.preferredExportContext = {
+      exportView: 'player-stacked',
+      exportPlayerKey: 'away:J. Brown',
+      exportRange: { start: 1, end: 1 },
+    };
+
+    const { result } = renderHook(() => usePlayExportController(props));
+
+    await act(async () => {
+      await result.current.handleExportImage();
+    });
+
+    expect(result.current.exportView).toBe('player-stacked');
+    expect(result.current.exportPlayerKey).toBe('away:J. Brown');
+    expect(mocks.renderExportCanvas).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        exportView: 'player-stacked',
+        selectedPlayer: expect.objectContaining({
+          key: 'away:J. Brown',
+          name: 'J. Brown',
+        }),
+      }),
+    );
+  });
+
   it('rebuilds the image only after applying caption changes', async () => {
     mocks.createObjectUrl.mockReset();
     mocks.createObjectUrl.mockReturnValueOnce('blob:first-preview');

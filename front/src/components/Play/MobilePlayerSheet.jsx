@@ -143,9 +143,7 @@ function MobilePlayerLegend({ statOn, onToggleStat }) {
                 </div>
               ) : (
                 <>
-                  <span className="mobilePlayerLegendIcon">
-                    {renderLegendIcon(group.items[0])}
-                  </span>
+                  <span className="mobilePlayerLegendIcon">{renderLegendIcon(group.items[0])}</span>
                   <span>{group.items[0].label}</span>
                 </>
               )}

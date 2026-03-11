@@ -59,6 +59,7 @@ export const usePlayExportController = ({
     teamColors,
     awayColor,
     homeColor,
+    preferredExportContext,
   } = exportData;
   const awayPlayerActions = stablePlayData.playerActions.away;
   const homePlayerActions = stablePlayData.playerActions.home;
@@ -88,8 +89,12 @@ export const usePlayExportController = ({
   const imageBuilderTrackedRef = useRef(false);
   const activeRequestIdRef = useRef(0);
 
-  const { resolvedExportRange, handleExportRangeStartChange, handleExportRangeEndChange } =
-    useExportRange({ gameId, numPeriods });
+  const {
+    resolvedExportRange,
+    setExportRange,
+    handleExportRangeStartChange,
+    handleExportRangeEndChange,
+  } = useExportRange({ gameId, numPeriods });
 
   const setExportPreviewState = useCallback((next) => {
     setExportPreview((prev) => {
@@ -173,15 +178,19 @@ export const usePlayExportController = ({
     [exportPlayerOptions, exportPlayerKey],
   );
 
+  const resolveExportPlayerDisplayName = useCallback(
+    (option) => {
+      if (!option?.name) return '';
+      const teamKey = option?.teamKey === 'away' ? 'away' : 'home';
+      const rosterPlayers = box?.teams?.[teamKey]?.players || [];
+      return resolveFullNameFromRoster(option.name, rosterPlayers) || option.name;
+    },
+    [box],
+  );
+
   const exportPlayerDisplayName = useMemo(() => {
-    if (!selectedExportPlayer?.name) return '';
-    const teamKey = selectedExportPlayer?.teamKey === 'away' ? 'away' : 'home';
-    const rosterPlayers = box?.teams?.[teamKey]?.players || [];
-    return (
-      resolveFullNameFromRoster(selectedExportPlayer.name, rosterPlayers) ||
-      selectedExportPlayer.name
-    );
-  }, [selectedExportPlayer, box]);
+    return resolveExportPlayerDisplayName(selectedExportPlayer);
+  }, [selectedExportPlayer, resolveExportPlayerDisplayName]);
 
   useEffect(() => {
     if (!exportPlayerOptions.length) {
@@ -244,10 +253,32 @@ export const usePlayExportController = ({
       );
       const exportTimeoutMs = isMobileViewport ? 30000 : EXPORT_TIMEOUT_MS;
 
+      const preferredContext =
+        !keepPreviewOpen && preferredExportContext ? preferredExportContext : null;
+      const effectiveExportView = preferredContext?.exportView || exportView;
+      const effectiveExportPlayerKey = preferredContext?.exportPlayerKey || exportPlayerKey;
+      const effectiveExportRange = preferredContext?.exportRange || resolvedExportRange;
+      const effectiveSelectedExportPlayer =
+        exportPlayerOptions.find((option) => option.key === effectiveExportPlayerKey) || null;
+      const effectiveExportPlayerDisplayName = resolveExportPlayerDisplayName(
+        effectiveSelectedExportPlayer,
+      );
+
+      if (preferredContext) {
+        setExportView(effectiveExportView);
+        setExportPlayerKey(effectiveExportPlayerKey);
+        if (effectiveExportRange?.start && effectiveExportRange?.end) {
+          setExportRange({
+            start: effectiveExportRange.start,
+            end: effectiveExportRange.end,
+          });
+        }
+      }
+
       const snapshot = buildExportRequestSnapshot({
-        resolvedExportRange,
-        exportView,
-        exportPlayerKey,
+        resolvedExportRange: effectiveExportRange,
+        exportView: effectiveExportView,
+        exportPlayerKey: effectiveExportPlayerKey,
         isFinal,
       });
       exportPreviewKeyRef.current = snapshot.exportPreviewKey;
@@ -257,15 +288,15 @@ export const usePlayExportController = ({
 
         const defaultCaption = resolveDefaultExportCaption({
           captions: generatedCaptions,
-          exportView,
+          exportView: effectiveExportView,
           exportRange: snapshot.exportRangeSnapshot,
-          selectedPlayer: selectedExportPlayer,
-          playerDisplayName: exportPlayerDisplayName,
+          selectedPlayer: effectiveSelectedExportPlayer,
+          playerDisplayName: effectiveExportPlayerDisplayName,
         });
         const resolvedCaption = clampExportCaption({
           text:
             typeof captionOverride === 'string' ? captionOverride : String(defaultCaption || ''),
-          exportView,
+          exportView: effectiveExportView,
           captions: generatedCaptions,
         });
         const teamLogos = await loadTeamLogosForExport({
@@ -275,9 +306,9 @@ export const usePlayExportController = ({
 
         const { renderInput, exportRangeLabel, exportIsFullGameRange } = buildExportRenderRequest({
           snapshot,
-          exportView,
-          selectedExportPlayer,
-          exportPlayerDisplayName,
+          exportView: effectiveExportView,
+          selectedExportPlayer: effectiveSelectedExportPlayer,
+          exportPlayerDisplayName: effectiveExportPlayerDisplayName,
           captionText: resolvedCaption,
           teamLogos,
           leftMargin,
@@ -399,6 +430,9 @@ export const usePlayExportController = ({
       displayHomePlayersAll,
       selectedExportPlayer,
       exportPlayerDisplayName,
+      exportPlayerOptions,
+      resolveExportPlayerDisplayName,
+      preferredExportContext,
       leftMargin,
       rightMargin,
       gameDate,
@@ -411,6 +445,7 @@ export const usePlayExportController = ({
       awayColor,
       homeColor,
       gameId,
+      setExportRange,
       setExportPreviewState,
     ],
   );

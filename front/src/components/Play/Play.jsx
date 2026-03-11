@@ -169,7 +169,8 @@ export default function Play({
     const teamKey = selectedPlayer.teamKey === 'away' ? 'away' : 'home';
     const filteredPlayers = teamKey === 'away' ? displayAwayPlayers : displayHomePlayers;
     const allPlayers = teamKey === 'away' ? displayAwayPlayersAll : displayHomePlayersAll;
-    const playerTimelines = teamKey === 'away' ? displayAwayPlayerTimeline : displayHomePlayerTimeline;
+    const playerTimelines =
+      teamKey === 'away' ? displayAwayPlayerTimeline : displayHomePlayerTimeline;
     const rosterPlayers = box?.teams?.[teamKey]?.players || [];
 
     if (!Object.prototype.hasOwnProperty.call(filteredPlayers, selectedPlayer.name)) {
@@ -195,6 +196,31 @@ export default function Play({
     displayHomePlayerTimeline,
     box,
     teamColors,
+  ]);
+
+  const preferredExportContext = useMemo(() => {
+    if (!selectedPlayerDetail || !isShowingMobilePlayerDetail) return null;
+
+    const exportRange =
+      Number(playerDetailPeriod) > 0
+        ? { start: Number(playerDetailPeriod), end: Number(playerDetailPeriod) }
+        : {
+            start: 1,
+            end: isFinal ? numPeriods : latestStartedPeriod || 1,
+          };
+
+    return {
+      exportView: 'player-stacked',
+      exportPlayerKey: `${selectedPlayerDetail.teamKey}:${selectedPlayerDetail.name}`,
+      exportRange,
+    };
+  }, [
+    selectedPlayerDetail,
+    isShowingMobilePlayerDetail,
+    playerDetailPeriod,
+    isFinal,
+    numPeriods,
+    latestStartedPeriod,
   ]);
 
   useEffect(() => {
@@ -284,6 +310,7 @@ export default function Play({
           teamColors,
           awayColor,
           homeColor,
+          preferredExportContext,
         }}
         onExportInteractionStart={() => {
           setInfoLocked(false);

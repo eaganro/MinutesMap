@@ -34,6 +34,7 @@ export const useExportRange = ({ gameId, numPeriods }) => {
 
   return {
     exportRange,
+    setExportRange,
     resolvedExportRange,
     handleExportRangeStartChange,
     handleExportRangeEndChange,
