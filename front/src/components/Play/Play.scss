@@ -286,7 +286,6 @@
 }
 
 .mobilePlayerSheetCard {
-  border: 1px solid var(--border-light);
   background: var(--bg-play);
   border-radius: 16px;
   padding: 14px 12px 12px;
@@ -320,14 +319,15 @@
   height: auto;
 }
 
-.mobilePlayerTimelineBaseline {
+.mobilePlayerTimelineSegment {
   stroke: var(--line-color-light);
-  stroke-width: 1.5;
-  opacity: 0.28;
+  stroke-width: 2.2;
+  stroke-linecap: round;
 }
 
-.mobilePlayerTimelineSegment {
-  stroke-width: 2.2;
+.mobilePlayerTimelineCap {
+  stroke: var(--line-color-light);
+  stroke-width: 1.5;
   stroke-linecap: round;
 }
 
@@ -407,7 +407,8 @@
   border: 1px solid var(--divider);
   border-radius: 12px;
   overflow: hidden;
-  min-width: 560px;
+  width: max-content;
+  min-width: 100%;
 }
 
 .mobilePlayerBoxScoreGrid {
@@ -420,7 +421,6 @@
 
 .mobilePlayerBoxScoreRow {
   background: var(--bg-table-even);
-  border-top: 1px solid var(--divider);
 }
 
 .mobilePlayerBoxScoreCell {

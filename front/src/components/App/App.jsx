@@ -72,7 +72,10 @@ export default function App() {
           gameStatus={scoreVm.gameStatus}
         />
 
-        <div className="playByPlaySection" ref={playVm.playByPlaySectionRef}>
+        <div
+          className={`playByPlaySection${isPlayerDetailOpen ? ' isPlayerDetailOpen' : ''}`}
+          ref={playVm.playByPlaySectionRef}
+        >
           <Play
             gameId={playVm.gameId}
             nbaGameId={playVm.nbaGameId}

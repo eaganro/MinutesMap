@@ -236,7 +236,7 @@ function buildMobilePlayerBoxScoreColumns(stats, playerName) {
   ];
 }
 
-function MobilePlayerTimelineRows({ periods, actions, timeline, teamColor }) {
+function MobilePlayerTimelineRows({ periods, actions, timeline }) {
   const renderableActions = useMemo(() => filterRenderableActions(actions), [actions]);
 
   const pointAtTime = useMemo(() => {
@@ -259,22 +259,23 @@ function MobilePlayerTimelineRows({ periods, actions, timeline, teamColor }) {
           actions={renderableActions}
           timeline={timeline}
           pointAtTime={pointAtTime}
-          teamColor={teamColor}
         />
       ))}
     </div>
   );
 }
 
-function MobilePlayerTimelineRow({ period, actions, timeline, pointAtTime, teamColor }) {
+function MobilePlayerTimelineRow({ period, actions, timeline, pointAtTime }) {
   const rowHeight = 34;
   const chartWidth = 320;
+  const horizontalPadding = 10;
   const rowTop = 16;
   const centerY = rowTop + rowHeight / 2;
   const periodDurationSeconds = getPeriodDurationSeconds(period);
+  const usableWidth = chartWidth - horizontalPadding * 2;
   const durationRatio = periodDurationSeconds / REGULATION_PERIOD_SECONDS;
-  const rowWidth = Math.max(1, Math.min(chartWidth, chartWidth * durationRatio));
-  const rowLeft = (chartWidth - rowWidth) / 2;
+  const rowWidth = Math.max(1, Math.min(usableWidth, usableWidth * durationRatio));
+  const rowLeft = horizontalPadding + (usableWidth - rowWidth) / 2;
   const rowRight = rowLeft + rowWidth;
   const periodStartSeconds = getPeriodStartSeconds(period);
 
@@ -332,7 +333,6 @@ function MobilePlayerTimelineRow({ period, actions, timeline, pointAtTime, teamC
           x2={x2}
           y2={centerY}
           className="mobilePlayerTimelineSegment"
-          style={{ stroke: teamColor || 'var(--text-primary)' }}
         />
       );
     });
@@ -348,13 +348,18 @@ function MobilePlayerTimelineRow({ period, actions, timeline, pointAtTime, teamC
       >
         <line
           x1={rowLeft}
-          y1={centerY}
-          x2={rowRight}
-          y2={centerY}
-          className="mobilePlayerTimelineBaseline"
+          y1={centerY - 6}
+          x2={rowLeft}
+          y2={centerY + 6}
+          className="mobilePlayerTimelineCap"
         />
-        <circle cx={rowLeft} cy={centerY} r="2" fill={teamColor} opacity="0.4" />
-        <circle cx={rowRight} cy={centerY} r="2" fill={teamColor} opacity="0.4" />
+        <line
+          x1={rowRight}
+          y1={centerY - 6}
+          x2={rowRight}
+          y2={centerY + 6}
+          className="mobilePlayerTimelineCap"
+        />
         {segments}
         {shapes}
       </svg>
@@ -426,7 +431,9 @@ export default function MobilePlayerSheet({
       data-testid="mobile-player-sheet"
     >
       <div className="mobilePlayerSheetHeader">
-        <h2 className="mobilePlayerSheetTitle">{playerDisplayName}</h2>
+        <h2 className="mobilePlayerSheetTitle" style={teamColor ? { color: teamColor } : undefined}>
+          {playerDisplayName}
+        </h2>
         <button
           type="button"
           className="mobilePlayerSheetClose"
@@ -442,7 +449,6 @@ export default function MobilePlayerSheet({
           periods={periods}
           actions={rangeActions}
           timeline={rangeTimeline}
-          teamColor={teamColor}
         />
         <MobilePlayerLegend statOn={statOn} onToggleStat={onToggleStat} />
         <MobilePlayerBoxScore columns={boxScoreColumns} />

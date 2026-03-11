@@ -110,6 +110,10 @@
   position: relative;
 }
 
+.playByPlaySection.isPlayerDetailOpen {
+  min-height: 0;
+}
+
 .playByPlaySection.isDesktopExport {
   width: var(--layout-content-width);
   max-width: none;
