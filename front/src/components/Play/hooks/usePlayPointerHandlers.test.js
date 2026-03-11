@@ -153,16 +153,13 @@ describe('usePlayPointerHandlers', () => {
       });
     });
 
-    const preventDefault = vi.fn();
     act(() => {
       result.current.handleTouchMove({
         touches: [{ clientX: 40, clientY: 12 }],
         target: container,
-        preventDefault,
       });
     });
 
-    expect(preventDefault).toHaveBeenCalled();
     expect(setInfoLocked).toHaveBeenCalledWith(false);
     expect(updateHoverAt).toHaveBeenCalledWith(40, 12, container, true);
   });

@@ -150,7 +150,6 @@ export function usePlayPointerHandlers({
         setInfoLocked(false);
       }
       touchMovedRef.current = true;
-      e.preventDefault();
       updateHoverAt(touch.clientX, touch.clientY, e.target, wasLocked);
     },
     [isDataLoading, infoLocked, resetInteraction, setInfoLocked, updateHoverAt],
