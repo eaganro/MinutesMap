@@ -151,6 +151,8 @@ export const computePlayerBoxScore = ({
     ftm: 0,
     fta: 0,
     reb: 0,
+    oreb: 0,
+    dreb: 0,
     ast: 0,
     stl: 0,
     blk: 0,
@@ -200,6 +202,11 @@ export const computePlayerBoxScore = ({
     }
     if (eventType === 'rebound') {
       stats.reb += 1;
+      if (desc.includes('offensive rebound') || desc.includes('off. rebound')) {
+        stats.oreb += 1;
+      } else if (desc.includes('defensive rebound') || desc.includes('def. rebound')) {
+        stats.dreb += 1;
+      }
     } else if (eventType === 'assist') {
       stats.ast += 1;
     } else if (eventType === 'steal') {

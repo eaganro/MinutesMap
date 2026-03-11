@@ -1,4 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { resolveFullNameFromRoster } from './PlayExport/playExportModel';
+import MobilePlayerSheet from './MobilePlayerSheet';
 import CircularProgress from '@mui/material/CircularProgress';
 import PlayExportControls from './PlayExport/PlayExportControls';
 import { usePlayPointerHandlers } from './hooks/usePlayPointerHandlers';
@@ -7,6 +9,7 @@ import Player from './Player/Player';
 import ScoreGraph from './ScoreGraph';
 import PlayTooltip from './PlayTooltip';
 import TimelineGrid from './TimelineGrid';
+import { MOBILE_TOOLTIP_BREAKPOINT } from './model/layoutModel';
 import { usePlayInteraction } from './usePlayInteraction';
 import './Play.scss';
 
@@ -21,6 +24,8 @@ export default function Play({
   statusMessage,
   showScoreDiff = true,
   statOn,
+  changeStatOn,
+  onPlayerDetailModeChange,
 }) {
   const {
     playRef,
@@ -45,6 +50,13 @@ export default function Play({
     hasDisplayData,
     displayAwayTeamNames,
     displayHomeTeamNames,
+    displayAwayPlayers,
+    displayAwayPlayersAll,
+    displayAwayPlayerTimeline,
+    displayHomePlayers,
+    displayHomePlayersAll,
+    displayHomePlayerTimeline,
+    displayScoreTimeline,
     displayNumQs,
     filteredAllActions,
     filteredScoreTimeline,
@@ -70,6 +82,8 @@ export default function Play({
     isLoading,
     statusMessage,
   });
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [playerDetailPeriod, setPlayerDetailPeriod] = useState(0);
 
   const {
     descriptionArray,
@@ -103,6 +117,11 @@ export default function Play({
     setHighlightActionIds([]);
   }, [activePeriod, setInfoLocked, setMouseLinePos, setDescriptionArray, setHighlightActionIds]);
 
+  useEffect(() => {
+    setSelectedPlayer(null);
+    setPlayerDetailPeriod(0);
+  }, [gameId]);
+
   const {
     isHoveringIcon,
     clearHoverIcon,
@@ -126,16 +145,89 @@ export default function Play({
     resetInteraction,
   });
 
+  const isMobilePlayerSheetEnabled =
+    Number.isFinite(sectionWidth) && sectionWidth > 0 && sectionWidth < MOBILE_TOOLTIP_BREAKPOINT;
+  const isShowingMobilePlayerDetail = isMobilePlayerSheetEnabled && Boolean(selectedPlayer);
+  const controlActivePeriod = isShowingMobilePlayerDetail ? playerDetailPeriod : activePeriod;
+
+  useEffect(() => {
+    onPlayerDetailModeChange?.(isShowingMobilePlayerDetail);
+  }, [isShowingMobilePlayerDetail, onPlayerDetailModeChange]);
+
+  useEffect(() => () => onPlayerDetailModeChange?.(false), [onPlayerDetailModeChange]);
+
+  useEffect(() => {
+    if (!isMobilePlayerSheetEnabled && selectedPlayer) {
+      setSelectedPlayer(null);
+      setPlayerDetailPeriod(0);
+    }
+  }, [isMobilePlayerSheetEnabled, selectedPlayer]);
+
+  const selectedPlayerDetail = useMemo(() => {
+    if (!selectedPlayer) return null;
+
+    const teamKey = selectedPlayer.teamKey === 'away' ? 'away' : 'home';
+    const filteredPlayers = teamKey === 'away' ? displayAwayPlayers : displayHomePlayers;
+    const allPlayers = teamKey === 'away' ? displayAwayPlayersAll : displayHomePlayersAll;
+    const playerTimelines = teamKey === 'away' ? displayAwayPlayerTimeline : displayHomePlayerTimeline;
+    const rosterPlayers = box?.teams?.[teamKey]?.players || [];
+
+    if (!Object.prototype.hasOwnProperty.call(filteredPlayers, selectedPlayer.name)) {
+      return null;
+    }
+
+    return {
+      ...selectedPlayer,
+      displayName:
+        resolveFullNameFromRoster(selectedPlayer.name, rosterPlayers) || selectedPlayer.name,
+      actions: filteredPlayers[selectedPlayer.name] || [],
+      boxScoreActions: allPlayers[selectedPlayer.name] || [],
+      timeline: playerTimelines[selectedPlayer.name] || [],
+      teamColor: teamKey === 'away' ? teamColors.away : teamColors.home,
+    };
+  }, [
+    selectedPlayer,
+    displayAwayPlayers,
+    displayAwayPlayersAll,
+    displayAwayPlayerTimeline,
+    displayHomePlayers,
+    displayHomePlayersAll,
+    displayHomePlayerTimeline,
+    box,
+    teamColors,
+  ]);
+
+  useEffect(() => {
+    if (selectedPlayer && !selectedPlayerDetail) {
+      setSelectedPlayer(null);
+    }
+  }, [selectedPlayer, selectedPlayerDetail]);
+
+  const handlePlayerSelect = (teamKey, name) => {
+    if (!isMobilePlayerSheetEnabled) return;
+    setInfoLocked(false);
+    clearHoverIcon();
+    resetInteraction(true);
+    setSelectedPlayer({ teamKey, name });
+    setPlayerDetailPeriod(0);
+  };
+
   const quarterSwitcher = showQuarterSwitcher ? (
     <div className="playQuarterSwitcher" style={{ width: sectionWidth }}>
       {periodOptions.map(({ period, label }) => (
         <button
           key={period}
           type="button"
-          className={`quarterTab ${period === activePeriod ? 'isActive' : ''}`}
-          onClick={() => selectPeriod(period)}
+          className={`quarterTab ${period === controlActivePeriod ? 'isActive' : ''}`}
+          onClick={() => {
+            if (isShowingMobilePlayerDetail) {
+              setPlayerDetailPeriod(period);
+              return;
+            }
+            selectPeriod(period);
+          }}
           disabled={isDataLoading || (period !== 0 && period > latestStartedPeriod)}
-          aria-pressed={period === activePeriod}
+          aria-pressed={period === controlActivePeriod}
         >
           {label}
         </button>
@@ -211,7 +303,7 @@ export default function Play({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
       >
-        {!isDataLoading && (
+        {!isDataLoading && !isShowingMobilePlayerDetail && (
           <PlayTooltip
             descriptionArray={descriptionArray}
             focusActionMeta={focusActionMeta}
@@ -231,7 +323,7 @@ export default function Play({
           />
         )}
 
-        {showLoadingOverlay && (
+        {showLoadingOverlay && !isShowingMobilePlayerDetail && (
           <div className="loadingOverlay">
             <CircularProgress size={20} thickness={5} />
             <span>Loading play-by-play...</span>
@@ -239,85 +331,119 @@ export default function Play({
         )}
 
         <div className="playContent">
-          <svg height="600" width={sectionWidth} className="line playGrid">
-            <TimelineGrid
-              width={width}
-              leftMargin={leftMargin}
-              qWidth={qWidth}
-              numQs={displayNumQs}
-              maxLead={maxLead}
-              maxY={maxY}
-              showScoreDiff={showScoreDiff}
-              awayTeamName={displayAwayTeamNames.name}
-              homeTeamName={displayHomeTeamNames.name}
-              teamColors={teamColors}
-              isQuarterView={isQuarterFocus}
-              activePeriodLabel={activePeriodLabel}
+          {selectedPlayerDetail && isMobilePlayerSheetEnabled ? (
+            <MobilePlayerSheet
+              selectedPlayer={selectedPlayerDetail}
+              playerDisplayName={selectedPlayerDetail.displayName}
+              selectedPeriod={playerDetailPeriod}
+              numPeriods={numPeriods}
+              latestStartedPeriod={latestStartedPeriod}
+              isFinal={isFinal}
+              actions={selectedPlayerDetail.actions}
+              boxScoreActions={selectedPlayerDetail.boxScoreActions}
+              timeline={selectedPlayerDetail.timeline}
+              scoreTimeline={displayScoreTimeline}
+              statOn={statOn}
+              onToggleStat={changeStatOn}
+              teamColor={selectedPlayerDetail.teamColor}
+              onClose={() => {
+                setSelectedPlayer(null);
+                setPlayerDetailPeriod(0);
+              }}
             />
+          ) : (
+            <>
+              <svg height="600" width={sectionWidth} className="line playGrid">
+                <TimelineGrid
+                  width={width}
+                  leftMargin={leftMargin}
+                  qWidth={qWidth}
+                  numQs={displayNumQs}
+                  maxLead={maxLead}
+                  maxY={maxY}
+                  showScoreDiff={showScoreDiff}
+                  awayTeamName={displayAwayTeamNames.name}
+                  homeTeamName={displayHomeTeamNames.name}
+                  teamColors={teamColors}
+                  isQuarterView={isQuarterFocus}
+                  activePeriodLabel={activePeriodLabel}
+                />
 
-            <ScoreGraph
-              scoreTimeline={filteredScoreTimeline}
-              lastAction={filteredLastAction}
-              width={width}
-              leftMargin={leftMargin}
-              timelineWindow={timelineWindow}
-              maxY={maxY}
-              showScoreDiff={showScoreDiff}
-              awayColor={awayColor}
-              homeColor={homeColor}
-              startScoreDiff={startScoreDiff}
-            />
+                <ScoreGraph
+                  scoreTimeline={filteredScoreTimeline}
+                  lastAction={filteredLastAction}
+                  width={width}
+                  leftMargin={leftMargin}
+                  timelineWindow={timelineWindow}
+                  maxY={maxY}
+                  showScoreDiff={showScoreDiff}
+                  awayColor={awayColor}
+                  homeColor={homeColor}
+                  startScoreDiff={startScoreDiff}
+                />
 
-            {mouseLinePos !== null && (
-              <line
-                x1={mouseLinePos}
-                y1={10}
-                x2={mouseLinePos}
-                y2={590}
-                style={{ stroke: 'var(--mouse-line-color)', strokeWidth: 1 }}
-              />
-            )}
-          </svg>
+                {mouseLinePos !== null && (
+                  <line
+                    x1={mouseLinePos}
+                    y1={10}
+                    x2={mouseLinePos}
+                    y2={590}
+                    style={{ stroke: 'var(--mouse-line-color)', strokeWidth: 1 }}
+                  />
+                )}
+              </svg>
 
-          <div className="teamName" style={{ color: teamColors.away }}>
-            {displayAwayTeamNames.name}
-          </div>
-          <div className="teamSection">
-            {Object.keys(filteredAwayPlayers).map((name) => (
-              <Player
-                key={name}
-                actions={filteredAwayPlayers[name]}
-                timeline={filteredAwayPlayerTimeline[name]}
-                name={name}
-                width={width}
-                rightMargin={rightMargin}
-                heightDivide={Object.keys(filteredAwayPlayers).length}
-                highlight={highlightActionIds}
-                leftMargin={leftMargin}
-                timelineWindow={timelineWindow}
-              />
-            ))}
-          </div>
+              <div className="teamName" style={{ color: teamColors.away }}>
+                {displayAwayTeamNames.name}
+              </div>
+              <div className="teamSection">
+                {Object.keys(filteredAwayPlayers).map((name) => (
+                  <Player
+                    key={name}
+                    actions={filteredAwayPlayers[name]}
+                    timeline={filteredAwayPlayerTimeline[name]}
+                    name={name}
+                    width={width}
+                    rightMargin={rightMargin}
+                    heightDivide={Object.keys(filteredAwayPlayers).length}
+                    highlight={highlightActionIds}
+                    leftMargin={leftMargin}
+                    timelineWindow={timelineWindow}
+                    onSelect={
+                      isMobilePlayerSheetEnabled
+                        ? () => handlePlayerSelect('away', name)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
 
-          <div className="teamName" style={{ color: teamColors.home }}>
-            {displayHomeTeamNames.name}
-          </div>
-          <div className="teamSection">
-            {Object.keys(filteredHomePlayers).map((name) => (
-              <Player
-                key={name}
-                actions={filteredHomePlayers[name]}
-                timeline={filteredHomePlayerTimeline[name]}
-                name={name}
-                width={width}
-                rightMargin={rightMargin}
-                heightDivide={Object.keys(filteredHomePlayers).length}
-                highlight={highlightActionIds}
-                leftMargin={leftMargin}
-                timelineWindow={timelineWindow}
-              />
-            ))}
-          </div>
+              <div className="teamName" style={{ color: teamColors.home }}>
+                {displayHomeTeamNames.name}
+              </div>
+              <div className="teamSection">
+                {Object.keys(filteredHomePlayers).map((name) => (
+                  <Player
+                    key={name}
+                    actions={filteredHomePlayers[name]}
+                    timeline={filteredHomePlayerTimeline[name]}
+                    name={name}
+                    width={width}
+                    rightMargin={rightMargin}
+                    heightDivide={Object.keys(filteredHomePlayers).length}
+                    highlight={highlightActionIds}
+                    leftMargin={leftMargin}
+                    timelineWindow={timelineWindow}
+                    onSelect={
+                      isMobilePlayerSheetEnabled
+                        ? () => handlePlayerSelect('home', name)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

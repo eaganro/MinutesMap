@@ -18,6 +18,7 @@ export default function Player({
   highlight,
   leftMargin,
   timelineWindow,
+  onSelect,
 }) {
   const playerName = name;
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
@@ -139,7 +140,22 @@ export default function Player({
   return (
     <div className="player" style={{ height: `${275 / heightDivide}px` }}>
       <div className="playerName" style={{ width: 90 }}>
-        {playerName}
+        {typeof onSelect === 'function' ? (
+          <button
+            type="button"
+            className="playerNameButton"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelect();
+            }}
+            onTouchStart={(event) => event.stopPropagation()}
+            aria-label={`Open player detail for ${playerName}`}
+          >
+            {playerName}
+          </button>
+        ) : (
+          playerName
+        )}
       </div>
       <svg width={width + rightMargin} height="28" className="line" style={{ left: leftMargin }}>
         {playTimeLines}

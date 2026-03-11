@@ -10,6 +10,26 @@
     transition: color 0.3s ease;
   }
 
+  .playerNameButton {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--text-primary);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+  }
+
   .line {
     position: absolute;
   }

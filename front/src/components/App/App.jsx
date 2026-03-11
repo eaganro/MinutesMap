@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMinutesMap } from '../hooks';
 
 import Schedule from '../Schedule/Schedule';
@@ -13,6 +14,7 @@ import './App.scss';
 
 export default function App() {
   const { scheduleVm, scoreVm, playVm, statControlsVm, boxVm, lineupsVm } = useMinutesMap();
+  const [isPlayerDetailOpen, setIsPlayerDetailOpen] = useState(false);
 
   return (
     <div className="topLevel">
@@ -82,15 +84,19 @@ export default function App() {
             statusMessage={playVm.statusMessage}
             showScoreDiff={playVm.showScoreDiff}
             statOn={playVm.statOn}
-          />
-          <StatButtons
-            statOn={statControlsVm.statOn}
             changeStatOn={statControlsVm.changeStatOn}
-            showScoreDiff={statControlsVm.showScoreDiff}
-            setShowScoreDiff={statControlsVm.setShowScoreDiff}
-            isLoading={statControlsVm.isLoading}
-            statusMessage={statControlsVm.statusMessage}
+            onPlayerDetailModeChange={setIsPlayerDetailOpen}
           />
+          {!isPlayerDetailOpen && (
+            <StatButtons
+              statOn={statControlsVm.statOn}
+              changeStatOn={statControlsVm.changeStatOn}
+              showScoreDiff={statControlsVm.showScoreDiff}
+              setShowScoreDiff={statControlsVm.setShowScoreDiff}
+              isLoading={statControlsVm.isLoading}
+              statusMessage={statControlsVm.statusMessage}
+            />
+          )}
         </div>
 
         <Boxscore box={boxVm.box} isLoading={boxVm.isLoading} statusMessage={boxVm.statusMessage} />
