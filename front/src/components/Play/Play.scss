@@ -257,9 +257,9 @@
 .mobilePlayerSheetHeader {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+  text-align: left;
 }
 
 .mobilePlayerSheetTitle {
@@ -267,9 +267,11 @@
   color: var(--text-primary);
   font-size: 1.2rem;
   line-height: 1.1;
+  text-align: left;
 }
 
 .mobilePlayerSheetClose {
+  margin-left: auto;
   border: 1px solid var(--border-light);
   background: var(--bg-play);
   color: var(--text-primary);
@@ -440,8 +442,9 @@
 
 .mobilePlayerBoxScoreCell.isPlayer {
   color: var(--text-secondary);
-  text-align: left;
+  text-align: center;
   padding-left: 8px;
+  padding-right: 6px;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;

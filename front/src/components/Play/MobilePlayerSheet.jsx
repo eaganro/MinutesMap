@@ -17,6 +17,8 @@ const EXCLUDED_ACTION_TYPES = new Set(['substitution', 'jump ball', 'jumpball', 
 const BOX_HIGHLIGHT_KEYS = new Set(['pts', 'reb', 'ast']);
 const FREE_THROW_ONE_OF_ONE_PATTERN = /\b(?:ft|free throw)\b\s*1\s*(?:of|\/)\s*1/i;
 const REGULATION_PERIOD_SECONDS = getPeriodDurationSeconds(1) || 1;
+const COMPACT_LAST_NAME_MAX = 12;
+const COMPACT_LAST_NAME_KEEP = 10;
 
 const LEGEND_GROUPS = [
   {
@@ -159,7 +161,7 @@ function MobilePlayerBoxScore({ columns }) {
   if (!columns.length) return null;
 
   const gridStyle = {
-    gridTemplateColumns: `minmax(88px, 1.9fr) repeat(${Math.max(
+    gridTemplateColumns: `minmax(72px, 1.35fr) repeat(${Math.max(
       0,
       columns.length - 1,
     )}, minmax(42px, 1fr))`,
@@ -211,11 +213,31 @@ function formatPercentage(made, attempted) {
   return (Math.round((made / attempted) * 1000) / 10).toFixed(1);
 }
 
+function formatCompactPlayerName(playerName) {
+  const parts = String(playerName || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return 'Player';
+  if (parts.length === 1) return parts[0];
+
+  const firstName = parts[0];
+  const familyName = parts.slice(1).join(' ');
+  const firstInitial = firstName ? `${firstName.charAt(0)}.` : '';
+  let compactLast = familyName;
+  if (familyName.length > COMPACT_LAST_NAME_MAX) {
+    compactLast = `${familyName.slice(0, COMPACT_LAST_NAME_KEEP)}.`;
+  }
+
+  return [firstInitial, compactLast].filter(Boolean).join(' ');
+}
+
 function buildMobilePlayerBoxScoreColumns(stats, playerName) {
   const plusMinus = stats.pm === 0 ? '0' : stats.pm > 0 ? `+${stats.pm}` : `${stats.pm}`;
+  const compactPlayerName = formatCompactPlayerName(playerName);
 
   return [
-    { key: 'player', label: 'PLAYER', value: playerName || 'Player' },
+    { key: 'player', label: 'PLAYER', value: compactPlayerName },
     { key: 'min', label: 'MIN', value: buildBoxScoreColumns(stats, playerName, true)[1].value },
     { key: 'pts', label: 'PTS', value: `${stats.pts}` },
     { key: 'reb', label: 'REB', value: `${stats.reb}` },
@@ -269,6 +291,7 @@ function MobilePlayerTimelineRow({ period, actions, timeline, pointAtTime }) {
   const rowHeight = 34;
   const chartWidth = 320;
   const horizontalPadding = 10;
+  const markerSize = 4.5;
   const rowTop = 16;
   const centerY = rowTop + rowHeight / 2;
   const periodDurationSeconds = getPeriodDurationSeconds(period);
@@ -297,7 +320,7 @@ function MobilePlayerTimelineRow({ period, actions, timeline, pointAtTime }) {
         return renderFreeThrowRing({
           cx: x,
           cy: centerY,
-          size: 4,
+          size: markerSize,
           key: `ft-${period}-${action.actionNumber ?? `${action.clock}-${action.description}`}`,
           description: action.description,
           subType: action.subType,
@@ -313,7 +336,7 @@ function MobilePlayerTimelineRow({ period, actions, timeline, pointAtTime }) {
         getEventType(action.description, action.actionType, action.result),
         x,
         centerY,
-        4,
+        markerSize,
         `event-${period}-${action.actionNumber ?? `${action.clock}-${action.description}`}`,
         isThreePointAction(action.description, action.actionType),
       );
