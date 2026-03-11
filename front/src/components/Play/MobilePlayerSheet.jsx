@@ -118,7 +118,6 @@ function renderLegendIcon(item) {
 function MobilePlayerLegend({ statOn, onToggleStat }) {
   return (
     <section className="mobilePlayerSheetSection" aria-label="Legend">
-      <div className="mobilePlayerSheetSectionTitle">Legend</div>
       <div className="mobilePlayerLegend">
         {LEGEND_GROUPS.map((group) => {
           const isOff = Array.isArray(statOn) ? statOn[group.toggleIndex] === false : false;
@@ -168,7 +167,6 @@ function MobilePlayerBoxScore({ columns }) {
 
   return (
     <section className="mobilePlayerSheetSection" aria-label="Box score">
-      <div className="mobilePlayerSheetSectionTitle">Box Score</div>
       <div className="mobilePlayerBoxScoreScroll">
         <div className="mobilePlayerBoxScore" role="table" aria-label="Player box score">
           <div
@@ -428,14 +426,7 @@ export default function MobilePlayerSheet({
       data-testid="mobile-player-sheet"
     >
       <div className="mobilePlayerSheetHeader">
-        <div>
-          <div className="mobilePlayerSheetEyebrow">
-            {periodRange.isFullGame
-              ? `Game through ${formatPeriodLabel(periodRange.end)}`
-              : formatPeriodLabel(periodRange.start)}
-          </div>
-          <h2 className="mobilePlayerSheetTitle">{playerDisplayName}</h2>
-        </div>
+        <h2 className="mobilePlayerSheetTitle">{playerDisplayName}</h2>
         <button
           type="button"
           className="mobilePlayerSheetClose"

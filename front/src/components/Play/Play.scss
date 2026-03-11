@@ -262,15 +262,6 @@
   margin-bottom: 12px;
 }
 
-.mobilePlayerSheetEyebrow {
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
 .mobilePlayerSheetTitle {
   margin: 0;
   color: var(--text-primary);
@@ -357,6 +348,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px 10px;
+  justify-content: center;
 }
 
 .mobilePlayerLegendGroup {

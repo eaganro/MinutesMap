@@ -207,7 +207,7 @@ describe('Play', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-player-sheet')).toBeInTheDocument();
-    expect(screen.getByText('Legend')).toBeInTheDocument();
+    expect(screen.getByLabelText('Legend')).toBeInTheDocument();
     const boxScore = screen.getByLabelText('Player box score');
     expect(boxScore).toBeInTheDocument();
     expect(
