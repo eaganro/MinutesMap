@@ -128,12 +128,6 @@ export default function Lineups({
 
   return (
     <div className="lineups" onClick={trackLineupsFeatureUse} onTouchStart={trackLineupsFeatureUse}>
-      <div className="lineupsHeader">
-        <div className="lineupsTitle">
-          <span>Lineups</span>
-        </div>
-      </div>
-
       {showLoadingIndicator ? (
         <div className="lineupsLoading">
           <CircularProgress size={22} thickness={5} />
