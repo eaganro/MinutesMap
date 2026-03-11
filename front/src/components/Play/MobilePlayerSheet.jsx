@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   getPeriodDurationSeconds,
   getPeriodStartSeconds,
@@ -404,6 +404,7 @@ export default function MobilePlayerSheet({
   teamColor,
   onClose,
 }) {
+  const ignoreNextCloseClickRef = useRef(false);
   const periodRange = useMemo(
     () => buildPeriodRange(selectedPeriod, numPeriods, latestStartedPeriod, isFinal),
     [selectedPeriod, numPeriods, latestStartedPeriod, isFinal],
@@ -444,6 +445,24 @@ export default function MobilePlayerSheet({
     () => buildMobilePlayerBoxScoreColumns(boxScoreStats, playerDisplayName),
     [boxScoreStats, playerDisplayName],
   );
+  const consumeCloseStart = (event) => {
+    event.stopPropagation();
+  };
+  const handleCloseTouchEnd = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    ignoreNextCloseClickRef.current = true;
+    onClose?.();
+  };
+  const handleCloseClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (ignoreNextCloseClickRef.current) {
+      ignoreNextCloseClickRef.current = false;
+      return;
+    }
+    onClose?.();
+  };
 
   return (
     <section
@@ -458,7 +477,10 @@ export default function MobilePlayerSheet({
         <button
           type="button"
           className="mobilePlayerSheetClose"
-          onClick={onClose}
+          onClick={handleCloseClick}
+          onTouchStart={consumeCloseStart}
+          onTouchMove={consumeCloseStart}
+          onTouchEnd={handleCloseTouchEnd}
           aria-label={`Close ${playerDisplayName} detail view`}
         >
           Back
