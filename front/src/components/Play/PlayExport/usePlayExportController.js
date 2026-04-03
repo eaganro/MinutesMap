@@ -55,6 +55,7 @@ export const usePlayExportController = ({
     leftMargin,
     rightMargin,
     showScoreDiff,
+    showOdds,
     statOn,
     teamColors,
     awayColor,
@@ -73,6 +74,7 @@ export const usePlayExportController = ({
   const displayAwayPlayerTimeline = stablePlayData.awayPlayerTimeline;
   const displayHomePlayerTimeline = stablePlayData.homePlayerTimeline;
   const displayScoreTimeline = stablePlayData.scoreTimeline;
+  const displayOddsTimeline = stablePlayData.oddsTimeline;
   const displayLastAction = stablePlayData.lastAction;
   const generatedCaptions = stablePlayData.captions;
   const timelineWindow = periodData.timelineWindow;
@@ -325,11 +327,13 @@ export const usePlayExportController = ({
           displayHomePlayerTimeline,
           displayLastAction,
           displayScoreTimeline,
+          displayOddsTimeline,
           gameStatus,
           isFinal,
           numPeriods,
           timelineWindow,
           showScoreDiff,
+          showOdds,
           statOn,
           teamColors,
           awayColor,
@@ -423,6 +427,7 @@ export const usePlayExportController = ({
       displayHomePlayerTimeline,
       displayLastAction,
       displayScoreTimeline,
+      displayOddsTimeline,
       gameStatus,
       numPeriods,
       timelineWindow,
@@ -440,6 +445,7 @@ export const usePlayExportController = ({
       displayHomeTeamNames,
       generatedCaptions,
       showScoreDiff,
+      showOdds,
       statOn,
       teamColors,
       awayColor,

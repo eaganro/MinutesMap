@@ -2,6 +2,7 @@ import { getCssVar } from './playExportCore.style';
 import {
   drawEventShape,
   drawFreeThrowLegendRing,
+  drawOddsLineIcon,
   drawScoreLeadIcon,
 } from './playExportCore.markers';
 
@@ -55,6 +56,7 @@ export const drawLegend = (
   allowWrap = false,
   statOn,
   showScoreDiff,
+  showOdds = false,
   includeScoreLead = true,
   legendScale = 1,
   forceWrapAfterGroupIndex = null,
@@ -68,6 +70,7 @@ export const drawLegend = (
   const labelOffColor = getCssVar(computedStyle, '--stat-label-off', '#94a3b8');
   const isStatOn = (index) => (Array.isArray(statOn) ? statOn[index] !== false : true);
   const isScoreLeadOn = showScoreDiff !== false;
+  const isOddsOn = showOdds !== false;
   ctx.textBaseline = 'middle';
 
   const buildRow = ({ iconSize, fontSize, itemGap, groupGap }) => {
@@ -212,6 +215,14 @@ export const drawLegend = (
         ),
       ]);
       groups.push(scoreLeadGroup);
+      const oddsGroup = buildGroup([
+        createItem(
+          'Win Odds',
+          (cx, cy) => drawOddsLineIcon(ctx, cx, cy, iconSize, computedStyle),
+          !isOddsOn,
+        ),
+      ]);
+      groups.push(oddsGroup);
     }
 
     const rowWidth =
@@ -302,6 +313,7 @@ export const measureLegendHeight = (
   allowWrap = false,
   statOn,
   showScoreDiff,
+  showOdds = false,
   includeScoreLead = true,
   legendScale = 1,
   forceWrapAfterGroupIndex = null,
@@ -312,6 +324,7 @@ export const measureLegendHeight = (
   const rowGap = 8 * normalizedLegendScale;
   const isStatOn = (index) => (Array.isArray(statOn) ? statOn[index] !== false : true);
   const isScoreLeadOn = showScoreDiff !== false;
+  const isOddsOn = showOdds !== false;
 
   const buildRow = ({ iconSize, fontSize, itemGap, groupGap }) => {
     const iconBox = iconSize * 2;
@@ -364,6 +377,8 @@ export const measureLegendHeight = (
     if (includeScoreLead) {
       const scoreLeadGroup = buildGroup([createItem('Score Lead', !isScoreLeadOn)]);
       groups.push(scoreLeadGroup);
+      const oddsGroup = buildGroup([createItem('Win Odds', !isOddsOn)]);
+      groups.push(oddsGroup);
     }
 
     const rowWidth =

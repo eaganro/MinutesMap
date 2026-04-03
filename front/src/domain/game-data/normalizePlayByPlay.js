@@ -2,6 +2,7 @@ import { sortActions } from './filterActions';
 
 export const EMPTY_TIMELINE_DATA = Object.freeze({
   scoreTimeline: [],
+  oddsTimeline: [],
   homePlayerTimeline: {},
   awayPlayerTimeline: {},
   allActions: [],
@@ -71,6 +72,17 @@ export function normalizeCompactScoreTimeline(scoreTimeline) {
   }));
 }
 
+export function normalizeCompactOddsTimeline(oddsTimeline) {
+  return (oddsTimeline || []).map((entry) => ({
+    period: entry?.quarter ?? entry?.period,
+    clock: entry?.time ?? entry?.clock,
+    awayWinProb: entry?.awayWinProb,
+    source: entry?.source ?? null,
+    marketTicker: entry?.marketTicker ?? null,
+    eventTicker: entry?.eventTicker ?? null,
+  }));
+}
+
 export function normalizeCompactTimeline(timelineMap) {
   if (!timelineMap || typeof timelineMap !== 'object') return {};
   return Object.fromEntries(
@@ -116,6 +128,7 @@ export function normalizePlayByPlay(playByPlay) {
     const homeActionsAll = normalizeCompactActionMap(playByPlay.players?.home, 'home');
     return {
       scoreTimeline: normalizeCompactScoreTimeline(playByPlay.score),
+      oddsTimeline: normalizeCompactOddsTimeline(playByPlay.odds),
       homePlayerTimeline: normalizeCompactTimeline(playByPlay.segments?.home),
       awayPlayerTimeline: normalizeCompactTimeline(playByPlay.segments?.away),
       allActions: buildAllActionsFromPlayers(awayActionsAll, homeActionsAll),
@@ -133,6 +146,7 @@ export function normalizePlayByPlay(playByPlay) {
 
   return {
     scoreTimeline: playByPlay.scoreTimeline || [],
+    oddsTimeline: playByPlay.oddsTimeline || [],
     homePlayerTimeline: playByPlay.homePlayerTimeline || {},
     awayPlayerTimeline: playByPlay.awayPlayerTimeline || {},
     allActions: buildAllActionsFromPlayers(awayActionsAll, homeActionsAll),

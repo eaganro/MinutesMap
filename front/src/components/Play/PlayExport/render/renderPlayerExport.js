@@ -100,6 +100,7 @@ export const renderPlayerExportCanvas = ({
     statOn,
     showScoreDiff,
     false,
+    false,
     legendScale,
   );
   const captionHeight = measureCaptionBlockHeight({
@@ -308,6 +309,7 @@ export const renderPlayerExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
+    false,
     false,
     legendScale,
   );

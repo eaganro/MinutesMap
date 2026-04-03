@@ -30,6 +30,70 @@ import {
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
+const clampProb = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.min(1, parsed));
+};
+
+const drawOddsOverlay = ({
+  ctx,
+  chartLeft,
+  chartTop,
+  chartWidth,
+  chartHeight,
+  timelineWindow,
+  oddsTimeline,
+  startOddsProb,
+  lastAction,
+  color,
+}) => {
+  if (!ctx || !chartWidth) return;
+  const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
+  const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
+  if (windowDurationSeconds <= 0) return;
+
+  const getXForEntry = (entry) => {
+    const elapsed = getSecondsElapsed(entry.period, entry.clock);
+    const ratio = (elapsed - windowStartSeconds) / windowDurationSeconds;
+    return chartLeft + Math.max(0, Math.min(chartWidth, ratio * chartWidth));
+  };
+  const probToY = (awayWinProb) => chartTop + (1 - awayWinProb) * chartHeight;
+
+  const timeline = (oddsTimeline || []).filter((entry) => clampProb(entry?.awayWinProb) !== null);
+  let currentProb = clampProb(startOddsProb);
+  let currentX = chartLeft;
+
+  if (currentProb === null && timeline.length) {
+    currentProb = clampProb(timeline[0]?.awayWinProb);
+    currentX = getXForEntry(timeline[0]);
+  }
+  if (currentProb === null) return;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(currentX, probToY(currentProb));
+
+  timeline.forEach((entry) => {
+    const nextProb = clampProb(entry?.awayWinProb);
+    if (nextProb === null) return;
+    const nextX = getXForEntry(entry);
+    ctx.lineTo(nextX, probToY(currentProb));
+    ctx.lineTo(nextX, probToY(nextProb));
+    currentX = nextX;
+    currentProb = nextProb;
+  });
+
+  const finalX = lastAction ? Math.max(currentX, getXForEntry(lastAction)) : chartLeft + chartWidth;
+  ctx.lineTo(finalX, probToY(currentProb));
+  ctx.stroke();
+  ctx.restore();
+};
+
 export const renderFullExportCanvas = ({
   exportWidth,
   legendShouldWrap,
@@ -45,6 +109,7 @@ export const renderFullExportCanvas = ({
   filteredAwayPlayerTimeline,
   filteredHomePlayerTimeline,
   filteredScoreTimeline,
+  filteredOddsTimeline,
   displayScoreTimeline,
   captionText,
   teamLogos,
@@ -52,10 +117,12 @@ export const renderFullExportCanvas = ({
   endAtSeconds,
   statusLabel,
   startScoreDiff,
+  startOddsProb,
   timelineWindow,
   maxY,
   maxLead,
   showScoreDiff,
+  showOdds,
   statOn,
   teamColors,
   awayColor,
@@ -82,6 +149,7 @@ export const renderFullExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
+    showOdds,
     true,
     legendScale,
   );
@@ -124,6 +192,7 @@ export const renderFullExportCanvas = ({
   const lineColor = getCssVar(computed, '--line-color', '#cbd5f5');
   const lineLight = getCssVar(computed, '--line-color-light', '#94a3b8');
   const quarterLabelColor = getCssVar(computed, '--quarter-label-color', '#6b7280');
+  const oddsLineColor = getCssVar(computed, '--odds-line-color', '#0f766e');
   const awayLabel = displayAwayTeamNames?.abr || 'Away';
   const homeLabel = displayHomeTeamNames?.abr || 'Home';
   const scoreTimelineSource = getScoreTimelineSource(filteredScoreTimeline, displayScoreTimeline);
@@ -271,6 +340,23 @@ export const renderFullExportCanvas = ({
     });
   }
 
+  if (showOdds && chartWidth > 0) {
+    drawOddsOverlay({
+      ctx,
+      chartLeft,
+      chartTop,
+      chartWidth,
+      chartHeight,
+      timelineWindow,
+      oddsTimeline: filteredOddsTimeline,
+      startOddsProb,
+      lastAction: filteredScoreTimeline?.length
+        ? filteredScoreTimeline[filteredScoreTimeline.length - 1]
+        : null,
+      color: oddsLineColor,
+    });
+  }
+
   const getXForTime = (period, clock) => {
     const elapsed = getSecondsElapsed(period, clock);
     return getXForSeconds(elapsed);
@@ -355,6 +441,7 @@ export const renderFullExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
+    showOdds,
     true,
     legendScale,
   );

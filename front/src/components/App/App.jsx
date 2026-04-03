@@ -86,6 +86,7 @@ export default function App() {
             isLoading={playVm.isLoading}
             statusMessage={playVm.statusMessage}
             showScoreDiff={playVm.showScoreDiff}
+            showOdds={playVm.showOdds}
             statOn={playVm.statOn}
             changeStatOn={statControlsVm.changeStatOn}
             onPlayerDetailModeChange={setIsPlayerDetailOpen}
@@ -96,6 +97,8 @@ export default function App() {
               changeStatOn={statControlsVm.changeStatOn}
               showScoreDiff={statControlsVm.showScoreDiff}
               setShowScoreDiff={statControlsVm.setShowScoreDiff}
+              showOdds={statControlsVm.showOdds}
+              setShowOdds={statControlsVm.setShowOdds}
               isLoading={statControlsVm.isLoading}
               statusMessage={statControlsVm.statusMessage}
             />

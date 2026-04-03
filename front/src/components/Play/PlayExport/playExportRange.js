@@ -79,6 +79,7 @@ export const buildExportRangeData = ({
   displayHomePlayers,
   displayHomePlayerTimeline,
   displayLastAction,
+  displayOddsTimeline,
   displayScoreTimeline,
   exportRangeSnapshot,
   gameStatus,
@@ -109,6 +110,9 @@ export const buildExportRangeData = ({
   const durationRatio =
     totalGameSeconds > 0 ? exportTimelineWindow.durationSeconds / totalGameSeconds : 1;
   const exportScoreTimeline = (displayScoreTimeline || []).filter((entry) =>
+    isInRange(entry?.period),
+  );
+  const exportOddsTimeline = (displayOddsTimeline || []).filter((entry) =>
     isInRange(entry?.period),
   );
   const exportStatusLabel = buildGameStatusLabel({
@@ -156,6 +160,19 @@ export const buildExportRangeData = ({
         return diff;
       })()
     : 0;
+  const exportStartOddsProb = hasRangeWindow
+    ? (() => {
+        const startSeconds = exportTimelineWindow.startSeconds;
+        let awayWinProb = null;
+        (displayOddsTimeline || []).forEach((entry) => {
+          const elapsed = getSecondsElapsed(entry.period, entry.clock);
+          if (elapsed <= startSeconds) {
+            awayWinProb = Number(entry.awayWinProb);
+          }
+        });
+        return Number.isFinite(awayWinProb) ? awayWinProb : null;
+      })()
+    : null;
   const exportScoreStats = (() => {
     let max = Math.abs(exportStartScoreDiff || 0);
     exportScoreTimeline.forEach((entry) => {
@@ -184,8 +201,10 @@ export const buildExportRangeData = ({
     exportEndAtSeconds,
     exportHomePlayers,
     exportHomePlayerTimeline,
+    exportOddsTimeline,
     exportScoreStats,
     exportScoreTimeline,
+    exportStartOddsProb,
     exportStartScoreDiff,
     exportStatusLabel,
     exportTimelineWindow,

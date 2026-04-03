@@ -116,6 +116,7 @@ export const renderPlayerStackedExportCanvas = ({
     statOn,
     showScoreDiff,
     false,
+    false,
     legendScale,
     legendForceWrapAfterGroupIndex,
   );
@@ -303,6 +304,7 @@ export const renderPlayerStackedExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
+    false,
     false,
     legendScale,
     legendForceWrapAfterGroupIndex,

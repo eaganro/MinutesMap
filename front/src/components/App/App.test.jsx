@@ -60,6 +60,7 @@ describe('App', () => {
     const changeGame = vi.fn();
     const changeStatOn = vi.fn();
     const setShowScoreDiff = vi.fn();
+    const setShowOdds = vi.fn();
     const playByPlaySectionRef = { current: null };
 
     mocks.useMinutesMapMock.mockReturnValue({
@@ -109,6 +110,7 @@ describe('App', () => {
         isLoading: false,
         statusMessage: null,
         showScoreDiff: true,
+        showOdds: false,
         statOn: [true, false, true, true, false, false, false, false],
       },
       statControlsVm: {
@@ -116,6 +118,8 @@ describe('App', () => {
         changeStatOn,
         showScoreDiff: true,
         setShowScoreDiff,
+        showOdds: false,
+        setShowOdds,
         isLoading: false,
         statusMessage: null,
       },
@@ -167,6 +171,7 @@ describe('App', () => {
         sectionWidth: 640,
         statusMessage: null,
         showScoreDiff: true,
+        showOdds: false,
       }),
       {},
     );
@@ -176,6 +181,8 @@ describe('App', () => {
         changeStatOn,
         showScoreDiff: true,
         setShowScoreDiff,
+        showOdds: false,
+        setShowOdds,
       }),
       {},
     );

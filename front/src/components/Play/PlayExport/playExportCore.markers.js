@@ -205,6 +205,31 @@ export const drawScoreLeadIcon = (ctx, cx, cy, size, computedStyle) => {
   ctx.restore();
 };
 
+export const drawOddsLineIcon = (ctx, cx, cy, size, computedStyle) => {
+  if (!ctx) return;
+  const color = getCssVar(computedStyle, '--odds-line-color', '#0f766e');
+  const left = cx - size;
+  const top = cy - size;
+  const width = size * 2;
+  const height = size * 2;
+  const px = (value) => left + value * width;
+  const py = (value) => top + value * height;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, size * 0.22);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(px(0.05), py(0.8));
+  ctx.lineTo(px(0.32), py(0.63));
+  ctx.lineTo(px(0.52), py(0.5));
+  ctx.lineTo(px(0.75), py(0.26));
+  ctx.lineTo(px(0.95), py(0.12));
+  ctx.stroke();
+  ctx.restore();
+};
+
 export const drawPeriodCaps = (ctx, xStart, xEnd, centerY, color) => {
   if (!ctx) return;
   ctx.save();

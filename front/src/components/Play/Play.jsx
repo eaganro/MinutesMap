@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { resolveFullNameFromRoster } from './PlayExport/playExportModel';
 import MobilePlayerSheet from './MobilePlayerSheet';
 import CircularProgress from '@mui/material/CircularProgress';
+import OddsGraph from './OddsGraph';
 import PlayExportControls from './PlayExport/PlayExportControls';
 import { usePlayPointerHandlers } from './hooks/usePlayPointerHandlers';
 import { usePlayViewModel } from './hooks/usePlayViewModel';
@@ -23,6 +24,7 @@ export default function Play({
   isLoading,
   statusMessage,
   showScoreDiff = true,
+  showOdds = false,
   statOn,
   changeStatOn,
   onPlayerDetailModeChange,
@@ -60,6 +62,7 @@ export default function Play({
     displayNumQs,
     filteredAllActions,
     filteredScoreTimeline,
+    filteredOddsTimeline,
     filteredAwayPlayers,
     filteredHomePlayers,
     filteredAwayPlayerTimeline,
@@ -67,6 +70,7 @@ export default function Play({
     filteredLastAction,
     timelineWindow,
     startScoreDiff,
+    startOddsProb,
     teamColors,
     awayColor,
     homeColor,
@@ -306,6 +310,7 @@ export default function Play({
           leftMargin,
           rightMargin,
           showScoreDiff,
+          showOdds,
           statOn,
           teamColors,
           awayColor,
@@ -407,6 +412,16 @@ export default function Play({
                   awayColor={awayColor}
                   homeColor={homeColor}
                   startScoreDiff={startScoreDiff}
+                />
+
+                <OddsGraph
+                  oddsTimeline={filteredOddsTimeline}
+                  lastAction={filteredLastAction}
+                  width={width}
+                  leftMargin={leftMargin}
+                  timelineWindow={timelineWindow}
+                  showOdds={showOdds}
+                  startOddsProb={startOddsProb}
                 />
 
                 {mouseLinePos !== null && (

@@ -39,6 +39,7 @@ export const renderLiteExportCanvas = ({
   timelineWindow,
   maxY,
   showScoreDiff,
+  showOdds,
   statOn,
   awayColor,
   homeColor,
@@ -61,6 +62,7 @@ export const renderLiteExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
+    showOdds,
     true,
     legendScale,
   );
@@ -176,6 +178,7 @@ export const renderLiteExportCanvas = ({
     legendShouldWrap,
     statOn,
     showScoreDiff,
+    showOdds,
     true,
     legendScale,
   );

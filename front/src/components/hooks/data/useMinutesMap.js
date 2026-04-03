@@ -26,6 +26,7 @@ export function useMinutesMap() {
   // === USER PREFERENCES ===
   const [statOn, setStatOn] = useLocalStorageState('statOn', DEFAULT_STAT_ON);
   const [showScoreDiff, setShowScoreDiff] = useLocalStorageState('showScoreDiff', true);
+  const [showOdds, setShowOdds] = useLocalStorageState('showOddsOverlay', false);
 
   // === GAME DATA ===
   const {
@@ -110,8 +111,14 @@ export function useMinutesMap() {
   }, [date, gameId, updateQueryParams]);
 
   // === PROCESSED TIMELINES ===
-  const { scoreTimeline, homePlayerTimeline, awayPlayerTimeline, allActions, playerActions } =
-    useGameTimeline(playByPlay, statOn);
+  const {
+    scoreTimeline,
+    oddsTimeline,
+    homePlayerTimeline,
+    awayPlayerTimeline,
+    allActions,
+    playerActions,
+  } = useGameTimeline(playByPlay, statOn);
 
   const lineupStats = useLineupStats({
     awayPlayerTimeline,
@@ -226,6 +233,7 @@ export function useMinutesMap() {
       playerActions,
       allActions,
       scoreTimeline,
+      oddsTimeline,
       awayPlayerTimeline,
       homePlayerTimeline,
       numQs: numPeriods,
@@ -238,6 +246,7 @@ export function useMinutesMap() {
     isLoading: isPlayVisible,
     statusMessage: gameStatusMessage,
     showScoreDiff,
+    showOdds,
     statOn,
   };
 
@@ -246,6 +255,8 @@ export function useMinutesMap() {
     changeStatOn,
     showScoreDiff,
     setShowScoreDiff,
+    showOdds,
+    setShowOdds,
     isLoading: isPlayVisible,
     statusMessage: gameStatusMessage,
   };

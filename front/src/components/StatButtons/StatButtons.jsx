@@ -6,6 +6,8 @@ export default function StatButtons({
   changeStatOn,
   showScoreDiff,
   setShowScoreDiff,
+  showOdds = false,
+  setShowOdds = () => {},
   isLoading,
   statusMessage,
 }) {
@@ -120,11 +122,37 @@ export default function StatButtons({
     </div>
   );
 
+  const oddsButton = (
+    <div
+      className={`buttonGroup oddsOverlay ${showOdds ? '' : 'off'}`}
+      onClick={() => {
+        if (!isInteractive) return;
+        setShowOdds(!showOdds);
+      }}
+      aria-disabled={!isInteractive}
+    >
+      <div className="shapeContainer oddsIcon">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <path
+            d="M1 14 L5 11 L9 9 L13 5 L17 3"
+            fill="none"
+            stroke="var(--odds-line-color)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+      <span className="label">Win Odds</span>
+    </div>
+  );
+
   return (
     <div className={`statButtons ${!isInteractive ? 'isLoading' : ''}`}>
       {buttons}
       <div className="separator" />
       {scoreDiffButton}
+      {oddsButton}
     </div>
   );
 }

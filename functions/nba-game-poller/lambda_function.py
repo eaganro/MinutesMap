@@ -10,6 +10,12 @@ from zoneinfo import ZoneInfo
 from botocore.exceptions import ClientError
 
 from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
+from nba_game_poller.kalshi_api import (
+    build_kalshi_nba_event_ticker,
+    fetch_kalshi_event_markets,
+    get_market_midpoint_or_last,
+    normalize_team_code,
+)
 from nba_game_poller.playbyplay_processing import infer_team_ids_from_actions, process_playbyplay_payload
 from nba_game_poller.gamepack_utils import (
     build_box_payload,
@@ -43,6 +49,7 @@ GAMEPACK_PREFIX = 'gamepack/'
 GAME_ID_MAP_PREFIX = os.environ.get("GAME_ID_MAP_PREFIX", "private/gameIdMap/")
 if GAME_ID_MAP_PREFIX and not GAME_ID_MAP_PREFIX.endswith('/'):
     GAME_ID_MAP_PREFIX += '/'
+KALSHI_ENABLED = os.environ.get("KALSHI_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
 SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
 HALF_POLL_SCHEDULE_PREFIX = "NBA_PollerHalf_"
@@ -582,10 +589,6 @@ def process_game(game_item, user_agent=None, date_str=None):
     play_data, play_etag = fetch_nba_data_urllib(urls['play'], last_play_etag, user_agent)
     box_data, box_etag = fetch_nba_data_urllib(urls['box'], last_box_etag, user_agent)
 
-    # 304 Optimization: If neither changed, exit early
-    if play_data is None and box_data is None:
-        return False, {}
-
     updates = {}
     is_game_final = False
     is_play_final = False
@@ -594,6 +597,7 @@ def process_game(game_item, user_agent=None, date_str=None):
     processed = None
     slim_box = None
     actions = []
+    last_action = None
     existing_gamepack = None
     existing_gamepack_loaded = False
 
@@ -729,6 +733,23 @@ def process_game(game_item, user_agent=None, date_str=None):
                 updates['homescore'] = existing_home
                 updates['awayscore'] = existing_away
 
+    existing_flow = None
+    if play_data is None or box_data is None:
+        existing = load_existing_gamepack_once()
+        existing_flow = (existing or {}).get("flow")
+
+    odds_snapshot = build_kalshi_odds_snapshot(
+        game_item=game_item,
+        box_game=box_game,
+        last_action=last_action,
+        existing_flow=existing_flow,
+        date_str=date_str,
+        user_agent=user_agent,
+    )
+
+    if play_data is None and box_data is None and odds_snapshot is None:
+        return False, {}
+
     if processed is not None and AI_CAPTIONS_ENABLED and GEMINI_API_KEY and LAMBDA_ARN:
         closed_periods = extract_closed_periods(actions)
         status_for_worker = updates.get("status") or game_item.get("status") or ""
@@ -747,13 +768,15 @@ def process_game(game_item, user_agent=None, date_str=None):
                 ):
                     updates["captions_requested_through"] = latest_closed_period
 
-    if processed is not None or slim_box is not None:
+    if processed is not None or slim_box is not None or odds_snapshot is not None:
         if processed is None or slim_box is None:
             existing = load_existing_gamepack_once()
             if processed is None:
                 processed = (existing or {}).get("flow")
             if slim_box is None:
                 slim_box = (existing or {}).get("box")
+            if existing_flow is None:
+                existing_flow = (existing or {}).get("flow")
 
         if isinstance(processed, dict) and not isinstance(processed.get("captions"), dict):
             existing = load_existing_gamepack_once()
@@ -762,6 +785,12 @@ def process_game(game_item, user_agent=None, date_str=None):
             if isinstance(existing_captions, dict):
                 processed = dict(processed)
                 processed["captions"] = existing_captions
+
+        if existing_flow is None:
+            existing = load_existing_gamepack_once()
+            existing_flow = (existing or {}).get("flow")
+
+        processed = merge_flow_odds(processed, existing_flow, odds_snapshot)
 
         if processed is not None and slim_box is not None:
             gamepack = {
@@ -796,10 +825,231 @@ def load_gamepack(game_key):
         if body.startswith(b"\x1f\x8b"):
             body = gzip.decompress(body)
         return json.loads(body)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404", "NotFound"):
+            return None
+        print(f"Poller: Failed to load gamepack {game_key}: {e}")
+        return None
     except Exception as e:
         print(f"Poller: Failed to load gamepack {game_key}: {e}")
         return None
 
+
+def clock_to_seconds_remaining(clock_value):
+    if not clock_value or not isinstance(clock_value, str):
+        return None
+    text = clock_value.strip()
+    if text.startswith("PT") and text.endswith("S"):
+        text = text[2:-1]
+        if "M" in text:
+            mins_part, sec_part = text.split("M", 1)
+            try:
+                return int(mins_part or 0) * 60 + float(sec_part or 0)
+            except ValueError:
+                return None
+    if ":" in text:
+        mins_part, sec_part = text.split(":", 1)
+        try:
+            return int(mins_part or 0) * 60 + float(sec_part or 0)
+        except ValueError:
+            return None
+    return None
+
+
+def build_odds_sort_key(entry):
+    quarter = parse_positive_int(entry.get("quarter"), fallback=0)
+    remaining = clock_to_seconds_remaining(entry.get("time"))
+    if remaining is None:
+        remaining = 0
+    return quarter, -remaining
+
+
+def merge_odds_timeline(existing_timeline, snapshot):
+    normalized = []
+    for entry in existing_timeline or []:
+        if not isinstance(entry, dict):
+            continue
+        quarter = parse_positive_int(entry.get("quarter"), fallback=0)
+        time_value = entry.get("time")
+        if quarter <= 0 or not time_value:
+            continue
+        try:
+            away_prob = float(entry.get("awayWinProb"))
+        except (TypeError, ValueError):
+            continue
+        if away_prob < 0 or away_prob > 1:
+            continue
+        normalized.append({
+            "quarter": quarter,
+            "time": time_value,
+            "awayWinProb": away_prob,
+            "source": entry.get("source") or None,
+            "marketTicker": entry.get("marketTicker") or None,
+            "eventTicker": entry.get("eventTicker") or None,
+        })
+
+    if isinstance(snapshot, dict):
+        normalized.append({
+            "quarter": parse_positive_int(snapshot.get("quarter"), fallback=0),
+            "time": snapshot.get("time"),
+            "awayWinProb": float(snapshot.get("awayWinProb")),
+            "source": snapshot.get("source") or None,
+            "marketTicker": snapshot.get("marketTicker") or None,
+            "eventTicker": snapshot.get("eventTicker") or None,
+        })
+
+    if not normalized:
+        return []
+
+    normalized.sort(key=build_odds_sort_key)
+    merged = []
+    for entry in normalized:
+        if (
+            merged
+            and merged[-1].get("quarter") == entry.get("quarter")
+            and merged[-1].get("time") == entry.get("time")
+        ):
+            merged[-1] = entry
+            continue
+        merged.append(entry)
+    return merged[-720:]
+
+
+def parse_live_period(status_text):
+    text = normalize_status(status_text)
+    if not text:
+        return None
+    if text.startswith("halftime") or text.startswith("half"):
+        return 2
+    if text.startswith("q") and len(text) >= 2 and text[1].isdigit():
+        return int(text[1])
+    if text.startswith("ot"):
+        return 5
+    if text.endswith("ot"):
+        try:
+            return 4 + int(text[:-2])
+        except ValueError:
+            return 5
+    return None
+
+
+def resolve_game_team_codes(game_item, box_game):
+    away_code = normalize_team_code(
+        (box_game.get("awayTeam") or {}).get("teamTricode") if isinstance(box_game, dict) else None
+    ) or normalize_team_code(game_item.get("awayteam"))
+    home_code = normalize_team_code(
+        (box_game.get("homeTeam") or {}).get("teamTricode") if isinstance(box_game, dict) else None
+    ) or normalize_team_code(game_item.get("hometeam"))
+    return away_code, home_code
+
+
+def resolve_odds_position(game_item, box_game=None, last_action=None, existing_flow=None):
+    status_text = ""
+    if isinstance(box_game, dict):
+        status_text = (box_game.get("gameStatusText") or "").strip()
+    if not status_text:
+        status_text = (game_item.get("status") or "").strip()
+
+    period = parse_live_period(status_text)
+    if not period and isinstance(last_action, dict):
+        period = parse_positive_int(last_action.get("period"), fallback=0)
+    if not period and isinstance(existing_flow, dict):
+        period = parse_positive_int((existing_flow.get("last") or {}).get("quarter"), fallback=0)
+
+    clock = ""
+    if isinstance(box_game, dict):
+        clock = (box_game.get("gameClock") or "").strip()
+    if not clock:
+        clock = (game_item.get("time") or "").strip()
+    if not clock and isinstance(last_action, dict):
+        clock = (last_action.get("clock") or "").strip()
+    if not clock and isinstance(existing_flow, dict):
+        clock = str((existing_flow.get("last") or {}).get("time") or "").strip()
+
+    if period <= 0 or not clock:
+        return None
+
+    return {
+        "quarter": period,
+        "time": clock,
+    }
+
+
+def build_kalshi_odds_snapshot(*, game_item, box_game, last_action, existing_flow, date_str, user_agent):
+    if not KALSHI_ENABLED:
+        return None
+
+    away_code, home_code = resolve_game_team_codes(game_item, box_game)
+    if not date_str or not away_code or not home_code:
+        return None
+
+    position = resolve_odds_position(
+        game_item,
+        box_game=box_game,
+        last_action=last_action,
+        existing_flow=existing_flow,
+    )
+    if not position:
+        return None
+
+    event_ticker = build_kalshi_nba_event_ticker(date_str, away_code, home_code)
+    if not event_ticker:
+        return None
+
+    markets = fetch_kalshi_event_markets(event_ticker, user_agent=user_agent)
+    if not markets:
+        return None
+
+    away_market = None
+    home_market = None
+    for market in markets:
+        if not isinstance(market, dict):
+            continue
+        ticker = normalize_team_code((market.get("ticker") or "").split("-")[-1])
+        if ticker == away_code:
+            away_market = market
+        elif ticker == home_code:
+            home_market = market
+
+    away_prob = None
+    source = None
+    market_ticker = None
+    if away_market:
+        away_prob, source = get_market_midpoint_or_last(away_market)
+        market_ticker = away_market.get("ticker")
+
+    if away_prob is None and home_market:
+        home_prob, home_source = get_market_midpoint_or_last(home_market)
+        if home_prob is not None:
+            away_prob = max(0.0, min(1.0, 1.0 - home_prob))
+            source = f"inverted-{home_source}" if home_source else "inverted"
+            market_ticker = home_market.get("ticker")
+
+    if away_prob is None:
+        return None
+
+    return {
+        **position,
+        "awayWinProb": round(float(away_prob), 4),
+        "source": source,
+        "marketTicker": market_ticker,
+        "eventTicker": event_ticker,
+    }
+
+
+def merge_flow_odds(processed_flow, existing_flow, odds_snapshot):
+    base_flow = processed_flow if isinstance(processed_flow, dict) else existing_flow
+    if not isinstance(base_flow, dict):
+        return base_flow
+
+    merged_odds = merge_odds_timeline((existing_flow or {}).get("odds"), odds_snapshot)
+    if not merged_odds:
+        return base_flow
+
+    next_flow = dict(base_flow)
+    next_flow["odds"] = merged_odds
+    return next_flow
 
 
 def get_nba_date():

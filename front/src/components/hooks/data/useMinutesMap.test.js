@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   changeGameMock: vi.fn(),
   setStatOnMock: vi.fn(),
   setShowScoreDiffMock: vi.fn(),
+  setShowOddsMock: vi.fn(),
   fetchGamePackWithReasonMock: vi.fn(),
   fetchScheduleWithReasonMock: vi.fn(),
   lastGamePackFetchRef: { current: { at: 0, reason: null } },
@@ -29,7 +30,13 @@ vi.mock('../state/useLocalStorageState', () => ({
     if (key === 'statOn') {
       return [defaultValue, mocks.setStatOnMock];
     }
-    return [true, mocks.setShowScoreDiffMock];
+    if (key === 'showScoreDiff') {
+      return [true, mocks.setShowScoreDiffMock];
+    }
+    if (key === 'showOddsOverlay') {
+      return [false, mocks.setShowOddsMock];
+    }
+    return [defaultValue, vi.fn()];
   },
 }));
 
@@ -144,6 +151,7 @@ vi.mock('./useGameTimeline', () => ({
       { scoreAway: 0, scoreHome: 0 },
       { scoreAway: 12, scoreHome: 14 },
     ],
+    oddsTimeline: [{ period: 2, clock: 'PT09M00.00S', awayWinProb: 0.58 }],
     homePlayerTimeline: { HomeA: [] },
     awayPlayerTimeline: { AwayA: [] },
     allActions: [{ actionNumber: 1 }],
@@ -208,6 +216,7 @@ describe('useMinutesMap', () => {
             { scoreAway: 0, scoreHome: 0 },
             { scoreAway: 12, scoreHome: 14 },
           ],
+          oddsTimeline: [{ period: 2, clock: 'PT09M00.00S', awayWinProb: 0.58 }],
           awayPlayerTimeline: { AwayA: [] },
           homePlayerTimeline: { HomeA: [] },
           numQs: 4,
@@ -227,6 +236,7 @@ describe('useMinutesMap', () => {
         playByPlaySectionWidth: 640,
         statusMessage: null,
         showScoreDiff: true,
+        showOdds: false,
         statOn: [true, false, true, true, false, false, false, false],
       }),
     );
@@ -236,6 +246,8 @@ describe('useMinutesMap', () => {
         changeStatOn: expect.any(Function),
         showScoreDiff: true,
         setShowScoreDiff: mocks.setShowScoreDiffMock,
+        showOdds: false,
+        setShowOdds: mocks.setShowOddsMock,
         statusMessage: null,
       }),
     );

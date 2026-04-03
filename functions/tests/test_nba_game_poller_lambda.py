@@ -445,6 +445,87 @@ class TestNbaGamePollerLambda:
         uploaded_payload = self.module.upload_json_to_s3.call_args.kwargs["data"]
         assert uploaded_payload["flow"]["captions"] == existing_captions
 
+    def test_process_game_merges_kalshi_odds_when_nba_feeds_are_unchanged(self):
+        game_item = {
+            "id": "2026-04-04-det-phi",
+            "nbaGameId": "0022600101",
+            "status": "Q1 09:30",
+            "time": "09:30",
+            "awayteam": "DET",
+            "hometeam": "PHI",
+        }
+        existing_gamepack = {
+            "v": 1,
+            "id": "0022600101",
+            "publicId": "2026-04-04-det-phi",
+            "box": {
+                "teams": {
+                    "away": {"abbr": "DET"},
+                    "home": {"abbr": "PHI"},
+                }
+            },
+            "flow": {
+                "v": 2,
+                "score": [],
+                "players": {"away": {}, "home": {}},
+                "segments": {"away": {}, "home": {}},
+                "odds": [
+                    {
+                        "quarter": 1,
+                        "time": "PT10M00.00S",
+                        "awayWinProb": 0.52,
+                        "source": "midpoint",
+                        "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
+                        "eventTicker": "KXNBAGAME-26APR04DETPHI",
+                    }
+                ],
+            },
+        }
+
+        self.module.fetch_nba_data_urllib = MagicMock(return_value=(None, None))
+        self.module.fetch_kalshi_event_markets = MagicMock(
+            return_value=[
+                {
+                    "ticker": "KXNBAGAME-26APR04DETPHI-DET",
+                    "yes_bid_dollars": "0.5600",
+                    "yes_ask_dollars": "0.6000",
+                    "last_price_dollars": "0.5900",
+                },
+                {
+                    "ticker": "KXNBAGAME-26APR04DETPHI-PHI",
+                    "yes_bid_dollars": "0.4200",
+                    "yes_ask_dollars": "0.4600",
+                    "last_price_dollars": "0.4300",
+                },
+            ]
+        )
+        self.module.load_gamepack = MagicMock(return_value=existing_gamepack)
+        self.module.upload_json_to_s3 = MagicMock()
+
+        is_final, updates = self.module.process_game(game_item, user_agent="ua", date_str="2026-04-04")
+
+        assert is_final is False
+        assert updates == {}
+        uploaded_payload = self.module.upload_json_to_s3.call_args.kwargs["data"]
+        assert uploaded_payload["flow"]["odds"] == [
+            {
+                "quarter": 1,
+                "time": "PT10M00.00S",
+                "awayWinProb": 0.52,
+                "source": "midpoint",
+                "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
+                "eventTicker": "KXNBAGAME-26APR04DETPHI",
+            },
+            {
+                "quarter": 1,
+                "time": "09:30",
+                "awayWinProb": 0.58,
+                "source": "midpoint",
+                "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
+                "eventTicker": "KXNBAGAME-26APR04DETPHI",
+            },
+        ]
+
     def test_poller_processes_final_games_missing_cached_etags(self):
         self.module.get_nba_date = MagicMock(return_value="2026-02-13")
         self.module.get_games_from_s3 = MagicMock(

@@ -81,6 +81,24 @@ export const compactPlayByPlayPayload = {
     { quarter: 1, time: 'PT11M00.00S', awayScore: 2, homeScore: 0 },
     { quarter: 2, time: 'PT11M50.00S', awayScore: 2, homeScore: 3 },
   ],
+  odds: [
+    {
+      quarter: 1,
+      time: 'PT11M40.00S',
+      awayWinProb: 0.61,
+      source: 'midpoint',
+      marketTicker: 'KXNBAGAME-26APR04DETPHI-DET',
+      eventTicker: 'KXNBAGAME-26APR04DETPHI',
+    },
+    {
+      quarter: 2,
+      time: 'PT11M50.00S',
+      awayWinProb: 0.44,
+      source: 'last',
+      marketTicker: 'KXNBAGAME-26APR04DETPHI-DET',
+      eventTicker: 'KXNBAGAME-26APR04DETPHI',
+    },
+  ],
   players: {
     away: {
       'Away Guard': [
@@ -144,6 +162,7 @@ export const compactPlayByPlayPayload = {
 
 export const expectedLegacyNormalized = {
   scoreTimeline: legacyPlayByPlayPayload.scoreTimeline,
+  oddsTimeline: [],
   awayPlayerTimeline: legacyPlayByPlayPayload.awayPlayerTimeline,
   homePlayerTimeline: legacyPlayByPlayPayload.homePlayerTimeline,
   awayActionsAll: legacyPlayByPlayPayload.awayActions,
@@ -210,6 +229,24 @@ export const expectedCompactNormalized = {
     { period: 1, clock: 'PT12M00.00S', away: 0, home: 0 },
     { period: 1, clock: 'PT11M00.00S', away: 2, home: 0 },
     { period: 2, clock: 'PT11M50.00S', away: 2, home: 3 },
+  ],
+  oddsTimeline: [
+    {
+      period: 1,
+      clock: 'PT11M40.00S',
+      awayWinProb: 0.61,
+      source: 'midpoint',
+      marketTicker: 'KXNBAGAME-26APR04DETPHI-DET',
+      eventTicker: 'KXNBAGAME-26APR04DETPHI',
+    },
+    {
+      period: 2,
+      clock: 'PT11M50.00S',
+      awayWinProb: 0.44,
+      source: 'last',
+      marketTicker: 'KXNBAGAME-26APR04DETPHI-DET',
+      eventTicker: 'KXNBAGAME-26APR04DETPHI',
+    },
   ],
   captions: null,
   awayPlayerTimeline: {

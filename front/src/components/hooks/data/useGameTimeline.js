@@ -18,6 +18,7 @@ export function useGameTimeline(playByPlay, statOn) {
 
     return {
       scoreTimeline: normalized.scoreTimeline,
+      oddsTimeline: normalized.oddsTimeline,
       homePlayerTimeline: normalized.homePlayerTimeline,
       awayPlayerTimeline: normalized.awayPlayerTimeline,
       allActions: normalized.allActions,

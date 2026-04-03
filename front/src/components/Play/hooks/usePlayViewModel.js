@@ -98,12 +98,14 @@ export function usePlayViewModel({
   const timelineWindow = periodData.timelineWindow;
   const filteredAllActions = periodData.allActions;
   const filteredScoreTimeline = periodData.scoreTimeline;
+  const filteredOddsTimeline = periodData.oddsTimeline;
   const filteredAwayPlayers = periodData.awayPlayers;
   const filteredHomePlayers = periodData.homePlayers;
   const filteredAwayPlayerTimeline = periodData.awayPlayerTimeline;
   const filteredHomePlayerTimeline = periodData.homePlayerTimeline;
   const filteredLastAction = periodData.lastAction;
   const startScoreDiff = periodData.startScoreDiff;
+  const startOddsProb = periodData.startOddsProb;
 
   const teamColors = getMatchupColors(
     displayAwayTeamNames.abr,
@@ -158,6 +160,7 @@ export function usePlayViewModel({
     displayGameDate,
     filteredAllActions,
     filteredScoreTimeline,
+    filteredOddsTimeline,
     filteredAwayPlayers,
     filteredHomePlayers,
     filteredAwayPlayerTimeline,
@@ -165,6 +168,7 @@ export function usePlayViewModel({
     filteredLastAction,
     timelineWindow,
     startScoreDiff,
+    startOddsProb,
     teamColors,
     awayColor,
     homeColor,

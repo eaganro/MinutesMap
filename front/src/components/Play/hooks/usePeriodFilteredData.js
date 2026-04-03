@@ -9,6 +9,7 @@ import {
 export function usePeriodFilteredData({ activePeriod, numPeriods, stablePlayData }) {
   const stableAllActions = stablePlayData.allActions;
   const stableScoreTimeline = stablePlayData.scoreTimeline;
+  const stableOddsTimeline = stablePlayData.oddsTimeline;
   const stableAwayPlayers = stablePlayData.playerActions.away.filtered;
   const stableHomePlayers = stablePlayData.playerActions.home.filtered;
   const stableAwayPlayerTimeline = stablePlayData.awayPlayerTimeline;
@@ -35,6 +36,11 @@ export function usePeriodFilteredData({ activePeriod, numPeriods, stablePlayData
     if (!activePeriod) return stableScoreTimeline;
     return stableScoreTimeline.filter((action) => Number(action.period) === activePeriod);
   }, [stableScoreTimeline, activePeriod]);
+
+  const periodOddsTimeline = useMemo(() => {
+    if (!activePeriod) return stableOddsTimeline;
+    return stableOddsTimeline.filter((entry) => Number(entry.period) === activePeriod);
+  }, [stableOddsTimeline, activePeriod]);
 
   const periodAwayPlayers = useMemo(() => {
     if (!activePeriod) return stableAwayPlayers;
@@ -95,28 +101,45 @@ export function usePeriodFilteredData({ activePeriod, numPeriods, stablePlayData
     return diff;
   }, [activePeriod, stableScoreTimeline]);
 
+  const startOddsProb = useMemo(() => {
+    if (!activePeriod) return null;
+    const startSeconds = getPeriodStartSeconds(activePeriod);
+    let awayWinProb = null;
+    stableOddsTimeline.forEach((entry) => {
+      const elapsed = getSecondsElapsed(entry.period, entry.clock);
+      if (elapsed <= startSeconds) {
+        awayWinProb = Number(entry.awayWinProb);
+      }
+    });
+    return Number.isFinite(awayWinProb) ? awayWinProb : null;
+  }, [activePeriod, stableOddsTimeline]);
+
   const periodData = useMemo(
     () => ({
       timelineWindow,
       allActions: periodAllActions,
       scoreTimeline: periodScoreTimeline,
+      oddsTimeline: periodOddsTimeline,
       awayPlayers: periodAwayPlayers,
       homePlayers: periodHomePlayers,
       awayPlayerTimeline: periodAwayPlayerTimeline,
       homePlayerTimeline: periodHomePlayerTimeline,
       lastAction: periodLastAction,
       startScoreDiff,
+      startOddsProb,
     }),
     [
       timelineWindow,
       periodAllActions,
       periodScoreTimeline,
+      periodOddsTimeline,
       periodAwayPlayers,
       periodHomePlayers,
       periodAwayPlayerTimeline,
       periodHomePlayerTimeline,
       periodLastAction,
       startScoreDiff,
+      startOddsProb,
     ],
   );
 

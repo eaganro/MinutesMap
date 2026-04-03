@@ -128,6 +128,10 @@ const buildPlayData = () => ({
     { period: 1, clock: 'PT12M00.00S', away: 0, home: 0 },
     { period: 1, clock: 'PT11M00.00S', away: 2, home: 0 },
   ],
+  oddsTimeline: [
+    { period: 1, clock: 'PT11M20.00S', awayWinProb: 0.58 },
+    { period: 1, clock: 'PT10M20.00S', awayWinProb: 0.64 },
+  ],
   awayPlayerTimeline: {
     'J. Embiid': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
     'T. Maxey': [{ period: 1, start: 'PT12M00.00S', end: 'PT00M00.00S' }],
@@ -169,6 +173,7 @@ const buildProps = (overrides = {}) => ({
   isLoading: false,
   statusMessage: null,
   showScoreDiff: true,
+  showOdds: false,
   statOn: STAT_ON,
   ...overrides,
 });
@@ -261,5 +266,11 @@ describe('Play', () => {
       screen.queryByRole('button', { name: /open player detail for j\. embiid/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
+  });
+
+  it('renders the win-odds overlay when enabled', () => {
+    const { container } = renderPlay(buildProps({ showOdds: true }));
+
+    expect(container.querySelectorAll('.playGrid polyline')).toHaveLength(3);
   });
 });
