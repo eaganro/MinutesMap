@@ -27,6 +27,19 @@ const allActions = [
   },
 ];
 
+const oddsTimeline = [
+  {
+    period: 1,
+    clock: 'PT11M30.00S',
+    awayWinProb: 0.54,
+  },
+  {
+    period: 1,
+    clock: 'PT10M00.00S',
+    awayWinProb: 0.67,
+  },
+];
+
 const buildHook = () =>
   renderHook(() => {
     const container = document.createElement('div');
@@ -40,6 +53,7 @@ const buildHook = () =>
     });
     return usePlayInteraction({
       allActions,
+      oddsTimeline,
       leftMargin: 96,
       timelineWidth: 500,
       timelineWindow: {
@@ -113,6 +127,8 @@ describe('usePlayInteraction', () => {
 
     expect(result.current.highlightActionIds).toEqual([1, 2]);
     expect(result.current.descriptionArray.map((entry) => entry.actionNumber)).toEqual([1, 2]);
+    expect([1, 2]).toContain(result.current.focusActionMeta?.actionNumber);
+    expect(result.current.focusActionMeta?.awayWinProb).toBe(0.54);
   });
 
   it('supports keyboard navigation while info is locked', () => {
@@ -136,5 +152,23 @@ describe('usePlayInteraction', () => {
 
     expect(result.current.infoLocked).toBe(false);
     expect(result.current.descriptionArray).toEqual([]);
+  });
+
+  it('tracks the latest known win odds for the selected action timestamp', () => {
+    const { result } = buildHook();
+
+    act(() => {
+      result.current.setHighlightActionIds([1]);
+      result.current.setDescriptionArray([allActions[0]]);
+    });
+
+    act(() => {
+      result.current.navigateAction(1);
+    });
+
+    expect(result.current.focusActionMeta).toEqual({
+      actionNumber: 3,
+      awayWinProb: 0.67,
+    });
   });
 });

@@ -111,6 +111,7 @@ export default function Play({
     timelineWidth: width,
     timelineWindow,
     allActions: filteredAllActions,
+    oddsTimeline: stablePlayData.oddsTimeline,
     playRef,
   });
 

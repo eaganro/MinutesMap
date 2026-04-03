@@ -4,6 +4,7 @@ import {
   isFreeThrowAction,
   isThreePointAction,
 } from '../../domain/events/classification';
+import { clampWinProbability, formatWinProbabilityPercent } from '../../helpers/odds';
 import { LegendShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
 import { formatClock, formatPeriod } from '../../helpers/utils';
 import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
@@ -174,6 +175,7 @@ export default function PlayTooltip({
               primaryAction={primaryAction}
               awayTeamNames={awayTeamNames}
               homeTeamNames={homeTeamNames}
+              awayWinProb={focusActionMeta?.awayWinProb}
               shouldPositionBelow={layout.shouldPositionBelow}
             />
           )}
@@ -185,6 +187,7 @@ export default function PlayTooltip({
               primaryAction={primaryAction}
               awayTeamNames={awayTeamNames}
               homeTeamNames={homeTeamNames}
+              awayWinProb={focusActionMeta?.awayWinProb}
               shouldPositionBelow={layout.shouldPositionBelow}
             />
           )}
@@ -267,17 +270,40 @@ export default function PlayTooltip({
   );
 }
 
-function TooltipHeader({ primaryAction, awayTeamNames, homeTeamNames, shouldPositionBelow }) {
+function TooltipHeader({
+  primaryAction,
+  awayTeamNames,
+  homeTeamNames,
+  awayWinProb,
+  shouldPositionBelow,
+}) {
+  const awayProbability = clampWinProbability(awayWinProb);
+  const homeProbability = awayProbability === null ? null : 1 - awayProbability;
+
   return (
     <div className={`time-score-header ${shouldPositionBelow ? 'bottom' : 'top'}`}>
-      <span className="time">
-        {formatPeriod(primaryAction.period)} {formatClock(primaryAction.clock)}
-      </span>
-      <span className="score">
-        <span className="team-tricode away">{awayTeamNames.abr}</span>
-        {primaryAction.scoreAway} - {primaryAction.scoreHome}
-        <span className="team-tricode home">{homeTeamNames.abr}</span>
-      </span>
+      <div className="headerRow">
+        <span className="time">
+          {formatPeriod(primaryAction.period)} {formatClock(primaryAction.clock)}
+        </span>
+        <span className="score">
+          <span className="team-tricode away">{awayTeamNames.abr}</span>
+          {primaryAction.scoreAway} - {primaryAction.scoreHome}
+          <span className="team-tricode home">{homeTeamNames.abr}</span>
+        </span>
+      </div>
+      {awayProbability !== null && homeProbability !== null && (
+        <div className="tooltipOddsRow">
+          <span className="label">Win Odds</span>
+          <span className="oddsValue">
+            <span className="team-tricode away">{awayTeamNames.abr}</span>{' '}
+            {formatWinProbabilityPercent(awayProbability)}
+            <span className="separator"></span>
+            <span className="team-tricode home">{homeTeamNames.abr}</span>{' '}
+            {formatWinProbabilityPercent(homeProbability)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

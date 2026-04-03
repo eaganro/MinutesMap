@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getEventType, isFreeThrowAction } from '../../domain/events/classification';
+import { findWinProbabilityAtOrBefore } from '../../helpers/odds';
 import {
   calculateTimelineXPosition,
   findClosestActionByPosition,
@@ -10,6 +11,7 @@ import {
 
 export const usePlayInteraction = ({
   allActions,
+  oddsTimeline,
   leftMargin,
   timelineWidth,
   timelineWindow,
@@ -39,6 +41,18 @@ export const usePlayInteraction = ({
     [timelineWindow, timelineWidth, leftMargin],
   );
 
+  const buildFocusActionMeta = useCallback(
+    (action) => {
+      if (!action) return null;
+
+      return {
+        actionNumber: action.actionNumber ?? null,
+        awayWinProb: findWinProbabilityAtOrBefore(oddsTimeline, action.period, action.clock),
+      };
+    },
+    [oddsTimeline],
+  );
+
   const applyActionSelection = useCallback(
     (action) => {
       if (!action) return false;
@@ -48,12 +62,10 @@ export const usePlayInteraction = ({
       setHighlightActionIds(newActionIds);
       setDescriptionArray(sameTimeActions);
       setMouseLinePos(newX);
-      setFocusActionMeta({
-        actionNumber: action.actionNumber ?? null,
-      });
+      setFocusActionMeta(buildFocusActionMeta(action));
       return true;
     },
-    [allActions, calculateXPosition],
+    [allActions, calculateXPosition, buildFocusActionMeta],
   );
 
   const getAdjacentAction = useCallback(
@@ -185,9 +197,7 @@ export const usePlayInteraction = ({
           setHighlightActionIds(hoverIds);
           setDescriptionArray(hoverActions);
           setMouseLinePos(actionX);
-          setFocusActionMeta({
-            actionNumber: hoveredAction.actionNumber ?? null,
-          });
+          setFocusActionMeta(buildFocusActionMeta(hoveredAction));
           return;
         }
       }
@@ -206,14 +216,20 @@ export const usePlayInteraction = ({
         setHighlightActionIds(sameTimeIds);
         setDescriptionArray(sameTimeActions);
         setMouseLinePos(pos + leftMargin);
-        setFocusActionMeta({
-          actionNumber: matchedAction.actionNumber ?? null,
-        });
+        setFocusActionMeta(buildFocusActionMeta(matchedAction));
       } else {
         setFocusActionMeta(null);
       }
     },
-    [infoLocked, playRef, leftMargin, timelineWidth, allActions, calculateXPosition],
+    [
+      infoLocked,
+      playRef,
+      leftMargin,
+      timelineWidth,
+      allActions,
+      calculateXPosition,
+      buildFocusActionMeta,
+    ],
   );
 
   const resetInteraction = useCallback(

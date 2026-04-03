@@ -661,8 +661,8 @@
 
     .time-score-header {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
+      flex-direction: column;
+      gap: 4px;
       padding: 8px 0;
       font-weight: 600;
 
@@ -675,6 +675,12 @@
         border-top: 2px solid var(--border-medium);
         margin-top: 8px;
         padding-top: 8px;
+      }
+
+      .headerRow {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
 
       .time {
@@ -693,6 +699,38 @@
         .team-tricode {
           font-size: 0.85em;
           font-weight: 600;
+          color: var(--text-tertiary);
+        }
+      }
+
+      .tooltipOddsRow {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.88em;
+
+        .label {
+          color: var(--text-tertiary);
+          font-weight: 600;
+        }
+
+        .oddsValue {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          color: var(--text-secondary);
+          font-weight: 600;
+        }
+
+        .team-tricode {
+          font-size: 0.95em;
+          font-weight: 700;
+          color: var(--text-tertiary);
+        }
+
+        .separator {
+          margin: 0 4px;
           color: var(--text-tertiary);
         }
       }
