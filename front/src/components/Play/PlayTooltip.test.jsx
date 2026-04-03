@@ -61,7 +61,9 @@ describe('PlayTooltip', () => {
       />,
     );
 
-    expect(screen.getByText('Win Odds')).toBeInTheDocument();
-    expect(screen.getByText((_, node) => node?.textContent === 'PHI 58.5%•GSW 41.5%')).toBeTruthy();
+    const oddsLabel = screen.getByText('Win Odds');
+
+    expect(oddsLabel).toBeInTheDocument();
+    expect(oddsLabel.closest('.tooltipOddsRow')).toHaveTextContent(/PHI\s*58\.5%\s*GSW\s*41\.5%/);
   });
 });
