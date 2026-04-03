@@ -12,7 +12,9 @@ from botocore.exceptions import ClientError
 from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
 from nba_game_poller.kalshi_api import (
     build_kalshi_nba_event_ticker,
+    fetch_kalshi_market_candlesticks,
     fetch_kalshi_event_markets,
+    get_candlestick_midpoint_or_last,
     get_market_midpoint_or_last,
     normalize_team_code,
 )
@@ -737,17 +739,21 @@ def process_game(game_item, user_agent=None, date_str=None):
     if play_data is None or box_data is None:
         existing = load_existing_gamepack_once()
         existing_flow = (existing or {}).get("flow")
+    elif KALSHI_ENABLED and actions:
+        existing = load_existing_gamepack_once()
+        existing_flow = (existing or {}).get("flow")
 
     odds_snapshot = build_kalshi_odds_snapshot(
         game_item=game_item,
         box_game=box_game,
         last_action=last_action,
         existing_flow=existing_flow,
+        actions=actions,
         date_str=date_str,
         user_agent=user_agent,
     )
 
-    if play_data is None and box_data is None and odds_snapshot is None:
+    if play_data is None and box_data is None and not odds_snapshot:
         return False, {}
 
     if processed is not None and AI_CAPTIONS_ENABLED and GEMINI_API_KEY and LAMBDA_ARN:
@@ -768,7 +774,7 @@ def process_game(game_item, user_agent=None, date_str=None):
                 ):
                     updates["captions_requested_through"] = latest_closed_period
 
-    if processed is not None or slim_box is not None or odds_snapshot is not None:
+    if processed is not None or slim_box is not None or odds_snapshot:
         if processed is None or slim_box is None:
             existing = load_existing_gamepack_once()
             if processed is None:
@@ -854,6 +860,21 @@ def clock_to_seconds_remaining(clock_value):
             return int(mins_part or 0) * 60 + float(sec_part or 0)
         except ValueError:
             return None
+    if "." in text:
+        whole_part, fractional_part = text.split(".", 1)
+    else:
+        whole_part, fractional_part = text, ""
+    if whole_part.isdigit() and len(whole_part) >= 3:
+        mins_part = whole_part[:-2]
+        sec_part = whole_part[-2:]
+        if fractional_part:
+            sec_text = f"{sec_part}.{fractional_part}"
+        else:
+            sec_text = sec_part
+        try:
+            return int(mins_part or 0) * 60 + float(sec_text or 0)
+        except ValueError:
+            return None
     return None
 
 
@@ -871,7 +892,7 @@ def merge_odds_timeline(existing_timeline, snapshot):
         if not isinstance(entry, dict):
             continue
         quarter = parse_positive_int(entry.get("quarter"), fallback=0)
-        time_value = entry.get("time")
+        time_value = trim_clock_value(entry.get("time")) or entry.get("time")
         if quarter <= 0 or not time_value:
             continue
         try:
@@ -889,14 +910,32 @@ def merge_odds_timeline(existing_timeline, snapshot):
             "eventTicker": entry.get("eventTicker") or None,
         })
 
+    snapshots = []
     if isinstance(snapshot, dict):
+        snapshots = [snapshot]
+    elif isinstance(snapshot, list):
+        snapshots = snapshot
+
+    for entry in snapshots:
+        if not isinstance(entry, dict):
+            continue
+        quarter = parse_positive_int(entry.get("quarter"), fallback=0)
+        time_value = trim_clock_value(entry.get("time")) or entry.get("time")
+        if quarter <= 0 or not time_value:
+            continue
+        try:
+            away_prob = float(entry.get("awayWinProb"))
+        except (TypeError, ValueError):
+            continue
+        if away_prob < 0 or away_prob > 1:
+            continue
         normalized.append({
-            "quarter": parse_positive_int(snapshot.get("quarter"), fallback=0),
-            "time": snapshot.get("time"),
-            "awayWinProb": float(snapshot.get("awayWinProb")),
-            "source": snapshot.get("source") or None,
-            "marketTicker": snapshot.get("marketTicker") or None,
-            "eventTicker": snapshot.get("eventTicker") or None,
+            "quarter": quarter,
+            "time": time_value,
+            "awayWinProb": away_prob,
+            "source": entry.get("source") or None,
+            "marketTicker": entry.get("marketTicker") or None,
+            "eventTicker": entry.get("eventTicker") or None,
         })
 
     if not normalized:
@@ -944,6 +983,171 @@ def resolve_game_team_codes(game_item, box_game):
     return away_code, home_code
 
 
+def parse_action_actual_ts(action):
+    raw = (action or {}).get("timeActual")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+
+    text = raw.strip()
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC_ZONE)
+    else:
+        parsed = parsed.astimezone(UTC_ZONE)
+
+    return parsed.timestamp()
+
+
+def align_ts_to_minute_bucket_end(ts_value):
+    try:
+        total_seconds = int(float(ts_value))
+    except (TypeError, ValueError):
+        return None
+    if total_seconds < 0:
+        return None
+    return ((total_seconds + 59) // 60) * 60
+
+
+def resolve_kalshi_market_pair(markets, away_code, home_code):
+    away_market = None
+    home_market = None
+    for market in markets or []:
+        if not isinstance(market, dict):
+            continue
+        ticker = normalize_team_code((market.get("ticker") or "").split("-")[-1])
+        if ticker == away_code:
+            away_market = market
+        elif ticker == home_code:
+            home_market = market
+    return away_market, home_market
+
+
+def build_market_odds_snapshot(position, market, event_ticker, invert=False):
+    if not position or not isinstance(market, dict):
+        return None
+
+    away_prob, source = get_market_midpoint_or_last(market)
+    if away_prob is None:
+        return None
+    if invert:
+        away_prob = max(0.0, min(1.0, 1.0 - away_prob))
+        source = f"inverted-{source}" if source else "inverted"
+
+    return {
+        **position,
+        "awayWinProb": round(float(away_prob), 4),
+        "source": source,
+        "marketTicker": market.get("ticker"),
+        "eventTicker": event_ticker,
+    }
+
+
+def build_kalshi_action_odds_snapshots(*, actions, existing_flow, market, event_ticker, invert, user_agent):
+    if not isinstance(existing_flow, dict) or not isinstance(market, dict):
+        return []
+
+    previous_seq = parse_positive_int((existing_flow.get("last") or {}).get("seq"), fallback=0)
+    if previous_seq <= 0:
+        return []
+
+    candidate_actions = []
+    for action in actions or []:
+        if not isinstance(action, dict):
+            continue
+        seq = parse_positive_int(action.get("actionNumber"), fallback=0)
+        if seq <= previous_seq:
+            continue
+        period = parse_positive_int(action.get("period"), fallback=0)
+        time_value = trim_clock_value(action.get("clock")) or (action.get("clock") or "").strip()
+        actual_ts = parse_action_actual_ts(action)
+        if period <= 0 or not time_value or actual_ts is None:
+            continue
+        candidate_actions.append(
+            {
+                "seq": seq,
+                "quarter": period,
+                "time": time_value,
+                "actualTs": actual_ts,
+            }
+        )
+
+    if not candidate_actions:
+        return []
+
+    start_ts = int(min(action["actualTs"] for action in candidate_actions))
+    end_ts = max(start_ts + 60, int(max(action["actualTs"] for action in candidate_actions)) + 60)
+    series_ticker = str(event_ticker).split("-", 1)[0]
+    candles = fetch_kalshi_market_candlesticks(
+        series_ticker,
+        market.get("ticker"),
+        start_ts,
+        end_ts,
+        period_interval=1,
+        include_latest_before_start=True,
+        user_agent=user_agent,
+    )
+    if not candles:
+        return []
+
+    candle_samples = []
+    for candle in candles:
+        if not isinstance(candle, dict):
+            continue
+        end_period_ts = parse_positive_int(candle.get("end_period_ts"), fallback=0)
+        if end_period_ts <= 0:
+            continue
+        away_prob, source = get_candlestick_midpoint_or_last(candle)
+        if away_prob is None:
+            continue
+        if invert:
+            away_prob = max(0.0, min(1.0, 1.0 - away_prob))
+            source = f"inverted-{source}" if source else "inverted"
+        candle_samples.append(
+            {
+                "endTs": end_period_ts,
+                "awayWinProb": round(float(away_prob), 4),
+                "source": source,
+            }
+        )
+
+    if not candle_samples:
+        return []
+
+    candle_samples.sort(key=lambda entry: entry["endTs"])
+    snapshots = []
+    for action in candidate_actions:
+        bucket_end_ts = align_ts_to_minute_bucket_end(action["actualTs"])
+        if bucket_end_ts is None:
+            continue
+        sample = None
+        for candidate in candle_samples:
+            if candidate["endTs"] <= bucket_end_ts:
+                sample = candidate
+            else:
+                break
+        if sample is None:
+            continue
+        snapshots.append(
+            {
+                "quarter": action["quarter"],
+                "time": action["time"],
+                "awayWinProb": sample["awayWinProb"],
+                "source": sample["source"],
+                "marketTicker": market.get("ticker"),
+                "eventTicker": event_ticker,
+            }
+        )
+
+    return snapshots
+
+
 def resolve_odds_position(game_item, box_game=None, last_action=None, existing_flow=None):
     status_text = ""
     if isinstance(box_game, dict):
@@ -972,17 +1176,17 @@ def resolve_odds_position(game_item, box_game=None, last_action=None, existing_f
 
     return {
         "quarter": period,
-        "time": clock,
+        "time": trim_clock_value(clock) or clock,
     }
 
 
-def build_kalshi_odds_snapshot(*, game_item, box_game, last_action, existing_flow, date_str, user_agent):
+def build_kalshi_odds_snapshot(*, game_item, box_game, last_action, existing_flow, actions, date_str, user_agent):
     if not KALSHI_ENABLED:
-        return None
+        return []
 
     away_code, home_code = resolve_game_team_codes(game_item, box_game)
     if not date_str or not away_code or not home_code:
-        return None
+        return []
 
     position = resolve_odds_position(
         game_item,
@@ -990,52 +1194,35 @@ def build_kalshi_odds_snapshot(*, game_item, box_game, last_action, existing_flo
         last_action=last_action,
         existing_flow=existing_flow,
     )
-    if not position:
-        return None
 
     event_ticker = build_kalshi_nba_event_ticker(date_str, away_code, home_code)
     if not event_ticker:
-        return None
+        return []
 
     markets = fetch_kalshi_event_markets(event_ticker, user_agent=user_agent)
     if not markets:
-        return None
+        return []
 
-    away_market = None
-    home_market = None
-    for market in markets:
-        if not isinstance(market, dict):
-            continue
-        ticker = normalize_team_code((market.get("ticker") or "").split("-")[-1])
-        if ticker == away_code:
-            away_market = market
-        elif ticker == home_code:
-            home_market = market
+    away_market, home_market = resolve_kalshi_market_pair(markets, away_code, home_code)
+    selected_market = away_market or home_market
+    if not isinstance(selected_market, dict):
+        return []
 
-    away_prob = None
-    source = None
-    market_ticker = None
-    if away_market:
-        away_prob, source = get_market_midpoint_or_last(away_market)
-        market_ticker = away_market.get("ticker")
+    invert = selected_market is home_market and away_market is None
+    snapshots = build_kalshi_action_odds_snapshots(
+        actions=actions,
+        existing_flow=existing_flow,
+        market=selected_market,
+        event_ticker=event_ticker,
+        invert=invert,
+        user_agent=user_agent,
+    )
 
-    if away_prob is None and home_market:
-        home_prob, home_source = get_market_midpoint_or_last(home_market)
-        if home_prob is not None:
-            away_prob = max(0.0, min(1.0, 1.0 - home_prob))
-            source = f"inverted-{home_source}" if home_source else "inverted"
-            market_ticker = home_market.get("ticker")
+    current_snapshot = build_market_odds_snapshot(position, selected_market, event_ticker, invert=invert)
+    if current_snapshot is not None:
+        snapshots.append(current_snapshot)
 
-    if away_prob is None:
-        return None
-
-    return {
-        **position,
-        "awayWinProb": round(float(away_prob), 4),
-        "source": source,
-        "marketTicker": market_ticker,
-        "eventTicker": event_ticker,
-    }
+    return snapshots
 
 
 def merge_flow_odds(processed_flow, existing_flow, odds_snapshot):

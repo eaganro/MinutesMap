@@ -510,7 +510,7 @@ class TestNbaGamePollerLambda:
         assert uploaded_payload["flow"]["odds"] == [
             {
                 "quarter": 1,
-                "time": "PT10M00.00S",
+                "time": "1000.00",
                 "awayWinProb": 0.52,
                 "source": "midpoint",
                 "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
@@ -520,6 +520,186 @@ class TestNbaGamePollerLambda:
                 "quarter": 1,
                 "time": "09:30",
                 "awayWinProb": 0.58,
+                "source": "midpoint",
+                "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
+                "eventTicker": "KXNBAGAME-26APR04DETPHI",
+            },
+        ]
+
+    def test_process_game_backfills_kalshi_odds_for_new_actions_between_polls(self):
+        game_item = {
+            "id": "2026-04-04-det-phi",
+            "nbaGameId": "0022600101",
+            "status": "Q1 09:10",
+            "time": "09:10",
+            "awayteam": "DET",
+            "hometeam": "PHI",
+        }
+        existing_gamepack = {
+            "v": 1,
+            "id": "0022600101",
+            "publicId": "2026-04-04-det-phi",
+            "box": {
+                "teams": {
+                    "away": {"abbr": "DET"},
+                    "home": {"abbr": "PHI"},
+                }
+            },
+            "flow": {
+                "v": 2,
+                "last": {"quarter": 1, "time": "10:00", "seq": 10, "awayScore": 2, "homeScore": 0},
+                "score": [],
+                "players": {"away": {}, "home": {}},
+                "segments": {"away": {}, "home": {}},
+                "odds": [
+                    {
+                        "quarter": 1,
+                        "time": "10:00",
+                        "awayWinProb": 0.52,
+                        "source": "midpoint",
+                        "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
+                        "eventTicker": "KXNBAGAME-26APR04DETPHI",
+                    }
+                ],
+            },
+        }
+        play_payload = {
+            "game": {
+                "homeTeamId": 1610612755,
+                "awayTeamId": 1610612765,
+                "actions": [
+                    {
+                        "actionNumber": 10,
+                        "period": 1,
+                        "clock": "PT10M00.00S",
+                        "scoreHome": "0",
+                        "scoreAway": "2",
+                        "timeActual": "2026-04-03T03:00:00Z",
+                    },
+                    {
+                        "actionNumber": 11,
+                        "period": 1,
+                        "clock": "PT09M40.00S",
+                        "scoreHome": "0",
+                        "scoreAway": "4",
+                        "timeActual": "2026-04-03T03:01:00Z",
+                    },
+                    {
+                        "actionNumber": 12,
+                        "period": 1,
+                        "clock": "PT09M10.00S",
+                        "scoreHome": "2",
+                        "scoreAway": "4",
+                        "timeActual": "2026-04-03T03:02:00Z",
+                    },
+                ],
+            }
+        }
+        box_payload = {
+            "game": {
+                "gameStatusText": "Q1 09:10",
+                "gameClock": "PT09M10.00S",
+                "homeTeam": {
+                    "teamId": 1610612755,
+                    "teamTricode": "PHI",
+                    "score": 2,
+                    "wins": 0,
+                    "losses": 0,
+                    "players": [],
+                },
+                "awayTeam": {
+                    "teamId": 1610612765,
+                    "teamTricode": "DET",
+                    "score": 4,
+                    "wins": 0,
+                    "losses": 0,
+                    "players": [],
+                },
+            }
+        }
+        processed_flow = {
+            "v": 2,
+            "periods": 4,
+            "last": {"quarter": 1, "time": "09:10", "seq": 12, "awayScore": 4, "homeScore": 2},
+            "score": [],
+            "players": {"away": {}, "home": {}},
+            "segments": {"away": {}, "home": {}},
+        }
+
+        def fake_fetch(url, _etag=None, _ua=None):
+            if "playbyplay" in url:
+                return play_payload, "play-etag"
+            if "boxscore" in url:
+                return box_payload, "box-etag"
+            return None, None
+
+        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_kalshi_event_markets = MagicMock(
+            return_value=[
+                {
+                    "ticker": "KXNBAGAME-26APR04DETPHI-DET",
+                    "yes_bid_dollars": "0.5800",
+                    "yes_ask_dollars": "0.6000",
+                    "last_price_dollars": "0.5900",
+                }
+            ]
+        )
+        self.module.fetch_kalshi_market_candlesticks = MagicMock(
+            return_value=[
+                {
+                    "end_period_ts": 1775185260,
+                    "yes_bid": {"close_dollars": "0.5600"},
+                    "yes_ask": {"close_dollars": "0.5800"},
+                    "price": {"close_dollars": "0.5700", "previous_dollars": "0.5200"},
+                },
+                {
+                    "end_period_ts": 1775185320,
+                    "yes_bid": {"close_dollars": "0.5800"},
+                    "yes_ask": {"close_dollars": "0.6000"},
+                    "price": {"close_dollars": "0.5900", "previous_dollars": "0.5700"},
+                },
+            ]
+        )
+        self.module.process_playbyplay_payload = MagicMock(return_value=processed_flow)
+        self.module.build_box_payload = MagicMock(
+            return_value={
+                "teams": {
+                    "away": {"abbr": "DET", "players": []},
+                    "home": {"abbr": "PHI", "players": []},
+                }
+            }
+        )
+        self.module.load_gamepack = MagicMock(return_value=existing_gamepack)
+        self.module.upload_json_to_s3 = MagicMock()
+        self.module.GEMINI_API_KEY = ""
+
+        is_final, updates = self.module.process_game(game_item, user_agent="ua", date_str="2026-04-04")
+
+        assert is_final is False
+        assert updates["play_etag"] == "play-etag"
+        assert updates["box_etag"] == "box-etag"
+        uploaded_payload = self.module.upload_json_to_s3.call_args.kwargs["data"]
+        assert uploaded_payload["flow"]["odds"] == [
+            {
+                "quarter": 1,
+                "time": "10:00",
+                "awayWinProb": 0.52,
+                "source": "midpoint",
+                "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
+                "eventTicker": "KXNBAGAME-26APR04DETPHI",
+            },
+            {
+                "quarter": 1,
+                "time": "0940.00",
+                "awayWinProb": 0.57,
+                "source": "midpoint",
+                "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
+                "eventTicker": "KXNBAGAME-26APR04DETPHI",
+            },
+            {
+                "quarter": 1,
+                "time": "0910.00",
+                "awayWinProb": 0.59,
                 "source": "midpoint",
                 "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
                 "eventTicker": "KXNBAGAME-26APR04DETPHI",

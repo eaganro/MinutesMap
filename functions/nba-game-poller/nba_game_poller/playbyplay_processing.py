@@ -1209,6 +1209,7 @@ def process_playbyplay_payload(
         last_payload = {
             "quarter": last_action.get("period"),
             "time": _trim_clock(last_action.get("clock")),
+            "seq": last_action.get("actionNumber"),
             "awayScore": last_action.get("scoreAway"),
             "homeScore": last_action.get("scoreHome"),
         }

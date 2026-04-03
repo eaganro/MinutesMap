@@ -630,6 +630,7 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(processed["periods"], 1)
         self.assertEqual(processed["last"]["quarter"], 1)
         self.assertEqual(processed["last"]["time"], "000.00")
+        self.assertEqual(processed["last"]["seq"], 3)
         self.assertEqual(processed["score"][0]["time"], "1200.00")
         self.assertEqual(processed["score"][-1]["time"], "000.00")
 

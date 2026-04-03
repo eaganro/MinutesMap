@@ -81,6 +81,46 @@ def fetch_kalshi_event_markets(event_ticker, user_agent=None):
     return markets if isinstance(markets, list) else []
 
 
+def fetch_kalshi_market_candlesticks(
+    series_ticker,
+    market_ticker,
+    start_ts,
+    end_ts,
+    *,
+    period_interval=1,
+    include_latest_before_start=False,
+    user_agent=None,
+):
+    if not series_ticker or not market_ticker or start_ts is None or end_ts is None:
+        return []
+
+    try:
+        start_value = int(start_ts)
+        end_value = int(end_ts)
+        interval_value = int(period_interval)
+    except (TypeError, ValueError):
+        return []
+
+    if start_value < 0 or end_value <= 0 or interval_value <= 0:
+        return []
+    if end_value < start_value:
+        return []
+
+    payload = fetch_kalshi_json(
+        f"/series/{urllib.parse.quote(str(series_ticker), safe='')}/markets/"
+        f"{urllib.parse.quote(str(market_ticker), safe='')}/candlesticks",
+        params={
+            "start_ts": start_value,
+            "end_ts": end_value,
+            "period_interval": interval_value,
+            "include_latest_before_start": str(bool(include_latest_before_start)).lower(),
+        },
+        user_agent=user_agent,
+    )
+    candles = payload.get("candlesticks") if isinstance(payload, dict) else None
+    return candles if isinstance(candles, list) else []
+
+
 def parse_kalshi_price(value):
     if value is None or value == "":
         return None
@@ -103,4 +143,27 @@ def get_market_midpoint_or_last(market):
     last = parse_kalshi_price(market.get("last_price_dollars"))
     if last is not None:
         return last, "last"
+    return None, None
+
+
+def get_candlestick_midpoint_or_last(candlestick):
+    if not isinstance(candlestick, dict):
+        return None, None
+
+    yes_bid = candlestick.get("yes_bid") if isinstance(candlestick.get("yes_bid"), dict) else {}
+    yes_ask = candlestick.get("yes_ask") if isinstance(candlestick.get("yes_ask"), dict) else {}
+    bid = parse_kalshi_price(yes_bid.get("close_dollars"))
+    ask = parse_kalshi_price(yes_ask.get("close_dollars"))
+    if bid is not None and ask is not None:
+        return (bid + ask) / 2.0, "midpoint"
+
+    price = candlestick.get("price") if isinstance(candlestick.get("price"), dict) else {}
+    close_price = parse_kalshi_price(price.get("close_dollars"))
+    if close_price is not None:
+        return close_price, "last"
+
+    previous_price = parse_kalshi_price(price.get("previous_dollars"))
+    if previous_price is not None:
+        return previous_price, "last"
+
     return None, None
