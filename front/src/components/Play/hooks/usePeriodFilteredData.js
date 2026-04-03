@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { clampWinProbability } from '../../../helpers/odds';
 import {
   getGameTotalSeconds,
   getPeriodDurationSeconds,
@@ -108,10 +109,10 @@ export function usePeriodFilteredData({ activePeriod, numPeriods, stablePlayData
     stableOddsTimeline.forEach((entry) => {
       const elapsed = getSecondsElapsed(entry.period, entry.clock);
       if (elapsed <= startSeconds) {
-        awayWinProb = Number(entry.awayWinProb);
+        awayWinProb = clampWinProbability(entry.awayWinProb);
       }
     });
-    return Number.isFinite(awayWinProb) ? awayWinProb : null;
+    return awayWinProb;
   }, [activePeriod, stableOddsTimeline]);
 
   const periodData = useMemo(

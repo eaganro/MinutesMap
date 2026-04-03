@@ -4,6 +4,7 @@ import {
   getPeriodStartSeconds,
   getSecondsElapsed,
 } from '../../../helpers/playTimeline';
+import { clampWinProbability } from '../../../helpers/odds';
 import { formatClock, formatStatusText } from '../../../helpers/utils';
 
 export const formatPeriodLabel = (period) => {
@@ -167,10 +168,10 @@ export const buildExportRangeData = ({
         (displayOddsTimeline || []).forEach((entry) => {
           const elapsed = getSecondsElapsed(entry.period, entry.clock);
           if (elapsed <= startSeconds) {
-            awayWinProb = Number(entry.awayWinProb);
+            awayWinProb = clampWinProbability(entry.awayWinProb);
           }
         });
-        return Number.isFinite(awayWinProb) ? awayWinProb : null;
+        return awayWinProb;
       })()
     : null;
   const exportScoreStats = (() => {

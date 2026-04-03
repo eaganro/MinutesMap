@@ -5,7 +5,7 @@ import Play from './Play';
 
 const STAT_ON = [true, true, true, true, true, true, true, true];
 
-const buildPlayData = () => ({
+const buildPlayData = (overrides = {}) => ({
   awayTeamNames: { name: 'Philadelphia 76ers', abr: 'PHI' },
   homeTeamNames: { name: 'Golden State Warriors', abr: 'GSW' },
   playerActions: {
@@ -147,6 +147,7 @@ const buildPlayData = () => ({
   },
   gameDate: '2026-03-11',
   captions: null,
+  ...overrides,
 });
 
 const buildBox = () => ({
@@ -272,5 +273,18 @@ describe('Play', () => {
     const { container } = renderPlay(buildProps({ showOdds: true }));
 
     expect(container.querySelectorAll('.playGrid polyline')).toHaveLength(3);
+  });
+
+  it('does not render a win-odds line when the odds data is missing', () => {
+    const { container } = renderPlay(
+      buildProps({
+        showOdds: true,
+        playData: buildPlayData({
+          oddsTimeline: [{ period: 1, clock: 'PT11M20.00S', awayWinProb: null }],
+        }),
+      }),
+    );
+
+    expect(container.querySelectorAll('.playGrid polyline')).toHaveLength(2);
   });
 });

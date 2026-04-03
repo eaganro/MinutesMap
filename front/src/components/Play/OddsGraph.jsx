@@ -1,18 +1,13 @@
 import { useMemo } from 'react';
+import { clampWinProbability } from '../../helpers/odds';
 import { getSecondsElapsed } from '../../helpers/playTimeline';
 
 const TOP_Y = 10;
 const BOTTOM_Y = 590;
 const MID_Y = 300;
 
-const clampProb = (value) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-  return Math.max(0, Math.min(1, parsed));
-};
-
 const probToY = (awayWinProb) => {
-  const prob = clampProb(awayWinProb);
+  const prob = clampWinProbability(awayWinProb);
   if (prob === null) return null;
   return BOTTOM_Y - prob * (BOTTOM_Y - TOP_Y);
 };
@@ -45,19 +40,19 @@ export default function OddsGraph({
     };
 
     const safeTimeline = (oddsTimeline || []).filter(
-      (entry) => clampProb(entry?.awayWinProb) !== null,
+      (entry) => clampWinProbability(entry?.awayWinProb) !== null,
     );
     const segments = [];
     let currentX = leftMargin;
-    let currentProb = clampProb(startOddsProb);
+    let currentProb = clampWinProbability(startOddsProb);
 
     if (currentProb === null && safeTimeline.length) {
-      currentProb = clampProb(safeTimeline[0]?.awayWinProb);
+      currentProb = clampWinProbability(safeTimeline[0]?.awayWinProb);
       currentX = getXForEntry(safeTimeline[0]);
     }
 
     safeTimeline.forEach((entry) => {
-      const nextProb = clampProb(entry.awayWinProb);
+      const nextProb = clampWinProbability(entry.awayWinProb);
       if (nextProb === null) return;
       const nextX = getXForEntry(entry);
 

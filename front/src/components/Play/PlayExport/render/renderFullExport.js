@@ -3,6 +3,7 @@ import {
   getPeriodStartSeconds,
   getSecondsElapsed,
 } from '../../../../helpers/playTimeline';
+import { clampWinProbability } from '../../../../helpers/odds';
 import {
   DESKTOP_EXPORT_WIDTH,
   TIMELINE_ICON_SCALE,
@@ -30,12 +31,6 @@ import {
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
-const clampProb = (value) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-  return Math.max(0, Math.min(1, parsed));
-};
-
 const drawOddsOverlay = ({
   ctx,
   chartLeft,
@@ -60,12 +55,14 @@ const drawOddsOverlay = ({
   };
   const probToY = (awayWinProb) => chartTop + (1 - awayWinProb) * chartHeight;
 
-  const timeline = (oddsTimeline || []).filter((entry) => clampProb(entry?.awayWinProb) !== null);
-  let currentProb = clampProb(startOddsProb);
+  const timeline = (oddsTimeline || []).filter(
+    (entry) => clampWinProbability(entry?.awayWinProb) !== null,
+  );
+  let currentProb = clampWinProbability(startOddsProb);
   let currentX = chartLeft;
 
   if (currentProb === null && timeline.length) {
-    currentProb = clampProb(timeline[0]?.awayWinProb);
+    currentProb = clampWinProbability(timeline[0]?.awayWinProb);
     currentX = getXForEntry(timeline[0]);
   }
   if (currentProb === null) return;
@@ -79,7 +76,7 @@ const drawOddsOverlay = ({
   ctx.moveTo(currentX, probToY(currentProb));
 
   timeline.forEach((entry) => {
-    const nextProb = clampProb(entry?.awayWinProb);
+    const nextProb = clampWinProbability(entry?.awayWinProb);
     if (nextProb === null) return;
     const nextX = getXForEntry(entry);
     ctx.lineTo(nextX, probToY(currentProb));
