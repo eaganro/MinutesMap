@@ -16,6 +16,7 @@ describe('useGameTimeline', () => {
 
     expect(result.current).toEqual({
       scoreTimeline: [],
+      oddsTimeline: [],
       homePlayerTimeline: {},
       awayPlayerTimeline: {},
       allActions: [],
