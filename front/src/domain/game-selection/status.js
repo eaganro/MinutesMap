@@ -1,6 +1,58 @@
 export const MAX_AUTO_LOOKBACK_DAYS = 10;
 export const GAME_NOT_STARTED_MESSAGE = 'Game data is not available yet. The game has not started.';
 const GAME_SLUG_RE = /^\d{4}-\d{2}-\d{2}-[a-z0-9]{2,}-[a-z0-9]{2,}$/i;
+const TERMINAL_STATUS_PREFIXES = ['final', 'postponed', 'cancelled', 'canceled', 'ppd'];
+const PREGAME_STATUS_PREFIXES = ['scheduled', 'pre', 'tbd', 'tba'];
+
+function normalizeStatus(status) {
+  return (status || '').trim().toLowerCase();
+}
+
+function isPregameStatus(status) {
+  const normalized = normalizeStatus(status);
+  if (!normalized) {
+    return false;
+  }
+  if (
+    PREGAME_STATUS_PREFIXES.some((prefix) => normalized.startsWith(prefix)) ||
+    normalized.includes('tbd') ||
+    normalized.includes('tba')
+  ) {
+    return true;
+  }
+  if (
+    normalized.includes(':') &&
+    (normalized.includes(' am') ||
+      normalized.includes(' pm') ||
+      normalized.endsWith('am') ||
+      normalized.endsWith('pm') ||
+      normalized.includes(' et'))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isLiveStatus(status) {
+  const normalized = normalizeStatus(status);
+  if (!normalized) {
+    return false;
+  }
+  if (/^q\d/.test(normalized)) {
+    return true;
+  }
+  if (
+    normalized.includes('qtr') ||
+    normalized.includes('quarter') ||
+    normalized.includes('half') ||
+    normalized.includes('halftime') ||
+    normalized.includes('in progress') ||
+    normalized.includes('end of')
+  ) {
+    return true;
+  }
+  return /^(\d+ot|ot)\b/.test(normalized) || normalized.includes(' overtime');
+}
 
 export function isGameSlug(value) {
   if (!value || typeof value !== 'string') {
@@ -20,15 +72,10 @@ export function parseGameSlug(value) {
 
 export function parseGameStatus(status) {
   const trimmed = (status || '').trim();
-  const lower = trimmed.toLowerCase();
-  const isFinal =
-    trimmed.startsWith('Final') ||
-    lower.startsWith('postponed') ||
-    lower.startsWith('cancelled') ||
-    lower.startsWith('canceled') ||
-    lower.startsWith('ppd');
-  const isUpcoming = trimmed.endsWith('ET');
-  const isLive = !!trimmed && !isFinal && !isUpcoming;
+  const normalized = normalizeStatus(trimmed);
+  const isFinal = TERMINAL_STATUS_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  const isUpcoming = isPregameStatus(trimmed);
+  const isLive = !isFinal && !isUpcoming && isLiveStatus(trimmed);
 
   return { isFinal, isUpcoming, isLive, status: trimmed };
 }
@@ -77,8 +124,8 @@ export function findFirstStartedOrCompletedGame(games = [], alreadySorted = fals
   const list = alreadySorted ? games : sortGamesForSelection(games);
   return (
     list.find((game) => {
-      const { status } = parseGameStatus(game?.status);
-      return status && !status.endsWith('ET');
+      const { isFinal, isLive } = parseGameStatus(game?.status);
+      return isLive || isFinal;
     }) || null
   );
 }

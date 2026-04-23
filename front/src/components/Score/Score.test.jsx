@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Score from './Score';
 
 const buildProps = (overrides = {}) => ({
@@ -15,6 +15,10 @@ const buildProps = (overrides = {}) => ({
 });
 
 describe('Score', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it('keeps stable score/date content while loading refreshes in the background', () => {
     const props = buildProps();
     const { rerender } = render(<Score {...props} />);
@@ -62,5 +66,11 @@ describe('Score', () => {
     );
 
     expect(screen.getByText('Loading game...')).toBeInTheDocument();
+  });
+
+  it('does not show the live indicator for TBD games', () => {
+    render(<Score {...buildProps({ gameStatus: 'TBD' })} />);
+
+    expect(screen.queryByLabelText('Live game')).not.toBeInTheDocument();
   });
 });

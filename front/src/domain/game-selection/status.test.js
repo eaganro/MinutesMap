@@ -41,11 +41,29 @@ describe('game selection status utils', () => {
       isLive: false,
       status: '7:30 PM ET',
     });
+    expect(parseGameStatus('TBD')).toEqual({
+      isFinal: false,
+      isUpcoming: true,
+      isLive: false,
+      status: 'TBD',
+    });
     expect(parseGameStatus('Q3 05:21')).toEqual({
       isFinal: false,
       isUpcoming: false,
       isLive: true,
       status: 'Q3 05:21',
+    });
+    expect(parseGameStatus('Halftime')).toEqual({
+      isFinal: false,
+      isUpcoming: false,
+      isLive: true,
+      status: 'Halftime',
+    });
+    expect(parseGameStatus('OT')).toEqual({
+      isFinal: false,
+      isUpcoming: false,
+      isLive: true,
+      status: 'OT',
     });
   });
 
@@ -86,6 +104,7 @@ describe('game selection status utils', () => {
 
   it('finds the first started/completed game from sorted selection order', () => {
     const games = [
+      { id: 'tbd', status: 'TBD', starttime: '2026-02-03T00:00:00Z', hometeam: 'D' },
       { id: 'upcoming', status: '8:00 PM ET', starttime: '2026-02-03T01:00:00Z', hometeam: 'C' },
       { id: 'live', status: 'Q1 10:10', starttime: '2026-02-03T02:00:00Z', hometeam: 'A' },
       { id: 'final', status: 'Final', starttime: '2026-02-03T03:00:00Z', hometeam: 'B' },

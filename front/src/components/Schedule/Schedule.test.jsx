@@ -114,4 +114,25 @@ describe('Schedule', () => {
     expect(mocks.scrollByMock).toHaveBeenNthCalledWith(1, -100);
     expect(mocks.scrollByMock).toHaveBeenNthCalledWith(2, 100);
   });
+
+  it('does not show the live indicator for TBD games', () => {
+    render(
+      <Schedule
+        {...buildProps({
+          games: [
+            {
+              id: '2026-02-03-phi-gsw',
+              status: 'TBD',
+              awayteam: 'PHI',
+              hometeam: 'GSW',
+              awayscore: 0,
+              homescore: 0,
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Live game')).not.toBeInTheDocument();
+  });
 });
