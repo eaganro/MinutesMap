@@ -54,6 +54,51 @@ class TestNbaGamePollerLambda:
         self.module.poller_logic(None)
         assert self.module.disable_self.called
 
+    def test_reconcile_recent_schedule_targets_previous_four_days_today_and_next_seven_days(self):
+        self.module.SCHEDULE_RECONCILE_DAYS = "4"
+        self.module.SCHEDULE_RECONCILE_FUTURE_DAYS = "7"
+        self.module.get_nba_date = MagicMock(return_value="2025-01-01")
+        feed = {"gameDates": []}
+        self.module.fetch_schedule_feed = MagicMock(return_value=feed)
+        self.module.build_schedule_feed_map = MagicMock(
+            return_value={
+                "2024-12-28": {"2024-12-28-dal-hou": {"id": "2024-12-28-dal-hou"}},
+                "2024-12-29": {"2024-12-29-bos-nyk": {"id": "2024-12-29-bos-nyk"}},
+                "2024-12-30": {"2024-12-30-atl-orl": {"id": "2024-12-30-atl-orl"}},
+                "2024-12-31": {"2024-12-31-phx-sac": {"id": "2024-12-31-phx-sac"}},
+                "2025-01-01": {"2025-01-01-bos-nyk": {"id": "2025-01-01-bos-nyk"}},
+                "2025-01-03": {"2025-01-03-lal-den": {"id": "2025-01-03-lal-den"}},
+                "2025-01-07": {"2025-01-07-mia-chi": {"id": "2025-01-07-mia-chi"}},
+                "2025-01-08": {"2025-01-08-min-okc": {"id": "2025-01-08-min-okc"}},
+            }
+        )
+        self.module.reconcile_schedule_date = MagicMock(return_value=False)
+        self.module.build_game_id_map_from_feed = MagicMock(return_value={})
+        self.module.upload_game_id_map = MagicMock()
+
+        self.module.reconcile_recent_schedule()
+
+        expected_dates = [
+            "2024-12-28",
+            "2024-12-29",
+            "2024-12-30",
+            "2024-12-31",
+            "2025-01-01",
+            "2025-01-02",
+            "2025-01-03",
+            "2025-01-04",
+            "2025-01-05",
+            "2025-01-06",
+            "2025-01-07",
+            "2025-01-08",
+        ]
+        actual_dates = [
+            call.args[0]
+            for call in self.module.reconcile_schedule_date.call_args_list
+        ]
+        assert actual_dates == expected_dates
+        assert self.module.build_game_id_map_from_feed.call_count == 12
+
     def test_process_game_promotes_play_final_when_box_regresses(self):
         game_item = {
             "id": "2026-02-04-phi-lal",

@@ -146,14 +146,15 @@ resource "aws_lambda_function" "nba_poller" {
 
   environment {
     variables = {
-      LAMBDA_ARN              = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
-      SCHEDULER_ROLE_ARN      = aws_iam_role.nba_scheduler_role.arn
-      DATA_BUCKET             = aws_s3_bucket.data_bucket.id
-      POLLER_RULE_NAME        = aws_cloudwatch_event_rule.nba_poller_rule.name
-      SCHEDULE_RECONCILE_DAYS = "4"
-      GAME_ID_MAP_PREFIX      = "private/gameIdMap/"
-      KALSHI_ENABLED          = "true"
-      GEMINI_API_KEY          = var.gemini_api_key
+      LAMBDA_ARN                     = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
+      SCHEDULER_ROLE_ARN             = aws_iam_role.nba_scheduler_role.arn
+      DATA_BUCKET                    = aws_s3_bucket.data_bucket.id
+      POLLER_RULE_NAME               = aws_cloudwatch_event_rule.nba_poller_rule.name
+      SCHEDULE_RECONCILE_DAYS        = "4"
+      SCHEDULE_RECONCILE_FUTURE_DAYS = "7"
+      GAME_ID_MAP_PREFIX             = "private/gameIdMap/"
+      KALSHI_ENABLED                 = "true"
+      GEMINI_API_KEY                 = var.gemini_api_key
     }
   }
 }

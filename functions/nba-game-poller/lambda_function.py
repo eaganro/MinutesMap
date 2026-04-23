@@ -54,6 +54,7 @@ if GAME_ID_MAP_PREFIX and not GAME_ID_MAP_PREFIX.endswith('/'):
 KALSHI_ENABLED = os.environ.get("KALSHI_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
 SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
+SCHEDULE_RECONCILE_FUTURE_DAYS = os.environ.get("SCHEDULE_RECONCILE_FUTURE_DAYS", "1")
 HALF_POLL_SCHEDULE_PREFIX = "NBA_PollerHalf_"
 HALF_POLL_OFFSET_SECONDS = int(os.environ.get("HALF_POLL_OFFSET_SECONDS", "30"))
 POLL_WINDOW_SECONDS = float(os.environ.get("POLL_WINDOW_SECONDS", "15"))
@@ -1448,8 +1449,9 @@ def get_games_from_s3(date_str):
         return []
 
 def reconcile_recent_schedule():
-    days = parse_positive_int(SCHEDULE_RECONCILE_DAYS, 3)
-    if days <= 0:
+    past_days = parse_positive_int(SCHEDULE_RECONCILE_DAYS, 3)
+    future_days = parse_positive_int(SCHEDULE_RECONCILE_FUTURE_DAYS, 1)
+    if past_days <= 0 and future_days <= 0:
         return
 
     today_str = get_nba_date()
@@ -1470,8 +1472,12 @@ def reconcile_recent_schedule():
         return
     updated = 0
 
-    for offset in range(days):
-        date_str = (today - timedelta(days=offset)).strftime("%Y-%m-%d")
+    start_offset = -past_days if past_days > 0 else 0
+    end_offset = future_days if future_days > 0 else 0
+
+    # Reconcile prior days, today, and upcoming schedule pages in one pass.
+    for offset in range(start_offset, end_offset + 1):
+        date_str = (today + timedelta(days=offset)).strftime("%Y-%m-%d")
         feed_games = feed_map.get(date_str, {})
         if reconcile_schedule_date(date_str, feed_games):
             updated += 1
