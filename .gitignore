@@ -4,6 +4,7 @@
 .vscode
 *.swp
 *.swo
+.codex
 
 # Global Node dependencies
 node_modules/
