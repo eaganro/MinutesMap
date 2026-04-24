@@ -65,13 +65,16 @@ def build_team_payload(team):
         if not isinstance(player, dict):
             continue
         stats = player.get("statistics") or {}
+        minutes = normalize_minutes(stats.get("minutes"))
+        if minutes == "00:00":
+            continue
         players.append(
             {
                 "id": _extract_player_id(player),
                 "first": (player.get("firstName") or "").strip(),
                 "last": (player.get("familyName") or "").strip(),
                 "stats": {
-                    "min": normalize_minutes(stats.get("minutes")),
+                    "min": minutes,
                     "pts": safe_int(stats.get("points")),
                     "fgm": safe_int(stats.get("fieldGoalsMade")),
                     "fga": safe_int(stats.get("fieldGoalsAttempted")),

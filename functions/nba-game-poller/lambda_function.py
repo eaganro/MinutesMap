@@ -30,6 +30,7 @@ from nba_game_poller.captioning import (
     extract_closed_periods,
     select_caption_checkpoint_periods,
 )
+from nba_game_poller.page_artifacts import update_page_artifacts_for_gamepack
 from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
 
 # --- Configuration & Environment ---
@@ -48,6 +49,7 @@ RECONCILE_LEAD_MINUTES = 15
 RECONCILE_LATE_MINUTES = 45
 SCHEDULE_PREFIX = 'schedule/'
 GAMEPACK_PREFIX = 'gamepack/'
+PAGE_PREFIX = 'pages/'
 GAME_ID_MAP_PREFIX = os.environ.get("GAME_ID_MAP_PREFIX", "private/gameIdMap/")
 if GAME_ID_MAP_PREFIX and not GAME_ID_MAP_PREFIX.endswith('/'):
     GAME_ID_MAP_PREFIX += '/'
@@ -815,6 +817,23 @@ def process_game(game_item, user_agent=None, date_str=None):
                 data=gamepack,
                 is_final=is_game_final,
             )
+            if is_game_final:
+                try:
+                    artifact_result = update_page_artifacts_for_gamepack(
+                        s3_client=s3_client,
+                        bucket=BUCKET,
+                        root_prefix=PREFIX,
+                        page_prefix=PAGE_PREFIX,
+                        gamepack=gamepack,
+                    )
+                    print(
+                        "Poller: Updated page artifacts for "
+                        f"{artifact_result['gameId']} "
+                        f"({artifact_result['teamFiles']} team, "
+                        f"{artifact_result['playerFiles']} player)."
+                    )
+                except Exception as exc:
+                    print(f"Poller: Failed to update page artifacts for {game_key}: {exc}")
         else:
             print(f"Poller: Skipping gamepack upload for {game_key}, missing data.")
 

@@ -166,6 +166,77 @@ class TestNbaGamePollerLambda:
         assert isinstance(updates.get("finalPendingSince"), str)
         assert updates["finalPendingSince"]
 
+    def test_process_game_updates_page_artifacts_after_confirmed_final_upload(self):
+        game_item = {
+            "id": "2026-02-04-phi-lal",
+            "nbaGameId": "0022500001",
+            "status": "Q4 00:05",
+            "homescore": 98,
+            "awayscore": 100,
+        }
+
+        play_payload = {
+            "game": {
+                "homeTeamId": 1610612747,
+                "awayTeamId": 1610612755,
+                "actions": [
+                    {
+                        "description": "Game End",
+                        "period": 4,
+                        "clock": "PT00M00.00S",
+                        "scoreHome": "104",
+                        "scoreAway": "118",
+                    }
+                ],
+            }
+        }
+        box_payload = {
+            "game": {
+                "gameStatusText": "Final",
+                "gameClock": "",
+                "homeTeam": {
+                    "teamId": 1610612747,
+                    "teamTricode": "LAL",
+                    "score": 104,
+                    "wins": 10,
+                    "losses": 5,
+                    "players": [],
+                },
+                "awayTeam": {
+                    "teamId": 1610612755,
+                    "teamTricode": "PHI",
+                    "score": 118,
+                    "wins": 12,
+                    "losses": 3,
+                    "players": [],
+                },
+            }
+        }
+
+        def fake_fetch(url, _etag=None, _ua=None):
+            if "playbyplay" in url:
+                return play_payload, "play-etag"
+            if "boxscore" in url:
+                return box_payload, "box-etag"
+            return None, None
+
+        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.process_playbyplay_payload = MagicMock(return_value={"v": 2, "players": {"away": {}, "home": {}}, "segments": {"away": {}, "home": {}}, "last": {"awayScore": 118, "homeScore": 104}})
+        self.module.build_box_payload = MagicMock(return_value={"start": "2026-02-04T00:00:00Z", "teams": {"away": {"id": 1610612755, "abbr": "PHI", "name": "76ers", "players": []}, "home": {"id": 1610612747, "abbr": "LAL", "name": "Lakers", "players": []}}})
+        self.module.upload_json_to_s3 = MagicMock()
+        self.module.update_page_artifacts_for_gamepack = MagicMock(return_value={"gameId": "2026-02-04-phi-lal", "teamFiles": 2, "playerFiles": 0})
+        self.module.load_gamepack = MagicMock(return_value=None)
+
+        is_final, updates = self.module.process_game(game_item, user_agent="ua", date_str="2026-02-04")
+
+        assert is_final is True
+        assert updates["status"] == "Final"
+        assert updates["finalConfirmed"] is True
+        self.module.upload_json_to_s3.assert_called_once()
+        self.module.update_page_artifacts_for_gamepack.assert_called_once()
+        uploaded_gamepack = self.module.upload_json_to_s3.call_args.kwargs["data"]
+        assert self.module.update_page_artifacts_for_gamepack.call_args.kwargs["gamepack"] == uploaded_gamepack
+
     def test_process_game_enqueues_caption_worker_at_halftime_checkpoint(self):
         game_item = {
             "id": "2026-02-04-phi-lal",
