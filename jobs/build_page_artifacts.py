@@ -340,8 +340,7 @@ def resolve_player_flow_key(player, player_map):
 
 def build_identity_registry(gamepacks):
     by_team_name = {}
-    by_name_counts = Counter()
-    by_name_id = {}
+    by_name_ids = {}
 
     for gamepack in gamepacks or []:
         box = (gamepack or {}).get("box") or {}
@@ -357,15 +356,14 @@ def build_identity_registry(gamepacks):
                 if player_id <= 0:
                     continue
                 normalized_name = normalize_player_name(full_name)
-                by_name_counts[normalized_name] += 1
-                by_name_id[normalized_name] = player_id
                 if team_abbr:
                     by_team_name[(team_abbr, normalized_name)] = player_id
+                by_name_ids.setdefault(normalized_name, set()).add(player_id)
 
     unique_by_name = {
-        name: by_name_id[name]
-        for name, count in by_name_counts.items()
-        if count == 1 and name in by_name_id
+        name: next(iter(ids))
+        for name, ids in by_name_ids.items()
+        if len(ids) == 1
     }
     return {
         "byTeamName": by_team_name,

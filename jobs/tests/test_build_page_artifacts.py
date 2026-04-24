@@ -432,3 +432,91 @@ def test_identity_registry_recovers_missing_player_ids_from_other_games():
     assert maxey["player"]["id"] == 201939
     assert maxey["player"]["key"] == "201939"
     assert maxey["row"]["playerId"] == 201939
+
+
+def test_identity_registry_recovers_same_player_after_team_change():
+    gamepack_with_phi_id = sample_gamepack()
+    gamepack_with_phi_id["box"]["teams"]["away"]["players"] = [
+        {
+            "id": 1629008,
+            "first": "Kelly",
+            "last": "Oubre Jr.",
+            "stats": {
+                "min": "30:00",
+                "pts": 20,
+                "fgm": 8,
+                "fga": 14,
+                "tpm": 2,
+                "tpa": 5,
+                "ftm": 2,
+                "fta": 3,
+                "oreb": 1,
+                "dreb": 4,
+                "ast": 2,
+                "stl": 1,
+                "blk": 0,
+                "to": 1,
+                "pf": 2,
+                "pm": 5,
+            },
+        }
+    ]
+    gamepack_with_phi_id["flow"]["players"]["away"] = {
+        "Kelly Oubre Jr.": [
+            {"quarter": 1, "time": "11:00", "type": "2pt", "text": "Kelly Oubre Jr. make 2pt jumper", "seq": 1, "r": "m"}
+        ]
+    }
+    gamepack_with_phi_id["flow"]["segments"]["away"] = {
+        "Kelly Oubre Jr.": [{"quarter": 1, "start": "12:00", "end": "06:00"}]
+    }
+
+    gamepack_missing_id_new_team = sample_gamepack()
+    gamepack_missing_id_new_team["publicId"] = "2026-02-05-dal-gsw"
+    gamepack_missing_id_new_team["box"]["teams"]["away"]["abbr"] = "DAL"
+    gamepack_missing_id_new_team["box"]["teams"]["away"]["name"] = "Mavericks"
+    gamepack_missing_id_new_team["box"]["teams"]["away"]["players"] = [
+        {
+            "first": "Kelly",
+            "last": "Oubre Jr.",
+            "stats": {
+                "min": "28:00",
+                "pts": 18,
+                "fgm": 7,
+                "fga": 13,
+                "tpm": 1,
+                "tpa": 4,
+                "ftm": 3,
+                "fta": 4,
+                "oreb": 1,
+                "dreb": 3,
+                "ast": 2,
+                "stl": 1,
+                "blk": 0,
+                "to": 1,
+                "pf": 2,
+                "pm": 3,
+            },
+        }
+    ]
+    gamepack_missing_id_new_team["flow"]["players"]["away"] = {
+        "Kelly Oubre Jr.": [
+            {"quarter": 1, "time": "11:00", "type": "2pt", "text": "Kelly Oubre Jr. make 2pt jumper", "seq": 1, "r": "m"}
+        ]
+    }
+    gamepack_missing_id_new_team["flow"]["segments"]["away"] = {
+        "Kelly Oubre Jr.": [{"quarter": 1, "start": "12:00", "end": "06:00"}]
+    }
+
+    registry = module.build_identity_registry([gamepack_with_phi_id, gamepack_missing_id_new_team])
+    derived = module.derive_game_artifacts(
+        gamepack=gamepack_missing_id_new_team,
+        root_prefix="data/",
+        gamepack_prefix="gamepack/",
+        page_prefix="pages/",
+        identity_registry=registry,
+    )
+
+    oubre = next(item for item in derived["players"] if item["player"]["name"] == "Kelly Oubre Jr.")
+    assert oubre["player"]["id"] == 1629008
+    assert oubre["player"]["key"] == "1629008"
+    assert oubre["row"]["playerId"] == 1629008

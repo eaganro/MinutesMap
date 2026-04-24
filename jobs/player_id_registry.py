@@ -56,7 +56,7 @@ def player_full_name(player):
 def build_identity_registry(gamepacks):
     by_team_name = {}
     by_name_counts = Counter()
-    by_name_id = {}
+    by_name_ids = {}
 
     for gamepack in gamepacks or []:
         teams = (((gamepack or {}).get("box") or {}).get("teams") or {})
@@ -71,12 +71,12 @@ def build_identity_registry(gamepacks):
                 normalized = normalize_player_name(name)
                 by_team_name[(team_abbr, normalized)] = player_id
                 by_name_counts[normalized] += 1
-                by_name_id[normalized] = player_id
+                by_name_ids.setdefault(normalized, set()).add(player_id)
 
     unique_by_name = {
-        name: by_name_id[name]
-        for name, count in by_name_counts.items()
-        if count == 1 and name in by_name_id
+        name: next(iter(ids))
+        for name, ids in by_name_ids.items()
+        if len(ids) == 1
     }
     return {
         "byTeamName": by_team_name,

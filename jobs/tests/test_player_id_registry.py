@@ -46,3 +46,41 @@ def test_resolve_player_id_prefers_team_name_match_then_unique_name():
         "PHI",
         registry,
     ) == 203954
+
+
+def test_registry_keeps_global_name_match_when_same_id_appears_on_multiple_teams():
+    registry = module.build_identity_registry(
+        [
+            {
+                "box": {
+                    "teams": {
+                        "away": {
+                            "abbr": "PHI",
+                            "players": [{"id": 1629008, "first": "Kelly", "last": "Oubre Jr."}],
+                        },
+                        "home": {"abbr": "BOS", "players": []},
+                    }
+                }
+            },
+            {
+                "box": {
+                    "teams": {
+                        "away": {
+                            "abbr": "DAL",
+                            "players": [{"id": 1629008, "first": "Kelly", "last": "Oubre Jr."}],
+                        },
+                        "home": {"abbr": "LAL", "players": []},
+                    }
+                }
+            },
+        ]
+    )
+
+    assert registry["byTeamName"][("PHI", "kelly oubre jr.")] == 1629008
+    assert registry["byTeamName"][("DAL", "kelly oubre jr.")] == 1629008
+    assert registry["uniqueByName"]["kelly oubre jr."] == 1629008
+    assert module.resolve_player_id(
+        {"first": "Kelly", "last": "Oubre Jr."},
+        "MIA",
+        registry,
+    ) == 1629008
