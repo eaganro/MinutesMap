@@ -394,6 +394,11 @@ def test_upsert_and_recalc_artifacts_are_idempotent():
     assert len(team_artifact["games"]) == 1
     assert team_artifact["record"] == {"wins": 1, "losses": 0, "ties": 0}
     assert team_artifact["games"][0]["recordAfter"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert len(team_artifact["players"]) == 2
+    assert team_artifact["players"][0]["name"] == "Tyrese Maxey"
+    assert team_artifact["players"][0]["games"] == 1
+    assert team_artifact["players"][0]["box"]["pts"] == 27
+    assert team_artifact["players"][0]["averages"]["pts"] == 27.0
 
     player_item = next(item for item in derived["players"] if item["player"]["name"] == "Tyrese Maxey")
     player_artifact = module.init_player_artifact(player_item["player"], player_item["season"])
@@ -520,3 +525,40 @@ def test_identity_registry_recovers_same_player_after_team_change():
     assert oubre["player"]["id"] == 1629008
     assert oubre["player"]["key"] == "1629008"
     assert oubre["row"]["playerId"] == 1629008
+
+
+def test_teams_only_flag_skips_player_artifacts():
+    derived = module.derive_game_artifacts(
+        gamepack=sample_gamepack(),
+        root_prefix="data/",
+        gamepack_prefix="gamepack/",
+        page_prefix="pages/",
+        identity_registry=module.build_identity_registry([sample_gamepack()]),
+    )
+
+    team_cache = {}
+    player_cache = {}
+    teams_only = True
+
+    for item in derived["teams"]:
+        key = module.season_key_for_team("pages/", item["team"]["abbr"], item["season"])
+        artifact = team_cache.setdefault(key, module.init_team_artifact(item["team"], item["season"]))
+        artifact["games"] = module.upsert_game_row(artifact.get("games"), item["row"])
+        module.recalc_team_artifact(artifact)
+
+    if not teams_only:
+        for item in derived["players"]:
+            _, artifact = module.load_or_init_player_artifact(
+                player_cache,
+                s3_client=None,
+                bucket=args.bucket,
+                root_prefix=args.prefix,
+                season_key=item["seasonKey"],
+                player=item["player"],
+                season=item["season"],
+            )
+            artifact["games"] = module.upsert_game_row(artifact.get("games"), item["row"])
+            module.recalc_player_artifact(artifact)
+
+    assert len(team_cache) == 2
+    assert player_cache == {}

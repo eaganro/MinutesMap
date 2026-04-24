@@ -238,6 +238,24 @@ def _aggregate_team_player_stats(players):
     return totals
 
 
+def _build_team_player_rows(players):
+    rows = []
+    for player in players or []:
+        name = _player_full_name(player)
+        player_id = _safe_int(player.get("id")) or None
+        if not name and player_id is None:
+            continue
+        rows.append(
+            {
+                "playerId": player_id,
+                "name": name,
+                "box": _build_player_box_stats(player),
+            }
+        )
+    rows.sort(key=lambda item: (item.get("name") or "", item.get("playerId") or 0))
+    return rows
+
+
 def _pick_team_leader(players, stat_key):
     best = None
     for player in players or []:
@@ -286,6 +304,7 @@ def _build_team_game_row(*, season, game_id, nba_game_id, start, date_str, side,
             "reb": _pick_team_leader(team_players, "reb"),
             "ast": _pick_team_leader(team_players, "ast"),
         },
+        "players": _build_team_player_rows(team_players),
         "playerCount": sum(1 for player in team_players or [] if _player_full_name(player)),
         "gamepackKey": gamepack_key,
     }
@@ -351,6 +370,7 @@ def _average_numeric_fields(totals, games_played, exclude=None):
 def _recalc_team_artifact(artifact):
     games = list(artifact.get("games") or [])
     totals = Counter()
+    players = {}
     wins = losses = ties = 0
     running_wins = running_losses = running_ties = 0
     for game in games:
@@ -369,10 +389,52 @@ def _recalc_team_artifact(artifact):
         totals["pointsAgainst"] += _safe_int(game.get("oppScore"))
         for key, value in ((game.get("teamStats") or {}).items()):
             totals[key] += _safe_int(value)
+        for player in game.get("players") or []:
+            player_id = _safe_int(player.get("playerId")) or None
+            name = str(player.get("name") or "").strip()
+            player_key = player_id if player_id is not None else f"name:{name.lower()}"
+            if player_key not in players:
+                players[player_key] = {
+                    "playerId": player_id,
+                    "name": name,
+                    "games": 0,
+                    "box": Counter(),
+                }
+            entry = players[player_key]
+            entry["games"] += 1
+            for key, value in ((player.get("box") or {}).items()):
+                if key == "min":
+                    continue
+                entry["box"][key] += _safe_int(value)
     totals_dict = dict(totals)
     if "seconds" in totals_dict:
         totals_dict["min"] = _seconds_to_clock(totals_dict["seconds"])
     artifact["games"] = games
+    season_players = []
+    for entry in players.values():
+        box_totals = dict(entry["box"])
+        if "seconds" in box_totals:
+            box_totals["min"] = _seconds_to_clock(box_totals["seconds"])
+        averages = _average_numeric_fields(box_totals, entry["games"], exclude={"seconds"})
+        if "seconds" in box_totals and entry["games"]:
+            averages["min"] = _seconds_to_clock(_safe_int(round(box_totals["seconds"] / entry["games"])))
+        season_players.append(
+            {
+                "playerId": entry["playerId"],
+                "name": entry["name"],
+                "games": entry["games"],
+                "box": box_totals,
+                "averages": averages,
+            }
+        )
+    season_players.sort(
+        key=lambda item: (
+            -_safe_int((item.get("box") or {}).get("pts")),
+            -(item.get("games") or 0),
+            item.get("name") or "",
+        )
+    )
+    artifact["players"] = season_players
     artifact["record"] = {"wins": wins, "losses": losses, "ties": ties}
     artifact["totals"] = totals_dict
     artifact["averages"] = _average_numeric_fields(totals_dict, len(games), exclude={"seconds"})
@@ -427,6 +489,7 @@ def _init_team_artifact(team, season):
         "season": season,
         "team": {"id": _safe_int(team.get("id")), "abbr": team.get("abbr"), "name": team.get("name")},
         "games": [],
+        "players": [],
         "record": {"wins": 0, "losses": 0, "ties": 0},
         "totals": {},
         "averages": {},

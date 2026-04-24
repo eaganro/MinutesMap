@@ -90,6 +90,11 @@ def parse_args():
         help="Store only per-game summaries in player season files (omit actions/segments).",
     )
     parser.add_argument(
+        "--teams-only",
+        action="store_true",
+        help="Update only team season files and skip player season files.",
+    )
+    parser.add_argument(
         "--include-non-final",
         action="store_true",
         help="Process games even when schedule status is not final.",
@@ -570,6 +575,24 @@ def aggregate_team_player_stats(players):
     return totals
 
 
+def build_team_player_rows(players):
+    rows = []
+    for player in players or []:
+        name = player_full_name(player)
+        player_id = safe_int(player.get("id")) or None
+        if not name and player_id is None:
+            continue
+        rows.append(
+            {
+                "playerId": player_id,
+                "name": name,
+                "box": build_player_box_stats(player),
+            }
+        )
+    rows.sort(key=lambda item: (item.get("name") or "", item.get("playerId") or 0))
+    return rows
+
+
 def pick_team_leader(players, stat_key):
     best = None
     for player in players or []:
@@ -619,6 +642,7 @@ def build_team_game_row(
             "reb": pick_team_leader(team_players, "reb"),
             "ast": pick_team_leader(team_players, "ast"),
         },
+        "players": build_team_player_rows(team_players),
         "playerCount": sum(1 for player in team_players or [] if player_full_name(player)),
         "gamepackKey": gamepack_key,
     }
@@ -850,6 +874,7 @@ def init_team_artifact(team, season):
             "name": team.get("name"),
         },
         "games": [],
+        "players": [],
         "record": {"wins": 0, "losses": 0, "ties": 0},
         "totals": {},
         "averages": {},
@@ -907,6 +932,7 @@ def average_numeric_fields(totals, games_played, exclude=None):
 def recalc_team_artifact(artifact):
     games = list(artifact.get("games") or [])
     totals = Counter()
+    players = {}
     wins = losses = ties = 0
     running_wins = running_losses = running_ties = 0
     for game in games:
@@ -929,8 +955,51 @@ def recalc_team_artifact(artifact):
         totals["pointsAgainst"] += safe_int(game.get("oppScore"))
         for key, value in ((game.get("teamStats") or {}).items()):
             totals[key] += safe_int(value)
+        for player in game.get("players") or []:
+            player_id = safe_int(player.get("playerId")) or None
+            name = str(player.get("name") or "").strip()
+            player_key = player_id if player_id is not None else f"name:{name.lower()}"
+            if player_key not in players:
+                players[player_key] = {
+                    "playerId": player_id,
+                    "name": name,
+                    "games": 0,
+                    "box": Counter(),
+                }
+            entry = players[player_key]
+            entry["games"] += 1
+            for key, value in ((player.get("box") or {}).items()):
+                if key == "min":
+                    continue
+                entry["box"][key] += safe_int(value)
 
     artifact["games"] = games
+    season_players = []
+    for entry in players.values():
+        box_totals = dict(entry["box"])
+        if "seconds" in box_totals:
+            box_totals["min"] = seconds_to_clock(box_totals["seconds"])
+        season_players.append(
+            {
+                "playerId": entry["playerId"],
+                "name": entry["name"],
+                "games": entry["games"],
+                "box": box_totals,
+                "averages": average_numeric_fields(box_totals, entry["games"], exclude={"seconds"}),
+            }
+        )
+        if "seconds" in box_totals and entry["games"]:
+            season_players[-1]["averages"]["min"] = seconds_to_clock(
+                safe_int(round(box_totals["seconds"] / entry["games"]))
+            )
+    season_players.sort(
+        key=lambda item: (
+            -safe_int((item.get("box") or {}).get("pts")),
+            -(item.get("games") or 0),
+            item.get("name") or "",
+        )
+    )
+    artifact["players"] = season_players
     artifact["record"] = {"wins": wins, "losses": losses, "ties": ties}
     totals_dict = dict(totals)
     if "seconds" in totals_dict:
@@ -1172,18 +1241,19 @@ def main():
             artifact["games"] = upsert_game_row(artifact.get("games"), item["row"])
             recalc_team_artifact(artifact)
 
-        for item in derived["players"]:
-            _, artifact = load_or_init_player_artifact(
-                player_cache,
-                s3_client=s3_client,
-                bucket=args.bucket,
-                root_prefix=args.prefix,
-                season_key=item["seasonKey"],
-                player=item["player"],
-                season=item["season"],
-            )
-            artifact["games"] = upsert_game_row(artifact.get("games"), item["row"])
-            recalc_player_artifact(artifact)
+        if not args.teams_only:
+            for item in derived["players"]:
+                _, artifact = load_or_init_player_artifact(
+                    player_cache,
+                    s3_client=s3_client,
+                    bucket=args.bucket,
+                    root_prefix=args.prefix,
+                    season_key=item["seasonKey"],
+                    player=item["player"],
+                    season=item["season"],
+                )
+                artifact["games"] = upsert_game_row(artifact.get("games"), item["row"])
+                recalc_player_artifact(artifact)
 
         processed_games += 1
 
