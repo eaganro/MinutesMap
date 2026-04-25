@@ -336,11 +336,13 @@ def test_derive_game_artifacts_builds_team_and_player_rows():
     )
 
     assert derived["season"] == "2025-26"
+    assert derived["seasonType"] == "regular"
     assert len(derived["teams"]) == 2
     assert len(derived["players"]) == 3
 
     away_team = next(item for item in derived["teams"] if item["team"]["abbr"] == "PHI")
     assert away_team["row"]["result"] == "W"
+    assert away_team["row"]["seasonType"] == "regular"
     assert away_team["row"]["teamScore"] == 112
     assert away_team["row"]["opponentAbbr"] == "GSW"
     assert away_team["row"]["gamepackKey"] == "data/gamepack/2026-02-03-phi-gsw.json.gz"
@@ -348,6 +350,7 @@ def test_derive_game_artifacts_builds_team_and_player_rows():
     maxey = next(item for item in derived["players"] if item["player"]["name"] == "Tyrese Maxey")
     assert maxey["seasonKey"] == "pages/players/201939/2025-26.json"
     assert maxey["row"]["teamAbbr"] == "PHI"
+    assert maxey["row"]["seasonType"] == "regular"
     assert "pbp" not in maxey["row"]
     assert maxey["row"]["playerId"] == 201939
     assert maxey["row"]["playerKey"] == "201939"
@@ -394,6 +397,9 @@ def test_upsert_and_recalc_artifacts_are_idempotent():
     assert len(team_artifact["games"]) == 1
     assert team_artifact["record"] == {"wins": 1, "losses": 0, "ties": 0}
     assert team_artifact["games"][0]["recordAfter"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert team_artifact["games"][0]["recordAfterBySeasonType"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert team_artifact["bySeasonType"]["regular"]["record"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert team_artifact["bySeasonType"]["regular"]["averages"]["pointsFor"] == 112.0
     assert len(team_artifact["players"]) == 2
     assert team_artifact["players"][0]["name"] == "Tyrese Maxey"
     assert team_artifact["players"][0]["games"] == 1
@@ -410,6 +416,8 @@ def test_upsert_and_recalc_artifacts_are_idempotent():
     assert player_artifact["totals"]["games"] == 1
     assert player_artifact["record"] == {"wins": 1, "losses": 0, "ties": 0}
     assert player_artifact["totals"]["box"]["pts"] == 27
+    assert player_artifact["bySeasonType"]["regular"]["totals"]["box"]["pts"] == 27
+    assert player_artifact["bySeasonType"]["regular"]["averages"]["box"]["pts"] == 27.0
     assert "pbp" not in player_artifact["totals"]
     assert "pbp" not in player_artifact["averages"]
     assert len(player_artifact["games"][0]["detail"]["actions"]) == 4

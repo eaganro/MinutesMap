@@ -147,12 +147,21 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
         gamepack=gamepack,
     )
 
-    assert result == {"teamFiles": 2, "playerFiles": 2, "gameId": "2026-02-03-phi-gsw", "season": "2025-26"}
+    assert result == {
+        "teamFiles": 2,
+        "playerFiles": 2,
+        "gameId": "2026-02-03-phi-gsw",
+        "season": "2025-26",
+        "seasonType": "regular",
+    }
 
     player_key = ("test-bucket", "data/pages/players/201939/2025-26.json.gz")
     player_artifact = json.loads(gzip.decompress(s3.objects[player_key]).decode("utf-8"))
     assert player_artifact["player"]["name"] == "Tyrese Maxey"
     assert player_artifact["games"][0]["gameId"] == "2026-02-03-phi-gsw"
+    assert player_artifact["games"][0]["seasonType"] == "regular"
+    assert player_artifact["bySeasonType"]["regular"]["totals"]["games"] == 1
+    assert player_artifact["bySeasonType"]["regular"]["averages"]["box"]["pts"] == 27.0
     assert len(player_artifact["games"][0]["detail"]["actions"]) == 1
     assert len(player_artifact["games"][0]["detail"]["segments"]) == 1
 
@@ -160,6 +169,10 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
     team_artifact = json.loads(gzip.decompress(s3.objects[team_key]).decode("utf-8"))
     assert team_artifact["team"]["abbr"] == "PHI"
     assert team_artifact["games"][0]["gameId"] == "2026-02-03-phi-gsw"
+    assert team_artifact["games"][0]["seasonType"] == "regular"
+    assert team_artifact["games"][0]["recordAfterBySeasonType"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert team_artifact["bySeasonType"]["regular"]["record"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert team_artifact["bySeasonType"]["regular"]["averages"]["pointsFor"] == 112.0
     assert len(team_artifact["players"]) == 1
     assert team_artifact["players"][0]["playerId"] == 201939
     assert team_artifact["players"][0]["name"] == "Tyrese Maxey"

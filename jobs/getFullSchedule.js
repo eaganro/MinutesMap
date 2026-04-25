@@ -43,6 +43,43 @@ function buildGameSlug(dateStr, awayTeam, homeTeam, fallbackId) {
   return fallbackId ? String(fallbackId) : null;
 }
 
+function normalizeSeasonType(value) {
+  const text = String(value ?? '').trim().toLowerCase();
+  if (!text) return null;
+  const normalized = text.replace(/[-\s]+/g, '_');
+  if (['preseason', 'regular', 'play_in', 'playoffs'].includes(normalized)) {
+    return normalized;
+  }
+  const compact = text.replace(/[^a-z0-9]/g, '');
+  if (compact.includes('preseason')) return 'preseason';
+  if (compact.includes('playin')) return 'play_in';
+  if (compact.includes('playoff') || compact.includes('postseason')) return 'playoffs';
+  if (compact.includes('regular')) return 'regular';
+  return null;
+}
+
+function seasonTypeFromGameId(gameId) {
+  const raw = String(gameId ?? '').trim();
+  const prefix = raw.slice(0, 3);
+  if (prefix === '001') return 'preseason';
+  if (prefix === '002') return 'regular';
+  if (prefix === '004') return 'playoffs';
+  if (prefix === '005') return 'play_in';
+  return null;
+}
+
+function deriveSeasonType(game) {
+  return (
+    seasonTypeFromGameId(game?.gameId) ||
+    normalizeSeasonType(game?.seasonType) ||
+    normalizeSeasonType(game?.gameType) ||
+    normalizeSeasonType(game?.gameLabel) ||
+    normalizeSeasonType(game?.gameSubLabel) ||
+    normalizeSeasonType(game?.seriesText) ||
+    'regular'
+  );
+}
+
 // async function fetchAllGamesFromSchedule() {
 //   console.log(`Fetching league schedule: ${SCHEDULE_URL}`);
 //   const res = await fetch(SCHEDULE_URL);
@@ -155,6 +192,7 @@ async function fetchAllGamesFromSchedule() {
         time:       '', 
         homerecord: `${home.wins ?? 0}-${home.losses ?? 0}`,
         awayrecord: `${away.wins ?? 0}-${away.losses ?? 0}`,
+        seasonType: deriveSeasonType(g),
         label:      g.gameLabel || '',       
         sublabel:   g.gameSubLabel || '',    
         isNeutral:  !!g.isNeutral,
@@ -185,6 +223,7 @@ async function putGameIfAbsent(game) {
     clock:      game.clock,
     homerecord: game.homerecord,
     awayrecord: game.awayrecord,
+    seasonType: game.seasonType,
     // Optional extras
     label:      game.label,
     sublabel:   game.sublabel,

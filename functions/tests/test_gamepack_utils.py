@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "functions" / "nba-game-poller"))
 
-from nba_game_poller.gamepack_utils import build_team_payload  # noqa: E402
+from nba_game_poller.gamepack_utils import build_box_payload, build_team_payload  # noqa: E402
 
 
 def test_build_team_payload_excludes_zero_minute_players():
@@ -55,3 +55,16 @@ def test_build_team_payload_excludes_zero_minute_players():
     assert payload["abbr"] == "PHI"
     assert [player["id"] for player in payload["players"]] == [1, 3]
     assert [player["stats"]["min"] for player in payload["players"]] == ["33:42", "31:00"]
+
+
+def test_build_box_payload_adds_canonical_season_type_from_game_id():
+    payload = build_box_payload(
+        {
+            "gameId": "0052500001",
+            "gameTimeUTC": "2026-04-15T23:00:00Z",
+            "awayTeam": {"teamId": 1, "teamTricode": "ATL", "teamName": "Hawks", "players": []},
+            "homeTeam": {"teamId": 2, "teamTricode": "MIA", "teamName": "Heat", "players": []},
+        }
+    )
+
+    assert payload["seasonType"] == "play_in"

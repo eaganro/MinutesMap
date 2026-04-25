@@ -235,7 +235,23 @@ class TestNbaGamePollerLambda:
         self.module.upload_json_to_s3.assert_called_once()
         self.module.update_page_artifacts_for_gamepack.assert_called_once()
         uploaded_gamepack = self.module.upload_json_to_s3.call_args.kwargs["data"]
+        assert uploaded_gamepack["seasonType"] == "regular"
         assert self.module.update_page_artifacts_for_gamepack.call_args.kwargs["gamepack"] == uploaded_gamepack
+
+    def test_build_schedule_item_from_feed_adds_canonical_season_type(self):
+        item = self.module.build_schedule_item_from_feed(
+            game={
+                "gameId": "0042500123",
+                "gameStatusText": "Scheduled",
+                "homeTeam": {"teamTricode": "BOS"},
+                "awayTeam": {"teamTricode": "NYK"},
+            },
+            game_id="0042500123",
+            date_str="2026-05-01",
+            starttime="2026-05-01T19:30:00",
+        )
+
+        assert item["seasonType"] == "playoffs"
 
     def test_process_game_enqueues_caption_worker_at_halftime_checkpoint(self):
         game_item = {

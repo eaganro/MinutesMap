@@ -1,3 +1,6 @@
+from nba_game_poller.season_types import derive_season_type
+
+
 def safe_int(value):
     if value is None:
         return 0
@@ -110,6 +113,7 @@ def build_box_payload(box_game):
             or box_game.get("gameTimeUTC")
             or box_game.get("gameDateTimeUTC")
         ),
+        "seasonType": derive_season_type(box_game, nba_game_id=box_game.get("gameId")),
         "teams": {
             "away": build_team_payload(box_game.get("awayTeam")),
             "home": build_team_payload(box_game.get("homeTeam")),

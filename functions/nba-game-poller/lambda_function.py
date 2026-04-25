@@ -25,6 +25,7 @@ from nba_game_poller.gamepack_utils import (
     extract_oncourt_ids,
     extract_oncourt_names,
 )
+from nba_game_poller.season_types import derive_season_type
 from nba_game_poller.captioning import (
     build_period_captions,
     extract_closed_periods,
@@ -601,6 +602,7 @@ def process_game(game_item, user_agent=None, date_str=None):
     play_final_away_score = None
     processed = None
     slim_box = None
+    season_type = derive_season_type(game_item, nba_game_id=nba_game_id)
     actions = []
     last_action = None
     existing_gamepack = None
@@ -685,6 +687,7 @@ def process_game(game_item, user_agent=None, date_str=None):
         is_game_final = status_text.startswith('Final')
 
         slim_box = build_box_payload(box_game)
+        season_type = derive_season_type(game_item, box_game, nba_game_id=nba_game_id)
 
         # Cache stable IDs so play-by-play processing can run even if boxscore is a 304 later.
         home_team_id = box_game.get("homeTeam", {}).get("teamId") or box_game.get("homeTeamId")
@@ -701,6 +704,7 @@ def process_game(game_item, user_agent=None, date_str=None):
             'awayrecord': f"{box_game.get('awayTeam', {}).get('wins','0')}-{box_game.get('awayTeam', {}).get('losses','0')}",
             'homeTeamId': home_team_id,
             'awayTeamId': away_team_id,
+            'seasonType': season_type,
         })
 
     # If the play feed ended but box status regressed (or lags), promote schedule state to Final.
@@ -806,6 +810,7 @@ def process_game(game_item, user_agent=None, date_str=None):
                 "v": 1,
                 "id": nba_game_id,
                 "publicId": game_key,
+                "seasonType": season_type,
                 "box": slim_box,
                 "flow": processed,
             }
@@ -1643,6 +1648,7 @@ def build_schedule_item_from_feed(*, game, game_id, date_str, starttime):
         "time": trim_clock_value(game.get("gameClock", "") or ""),
         "homerecord": f"{home.get('wins') or 0}-{home.get('losses') or 0}",
         "awayrecord": f"{away.get('wins') or 0}-{away.get('losses') or 0}",
+        "seasonType": derive_season_type(game, nba_game_id=game_id),
     }
 
     home_team_id = home.get("teamId") or game.get("homeTeamId")
