@@ -195,6 +195,11 @@ def is_final_schedule_game(game):
     return status.startswith("final")
 
 
+def is_cancelled_schedule_game(game):
+    status = str((game or {}).get("status") or "").strip().lower()
+    return status.startswith(("postponed", "cancelled", "canceled", "ppd"))
+
+
 def safe_int(value):
     if value in (None, ""):
         return 0
@@ -263,6 +268,35 @@ def clock_to_seconds(value):
 
 def iso_utc_now():
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_iso_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def is_future_schedule_game(game, *, now=None):
+    if not isinstance(game, dict) or is_final_schedule_game(game) or is_cancelled_schedule_game(game):
+        return False
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    start = parse_iso_datetime(game.get("starttime"))
+    if start:
+        return start > now
+    game_date = parse_date(game.get("date"))
+    if game_date:
+        return game_date > now.date()
+    return False
 
 
 def derive_season_label(date_str):
@@ -651,6 +685,100 @@ def build_team_game_row(
     }
 
 
+def build_scheduled_team_game_row(
+    *,
+    season,
+    season_type,
+    schedule_game,
+    side,
+    opponent,
+):
+    if side == "home":
+        team_score = safe_int(schedule_game.get("homescore"))
+        opp_score = safe_int(schedule_game.get("awayscore"))
+    else:
+        team_score = safe_int(schedule_game.get("awayscore"))
+        opp_score = safe_int(schedule_game.get("homescore"))
+    return {
+        "gameId": str(schedule_game.get("id") or "").strip(),
+        "nbaGameId": str(schedule_game.get("nbaGameId") or "").strip(),
+        "date": str(schedule_game.get("date") or "").strip(),
+        "start": str(schedule_game.get("starttime") or "").strip() or None,
+        "homeAway": side,
+        "season": season,
+        "seasonType": season_type,
+        "opponentId": safe_int(opponent.get("id")),
+        "opponentAbbr": opponent.get("abbr"),
+        "opponentName": opponent.get("name"),
+        "status": str(schedule_game.get("status") or "").strip(),
+        "played": False,
+        "result": None,
+        "teamScore": team_score,
+        "oppScore": opp_score,
+        "teamStats": {},
+        "leaders": {},
+        "players": [],
+        "playerCount": 0,
+        "gamepackKey": None,
+    }
+
+
+def derive_scheduled_team_artifacts(schedule_game):
+    if not isinstance(schedule_game, dict):
+        return []
+    game_id = str(schedule_game.get("id") or "").strip()
+    date_str = str(schedule_game.get("date") or "").strip()
+    start = str(schedule_game.get("starttime") or "").strip()
+    if not date_str and start:
+        date_str = start[:10]
+    if not game_id or not date_str:
+        return []
+    away_abbr = str(schedule_game.get("awayteam") or "").strip().upper()
+    home_abbr = str(schedule_game.get("hometeam") or "").strip().upper()
+    if not away_abbr or not home_abbr:
+        return []
+    season = derive_season_label(date_str)
+    season_type = derive_season_type(
+        schedule_game,
+        nba_game_id=schedule_game.get("nbaGameId"),
+    )
+    away_team = {
+        "id": safe_int(schedule_game.get("awayTeamId")),
+        "abbr": away_abbr,
+        "name": "",
+    }
+    home_team = {
+        "id": safe_int(schedule_game.get("homeTeamId")),
+        "abbr": home_abbr,
+        "name": "",
+    }
+    schedule_game = {**schedule_game, "date": date_str}
+    return [
+        {
+            "team": away_team,
+            "season": season,
+            "row": build_scheduled_team_game_row(
+                season=season,
+                season_type=season_type,
+                schedule_game=schedule_game,
+                side="away",
+                opponent=home_team,
+            ),
+        },
+        {
+            "team": home_team,
+            "season": season,
+            "row": build_scheduled_team_game_row(
+                season=season,
+                season_type=season_type,
+                schedule_game=schedule_game,
+                side="home",
+                opponent=away_team,
+            ),
+        },
+    ]
+
+
 def season_key_for_player(page_prefix, player_id, season):
     return f"{page_prefix}players/{player_id}/{season}.json"
 
@@ -953,6 +1081,10 @@ def game_season_type(game):
     return derive_season_type(game, nba_game_id=(game or {}).get("nbaGameId"))
 
 
+def is_played_team_game(game):
+    return not (isinstance(game, dict) and game.get("played") is False)
+
+
 def new_team_split_bucket():
     return {
         "games": 0,
@@ -1076,6 +1208,14 @@ def recalc_team_artifact(artifact):
     for game in games:
         season_type = game_season_type(game)
         game["seasonType"] = season_type
+        if not is_played_team_game(game):
+            game["recordAfter"] = {
+                "wins": running_wins,
+                "losses": running_losses,
+                "ties": running_ties,
+            }
+            game["recordAfterBySeasonType"] = None
+            continue
         split = by_season_type.setdefault(season_type, new_team_split_bucket())
         split["games"] += 1
         result = game.get("result")
@@ -1121,12 +1261,12 @@ def recalc_team_artifact(artifact):
     artifact["totals"] = totals_dict
     artifact["averages"] = average_numeric_fields(
         totals_dict,
-        len(games),
+        wins + losses + ties,
         exclude={"seconds"},
     )
-    if "seconds" in totals_dict and games:
+    if "seconds" in totals_dict and wins + losses + ties:
         artifact["averages"]["min"] = seconds_to_clock(
-            safe_int(round(totals_dict["seconds"] / len(games)))
+            safe_int(round(totals_dict["seconds"] / (wins + losses + ties)))
         )
     artifact["bySeasonType"] = {
         season_type: finalize_team_split(bucket)
@@ -1210,6 +1350,35 @@ def recalc_player_artifact(artifact):
     return artifact
 
 
+def collect_date_targets(args, s3_client, schedule_prefix, *, include_game_key_dates=False):
+    if args.date:
+        date_targets = [args.date]
+    elif args.start_date and args.end_date:
+        date_targets = expand_date_range(args.start_date, args.end_date)
+    elif args.all_s3:
+        date_targets = list_schedule_dates_from_s3(s3_client, args.bucket, schedule_prefix)
+    else:
+        date_targets = []
+
+    if include_game_key_dates:
+        for game_key in args.game_key or []:
+            game_date = extract_date_from_game_key(str(game_key or "").strip())
+            if game_date:
+                date_targets.append(game_date)
+
+    deduped = []
+    seen = set()
+    for date_str in date_targets:
+        if date_str in seen:
+            continue
+        seen.add(date_str)
+        deduped.append(date_str)
+
+    if args.max_dates is not None:
+        deduped = deduped[: max(0, args.max_dates)]
+    return deduped
+
+
 def collect_targets(args, s3_client, schedule_prefix):
     game_targets = []
     schedule_cache = {}
@@ -1261,18 +1430,7 @@ def collect_targets(args, s3_client, schedule_prefix):
                 continue
         game_targets.append({"gameKey": normalized, "date": game_date, "scheduleGame": schedule_game})
 
-    date_targets = []
-    if args.date:
-        date_targets = [args.date]
-    elif args.start_date and args.end_date:
-        date_targets = expand_date_range(args.start_date, args.end_date)
-    elif args.all_s3:
-        date_targets = list_schedule_dates_from_s3(s3_client, args.bucket, schedule_prefix)
-
-    if args.max_dates is not None:
-        date_targets = date_targets[: max(0, args.max_dates)]
-
-    for date_str in date_targets:
+    for date_str in collect_date_targets(args, s3_client, schedule_prefix):
         add_date(date_str)
 
     deduped = []
@@ -1284,6 +1442,21 @@ def collect_targets(args, s3_client, schedule_prefix):
         seen.add(game_key)
         deduped.append(target)
     return deduped
+
+
+def collect_future_team_items(args, s3_client, schedule_prefix, *, now=None):
+    items = []
+    seen = set()
+    for date_str in collect_date_targets(args, s3_client, schedule_prefix, include_game_key_dates=True):
+        for schedule_game in load_schedule_from_s3(s3_client, args.bucket, date_str, schedule_prefix):
+            game_id = str((schedule_game or {}).get("id") or "").strip()
+            if not game_id or game_id in seen:
+                continue
+            if not is_future_schedule_game(schedule_game, now=now):
+                continue
+            seen.add(game_id)
+            items.extend(derive_scheduled_team_artifacts(schedule_game))
+    return items
 
 
 def load_or_init_team_artifact(cache, *, s3_client, bucket, root_prefix, page_prefix, team, season):
@@ -1324,7 +1497,8 @@ def main():
 
     s3_client = boto3.client("s3", region_name=args.region)
     targets = collect_targets(args, s3_client, args.schedule_prefix)
-    if not targets:
+    future_team_items = collect_future_team_items(args, s3_client, args.schedule_prefix)
+    if not targets and not future_team_items:
         print("No game targets to process.")
         return 0
 
@@ -1392,6 +1566,21 @@ def main():
                 recalc_player_artifact(artifact)
 
         processed_games += 1
+
+    for item in future_team_items:
+        team = item["team"]
+        season = item["season"]
+        _, artifact = load_or_init_team_artifact(
+            team_cache,
+            s3_client=s3_client,
+            bucket=args.bucket,
+            root_prefix=args.prefix,
+            page_prefix=args.page_prefix,
+            team=team,
+            season=season,
+        )
+        artifact["games"] = upsert_game_row(artifact.get("games"), item["row"])
+        recalc_team_artifact(artifact)
 
     if args.dry_run:
         print(

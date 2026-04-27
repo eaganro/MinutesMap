@@ -382,6 +382,10 @@ def _game_season_type(game):
     return derive_season_type(game, nba_game_id=(game or {}).get("nbaGameId"))
 
 
+def _is_played_team_game(game):
+    return not (isinstance(game, dict) and game.get("played") is False)
+
+
 def _new_team_split_bucket():
     return {
         "games": 0,
@@ -499,6 +503,10 @@ def _recalc_team_artifact(artifact):
     for game in games:
         season_type = _game_season_type(game)
         game["seasonType"] = season_type
+        if not _is_played_team_game(game):
+            game["recordAfter"] = {"wins": running_wins, "losses": running_losses, "ties": running_ties}
+            game["recordAfterBySeasonType"] = None
+            continue
         split = by_season_type.setdefault(season_type, _new_team_split_bucket())
         split["games"] += 1
         result = game.get("result")
@@ -537,9 +545,10 @@ def _recalc_team_artifact(artifact):
     artifact["players"] = _team_players_summary(players)
     artifact["record"] = {"wins": wins, "losses": losses, "ties": ties}
     artifact["totals"] = totals_dict
-    artifact["averages"] = _average_numeric_fields(totals_dict, len(games), exclude={"seconds"})
-    if "seconds" in totals_dict and games:
-        artifact["averages"]["min"] = _seconds_to_clock(_safe_int(round(totals_dict["seconds"] / len(games))))
+    played_games = wins + losses + ties
+    artifact["averages"] = _average_numeric_fields(totals_dict, played_games, exclude={"seconds"})
+    if "seconds" in totals_dict and played_games:
+        artifact["averages"]["min"] = _seconds_to_clock(_safe_int(round(totals_dict["seconds"] / played_games)))
     artifact["bySeasonType"] = {
         season_type: _finalize_team_split(bucket)
         for season_type, bucket in sorted(by_season_type.items(), key=_season_type_sort_key)

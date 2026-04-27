@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -421,6 +422,55 @@ def test_upsert_and_recalc_artifacts_are_idempotent():
     assert "pbp" not in player_artifact["totals"]
     assert "pbp" not in player_artifact["averages"]
     assert len(player_artifact["games"][0]["detail"]["actions"]) == 4
+
+
+def test_future_schedule_games_are_included_without_affecting_team_stats():
+    derived = module.derive_game_artifacts(
+        gamepack=sample_gamepack(),
+        root_prefix="data/",
+        gamepack_prefix="gamepack/",
+        page_prefix="pages/",
+        identity_registry=module.build_identity_registry([sample_gamepack()]),
+    )
+    team_item = next(item for item in derived["teams"] if item["team"]["abbr"] == "PHI")
+    artifact = module.init_team_artifact(team_item["team"], team_item["season"])
+    artifact["games"] = module.upsert_game_row(artifact["games"], team_item["row"])
+
+    schedule_game = {
+        "id": "2026-02-10-phi-lal",
+        "nbaGameId": "0022500100",
+        "date": "2026-02-10",
+        "starttime": "2026-02-10T22:00:00-05:00",
+        "awayteam": "PHI",
+        "hometeam": "LAL",
+        "awayTeamId": 1610612755,
+        "homeTeamId": 1610612747,
+        "awayscore": 0,
+        "homescore": 0,
+        "status": "Scheduled",
+        "seasonType": "regular",
+    }
+    assert module.is_future_schedule_game(
+        schedule_game,
+        now=datetime(2026, 2, 9, tzinfo=timezone.utc),
+    )
+    scheduled_item = next(
+        item for item in module.derive_scheduled_team_artifacts(schedule_game) if item["team"]["abbr"] == "PHI"
+    )
+    artifact["games"] = module.upsert_game_row(artifact["games"], scheduled_item["row"])
+    module.recalc_team_artifact(artifact)
+
+    assert [game["gameId"] for game in artifact["games"]] == [
+        "2026-02-03-phi-gsw",
+        "2026-02-10-phi-lal",
+    ]
+    assert artifact["games"][1]["played"] is False
+    assert artifact["games"][1]["recordAfter"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert artifact["games"][1]["recordAfterBySeasonType"] is None
+    assert artifact["record"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert artifact["bySeasonType"]["regular"]["games"] == 1
+    assert artifact["averages"]["pointsFor"] == 112.0
+    assert len(artifact["players"]) == 2
 
 
 def test_identity_registry_recovers_missing_player_ids_from_other_games():

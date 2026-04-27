@@ -10,7 +10,7 @@ from botocore.exceptions import ClientError
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "functions" / "nba-game-poller"))
 
-from nba_game_poller.page_artifacts import update_page_artifacts_for_gamepack  # noqa: E402
+from nba_game_poller.page_artifacts import _recalc_team_artifact, update_page_artifacts_for_gamepack  # noqa: E402
 
 
 class FakeS3:
@@ -178,3 +178,45 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
     assert team_artifact["players"][0]["name"] == "Tyrese Maxey"
     assert team_artifact["players"][0]["games"] == 1
     assert team_artifact["players"][0]["box"]["pts"] == 27
+
+
+def test_team_recalc_ignores_unplayed_schedule_rows():
+    artifact = {
+        "games": [
+            {
+                "gameId": "2026-02-03-phi-gsw",
+                "nbaGameId": "0022500003",
+                "date": "2026-02-03",
+                "start": "2026-02-03T22:10:00Z",
+                "seasonType": "regular",
+                "result": "W",
+                "teamScore": 112,
+                "oppScore": 108,
+                "teamStats": {"pts": 112, "seconds": 14400},
+                "players": [{"playerId": 201939, "name": "Tyrese Maxey", "box": {"pts": 27}}],
+            },
+            {
+                "gameId": "2026-02-10-phi-lal",
+                "nbaGameId": "0022500100",
+                "date": "2026-02-10",
+                "start": "2026-02-10T22:00:00Z",
+                "seasonType": "regular",
+                "status": "Scheduled",
+                "played": False,
+                "result": None,
+                "teamScore": 0,
+                "oppScore": 0,
+                "teamStats": {},
+                "players": [],
+            },
+        ]
+    }
+
+    _recalc_team_artifact(artifact)
+
+    assert artifact["record"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert artifact["games"][1]["recordAfter"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert artifact["games"][1]["recordAfterBySeasonType"] is None
+    assert artifact["bySeasonType"]["regular"]["games"] == 1
+    assert artifact["averages"]["pointsFor"] == 112.0
+    assert artifact["players"][0]["games"] == 1
