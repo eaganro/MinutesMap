@@ -1524,9 +1524,8 @@ def reconcile_schedule_date(date_str, feed_games):
     for game_id, feed_game in feed_games.items():
         existing_game = existing_by_id.get(str(game_id))
         if existing_game:
-            merged_game = {**feed_game, **existing_game}
-            if is_cancelled_status(feed_game.get("status")):
-                merged_game["status"] = feed_game.get("status")
+            merged_game = {**existing_game, **feed_game}
+            merged_game = protect_final_schedule_state(existing_game, merged_game)
         else:
             merged_game = feed_game
         merged_game.pop("nbaGameId", None)

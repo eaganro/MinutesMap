@@ -99,6 +99,101 @@ class TestNbaGamePollerLambda:
         assert actual_dates == expected_dates
         assert self.module.build_game_id_map_from_feed.call_count == 12
 
+    def test_reconcile_schedule_date_replaces_future_tbd_time_from_feed(self):
+        self.module.get_games_from_s3 = MagicMock(
+            return_value=[
+                {
+                    "id": "2026-05-01-nyk-bos",
+                    "date": "2026-05-01",
+                    "starttime": "2026-05-01T00:00:00",
+                    "hometeam": "BOS",
+                    "awayteam": "NYK",
+                    "homescore": 0,
+                    "awayscore": 0,
+                    "status": "TBD",
+                    "time": "TBD",
+                    "box_etag": "box-etag",
+                    "nbaGameId": "0042500123",
+                }
+            ]
+        )
+        self.module.upload_schedule_s3 = MagicMock()
+
+        changed = self.module.reconcile_schedule_date(
+            "2026-05-01",
+            {
+                "2026-05-01-nyk-bos": {
+                    "id": "2026-05-01-nyk-bos",
+                    "date": "2026-05-01",
+                    "starttime": "2026-05-01T19:30:00",
+                    "hometeam": "BOS",
+                    "awayteam": "NYK",
+                    "homescore": 0,
+                    "awayscore": 0,
+                    "status": "7:30 PM ET",
+                    "time": "",
+                    "seasonType": "playoffs",
+                }
+            },
+        )
+
+        assert changed is True
+        uploaded = self.module.upload_schedule_s3.call_args.kwargs["games_list"]
+        assert uploaded == [
+            {
+                "id": "2026-05-01-nyk-bos",
+                "date": "2026-05-01",
+                "starttime": "2026-05-01T19:30:00",
+                "hometeam": "BOS",
+                "awayteam": "NYK",
+                "homescore": 0,
+                "awayscore": 0,
+                "status": "7:30 PM ET",
+                "time": "",
+                "box_etag": "box-etag",
+                "seasonType": "playoffs",
+            }
+        ]
+
+    def test_reconcile_schedule_date_keeps_final_state_when_feed_regresses(self):
+        self.module.get_games_from_s3 = MagicMock(
+            return_value=[
+                {
+                    "id": "2026-05-01-nyk-bos",
+                    "date": "2026-05-01",
+                    "starttime": "2026-05-01T19:30:00",
+                    "hometeam": "BOS",
+                    "awayteam": "NYK",
+                    "homescore": 101,
+                    "awayscore": 99,
+                    "status": "Final",
+                    "time": "",
+                    "finalConfirmed": True,
+                }
+            ]
+        )
+        self.module.upload_schedule_s3 = MagicMock()
+
+        changed = self.module.reconcile_schedule_date(
+            "2026-05-01",
+            {
+                "2026-05-01-nyk-bos": {
+                    "id": "2026-05-01-nyk-bos",
+                    "date": "2026-05-01",
+                    "starttime": "2026-05-01T19:30:00",
+                    "hometeam": "BOS",
+                    "awayteam": "NYK",
+                    "homescore": 0,
+                    "awayscore": 0,
+                    "status": "Scheduled",
+                    "time": "",
+                }
+            },
+        )
+
+        assert changed is False
+        self.module.upload_schedule_s3.assert_not_called()
+
     def test_process_game_promotes_play_final_when_box_regresses(self):
         game_item = {
             "id": "2026-02-04-phi-lal",
