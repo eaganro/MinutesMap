@@ -933,6 +933,48 @@ class TestNbaGamePollerLambda:
             },
         ]
 
+    def test_resolve_odds_position_ignores_premature_zero_box_clock(self):
+        position = self.module.resolve_odds_position(
+            {
+                "status": "Q2 00:00",
+                "time": "0000.00",
+            },
+            box_game={
+                "gameStatusText": "Q2 00:00",
+                "gameClock": "PT00M00.00S",
+            },
+            last_action={
+                "period": 2,
+                "clock": "PT05M27.00S",
+            },
+        )
+
+        assert position == {
+            "quarter": 2,
+            "time": "0527.00",
+        }
+
+    def test_resolve_odds_position_keeps_zero_when_play_feed_reaches_zero(self):
+        position = self.module.resolve_odds_position(
+            {
+                "status": "Q2 00:00",
+                "time": "0000.00",
+            },
+            box_game={
+                "gameStatusText": "Q2 00:00",
+                "gameClock": "PT00M00.00S",
+            },
+            last_action={
+                "period": 2,
+                "clock": "PT00M00.00S",
+            },
+        )
+
+        assert position == {
+            "quarter": 2,
+            "time": "0000.00",
+        }
+
     def test_poller_processes_final_games_missing_cached_etags(self):
         self.module.get_nba_date = MagicMock(return_value="2026-02-13")
         self.module.get_games_from_s3 = MagicMock(

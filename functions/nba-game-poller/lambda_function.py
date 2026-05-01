@@ -998,6 +998,24 @@ def parse_live_period(status_text):
     return None
 
 
+def is_zero_clock_value(clock_value):
+    remaining = clock_to_seconds_remaining(clock_value)
+    return remaining is not None and remaining <= 0
+
+
+def should_use_play_clock_for_zero_box_clock(period, box_clock, last_action):
+    period_value = parse_positive_int(period, fallback=0)
+    if period_value <= 0 or not is_zero_clock_value(box_clock) or not isinstance(last_action, dict):
+        return False
+
+    action_period = parse_positive_int(last_action.get("period"), fallback=0)
+    if action_period != period_value:
+        return False
+
+    action_clock = (last_action.get("clock") or "").strip()
+    return bool(action_clock) and not is_zero_clock_value(action_clock)
+
+
 def resolve_game_team_codes(game_item, box_game):
     away_code = normalize_team_code(
         (box_game.get("awayTeam") or {}).get("teamTricode") if isinstance(box_game, dict) else None
@@ -1189,8 +1207,12 @@ def resolve_odds_position(game_item, box_game=None, last_action=None, existing_f
     clock = ""
     if isinstance(box_game, dict):
         clock = (box_game.get("gameClock") or "").strip()
+        if should_use_play_clock_for_zero_box_clock(period, clock, last_action):
+            clock = (last_action.get("clock") or "").strip()
     if not clock:
         clock = (game_item.get("time") or "").strip()
+        if should_use_play_clock_for_zero_box_clock(period, clock, last_action):
+            clock = (last_action.get("clock") or "").strip()
     if not clock and isinstance(last_action, dict):
         clock = (last_action.get("clock") or "").strip()
     if not clock and isinstance(existing_flow, dict):
