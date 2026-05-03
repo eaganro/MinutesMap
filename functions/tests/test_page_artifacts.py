@@ -150,6 +150,8 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
     assert result == {
         "teamFiles": 2,
         "playerFiles": 2,
+        "teams": ["PHI", "GSW"],
+        "players": [201939, 2019399],
         "gameId": "2026-02-03-phi-gsw",
         "season": "2025-26",
         "seasonType": "regular",

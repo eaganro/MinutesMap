@@ -712,8 +712,11 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
     ]
     team_writes = 0
     player_writes = 0
+    affected_teams = []
+    affected_players = []
 
     for side, team, opponent, team_players, team_score, opp_score in team_updates:
+        team_abbr = str(team.get("abbr") or "").strip().upper()
         key = _season_key_for_team(page_prefix, team.get("abbr"), season)
         artifact = _load_or_init_team_artifact(
             s3_client=s3_client,
@@ -749,6 +752,8 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
             is_final=False,
         )
         team_writes += 1
+        if team_abbr and team_abbr not in affected_teams:
+            affected_teams.append(team_abbr)
 
     player_inputs = [
         (away_team, home_team, "away", away_score, home_score, away_players, away_player_map, away_segments_map),
@@ -812,10 +817,14 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
                 is_final=False,
             )
             player_writes += 1
+            if player_id not in affected_players:
+                affected_players.append(player_id)
 
     return {
         "teamFiles": team_writes,
         "playerFiles": player_writes,
+        "teams": affected_teams,
+        "players": affected_players,
         "gameId": game_id,
         "season": season,
         "seasonType": season_type,

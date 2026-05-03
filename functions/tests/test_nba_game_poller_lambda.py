@@ -319,7 +319,15 @@ class TestNbaGamePollerLambda:
         self.module.process_playbyplay_payload = MagicMock(return_value={"v": 2, "players": {"away": {}, "home": {}}, "segments": {"away": {}, "home": {}}, "last": {"awayScore": 118, "homeScore": 104}})
         self.module.build_box_payload = MagicMock(return_value={"start": "2026-02-04T00:00:00Z", "teams": {"away": {"id": 1610612755, "abbr": "PHI", "name": "76ers", "players": []}, "home": {"id": 1610612747, "abbr": "LAL", "name": "Lakers", "players": []}}})
         self.module.upload_json_to_s3 = MagicMock()
-        self.module.update_page_artifacts_for_gamepack = MagicMock(return_value={"gameId": "2026-02-04-phi-lal", "teamFiles": 2, "playerFiles": 0})
+        artifact_result = {
+            "gameId": "2026-02-04-phi-lal",
+            "teamFiles": 2,
+            "playerFiles": 0,
+            "teams": ["PHI", "LAL"],
+            "players": [],
+        }
+        self.module.update_page_artifacts_for_gamepack = MagicMock(return_value=artifact_result)
+        self.module.request_minutesmap_revalidation = MagicMock()
         self.module.load_gamepack = MagicMock(return_value=None)
 
         is_final, updates = self.module.process_game(game_item, user_agent="ua", date_str="2026-02-04")
@@ -329,6 +337,7 @@ class TestNbaGamePollerLambda:
         assert updates["finalConfirmed"] is True
         self.module.upload_json_to_s3.assert_called_once()
         self.module.update_page_artifacts_for_gamepack.assert_called_once()
+        self.module.request_minutesmap_revalidation.assert_called_once_with(artifact_result)
         uploaded_gamepack = self.module.upload_json_to_s3.call_args.kwargs["data"]
         assert uploaded_gamepack["seasonType"] == "regular"
         assert self.module.update_page_artifacts_for_gamepack.call_args.kwargs["gamepack"] == uploaded_gamepack

@@ -4,6 +4,8 @@ import boto3
 import os
 import random
 import time
+import urllib.error
+import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -64,6 +66,15 @@ POLL_WINDOW_SECONDS = float(os.environ.get("POLL_WINDOW_SECONDS", "15"))
 AI_CAPTIONS_ENABLED = os.environ.get("AI_CAPTIONS_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
 GEMINI_MODEL = (os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+MINUTESMAP_REVALIDATE_URL = (os.environ.get("MINUTESMAP_REVALIDATE_URL") or "").strip()
+MINUTESMAP_REVALIDATE_SECRET_ARN = (os.environ.get("MINUTESMAP_REVALIDATE_SECRET_ARN") or "").strip()
+try:
+    MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS = max(
+        1.0,
+        float(os.environ.get("MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS", "5")),
+    )
+except (TypeError, ValueError):
+    MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS = 5.0
 try:
     CAPTION_MAX_PLAYERS_PER_TEAM = max(0, int(os.environ.get("CAPTION_MAX_PLAYERS_PER_TEAM", "2")))
 except (TypeError, ValueError):
@@ -82,9 +93,11 @@ s3_client = boto3.client('s3', region_name=REGION)
 events_client = boto3.client('events', region_name=REGION)
 scheduler_client = boto3.client('scheduler', region_name=REGION)
 lambda_client = boto3.client('lambda', region_name=REGION)
+secrets_client = boto3.client('secretsmanager', region_name=REGION)
 
 ET_ZONE = ZoneInfo("America/New_York")
 UTC_ZONE = ZoneInfo("UTC")
+_minutesmap_revalidate_secret = None
 
 # --- Main Handler ---
 
@@ -509,7 +522,69 @@ def enqueue_caption_worker(*, game_key, latest_closed_period, status_text=""):
         return True
     except Exception as e:
         print(f"Caption enqueue error for {game_key}: {e}")
+    return False
+
+
+def get_minutesmap_revalidate_secret():
+    global _minutesmap_revalidate_secret
+    if _minutesmap_revalidate_secret:
+        return _minutesmap_revalidate_secret
+    if not MINUTESMAP_REVALIDATE_SECRET_ARN:
+        return ""
+
+    response = secrets_client.get_secret_value(SecretId=MINUTESMAP_REVALIDATE_SECRET_ARN)
+    secret = (response.get("SecretString") or "").strip()
+    _minutesmap_revalidate_secret = secret
+    return secret
+
+
+def request_minutesmap_revalidation(artifact_result):
+    if not MINUTESMAP_REVALIDATE_URL or not MINUTESMAP_REVALIDATE_SECRET_ARN:
         return False
+
+    teams = artifact_result.get("teams") or []
+    players = artifact_result.get("players") or []
+    if not teams and not players:
+        return False
+
+    try:
+        revalidate_secret = get_minutesmap_revalidate_secret()
+    except Exception as exc:
+        print(f"Poller: Failed to load MinutesMap revalidation secret: {exc}")
+        return False
+
+    if not revalidate_secret:
+        print("Poller: MinutesMap revalidation secret is empty.")
+        return False
+
+    payload = json.dumps({"teams": teams, "players": players}).encode("utf-8")
+    req = urllib.request.Request(
+        MINUTESMAP_REVALIDATE_URL,
+        data=payload,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "x-revalidate-secret": revalidate_secret,
+            "User-Agent": "nba-game-poller/1.0",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS) as response:
+            status = getattr(response, "status", response.getcode())
+            print(
+                "Poller: Requested MinutesMap revalidation for "
+                f"{len(teams)} teams and {len(players)} players "
+                f"(HTTP {status})."
+            )
+            return 200 <= status < 300
+    except urllib.error.HTTPError as exc:
+        detail = exc.read(512).decode("utf-8", errors="replace")
+        print(f"Poller: MinutesMap revalidation failed with HTTP {exc.code}: {detail}")
+    except Exception as exc:
+        print(f"Poller: MinutesMap revalidation request failed: {exc}")
+
+    return False
 
 
 def caption_worker_logic(event):
@@ -837,6 +912,7 @@ def process_game(game_item, user_agent=None, date_str=None):
                         f"({artifact_result['teamFiles']} team, "
                         f"{artifact_result['playerFiles']} player)."
                     )
+                    request_minutesmap_revalidation(artifact_result)
                 except Exception as exc:
                     print(f"Poller: Failed to update page artifacts for {game_key}: {exc}")
         else:
