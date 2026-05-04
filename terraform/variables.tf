@@ -11,7 +11,7 @@ variable "gemini_api_key" {
 variable "minutesmap_revalidate_url" {
   description = "Optional MinutesMap revalidation endpoint called after final page artifacts are written."
   type        = string
-  default     = "https://minutes-map-teams.vercel.app/api/revalidate"
+  default     = "https://teams.minutesmap.com/api/revalidate"
 }
 
 variable "minutesmap_revalidate_secret_arn" {
