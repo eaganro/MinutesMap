@@ -100,6 +100,7 @@ async function blockAnalytics(page) {
     '**/analytics.minutesmap.com/**',
     '**/www.google-analytics.com/**',
     '**/api.posthog.com/**',
+    '**/minutesmap.com/ph/**',
   ];
 
   await Promise.all(

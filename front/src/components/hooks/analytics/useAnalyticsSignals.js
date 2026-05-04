@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { trackPostHogEvent, trackPostHogPageView } from '../../../helpers/analytics';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 15000;
 
@@ -30,14 +31,20 @@ export function useAnalyticsSignals({
     if (!gameId) return;
     if (lastTrackedGameIdRef.current === gameId) return;
     lastTrackedGameIdRef.current = gameId;
-    if (!window?.umami?.track) return;
     const trackedUrl = `${window.location.pathname}${window.location.search}`;
-    window.umami.track((props) => ({
-      ...props,
-      url: trackedUrl,
-      title: document.title,
-    }));
-  }, [gameId, isInitLoading]);
+    if (window?.umami?.track) {
+      window.umami.track((props) => ({
+        ...props,
+        url: trackedUrl,
+        title: document.title,
+      }));
+    }
+    trackPostHogPageView({
+      gameId: gameId || null,
+      date: date || null,
+      status: currentScheduleGameStatus || null,
+    });
+  }, [date, gameId, currentScheduleGameStatus, isInitLoading]);
 
   useEffect(() => {
     if (isInitLoading) return;
@@ -46,16 +53,19 @@ export function useAnalyticsSignals({
       if (document.visibilityState && document.visibilityState !== 'visible') {
         return;
       }
-      if (!window?.umami?.track) return;
       const payload = heartbeatPayloadRef.current;
       const trackedUrl = `${window.location.pathname}${window.location.search}`;
-      window.umami.track('heartbeat', {
+      const eventData = {
         url: trackedUrl,
         title: document.title,
         gameId: payload.gameId,
         date: payload.date,
         status: payload.status,
-      });
+      };
+      if (window?.umami?.track) {
+        window.umami.track('heartbeat', eventData);
+      }
+      trackPostHogEvent('heartbeat', eventData);
     };
 
     sendHeartbeat();
@@ -72,16 +82,19 @@ export function useAnalyticsSignals({
     const sendCloseSignal = (reason) => {
       if (closeSignalSentRef.current) return;
       closeSignalSentRef.current = true;
-      if (!window?.umami?.track) return;
       const trackedUrl = `${window.location.pathname}${window.location.search}`;
-      window.umami.track('page-close', {
+      const eventData = {
         reason,
         url: trackedUrl,
         title: document.title,
         gameId: gameId || null,
         date: date || null,
         status: currentScheduleGameStatus || null,
-      });
+      };
+      if (window?.umami?.track) {
+        window.umami.track('page-close', eventData);
+      }
+      trackPostHogEvent('page-close', eventData);
     };
 
     const handlePageHide = (event) => {
