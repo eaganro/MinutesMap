@@ -13,7 +13,9 @@ from botocore.exceptions import ClientError
 
 from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
 from nba_game_poller.kalshi_api import (
+    KALSHI_NBA_SERIES_SERIES,
     build_kalshi_nba_event_ticker,
+    fetch_kalshi_events,
     fetch_kalshi_market_candlesticks,
     fetch_kalshi_event_markets,
     get_candlestick_midpoint_or_last,
@@ -1148,7 +1150,13 @@ def resolve_kalshi_market_pair(markets, away_code, home_code):
     return away_market, home_market
 
 
-def build_market_odds_snapshot(position, market, event_ticker, invert=False):
+def format_kalshi_source(source, source_prefix=None):
+    if source_prefix and source:
+        return f"{source_prefix}-{source}"
+    return source_prefix or source
+
+
+def build_market_odds_snapshot(position, market, event_ticker, invert=False, source_prefix=None):
     if not position or not isinstance(market, dict):
         return None
 
@@ -1162,13 +1170,22 @@ def build_market_odds_snapshot(position, market, event_ticker, invert=False):
     return {
         **position,
         "awayWinProb": round(float(away_prob), 4),
-        "source": source,
+        "source": format_kalshi_source(source, source_prefix=source_prefix),
         "marketTicker": market.get("ticker"),
         "eventTicker": event_ticker,
     }
 
 
-def build_kalshi_action_odds_snapshots(*, actions, existing_flow, market, event_ticker, invert, user_agent):
+def build_kalshi_action_odds_snapshots(
+    *,
+    actions,
+    existing_flow,
+    market,
+    event_ticker,
+    invert,
+    user_agent,
+    source_prefix=None,
+):
     if not isinstance(existing_flow, dict) or not isinstance(market, dict):
         return []
 
@@ -1232,7 +1249,7 @@ def build_kalshi_action_odds_snapshots(*, actions, existing_flow, market, event_
             {
                 "endTs": end_period_ts,
                 "awayWinProb": round(float(away_prob), 4),
-                "source": source,
+                "source": format_kalshi_source(source, source_prefix=source_prefix),
             }
         )
 
@@ -1303,6 +1320,74 @@ def resolve_odds_position(game_item, box_game=None, last_action=None, existing_f
     }
 
 
+def build_kalshi_series_year_code(date_str):
+    if not date_str:
+        return None
+    try:
+        parsed = datetime.strptime(str(date_str).strip(), "%Y-%m-%d")
+    except ValueError:
+        return None
+    return f"{parsed.year % 100:02d}"
+
+
+def extract_kalshi_series_team_part(event_ticker, year_code):
+    if not event_ticker or not year_code:
+        return None
+    prefix = f"{KALSHI_NBA_SERIES_SERIES}-"
+    text = str(event_ticker).strip().upper()
+    if not text.startswith(prefix):
+        return None
+    body = text[len(prefix):]
+    if not body.startswith(year_code):
+        return None
+    body = body[len(year_code):]
+    for round_number in range(1, 5):
+        suffix = f"R{round_number}"
+        if body.endswith(suffix):
+            team_part = body[:-len(suffix)]
+            return normalize_team_code(team_part)
+    return None
+
+
+def is_kalshi_game7_series_event(event):
+    if not isinstance(event, dict):
+        return False
+    metadata = event.get("product_metadata") if isinstance(event.get("product_metadata"), dict) else {}
+    scope = str(metadata.get("competition_scope") or "").strip().lower()
+    title = str(event.get("title") or "").strip().lower()
+    return scope == "game" and title.startswith("game 7")
+
+
+def select_kalshi_game7_series_event(events, *, date_str, away_code, home_code):
+    year_code = build_kalshi_series_year_code(date_str)
+    if not year_code or not away_code or not home_code:
+        return None
+
+    away_home = normalize_team_code(f"{away_code}{home_code}")
+    home_away = normalize_team_code(f"{home_code}{away_code}")
+    for event in events or []:
+        if not is_kalshi_game7_series_event(event):
+            continue
+        team_part = extract_kalshi_series_team_part(event.get("event_ticker"), year_code)
+        if team_part in (away_home, home_away):
+            return event
+    return None
+
+
+def fetch_kalshi_game7_series_fallback_markets(*, date_str, away_code, home_code, user_agent):
+    events = fetch_kalshi_events(KALSHI_NBA_SERIES_SERIES, user_agent=user_agent)
+    event = select_kalshi_game7_series_event(
+        events,
+        date_str=date_str,
+        away_code=away_code,
+        home_code=home_code,
+    )
+    event_ticker = event.get("event_ticker") if isinstance(event, dict) else None
+    if not event_ticker:
+        return None, []
+    return event_ticker, fetch_kalshi_event_markets(event_ticker, user_agent=user_agent)
+
+
 def build_kalshi_odds_snapshot(*, game_item, box_game, last_action, existing_flow, actions, date_str, user_agent):
     if not KALSHI_ENABLED:
         return []
@@ -1323,8 +1408,21 @@ def build_kalshi_odds_snapshot(*, game_item, box_game, last_action, existing_flo
         return []
 
     markets = fetch_kalshi_event_markets(event_ticker, user_agent=user_agent)
+    source_prefix = None
     if not markets:
-        return []
+        print(f"Poller: No Kalshi game markets for {event_ticker}; checking Game 7 series fallback.")
+        fallback_event_ticker, markets = fetch_kalshi_game7_series_fallback_markets(
+            date_str=date_str,
+            away_code=away_code,
+            home_code=home_code,
+            user_agent=user_agent,
+        )
+        if not markets:
+            print(f"Poller: No Kalshi odds market found for {away_code} at {home_code} on {date_str}.")
+            return []
+        print(f"Poller: Using Kalshi Game 7 series market {fallback_event_ticker} for {event_ticker}.")
+        event_ticker = fallback_event_ticker
+        source_prefix = "series-game7"
 
     away_market, home_market = resolve_kalshi_market_pair(markets, away_code, home_code)
     selected_market = away_market or home_market
@@ -1339,9 +1437,16 @@ def build_kalshi_odds_snapshot(*, game_item, box_game, last_action, existing_flo
         event_ticker=event_ticker,
         invert=invert,
         user_agent=user_agent,
+        source_prefix=source_prefix,
     )
 
-    current_snapshot = build_market_odds_snapshot(position, selected_market, event_ticker, invert=invert)
+    current_snapshot = build_market_odds_snapshot(
+        position,
+        selected_market,
+        event_ticker,
+        invert=invert,
+        source_prefix=source_prefix,
+    )
     if current_snapshot is not None:
         snapshots.append(current_snapshot)
 

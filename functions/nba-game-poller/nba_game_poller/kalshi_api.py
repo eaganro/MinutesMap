@@ -7,6 +7,7 @@ from datetime import datetime
 
 KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2"
 KALSHI_NBA_GAME_SERIES = "KXNBAGAME"
+KALSHI_NBA_SERIES_SERIES = "KXNBASERIES"
 MONTH_CODES = (
     "JAN",
     "FEB",
@@ -79,6 +80,18 @@ def fetch_kalshi_event_markets(event_ticker, user_agent=None):
     )
     markets = payload.get("markets") if isinstance(payload, dict) else None
     return markets if isinstance(markets, list) else []
+
+
+def fetch_kalshi_events(series_ticker, user_agent=None, limit=100):
+    if not series_ticker:
+        return []
+    payload = fetch_kalshi_json(
+        "/events",
+        params={"series_ticker": series_ticker, "limit": limit},
+        user_agent=user_agent,
+    )
+    events = payload.get("events") if isinstance(payload, dict) else None
+    return events if isinstance(events, list) else []
 
 
 def fetch_kalshi_market_candlesticks(

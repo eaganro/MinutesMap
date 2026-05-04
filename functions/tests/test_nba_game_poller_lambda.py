@@ -942,6 +942,107 @@ class TestNbaGamePollerLambda:
             },
         ]
 
+    def test_build_kalshi_odds_snapshot_uses_game7_series_fallback(self):
+        self.module.fetch_kalshi_event_markets = MagicMock(
+            side_effect=[
+                [],
+                [
+                    {
+                        "ticker": "KXNBASERIES-26TORCLER1-CLE",
+                        "yes_bid_dollars": "0.7000",
+                        "yes_ask_dollars": "0.7100",
+                        "last_price_dollars": "0.7000",
+                    },
+                    {
+                        "ticker": "KXNBASERIES-26TORCLER1-TOR",
+                        "yes_bid_dollars": "0.2900",
+                        "yes_ask_dollars": "0.3000",
+                        "last_price_dollars": "0.3000",
+                    },
+                ],
+            ]
+        )
+        self.module.fetch_kalshi_events = MagicMock(
+            return_value=[
+                {
+                    "event_ticker": "KXNBASERIES-26TORCLER1",
+                    "title": "Game 7: Toronto (5) vs Cleveland (4)",
+                    "product_metadata": {"competition_scope": "Game"},
+                }
+            ]
+        )
+
+        snapshots = self.module.build_kalshi_odds_snapshot(
+            game_item={
+                "status": "Q1 10:00",
+                "time": "10:00",
+                "awayteam": "TOR",
+                "hometeam": "CLE",
+            },
+            box_game={
+                "gameStatusText": "Q1 10:00",
+                "gameClock": "PT10M00.00S",
+                "awayTeam": {"teamTricode": "TOR"},
+                "homeTeam": {"teamTricode": "CLE"},
+            },
+            last_action={"period": 1, "clock": "PT10M00.00S"},
+            existing_flow=None,
+            actions=[],
+            date_str="2026-05-03",
+            user_agent="ua",
+        )
+
+        assert snapshots == [
+            {
+                "quarter": 1,
+                "time": "1000.00",
+                "awayWinProb": 0.295,
+                "source": "series-game7-midpoint",
+                "marketTicker": "KXNBASERIES-26TORCLER1-TOR",
+                "eventTicker": "KXNBASERIES-26TORCLER1",
+            }
+        ]
+        assert self.module.fetch_kalshi_event_markets.call_args_list[0].args[0] == "KXNBAGAME-26MAY03TORCLE"
+        assert self.module.fetch_kalshi_event_markets.call_args_list[1].args[0] == "KXNBASERIES-26TORCLER1"
+
+    def test_build_kalshi_odds_snapshot_ignores_non_game7_series_fallback(self):
+        self.module.fetch_kalshi_event_markets = MagicMock(return_value=[])
+        self.module.fetch_kalshi_events = MagicMock(
+            return_value=[
+                {
+                    "event_ticker": "KXNBASERIES-26TORCLER1",
+                    "title": "Series Winner: Toronto (5) vs Cleveland (4)",
+                    "product_metadata": {"competition_scope": "Series Winner"},
+                }
+            ]
+        )
+
+        snapshots = self.module.build_kalshi_odds_snapshot(
+            game_item={
+                "status": "Q1 10:00",
+                "time": "10:00",
+                "awayteam": "TOR",
+                "hometeam": "CLE",
+            },
+            box_game={
+                "gameStatusText": "Q1 10:00",
+                "gameClock": "PT10M00.00S",
+                "awayTeam": {"teamTricode": "TOR"},
+                "homeTeam": {"teamTricode": "CLE"},
+            },
+            last_action={"period": 1, "clock": "PT10M00.00S"},
+            existing_flow=None,
+            actions=[],
+            date_str="2026-05-03",
+            user_agent="ua",
+        )
+
+        assert snapshots == []
+        self.module.fetch_kalshi_event_markets.assert_called_once_with(
+            "KXNBAGAME-26MAY03TORCLE",
+            user_agent="ua",
+        )
+
     def test_resolve_odds_position_ignores_premature_zero_box_clock(self):
         position = self.module.resolve_odds_position(
             {
