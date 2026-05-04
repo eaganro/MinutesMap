@@ -78,6 +78,13 @@ try:
 except (TypeError, ValueError):
     MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS = 5.0
 try:
+    MINUTESMAP_REVALIDATE_ATTEMPTS = max(
+        1,
+        int(os.environ.get("MINUTESMAP_REVALIDATE_ATTEMPTS", "2")),
+    )
+except (TypeError, ValueError):
+    MINUTESMAP_REVALIDATE_ATTEMPTS = 2
+try:
     CAPTION_MAX_PLAYERS_PER_TEAM = max(0, int(os.environ.get("CAPTION_MAX_PLAYERS_PER_TEAM", "2")))
 except (TypeError, ValueError):
     CAPTION_MAX_PLAYERS_PER_TEAM = 2
@@ -527,6 +534,20 @@ def enqueue_caption_worker(*, game_key, latest_closed_period, status_text=""):
     return False
 
 
+def normalize_minutesmap_revalidate_secret(secret):
+    if secret.startswith("{"):
+        try:
+            secret_data = json.loads(secret)
+            for key in ("REVALIDATE_SECRET", "revalidateSecret", "secret", "value"):
+                value = secret_data.get(key) if isinstance(secret_data, dict) else None
+                if isinstance(value, str) and value.strip():
+                    secret = value.strip()
+                    break
+        except Exception as exc:
+            print(f"Poller: Failed to parse MinutesMap revalidation secret JSON: {exc}")
+    return secret
+
+
 def get_minutesmap_revalidate_secret():
     global _minutesmap_revalidate_secret
     if _minutesmap_revalidate_secret:
@@ -536,17 +557,45 @@ def get_minutesmap_revalidate_secret():
 
     response = secrets_client.get_secret_value(SecretId=MINUTESMAP_REVALIDATE_SECRET_ARN)
     secret = (response.get("SecretString") or "").strip()
+    secret = normalize_minutesmap_revalidate_secret(secret)
     _minutesmap_revalidate_secret = secret
     return secret
 
 
+def build_minutesmap_revalidation_payload(artifact_result):
+    teams = []
+    for team in artifact_result.get("teams") or []:
+        team_abbr = str(team).strip().upper()
+        if team_abbr and team_abbr not in teams:
+            teams.append(team_abbr)
+
+    players = []
+    for player in artifact_result.get("players") or []:
+        player_id = str(player).strip()
+        if player_id and player_id not in players:
+            players.append(player_id)
+
+    paths = [f"/teams/{team}" for team in teams]
+    paths.extend(f"/players/{player_id}" for player_id in players)
+
+    return {
+        "teams": teams,
+        "players": players,
+        "paths": paths,
+    }
+
+
 def request_minutesmap_revalidation(artifact_result):
     if not MINUTESMAP_REVALIDATE_URL or not MINUTESMAP_REVALIDATE_SECRET_ARN:
+        print("Poller: MinutesMap revalidation is not configured.")
         return False
 
-    teams = artifact_result.get("teams") or []
-    players = artifact_result.get("players") or []
+    revalidation_payload = build_minutesmap_revalidation_payload(artifact_result)
+    teams = revalidation_payload["teams"]
+    players = revalidation_payload["players"]
+    paths = revalidation_payload["paths"]
     if not teams and not players:
+        print("Poller: No MinutesMap team/player pages to revalidate.")
         return False
 
     try:
@@ -559,7 +608,7 @@ def request_minutesmap_revalidation(artifact_result):
         print("Poller: MinutesMap revalidation secret is empty.")
         return False
 
-    payload = json.dumps({"teams": teams, "players": players}).encode("utf-8")
+    payload = json.dumps(revalidation_payload).encode("utf-8")
     req = urllib.request.Request(
         MINUTESMAP_REVALIDATE_URL,
         data=payload,
@@ -571,20 +620,32 @@ def request_minutesmap_revalidation(artifact_result):
         },
     )
 
-    try:
-        with urllib.request.urlopen(req, timeout=MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS) as response:
-            status = getattr(response, "status", response.getcode())
+    for attempt in range(1, MINUTESMAP_REVALIDATE_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS) as response:
+                status = getattr(response, "status", None)
+                if status is None:
+                    status = response.getcode()
+                detail = response.read(512).decode("utf-8", errors="replace")
+                print(
+                    "Poller: Requested MinutesMap revalidation for "
+                    f"{len(teams)} teams, {len(players)} players, and {len(paths)} paths "
+                    f"(HTTP {status}): {detail}"
+                )
+                return 200 <= status < 300
+        except urllib.error.HTTPError as exc:
+            detail = exc.read(512).decode("utf-8", errors="replace")
             print(
-                "Poller: Requested MinutesMap revalidation for "
-                f"{len(teams)} teams and {len(players)} players "
-                f"(HTTP {status})."
+                f"Poller: MinutesMap revalidation failed with HTTP {exc.code} "
+                f"on attempt {attempt}: {detail}"
             )
-            return 200 <= status < 300
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(512).decode("utf-8", errors="replace")
-        print(f"Poller: MinutesMap revalidation failed with HTTP {exc.code}: {detail}")
-    except Exception as exc:
-        print(f"Poller: MinutesMap revalidation request failed: {exc}")
+            if exc.code < 500 or attempt >= MINUTESMAP_REVALIDATE_ATTEMPTS:
+                break
+        except Exception as exc:
+            print(f"Poller: MinutesMap revalidation request failed on attempt {attempt}: {exc}")
+            if attempt >= MINUTESMAP_REVALIDATE_ATTEMPTS:
+                break
+        time.sleep(0.5 * attempt)
 
     return False
 

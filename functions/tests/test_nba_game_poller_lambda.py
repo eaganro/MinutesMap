@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -341,6 +342,48 @@ class TestNbaGamePollerLambda:
         uploaded_gamepack = self.module.upload_json_to_s3.call_args.kwargs["data"]
         assert uploaded_gamepack["seasonType"] == "regular"
         assert self.module.update_page_artifacts_for_gamepack.call_args.kwargs["gamepack"] == uploaded_gamepack
+
+    def test_request_minutesmap_revalidation_posts_paths_and_logs_response(self):
+        artifact_result = {
+            "teams": ["phi", "LAL", "PHI"],
+            "players": [201939, "2544", 201939],
+        }
+        seen = {}
+
+        class FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, _limit):
+                return b'{"revalidated":["/teams/PHI"]}'
+
+        def fake_urlopen(req, timeout):
+            seen["timeout"] = timeout
+            seen["data"] = json.loads(req.data.decode("utf-8"))
+            return FakeResponse()
+
+        self.module.MINUTESMAP_REVALIDATE_URL = "https://teams.minutesmap.com/api/revalidate"
+        self.module.MINUTESMAP_REVALIDATE_SECRET_ARN = "secret-arn"
+        self.module.MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS = 3.0
+        self.module.MINUTESMAP_REVALIDATE_ATTEMPTS = 1
+        self.module._minutesmap_revalidate_secret = None
+        self.module.secrets_client.get_secret_value = MagicMock(
+            return_value={"SecretString": '{"REVALIDATE_SECRET":"test-secret"}'}
+        )
+        self.module.urllib.request.urlopen = fake_urlopen
+
+        assert self.module.request_minutesmap_revalidation(artifact_result) is True
+        assert seen["timeout"] == 3.0
+        assert seen["data"] == {
+            "teams": ["PHI", "LAL"],
+            "players": ["201939", "2544"],
+            "paths": ["/teams/PHI", "/teams/LAL", "/players/201939", "/players/2544"],
+        }
 
     def test_build_schedule_item_from_feed_adds_canonical_season_type(self):
         item = self.module.build_schedule_item_from_feed(
