@@ -8,11 +8,7 @@ vi.mock('./processTeamStats', () => ({
       <button type="button" onClick={() => setShowMore(!showMore)}>
         {showMore ? 'Show fewer stats' : 'Show more stats'}
       </button>
-      <div
-        data-testid={isHome ? 'home-box' : 'away-box'}
-        ref={tableWrapperRef}
-        onScroll={onScroll}
-      >
+      <div data-testid={isHome ? 'home-box' : 'away-box'} ref={tableWrapperRef} onScroll={onScroll}>
         {team?.abbr || 'N/A'}
       </div>
     </div>
