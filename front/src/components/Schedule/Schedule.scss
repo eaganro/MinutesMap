@@ -187,6 +187,11 @@
   margin: 10px;
   color: var(--text-secondary);
 
+  &.isHidden {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
   &:hover {
     background-color: var(--bg-hover) !important;
   }

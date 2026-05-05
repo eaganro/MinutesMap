@@ -60,6 +60,7 @@ export default function Schedule({
   selectedGameId,
 }) {
   const trackDateFeatureUse = useTrackFeatureUseOnce('date-selector');
+  const [canScrollGames, setCanScrollGames] = useState(true);
   const { handleDateChange, shiftDate } = useDateInputState({
     date,
     onDateChange: changeDate,
@@ -131,6 +132,38 @@ export default function Schedule({
     scrollBy(-100);
   };
 
+  useEffect(() => {
+    const gamesNode = scrollRef.current;
+    if (!gamesNode || isLoading || !gamesList.length) {
+      setCanScrollGames(false);
+      return undefined;
+    }
+
+    const updateCanScrollGames = () => {
+      const hasHorizontalOverflow = gamesNode.scrollWidth > gamesNode.clientWidth + 1;
+      setCanScrollGames((prev) => (prev === hasHorizontalOverflow ? prev : hasHorizontalOverflow));
+    };
+
+    updateCanScrollGames();
+
+    let resizeObserver;
+    if (typeof ResizeObserver === 'function') {
+      resizeObserver = new ResizeObserver(updateCanScrollGames);
+      resizeObserver.observe(gamesNode);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', updateCanScrollGames);
+    }
+
+    return () => {
+      resizeObserver?.disconnect();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', updateCanScrollGames);
+      }
+    };
+  }, [games, gamesList.length, isLoading, scrollRef]);
+
   const dateDown = () => {
     shiftDate(-DATE_NAVIGATION_STEP_DAYS);
     resetScrollPosition();
@@ -163,9 +196,12 @@ export default function Schedule({
         </div>
         <div className="gamePick">
           <IconButton
-            className="scheduleButton"
+            className={`scheduleButton${canScrollGames ? '' : ' isHidden'}`}
             onClick={scrollScheduleLeft}
             aria-label="Scroll games left"
+            aria-hidden={!canScrollGames}
+            disabled={!canScrollGames}
+            tabIndex={canScrollGames ? undefined : -1}
           >
             <NavigateBefore />
           </IconButton>
@@ -193,9 +229,12 @@ export default function Schedule({
             <div className="noGames">No Games Scheduled</div>
           )}
           <IconButton
-            className="scheduleButton end"
+            className={`scheduleButton end${canScrollGames ? '' : ' isHidden'}`}
             onClick={scrollScheduleRight}
             aria-label="Scroll games right"
+            aria-hidden={!canScrollGames}
+            disabled={!canScrollGames}
+            tabIndex={canScrollGames ? undefined : -1}
           >
             <NavigateNext />
           </IconButton>

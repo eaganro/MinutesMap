@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Schedule from './Schedule';
 
@@ -62,6 +62,18 @@ describe('Schedule', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return 100;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        return 200;
+      },
+    });
     mocks.useDateInputStateMock.mockReturnValue({
       handleDateChange: mocks.handleDateChangeMock,
       shiftDate: mocks.shiftDateMock,
@@ -113,6 +125,33 @@ describe('Schedule', () => {
     expect(changeGame).toHaveBeenCalledWith('2026-02-03-phi-gsw');
     expect(mocks.scrollByMock).toHaveBeenNthCalledWith(1, -100);
     expect(mocks.scrollByMock).toHaveBeenNthCalledWith(2, 100);
+  });
+
+  it('hides game scroll controls without removing their layout space when games fit', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return 200;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        return 100;
+      },
+    });
+
+    const { container } = render(<Schedule {...buildProps()} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Scroll games left')).toBeDisabled();
+      expect(screen.getByLabelText('Scroll games right')).toBeDisabled();
+    });
+
+    const gameScrollButtons = container.querySelectorAll('.gamePick .scheduleButton');
+    expect(gameScrollButtons).toHaveLength(2);
+    expect(gameScrollButtons[0]).toHaveClass('isHidden');
+    expect(gameScrollButtons[1]).toHaveClass('isHidden');
   });
 
   it('does not show the live indicator for TBD games', () => {
