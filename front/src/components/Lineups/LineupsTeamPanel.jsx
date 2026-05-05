@@ -30,6 +30,15 @@ export default function LineupsTeamPanel({
   const hasMore = lineups.length > DEFAULT_VISIBLE_COUNT;
   const selectionLimitReached = selectedPlayers.length >= MAX_SELECTED_PLAYERS;
   const selectedPlayersSet = new Set(selectedPlayers);
+  const togglePlayerSelection = (player) => {
+    const isSelected = selectedPlayersSet.has(player);
+    if (!isSelected && selectionLimitReached) return;
+    if (isSelected) {
+      onSelectionChange(selectedPlayers.filter((name) => name !== player));
+      return;
+    }
+    onSelectionChange([...selectedPlayers, player]);
+  };
   const summary =
     selectedPlayers.length && selectionMode === 'filter'
       ? lineups.reduce(
@@ -89,14 +98,7 @@ export default function LineupsTeamPanel({
                   key={`${teamLabel}-${player}`}
                   type="button"
                   className={`lineupsFilterPill${isSelected ? ' isSelected' : ''}${isDisabled ? ' isDisabled' : ''}`}
-                  onClick={() => {
-                    if (isDisabled) return;
-                    if (isSelected) {
-                      onSelectionChange(selectedPlayers.filter((name) => name !== player));
-                      return;
-                    }
-                    onSelectionChange([...selectedPlayers, player]);
-                  }}
+                  onClick={() => togglePlayerSelection(player)}
                   aria-pressed={isSelected}
                   disabled={isDisabled}
                   title={player}
@@ -158,14 +160,17 @@ export default function LineupsTeamPanel({
                   <span className="lineupsSummaryLabel">Selected total</span>
                   <span className="lineupsNames">
                     {selectedPlayers.map((player) => (
-                      <span
+                      <button
+                        type="button"
                         className="lineupsPill isSelected"
                         key={`${teamLabel}-summary-${player}`}
+                        onClick={() => togglePlayerSelection(player)}
+                        aria-pressed="true"
                         title={player}
                         aria-label={player}
                       >
                         {formatPlayerName(player, lastNameCounts, playerDisplayNames)}
-                      </span>
+                      </button>
                     ))}
                   </span>
                 </div>
@@ -195,15 +200,20 @@ export default function LineupsTeamPanel({
                       ...lineup.players.filter((player) => !selectedPlayersSet.has(player)),
                     ].map((player) => {
                       const isSelected = selectedPlayersSet.has(player);
+                      const isDisabled = !isSelected && selectionLimitReached;
                       return (
-                        <span
-                          className={`lineupsPill${isSelected ? ' isSelected' : ''}`}
+                        <button
+                          type="button"
+                          className={`lineupsPill${isSelected ? ' isSelected' : ''}${isDisabled ? ' isDisabled' : ''}`}
                           key={`${lineup.key}-${player}`}
+                          onClick={() => togglePlayerSelection(player)}
+                          aria-pressed={isSelected}
+                          disabled={isDisabled}
                           title={player}
                           aria-label={player}
                         >
                           {formatPlayerName(player, lastNameCounts, playerDisplayNames)}
-                        </span>
+                        </button>
                       );
                     })}
                   </span>

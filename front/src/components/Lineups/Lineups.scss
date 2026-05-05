@@ -248,6 +248,7 @@
 }
 
 .lineupsPill {
+  font-family: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -263,12 +264,36 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+button.lineupsPill {
+  cursor: pointer;
+}
+
+button.lineupsPill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .lineupsPill.isSelected {
   background: var(--bg-highlight-col-header);
   border-color: var(--bg-highlight-col-header);
   color: var(--text-heading);
+}
+
+button.lineupsPill.isDisabled,
+button.lineupsPill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.lineupsPill:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 .lineupsBadge {

@@ -24,6 +24,19 @@ const buildLineups = (prefix) =>
     plusMinus: index,
   }));
 
+const renderLineups = () =>
+  render(
+    <Lineups
+      gameId="game-1"
+      awayTeam={{ name: 'Away Team', abr: 'AWY' }}
+      homeTeam={{ name: 'Home Team', abr: 'HME' }}
+      awayLineups={buildLineups('Away')}
+      homeLineups={buildLineups('Home')}
+      isLoading={false}
+      statusMessage={null}
+    />,
+  );
+
 describe('Lineups', () => {
   afterEach(() => {
     cleanup();
@@ -60,5 +73,43 @@ describe('Lineups', () => {
 
     expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(2);
     expect(screen.queryByRole('button', { name: 'Show top lineups' })).not.toBeInTheDocument();
+  });
+
+  it('lets lineup row player pills apply the active filter mode', () => {
+    renderLineups();
+
+    const playerButtons = screen.getAllByRole('button', { name: 'Away Player 1A' });
+    fireEvent.click(playerButtons[1]);
+
+    expect(screen.getByText('Selected total')).toBeInTheDocument();
+    expect(playerButtons[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(playerButtons[1]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(1);
+  });
+
+  it('lets selected total player pills remove the active selection', () => {
+    renderLineups();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Away Player 1A' })[1]);
+    expect(screen.getByText('Selected total')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Away Player 1A' })[1]);
+
+    expect(screen.queryByText('Selected total')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Away Player 1A' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(2);
+  });
+
+  it('lets lineup row player pills apply the active highlight mode', () => {
+    renderLineups();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Highlight' })[0]);
+    const playerButtons = screen.getAllByRole('button', { name: 'Away Player 1A' });
+    fireEvent.click(playerButtons[1]);
+
+    expect(screen.queryByText('Selected total')).not.toBeInTheDocument();
+    expect(playerButtons[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(playerButtons[1]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(2);
   });
 });
