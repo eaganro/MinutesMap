@@ -16,3 +16,9 @@ front/public/static-pages/
 
 # Local audit/reprocess artifacts
 tmp/
+
+# Local Terraform secrets/state
+*.tfvars
+*.tfvars.json
+*.tfstate
+*.tfstate.*

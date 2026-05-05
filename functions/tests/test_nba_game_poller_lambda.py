@@ -368,13 +368,9 @@ class TestNbaGamePollerLambda:
             return FakeResponse()
 
         self.module.MINUTESMAP_REVALIDATE_URL = "https://teams.minutesmap.com/api/revalidate"
-        self.module.MINUTESMAP_REVALIDATE_SECRET_ARN = "secret-arn"
+        self.module.MINUTESMAP_REVALIDATE_SECRET = '{"REVALIDATE_SECRET":"test-secret"}'
         self.module.MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS = 3.0
         self.module.MINUTESMAP_REVALIDATE_ATTEMPTS = 1
-        self.module._minutesmap_revalidate_secret = None
-        self.module.secrets_client.get_secret_value = MagicMock(
-            return_value={"SecretString": '{"REVALIDATE_SECRET":"test-secret"}'}
-        )
         self.module.urllib.request.urlopen = fake_urlopen
 
         assert self.module.request_minutesmap_revalidation(artifact_result) is True

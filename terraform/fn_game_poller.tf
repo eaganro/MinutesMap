@@ -40,7 +40,7 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = concat([
+    Statement = [
       # 1. Logging
       {
         Sid      = "WriteLambdaLogs",
@@ -106,15 +106,7 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
         Effect   = "Allow"
         Resource = aws_iam_role.nba_scheduler_role.arn
       }
-      ],
-      var.minutesmap_revalidate_secret_arn != "" ? [{
-        # 7. Read the Vercel revalidation secret at runtime.
-        Sid      = "ReadMinutesMapRevalidationSecret"
-        Action   = "secretsmanager:GetSecretValue"
-        Effect   = "Allow"
-        Resource = var.minutesmap_revalidate_secret_arn
-      }] : []
-    )
+    ]
   })
 }
 
@@ -154,17 +146,17 @@ resource "aws_lambda_function" "nba_poller" {
 
   environment {
     variables = {
-      LAMBDA_ARN                       = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
-      SCHEDULER_ROLE_ARN               = aws_iam_role.nba_scheduler_role.arn
-      DATA_BUCKET                      = aws_s3_bucket.data_bucket.id
-      POLLER_RULE_NAME                 = aws_cloudwatch_event_rule.nba_poller_rule.name
-      SCHEDULE_RECONCILE_DAYS          = "4"
-      SCHEDULE_RECONCILE_FUTURE_DAYS   = "7"
-      GAME_ID_MAP_PREFIX               = "private/gameIdMap/"
-      KALSHI_ENABLED                   = "true"
-      GEMINI_API_KEY                   = var.gemini_api_key
-      MINUTESMAP_REVALIDATE_URL        = var.minutesmap_revalidate_url
-      MINUTESMAP_REVALIDATE_SECRET_ARN = var.minutesmap_revalidate_secret_arn
+      LAMBDA_ARN                     = "arn:aws:lambda:us-east-1:${data.aws_caller_identity.current.account_id}:function:NBAGamePoller"
+      SCHEDULER_ROLE_ARN             = aws_iam_role.nba_scheduler_role.arn
+      DATA_BUCKET                    = aws_s3_bucket.data_bucket.id
+      POLLER_RULE_NAME               = aws_cloudwatch_event_rule.nba_poller_rule.name
+      SCHEDULE_RECONCILE_DAYS        = "4"
+      SCHEDULE_RECONCILE_FUTURE_DAYS = "7"
+      GAME_ID_MAP_PREFIX             = "private/gameIdMap/"
+      KALSHI_ENABLED                 = "true"
+      GEMINI_API_KEY                 = var.gemini_api_key
+      MINUTESMAP_REVALIDATE_URL      = var.minutesmap_revalidate_url
+      MINUTESMAP_REVALIDATE_SECRET   = var.minutesmap_revalidate_secret
     }
   }
 }

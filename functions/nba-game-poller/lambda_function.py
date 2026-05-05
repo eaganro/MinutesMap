@@ -69,7 +69,7 @@ AI_CAPTIONS_ENABLED = os.environ.get("AI_CAPTIONS_ENABLED", "1").strip().lower()
 GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
 GEMINI_MODEL = (os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
 MINUTESMAP_REVALIDATE_URL = (os.environ.get("MINUTESMAP_REVALIDATE_URL") or "").strip()
-MINUTESMAP_REVALIDATE_SECRET_ARN = (os.environ.get("MINUTESMAP_REVALIDATE_SECRET_ARN") or "").strip()
+MINUTESMAP_REVALIDATE_SECRET = (os.environ.get("MINUTESMAP_REVALIDATE_SECRET") or "").strip()
 try:
     MINUTESMAP_REVALIDATE_TIMEOUT_SECONDS = max(
         1.0,
@@ -102,11 +102,9 @@ s3_client = boto3.client('s3', region_name=REGION)
 events_client = boto3.client('events', region_name=REGION)
 scheduler_client = boto3.client('scheduler', region_name=REGION)
 lambda_client = boto3.client('lambda', region_name=REGION)
-secrets_client = boto3.client('secretsmanager', region_name=REGION)
 
 ET_ZONE = ZoneInfo("America/New_York")
 UTC_ZONE = ZoneInfo("UTC")
-_minutesmap_revalidate_secret = None
 
 # --- Main Handler ---
 
@@ -549,17 +547,9 @@ def normalize_minutesmap_revalidate_secret(secret):
 
 
 def get_minutesmap_revalidate_secret():
-    global _minutesmap_revalidate_secret
-    if _minutesmap_revalidate_secret:
-        return _minutesmap_revalidate_secret
-    if not MINUTESMAP_REVALIDATE_SECRET_ARN:
+    if not MINUTESMAP_REVALIDATE_SECRET:
         return ""
-
-    response = secrets_client.get_secret_value(SecretId=MINUTESMAP_REVALIDATE_SECRET_ARN)
-    secret = (response.get("SecretString") or "").strip()
-    secret = normalize_minutesmap_revalidate_secret(secret)
-    _minutesmap_revalidate_secret = secret
-    return secret
+    return normalize_minutesmap_revalidate_secret(MINUTESMAP_REVALIDATE_SECRET)
 
 
 def build_minutesmap_revalidation_payload(artifact_result):
@@ -586,7 +576,7 @@ def build_minutesmap_revalidation_payload(artifact_result):
 
 
 def request_minutesmap_revalidation(artifact_result):
-    if not MINUTESMAP_REVALIDATE_URL or not MINUTESMAP_REVALIDATE_SECRET_ARN:
+    if not MINUTESMAP_REVALIDATE_URL or not MINUTESMAP_REVALIDATE_SECRET:
         print("Poller: MinutesMap revalidation is not configured.")
         return False
 

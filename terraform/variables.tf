@@ -14,8 +14,9 @@ variable "minutesmap_revalidate_url" {
   default     = "https://teams.minutesmap.com/api/revalidate"
 }
 
-variable "minutesmap_revalidate_secret_arn" {
-  description = "ARN of the AWS Secrets Manager secret containing the MinutesMap revalidation secret."
+variable "minutesmap_revalidate_secret" {
+  description = "MinutesMap revalidation secret passed to the NBA poller Lambda."
   type        = string
-  default     = "arn:aws:secretsmanager:us-east-1:872515267246:secret:minutesmap/revalidate-secret-XRYnes"
+  sensitive   = true
+  default     = ""
 }
