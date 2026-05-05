@@ -1,10 +1,21 @@
-import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Boxscore from './Boxscore';
 
 vi.mock('./processTeamStats', () => ({
-  default: vi.fn((team, isHome) => (
-    <div data-testid={isHome ? 'home-box' : 'away-box'}>{team?.abbr || 'N/A'}</div>
+  default: vi.fn((team, isHome, showMore, setShowMore, tableWrapperRef, onScroll) => (
+    <div>
+      <button type="button" onClick={() => setShowMore(!showMore)}>
+        {showMore ? 'Show fewer stats' : 'Show more stats'}
+      </button>
+      <div
+        data-testid={isHome ? 'home-box' : 'away-box'}
+        ref={tableWrapperRef}
+        onScroll={onScroll}
+      >
+        {team?.abbr || 'N/A'}
+      </div>
+    </div>
   )),
 }));
 
@@ -24,6 +35,10 @@ const buildBox = () => ({
 });
 
 describe('Boxscore', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -55,5 +70,26 @@ describe('Boxscore', () => {
     render(<Boxscore box={{}} isLoading={false} statusMessage="Game has not started." />);
 
     expect(screen.getByText('Game has not started.')).toBeInTheDocument();
+  });
+
+  it('resets expanded stats and table scroll when the selected game changes', () => {
+    const { rerender } = render(
+      <Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />,
+    );
+
+    fireEvent.click(screen.getAllByText('Show more stats')[0]);
+    expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
+
+    const awayBox = screen.getByTestId('away-box');
+    const homeBox = screen.getByTestId('home-box');
+    awayBox.scrollLeft = 120;
+    homeBox.scrollLeft = 120;
+
+    rerender(<Boxscore gameId="game-2" box={buildBox()} isLoading={false} statusMessage={null} />);
+
+    expect(screen.getAllByText('Show more stats')).toHaveLength(2);
+    expect(screen.queryByText('Show fewer stats')).not.toBeInTheDocument();
+    expect(screen.getByTestId('away-box').scrollLeft).toBe(0);
+    expect(screen.getByTestId('home-box').scrollLeft).toBe(0);
   });
 });

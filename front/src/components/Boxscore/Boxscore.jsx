@@ -9,9 +9,11 @@ import { useStableWhileLoading } from '../hooks/ui/useStableWhileLoading';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
 import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../constants/loadingUiTimings';
 
-export default function Boxscore({ box, isLoading, statusMessage }) {
+const INITIAL_SORT_CONFIG = { key: 'min', direction: 'desc' };
+
+export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   const [showMore, setShowMore] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ key: 'min', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState(INITIAL_SORT_CONFIG);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
   const { isDarkMode } = useTheme();
@@ -23,6 +25,22 @@ export default function Boxscore({ box, isLoading, statusMessage }) {
   const [isCompact, setIsCompact] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 640px)').matches : false,
   );
+
+  useEffect(() => {
+    setShowMore(false);
+    setSortConfig(INITIAL_SORT_CONFIG);
+    isSyncingScrollRef.current = false;
+    if (syncRafRef.current) {
+      cancelAnimationFrame(syncRafRef.current);
+      syncRafRef.current = null;
+    }
+    if (awayTableRef.current) {
+      awayTableRef.current.scrollLeft = 0;
+    }
+    if (homeTableRef.current) {
+      homeTableRef.current.scrollLeft = 0;
+    }
+  }, [gameId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {

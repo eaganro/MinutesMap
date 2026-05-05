@@ -253,6 +253,7 @@ describe('useMinutesMap', () => {
     );
     expect(result.current.boxVm).toEqual(
       expect.objectContaining({
+        gameId: '2026-02-03-phi-gsw',
         box: expect.objectContaining({
           teams: expect.objectContaining({
             away: expect.objectContaining({ abbr: 'PHI' }),
@@ -264,6 +265,7 @@ describe('useMinutesMap', () => {
     );
     expect(result.current.lineupsVm).toEqual(
       expect.objectContaining({
+        gameId: '2026-02-03-phi-gsw',
         awayTeam: { name: 'Philadelphia 76ers', abr: 'PHI' },
         homeTeam: { name: 'Golden State Warriors', abr: 'GSW' },
         awayLineups: [],

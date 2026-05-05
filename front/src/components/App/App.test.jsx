@@ -124,11 +124,13 @@ describe('App', () => {
         statusMessage: null,
       },
       boxVm: {
+        gameId: '2026-02-03-phi-gsw',
         box: { teams: { away: { abbr: 'PHI' }, home: { abbr: 'GSW' } } },
         isLoading: false,
         statusMessage: null,
       },
       lineupsVm: {
+        gameId: '2026-02-03-phi-gsw',
         awayTeam: { name: 'Philadelphia 76ers', abr: 'PHI' },
         homeTeam: { name: 'Golden State Warriors', abr: 'GSW' },
         awayLineups: [],
@@ -188,6 +190,7 @@ describe('App', () => {
     );
     expect(mocks.boxscoreMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        gameId: '2026-02-03-phi-gsw',
         box: { teams: { away: { abbr: 'PHI' }, home: { abbr: 'GSW' } } },
         isLoading: false,
         statusMessage: null,
@@ -196,6 +199,7 @@ describe('App', () => {
     );
     expect(mocks.lineupsMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        gameId: '2026-02-03-phi-gsw',
         awayTeam: { name: 'Philadelphia 76ers', abr: 'PHI' },
         homeTeam: { name: 'Golden State Warriors', abr: 'GSW' },
         awayLineups: [],

@@ -16,6 +16,7 @@ import './Lineups.scss';
 const INITIAL_SORT_CONFIG = { key: 'minutes', direction: 'desc' };
 
 export default function Lineups({
+  gameId,
   awayTeam,
   homeTeam,
   awayLineups,
@@ -35,6 +36,16 @@ export default function Lineups({
   const { isDarkMode } = useTheme();
   const trackLineupsFeatureUse = useTrackFeatureUseOnce('lineups');
   const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode);
+
+  useEffect(() => {
+    setSortConfig(INITIAL_SORT_CONFIG);
+    setShowAll(false);
+    setSelectedAwayPlayers([]);
+    setSelectedHomePlayers([]);
+    setAwaySelectionMode('filter');
+    setHomeSelectionMode('filter');
+    setTopSectionMinHeight(0);
+  }, [gameId]);
 
   const awayOptions = useMemo(() => buildPlayerOptions(awayLineups), [awayLineups]);
   const homeOptions = useMemo(() => buildPlayerOptions(homeLineups), [homeLineups]);

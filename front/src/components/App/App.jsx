@@ -105,8 +105,14 @@ export default function App() {
           )}
         </div>
 
-        <Boxscore box={boxVm.box} isLoading={boxVm.isLoading} statusMessage={boxVm.statusMessage} />
+        <Boxscore
+          gameId={boxVm.gameId}
+          box={boxVm.box}
+          isLoading={boxVm.isLoading}
+          statusMessage={boxVm.statusMessage}
+        />
         <Lineups
+          gameId={lineupsVm.gameId}
           awayTeam={lineupsVm.awayTeam}
           homeTeam={lineupsVm.homeTeam}
           awayLineups={lineupsVm.awayLineups}

@@ -262,12 +262,14 @@ export function useMinutesMap() {
   };
 
   const boxVm = {
+    gameId,
     box,
     isLoading: isBoxVisible,
     statusMessage: gameStatusMessage,
   };
 
   const lineupsVm = {
+    gameId,
     awayTeam: awayTeamName,
     homeTeam: homeTeamName,
     awayLineups: lineupStats?.away || [],
