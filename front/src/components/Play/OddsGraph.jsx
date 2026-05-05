@@ -5,6 +5,7 @@ import { getSecondsElapsed } from '../../helpers/playTimeline';
 const TOP_Y = 10;
 const BOTTOM_Y = 590;
 const MID_Y = 300;
+const ODDS_LINE_STROKE_WIDTH = 0.5;
 
 const probToY = (awayWinProb) => {
   const prob = clampWinProbability(awayWinProb);
@@ -97,7 +98,11 @@ export default function OddsGraph({
       <polyline
         points={points}
         fill="none"
-        style={{ stroke: 'var(--odds-line-color)', strokeWidth: 2, strokeLinejoin: 'round' }}
+        style={{
+          stroke: 'var(--odds-line-color)',
+          strokeWidth: ODDS_LINE_STROKE_WIDTH,
+          strokeLinejoin: 'round',
+        }}
       />
     </>
   );

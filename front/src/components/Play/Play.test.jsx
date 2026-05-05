@@ -271,8 +271,10 @@ describe('Play', () => {
 
   it('renders the win-odds overlay when enabled', () => {
     const { container } = renderPlay(buildProps({ showOdds: true }));
+    const graphLines = container.querySelectorAll('.playGrid polyline');
 
-    expect(container.querySelectorAll('.playGrid polyline')).toHaveLength(3);
+    expect(graphLines).toHaveLength(3);
+    expect(graphLines[2]).toHaveStyle({ strokeWidth: '0.5' });
   });
 
   it('does not render a win-odds line when the odds data is missing', () => {

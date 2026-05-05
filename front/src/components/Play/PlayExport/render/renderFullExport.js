@@ -31,6 +31,8 @@ import {
   getScoreTimelineSource,
 } from './renderSharedPrimitives';
 
+const ODDS_LINE_STROKE_WIDTH = 0.5;
+
 const drawOddsOverlay = ({
   ctx,
   chartLeft,
@@ -69,7 +71,7 @@ const drawOddsOverlay = ({
 
   ctx.save();
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = ODDS_LINE_STROKE_WIDTH;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.beginPath();
