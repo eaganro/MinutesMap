@@ -2,6 +2,7 @@ import gzip
 import io
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 from botocore.exceptions import ClientError
@@ -10,7 +11,11 @@ from botocore.exceptions import ClientError
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "functions" / "nba-game-poller"))
 
-from nba_game_poller.page_artifacts import _recalc_team_artifact, update_page_artifacts_for_gamepack  # noqa: E402
+from nba_game_poller.page_artifacts import (  # noqa: E402
+    _recalc_player_artifact,
+    _recalc_team_artifact,
+    update_page_artifacts_for_gamepack,
+)
 
 
 class FakeS3:
@@ -182,7 +187,7 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
     assert team_artifact["players"][0]["box"]["pts"] == 27
 
 
-def test_team_recalc_ignores_unplayed_schedule_rows():
+def test_team_recalc_keeps_future_unplayed_schedule_rows_out_of_totals():
     artifact = {
         "games": [
             {
@@ -198,10 +203,10 @@ def test_team_recalc_ignores_unplayed_schedule_rows():
                 "players": [{"playerId": 201939, "name": "Tyrese Maxey", "box": {"pts": 27}}],
             },
             {
-                "gameId": "2026-02-10-phi-lal",
+                "gameId": "2099-02-10-phi-lal",
                 "nbaGameId": "0022500100",
-                "date": "2026-02-10",
-                "start": "2026-02-10T22:00:00Z",
+                "date": "2099-02-10",
+                "start": "2099-02-10T22:00:00Z",
                 "seasonType": "regular",
                 "status": "Scheduled",
                 "played": False,
@@ -214,11 +219,96 @@ def test_team_recalc_ignores_unplayed_schedule_rows():
         ]
     }
 
-    _recalc_team_artifact(artifact)
+    _recalc_team_artifact(artifact, today=date(2026, 5, 7))
 
     assert artifact["record"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert len(artifact["games"]) == 2
     assert artifact["games"][1]["recordAfter"] == {"wins": 1, "losses": 0, "ties": 0}
     assert artifact["games"][1]["recordAfterBySeasonType"] is None
     assert artifact["bySeasonType"]["regular"]["games"] == 1
     assert artifact["averages"]["pointsFor"] == 112.0
     assert artifact["players"][0]["games"] == 1
+
+
+def test_team_recalc_removes_stale_unplayed_schedule_rows():
+    artifact = {
+        "games": [
+            {
+                "gameId": "2026-02-03-phi-gsw",
+                "nbaGameId": "0022500003",
+                "date": "2026-02-03",
+                "start": "2026-02-03T22:10:00Z",
+                "seasonType": "regular",
+                "result": "W",
+                "teamScore": 112,
+                "oppScore": 108,
+                "teamStats": {"pts": 112, "seconds": 14400},
+                "players": [{"playerId": 201939, "name": "Tyrese Maxey", "box": {"pts": 27}}],
+            },
+            {
+                "gameId": "2026-04-28-lal-den",
+                "nbaGameId": "0042500157",
+                "date": "2026-04-28",
+                "start": "2026-04-28T02:00:00Z",
+                "seasonType": "playoffs",
+                "status": "Scheduled",
+                "played": False,
+                "result": None,
+                "teamScore": 0,
+                "oppScore": 0,
+                "teamStats": {},
+                "players": [],
+            },
+        ]
+    }
+
+    _recalc_team_artifact(artifact, today=date(2026, 5, 7))
+
+    assert [game["gameId"] for game in artifact["games"]] == ["2026-02-03-phi-gsw"]
+    assert artifact["record"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert "playoffs" not in artifact["bySeasonType"]
+
+
+def test_player_recalc_removes_stale_unplayed_rows():
+    artifact = {
+        "games": [
+            {
+                "gameId": "2026-02-03-phi-gsw",
+                "nbaGameId": "0022500003",
+                "date": "2026-02-03",
+                "start": "2026-02-03T22:10:00Z",
+                "seasonType": "regular",
+                "result": "W",
+                "teamScore": 112,
+                "oppScore": 108,
+                "teamId": 1610612755,
+                "teamAbbr": "PHI",
+                "teamName": "76ers",
+                "box": {"seconds": 2052, "pts": 27},
+            },
+            {
+                "gameId": "2026-04-28-lal-den",
+                "nbaGameId": "0042500157",
+                "date": "2026-04-28",
+                "start": "2026-04-28T02:00:00Z",
+                "seasonType": "playoffs",
+                "status": "Scheduled",
+                "played": False,
+                "result": None,
+                "teamScore": 0,
+                "oppScore": 0,
+                "teamId": 1610612747,
+                "teamAbbr": "LAL",
+                "teamName": "Lakers",
+                "box": {},
+                "detail": {"actions": [], "segments": []},
+            },
+        ]
+    }
+
+    _recalc_player_artifact(artifact, today=date(2026, 5, 7))
+
+    assert [game["gameId"] for game in artifact["games"]] == ["2026-02-03-phi-gsw"]
+    assert artifact["totals"]["games"] == 1
+    assert artifact["totals"]["box"]["pts"] == 27
+    assert artifact["teams"] == [{"id": 1610612755, "abbr": "PHI", "name": "76ers"}]

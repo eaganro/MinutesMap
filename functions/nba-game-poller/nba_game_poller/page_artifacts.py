@@ -11,6 +11,15 @@ from nba_game_poller.storage import upload_json_to_s3
 
 
 GAME_KEY_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-[a-z0-9]+-[a-z0-9]+$")
+UNPLAYED_STATUS_PREFIXES = (
+    "scheduled",
+    "pre",
+    "tbd",
+    "postponed",
+    "cancelled",
+    "canceled",
+    "ppd",
+)
 
 
 def _load_json_from_s3(*, s3_client, bucket, key, allow_missing=False):
@@ -60,6 +69,22 @@ def _parse_date(value):
 def _extract_date_from_game_key(game_key):
     match = GAME_KEY_RE.match((game_key or "").strip())
     return match.group(1) if match else None
+
+
+def _today_utc():
+    return datetime.now(timezone.utc).date()
+
+
+def _date_str_for_game(game):
+    if not isinstance(game, dict):
+        return ""
+    date_str = str(game.get("date") or "").strip()
+    if date_str:
+        return date_str
+    start = str(game.get("start") or "").strip()
+    if len(start) >= 10:
+        return start[:10]
+    return _extract_date_from_game_key(str(game.get("gameId") or ""))
 
 
 def _derive_season_label(date_str):
@@ -378,12 +403,77 @@ def _season_type_sort_key(item):
         return (1, str(season_type))
 
 
+def _status_text(game):
+    return str((game or {}).get("status") or "").strip().lower()
+
+
+def _numeric_mapping_has_output(values):
+    for key, value in (values or {}).items():
+        if key == "min":
+            continue
+        if _safe_int(value):
+            return True
+    return False
+
+
+def _player_row_has_output(player):
+    if not isinstance(player, dict):
+        return False
+    if _numeric_mapping_has_output(player.get("box")):
+        return True
+    detail = player.get("detail") or {}
+    if detail.get("actions"):
+        return True
+    for segment in detail.get("segments") or []:
+        if _clock_to_seconds(segment.get("start")) > _clock_to_seconds(segment.get("end")):
+            return True
+    return False
+
+
+def _game_row_has_output(game):
+    if not isinstance(game, dict):
+        return False
+    if _safe_int(game.get("teamScore")) or _safe_int(game.get("oppScore")):
+        return True
+    if _numeric_mapping_has_output(game.get("teamStats")) or _numeric_mapping_has_output(game.get("box")):
+        return True
+    return any(_player_row_has_output(player) for player in game.get("players") or [])
+
+
+def _is_unplayed_game_row(game):
+    if not isinstance(game, dict):
+        return False
+    if game.get("played") is False:
+        return True
+    status = _status_text(game)
+    if status.startswith("final"):
+        return False
+    if status.startswith(UNPLAYED_STATUS_PREFIXES):
+        return not _game_row_has_output(game)
+    if game.get("result") in (None, "") and not _game_row_has_output(game):
+        return True
+    return False
+
+
+def _is_stale_unplayed_game(game, today=None):
+    if not _is_unplayed_game_row(game):
+        return False
+    parsed = _parse_date(_date_str_for_game(game))
+    if not parsed:
+        return False
+    return parsed < (today or _today_utc())
+
+
+def _prune_stale_unplayed_games(games, today=None):
+    return [game for game in games or [] if not _is_stale_unplayed_game(game, today=today)]
+
+
 def _game_season_type(game):
     return derive_season_type(game, nba_game_id=(game or {}).get("nbaGameId"))
 
 
 def _is_played_team_game(game):
-    return not (isinstance(game, dict) and game.get("played") is False)
+    return not _is_unplayed_game_row(game)
 
 
 def _new_team_split_bucket():
@@ -493,8 +583,8 @@ def _finalize_player_split(bucket):
     }
 
 
-def _recalc_team_artifact(artifact):
-    games = list(artifact.get("games") or [])
+def _recalc_team_artifact(artifact, today=None):
+    games = _prune_stale_unplayed_games(artifact.get("games"), today=today)
     totals = Counter()
     players = {}
     by_season_type = {}
@@ -557,8 +647,8 @@ def _recalc_team_artifact(artifact):
     return artifact
 
 
-def _recalc_player_artifact(artifact):
-    games = list(artifact.get("games") or [])
+def _recalc_player_artifact(artifact, today=None):
+    games = _prune_stale_unplayed_games(artifact.get("games"), today=today)
     totals_box = Counter()
     wins = losses = ties = 0
     teams = {}
@@ -566,6 +656,8 @@ def _recalc_player_artifact(artifact):
     for game in games:
         season_type = _game_season_type(game)
         game["seasonType"] = season_type
+        if _is_unplayed_game_row(game):
+            continue
         split = by_season_type.setdefault(season_type, _new_player_split_bucket())
         split["games"] += 1
         result = game.get("result")
