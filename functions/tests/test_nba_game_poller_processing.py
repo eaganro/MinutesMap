@@ -294,6 +294,37 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(brown_segments[0]["start"], "1200.00")
         self.assertEqual(brown_segments[0]["end"], "0500.00")
 
+    def test_unlabeled_non_roster_technical_does_not_create_player_row(self):
+        actions = [
+            {
+                "actionNumber": 142,
+                "actionId": 142,
+                "clock": "PT01M26.00S",
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 200755,
+                "playerName": "",
+                "playerNameI": "",
+                "description": "NOP technical FOUL",
+                "actionType": "foul",
+                "subType": "technical",
+                "scoreHome": "26",
+                "scoreAway": "16",
+            }
+        ]
+
+        processed = process_playbyplay_payload(
+            game_id="unlabeled-staff-technical",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+            away_player_labels={2544: "LeBron James"},
+        )
+
+        self.assertNotIn("Player 200755", processed["players"]["away"])
+        self.assertNotIn("Player 200755", processed["segments"]["away"])
+
     def test_off_court_personal_foul_does_not_create_sixth_player(self):
         actions = [
             {

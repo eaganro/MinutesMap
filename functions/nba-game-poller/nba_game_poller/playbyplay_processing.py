@@ -520,7 +520,10 @@ def create_players(actions, away_team_id, home_team_id, away_player_labels=None,
         player_name = fix_player_name(a)
 
         if team_id == away_team_id:
-            if player_key:
+            skip_player_action = _should_skip_unlabeled_off_court_player(
+                a, away_players, away_player_labels
+            )
+            if player_key and not skip_player_action:
                 away_players.setdefault(player_key, []).append(a)
                 if player_key not in away_labels:
                     away_labels[player_key] = _display_name_from_action(
@@ -543,7 +546,10 @@ def create_players(actions, away_team_id, home_team_id, away_player_labels=None,
                     away_players.setdefault(incoming_key, [])
                     away_labels.setdefault(incoming_key, name)
         elif team_id == home_team_id:
-            if player_key:
+            skip_player_action = _should_skip_unlabeled_off_court_player(
+                a, home_players, home_player_labels
+            )
+            if player_key and not skip_player_action:
                 home_players.setdefault(player_key, []).append(a)
                 if player_key not in home_labels:
                     home_labels[player_key] = _display_name_from_action(
@@ -630,6 +636,24 @@ def _should_skip_off_court_action(action):
     if "technical" in detail or "technical" in desc:
         return True
     return False
+
+
+def _should_skip_unlabeled_off_court_player(action, players, roster_labels=None):
+    if not _should_skip_off_court_action(action):
+        return False
+
+    player_key = _player_key_from_action(action)
+    if player_key and player_key in (players or {}):
+        return False
+
+    person_id = _coerce_person_id((action or {}).get("personId"))
+    if person_id is not None and isinstance(roster_labels, dict) and roster_labels.get(person_id):
+        return False
+
+    if _display_name_from_action(action, roster_labels=roster_labels, fallback_name=fix_player_name(action)):
+        return False
+
+    return True
 
 
 def update_playtime_for_key(player_key, action, playtimes):
