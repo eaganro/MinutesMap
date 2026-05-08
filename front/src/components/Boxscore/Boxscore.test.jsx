@@ -36,6 +36,7 @@ describe('Boxscore', () => {
   });
 
   beforeEach(() => {
+    localStorage.clear();
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockReturnValue({
@@ -68,13 +69,14 @@ describe('Boxscore', () => {
     expect(screen.getByText('Game has not started.')).toBeInTheDocument();
   });
 
-  it('resets expanded stats and table scroll when the selected game changes', () => {
+  it('persists expanded stats and resets table scroll when the selected game changes', () => {
     const { rerender } = render(
       <Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />,
     );
 
     fireEvent.click(screen.getAllByText('Show more stats')[0]);
     expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
+    expect(localStorage.getItem('boxscoreExpanded')).toBe('true');
 
     const awayBox = screen.getByTestId('away-box');
     const homeBox = screen.getByTestId('home-box');
@@ -83,9 +85,18 @@ describe('Boxscore', () => {
 
     rerender(<Boxscore gameId="game-2" box={buildBox()} isLoading={false} statusMessage={null} />);
 
-    expect(screen.getAllByText('Show more stats')).toHaveLength(2);
-    expect(screen.queryByText('Show fewer stats')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
+    expect(screen.queryByText('Show more stats')).not.toBeInTheDocument();
     expect(screen.getByTestId('away-box').scrollLeft).toBe(0);
     expect(screen.getByTestId('home-box').scrollLeft).toBe(0);
+  });
+
+  it('loads the expanded stats preference from localStorage', () => {
+    localStorage.setItem('boxscoreExpanded', 'true');
+
+    render(<Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />);
+
+    expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
+    expect(screen.queryByText('Show more stats')).not.toBeInTheDocument();
   });
 });

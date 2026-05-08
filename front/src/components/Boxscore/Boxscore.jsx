@@ -7,12 +7,14 @@ import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
 import { useStableWhileLoading } from '../hooks/ui/useStableWhileLoading';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
+import { useLocalStorageState } from '../hooks/state/useLocalStorageState';
 import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../constants/loadingUiTimings';
 
 const INITIAL_SORT_CONFIG = { key: 'min', direction: 'desc' };
+const BOXSCORE_EXPANDED_STORAGE_KEY = 'boxscoreExpanded';
 
 export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
-  const [showMore, setShowMore] = useState(false);
+  const [showMore, setShowMore] = useLocalStorageState(BOXSCORE_EXPANDED_STORAGE_KEY, false);
   const [sortConfig, setSortConfig] = useState(INITIAL_SORT_CONFIG);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
@@ -27,7 +29,6 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   );
 
   useEffect(() => {
-    setShowMore(false);
     setSortConfig(INITIAL_SORT_CONFIG);
     isSyncingScrollRef.current = false;
     if (syncRafRef.current) {
