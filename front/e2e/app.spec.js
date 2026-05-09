@@ -193,6 +193,19 @@ test.describe('MinutesMap Smoke', () => {
     await expect(firstGame).toHaveClass(/selected/);
   });
 
+  test('mobile browser back closes player detail @smoke', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/${SMOKE_GAME_ID}`);
+    await waitForAppReady(page);
+
+    await page.getByRole('button', { name: /open player detail for joel embiid/i }).click();
+    await expect(page.getByTestId('mobile-player-sheet')).toBeVisible();
+
+    await page.goBack();
+    await expect(page.getByTestId('mobile-player-sheet')).toBeHidden();
+    await expect(page.getByRole('button', { name: /open player detail for joel embiid/i })).toBeVisible();
+  });
+
   test('app survives reload and resume-like events on live/non-final paths @smoke', async ({
     page,
   }) => {

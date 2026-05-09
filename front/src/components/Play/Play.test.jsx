@@ -203,6 +203,7 @@ const renderPlay = (props) => {
 
 afterEach(() => {
   cleanup();
+  window.history.replaceState({}, '', '/');
 });
 
 describe('Play', () => {
@@ -247,6 +248,28 @@ describe('Play', () => {
 
     expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('closes the mobile player sheet on browser back', () => {
+    renderPlay(buildProps());
+
+    fireEvent.click(screen.getByRole('button', { name: /open player detail for j\. embiid/i }));
+
+    expect(window.history.state?.minutesMapPlayerDetail).toEqual({
+      gameId: '2026-03-11-phi-gsw',
+      teamKey: 'away',
+      name: 'J. Embiid',
+    });
+    expect(screen.getByTestId('mobile-player-sheet')).toBeInTheDocument();
+
+    fireEvent(
+      window,
+      new PopStateEvent('popstate', {
+        state: {},
+      }),
+    );
+
+    expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
   });
 
   it('reuses the player-view legend as stat toggles', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { resolveFullNameFromRoster } from './PlayExport/playExportModel';
 import MobilePlayerSheet from './MobilePlayerSheet';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -13,6 +13,8 @@ import TimelineGrid from './TimelineGrid';
 import { MOBILE_TOOLTIP_BREAKPOINT } from './model/layoutModel';
 import { usePlayInteraction } from './usePlayInteraction';
 import './Play.scss';
+
+const PLAYER_DETAIL_HISTORY_KEY = 'minutesMapPlayerDetail';
 
 export default function Play({
   gameId,
@@ -89,6 +91,16 @@ export default function Play({
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [playerDetailPeriod, setPlayerDetailPeriod] = useState(0);
 
+  const clearSelectedPlayer = useCallback(() => {
+    setSelectedPlayer(null);
+    setPlayerDetailPeriod(0);
+  }, []);
+
+  const isCurrentPlayerHistoryEntry = useCallback(
+    () => Boolean(window.history.state?.[PLAYER_DETAIL_HISTORY_KEY]),
+    [],
+  );
+
   const {
     descriptionArray,
     mouseLinePos,
@@ -123,9 +135,8 @@ export default function Play({
   }, [activePeriod, setInfoLocked, setMouseLinePos, setDescriptionArray, setHighlightActionIds]);
 
   useEffect(() => {
-    setSelectedPlayer(null);
-    setPlayerDetailPeriod(0);
-  }, [gameId]);
+    clearSelectedPlayer();
+  }, [clearSelectedPlayer, gameId]);
 
   const {
     isHoveringIcon,
@@ -163,10 +174,27 @@ export default function Play({
 
   useEffect(() => {
     if (!isMobilePlayerSheetEnabled && selectedPlayer) {
-      setSelectedPlayer(null);
-      setPlayerDetailPeriod(0);
+      clearSelectedPlayer();
     }
-  }, [isMobilePlayerSheetEnabled, selectedPlayer]);
+  }, [clearSelectedPlayer, isMobilePlayerSheetEnabled, selectedPlayer]);
+
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const historyPlayer = event.state?.[PLAYER_DETAIL_HISTORY_KEY] || null;
+      if (historyPlayer?.gameId === gameId && isMobilePlayerSheetEnabled) {
+        setSelectedPlayer({ teamKey: historyPlayer.teamKey, name: historyPlayer.name });
+        setPlayerDetailPeriod(0);
+        return;
+      }
+
+      if (selectedPlayer) {
+        clearSelectedPlayer();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [clearSelectedPlayer, gameId, isMobilePlayerSheetEnabled, selectedPlayer]);
 
   const selectedPlayerDetail = useMemo(() => {
     if (!selectedPlayer) return null;
@@ -230,9 +258,9 @@ export default function Play({
 
   useEffect(() => {
     if (selectedPlayer && !selectedPlayerDetail) {
-      setSelectedPlayer(null);
+      clearSelectedPlayer();
     }
-  }, [selectedPlayer, selectedPlayerDetail]);
+  }, [clearSelectedPlayer, selectedPlayer, selectedPlayerDetail]);
 
   const handlePlayerSelect = (teamKey, name) => {
     if (!isMobilePlayerSheetEnabled) return;
@@ -241,6 +269,23 @@ export default function Play({
     resetInteraction(true);
     setSelectedPlayer({ teamKey, name });
     setPlayerDetailPeriod(0);
+    window.history.pushState(
+      {
+        ...(window.history.state || {}),
+        [PLAYER_DETAIL_HISTORY_KEY]: { gameId, teamKey, name },
+      },
+      '',
+      window.location.href,
+    );
+  };
+
+  const handlePlayerDetailClose = () => {
+    if (isCurrentPlayerHistoryEntry()) {
+      clearSelectedPlayer();
+      window.history.back();
+      return;
+    }
+    clearSelectedPlayer();
   };
 
   const quarterSwitcher = showQuarterSwitcher ? (
@@ -379,10 +424,7 @@ export default function Play({
               statOn={statOn}
               onToggleStat={changeStatOn}
               teamColor={selectedPlayerDetail.teamColor}
-              onClose={() => {
-                setSelectedPlayer(null);
-                setPlayerDetailPeriod(0);
-              }}
+              onClose={handlePlayerDetailClose}
             />
           ) : (
             <>
