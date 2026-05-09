@@ -16,11 +16,12 @@ const mocks = vi.hoisted(() => ({
   useResumeRefreshMock: vi.fn(),
   useAnalyticsSignalsMock: vi.fn(),
   playRef: { current: null },
+  currentUrlParams: { date: '2026-02-03', gameId: '2026-02-03-phi-gsw' },
 }));
 
 vi.mock('../schedule/useQueryParams', () => ({
   useQueryParams: () => ({
-    getInitialParams: () => ({ date: '2026-02-03', gameId: '2026-02-03-phi-gsw' }),
+    getInitialParams: () => mocks.currentUrlParams,
     updateQueryParams: mocks.updateQueryParamsMock,
   }),
 }));
@@ -173,6 +174,7 @@ vi.mock('./useLineupStats', () => ({
 describe('useMinutesMap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.currentUrlParams = { date: '2026-02-03', gameId: '2026-02-03-phi-gsw' };
   });
 
   it('keeps the App-facing return contract stable and wires orchestration hooks', () => {
@@ -187,7 +189,7 @@ describe('useMinutesMap', () => {
         date: '2026-02-03',
         gameId: '2026-02-03-phi-gsw',
         changeDate: mocks.changeDateMock,
-        changeGame: mocks.changeGameMock,
+        changeGame: expect.any(Function),
       }),
     );
     expect(result.current.scoreVm).toEqual(
@@ -293,6 +295,15 @@ describe('useMinutesMap', () => {
         isInitLoading: false,
       }),
     );
+    expect(mocks.updateQueryParamsMock).toHaveBeenCalledWith('2026-02-03', '2026-02-03-phi-gsw', {
+      mode: 'replace',
+    });
+
+    act(() => {
+      result.current.scheduleVm.changeGame('2026-02-03-lal-bos');
+    });
+
+    expect(mocks.changeGameMock).toHaveBeenCalledWith('2026-02-03-lal-bos');
 
     act(() => {
       result.current.statControlsVm.changeStatOn(2);
@@ -301,5 +312,18 @@ describe('useMinutesMap', () => {
     expect(mocks.setStatOnMock).toHaveBeenCalledTimes(1);
     const updater = mocks.setStatOnMock.mock.calls[0][0];
     expect(typeof updater).toBe('function');
+  });
+
+  it('selects the game from browser history when popstate fires', () => {
+    renderHook(() => useMinutesMap());
+    vi.clearAllMocks();
+    mocks.currentUrlParams = { date: '2026-02-03', gameId: '2026-02-03-lal-bos' };
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    expect(mocks.changeDateMock).not.toHaveBeenCalled();
+    expect(mocks.changeGameMock).toHaveBeenCalledWith('2026-02-03-lal-bos');
   });
 });

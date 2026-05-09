@@ -58,7 +58,7 @@ export function useQueryParams() {
   /**
    * Update the URL without page reload (path preferred, query preserved)
    */
-  const updateQueryParams = useCallback((_newDate, newGameId) => {
+  const updateQueryParams = useCallback((_newDate, newGameId, options = {}) => {
     const params = new URLSearchParams(window.location.search);
     params.delete('date');
     params.delete('gameid');
@@ -66,7 +66,13 @@ export function useQueryParams() {
     const pathname = newGameId ? `/${encodeURIComponent(newGameId)}` : '/';
     const query = params.toString();
     const newUrl = `${pathname}${query ? `?${query}` : ''}${window.location.hash}`;
-    window.history.replaceState({}, '', newUrl);
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (newUrl === currentUrl) {
+      return;
+    }
+
+    const historyMethod = options.mode === 'push' ? 'pushState' : 'replaceState';
+    window.history[historyMethod]({}, '', newUrl);
   }, []);
 
   return { getInitialParams, updateQueryParams };

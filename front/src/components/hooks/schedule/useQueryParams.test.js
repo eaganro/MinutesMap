@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach, vi } from 'vitest';
 import { useQueryParams } from './useQueryParams';
 
 function setUrl(url) {
@@ -60,6 +60,23 @@ describe('useQueryParams', () => {
       result.current.updateQueryParams('2026-02-04', '2026-02-04-nyk-mia');
     });
 
+    expect(window.location.pathname).toBe('/2026-02-04-nyk-mia');
+    expect(window.location.search).toBe('?keep=1');
+    expect(window.location.hash).toBe('#details');
+  });
+
+  it('can push a new history entry for user-driven game changes', () => {
+    setUrl('/2026-02-03-phi-gsw?keep=1#details');
+    const pushSpy = vi.spyOn(window.history, 'pushState');
+    const replaceSpy = vi.spyOn(window.history, 'replaceState');
+    const { result } = renderHook(() => useQueryParams());
+
+    act(() => {
+      result.current.updateQueryParams('2026-02-04', '2026-02-04-nyk-mia', { mode: 'push' });
+    });
+
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    expect(replaceSpy).not.toHaveBeenCalled();
     expect(window.location.pathname).toBe('/2026-02-04-nyk-mia');
     expect(window.location.search).toBe('?keep=1');
     expect(window.location.hash).toBe('#details');

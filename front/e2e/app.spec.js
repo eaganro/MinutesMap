@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const SMOKE_GAME_ID = '2025-01-15-phi-gsw';
+const ALT_SMOKE_GAME_ID = '2025-01-15-lal-bos';
 
 const SMOKE_INIT_STATE = {
   date: '2025-01-15',
@@ -16,6 +17,15 @@ const SMOKE_SCHEDULE = [
     starttime: '2025-01-15T03:00:00Z',
     awayscore: 102,
     homescore: 98,
+  },
+  {
+    id: ALT_SMOKE_GAME_ID,
+    awayteam: 'LAL',
+    hometeam: 'BOS',
+    status: 'Final',
+    starttime: '2025-01-15T04:00:00Z',
+    awayscore: 110,
+    homescore: 107,
   },
 ];
 
@@ -164,6 +174,23 @@ test.describe('MinutesMap Smoke', () => {
     await firstGame.click();
 
     await expect(page).toHaveURL(/\/2025-01-15-[a-z0-9]+-[a-z0-9]+$/i);
+  });
+
+  test('browser back restores the previous selected game @smoke', async ({ page }) => {
+    await page.goto(`/${SMOKE_GAME_ID}`);
+    await waitForAppReady(page);
+
+    const firstGame = page.locator('.games .game', { hasText: 'PHI - GSW' });
+    const secondGame = page.locator('.games .game', { hasText: 'LAL - BOS' });
+    await expect(firstGame).toHaveClass(/selected/);
+
+    await secondGame.click();
+    await expect(page).toHaveURL(new RegExp(`/${ALT_SMOKE_GAME_ID}$`));
+    await expect(secondGame).toHaveClass(/selected/);
+
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`/${SMOKE_GAME_ID}$`));
+    await expect(firstGame).toHaveClass(/selected/);
   });
 
   test('app survives reload and resume-like events on live/non-final paths @smoke', async ({

@@ -61,6 +61,16 @@ export function useMinutesMap() {
     schedule,
     resetLoadingStates,
   });
+  const nextUrlHistoryModeRef = useRef('replace');
+
+  const changeGameWithHistory = useCallback(
+    (id) => {
+      if (!id || id === gameId) return;
+      nextUrlHistoryModeRef.current = 'push';
+      changeGame(id);
+    },
+    [changeGame, gameId],
+  );
 
   const scheduleFetchRef = useRef(() => {});
   const fetchScheduleForDateChange = useCallback((dateString, reason = 'date-change') => {
@@ -106,9 +116,36 @@ export function useMinutesMap() {
   // === URL SYNC ===
   useEffect(() => {
     if (date) {
-      updateQueryParams(date, gameId);
+      updateQueryParams(date, gameId, { mode: nextUrlHistoryModeRef.current });
+      nextUrlHistoryModeRef.current = 'replace';
     }
   }, [date, gameId, updateQueryParams]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextParams = getInitialParams();
+      nextUrlHistoryModeRef.current = 'replace';
+
+      if (nextParams.date && nextParams.date !== date) {
+        changeDate(nextParams.date);
+      }
+
+      if (nextParams.gameId) {
+        if (nextParams.gameId !== gameId) {
+          changeGame(nextParams.gameId);
+        }
+        return;
+      }
+
+      if (gameId) {
+        resetLoadingStates();
+        setGameId(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [changeDate, changeGame, date, gameId, getInitialParams, resetLoadingStates, setGameId]);
 
   // === PROCESSED TIMELINES ===
   const {
@@ -207,7 +244,7 @@ export function useMinutesMap() {
     date: date || '',
     gameId,
     changeDate,
-    changeGame,
+    changeGame: changeGameWithHistory,
     isLoading: isScheduleVisible,
   };
 
