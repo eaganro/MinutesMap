@@ -203,7 +203,9 @@ test.describe('MinutesMap Smoke', () => {
 
     await page.goBack();
     await expect(page.getByTestId('mobile-player-sheet')).toBeHidden();
-    await expect(page.getByRole('button', { name: /open player detail for joel embiid/i })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /open player detail for joel embiid/i }),
+    ).toBeVisible();
   });
 
   test('app survives reload and resume-like events on live/non-final paths @smoke', async ({
