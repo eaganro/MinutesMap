@@ -12,7 +12,7 @@ import { useLiveUpdates } from '../realtime/useLiveUpdates';
 import { useResumeRefresh } from '../realtime/useResumeRefresh';
 import { useAnalyticsSignals } from '../analytics/useAnalyticsSignals';
 
-const DEFAULT_STAT_ON = [true, false, true, true, false, false, false, false];
+const DEFAULT_STAT_ON = [true, false, false, true, false, false, false, false];
 const LOADING_DELAY_MS = 500;
 
 /**
