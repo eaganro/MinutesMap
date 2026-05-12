@@ -34,6 +34,14 @@ class FakeS3:
         self.objects[(Bucket, Key)] = Body
 
 
+def _put_json(s3, bucket, key, data):
+    s3.objects[(bucket, key)] = gzip.compress(json.dumps(data).encode("utf-8"))
+
+
+def _read_json(s3, bucket, key):
+    return json.loads(gzip.decompress(s3.objects[(bucket, key)]).decode("utf-8"))
+
+
 def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
     s3 = FakeS3()
     gamepack = {
@@ -156,6 +164,7 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
 
     assert result == {
         "teamFiles": 2,
+        "teamStatusFiles": 0,
         "playerFiles": 2,
         "teams": ["PHI", "GSW"],
         "players": [201939, 2019399],
@@ -189,7 +198,66 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
     assert team_artifact["players"][0]["box"]["pts"] == 27
 
 
-def test_update_team_live_artifacts_for_schedule_game_writes_team_files_only():
+def test_update_page_artifacts_for_gamepack_clears_team_status_files():
+    s3 = FakeS3()
+    for team_abbr in ("PHI", "GSW"):
+        _put_json(
+            s3,
+            "test-bucket",
+            f"data/pages/team-status/{team_abbr}/2025-26.json.gz",
+            {
+                "schemaVersion": 1,
+                "season": "2025-26",
+                "team": {"id": 0, "abbr": team_abbr, "name": ""},
+                "currentGame": {
+                    "gameId": "2026-02-03-phi-gsw",
+                    "date": "2026-02-03",
+                    "start": "2026-02-03T22:10:00Z",
+                    "status": "Q4 00:00",
+                    "played": False,
+                    "result": None,
+                },
+            },
+        )
+
+    result = update_page_artifacts_for_gamepack(
+        s3_client=s3,
+        bucket="test-bucket",
+        root_prefix="data/",
+        page_prefix="pages/",
+        gamepack={
+            "v": 1,
+            "id": "0022500003",
+            "publicId": "2026-02-03-phi-gsw",
+            "box": {
+                "start": "2026-02-03T22:10:00Z",
+                "teams": {
+                    "away": {"id": 1610612755, "abbr": "PHI", "name": "76ers", "players": []},
+                    "home": {"id": 1610612744, "abbr": "GSW", "name": "Warriors", "players": []},
+                },
+            },
+            "flow": {
+                "last": {
+                    "quarter": 4,
+                    "time": "00.00",
+                    "awayScore": 112,
+                    "homeScore": 108,
+                }
+            },
+        },
+    )
+
+    assert result["teamStatusFiles"] == 2
+    for team_abbr in ("PHI", "GSW"):
+        status_artifact = _read_json(
+            s3,
+            "test-bucket",
+            f"data/pages/team-status/{team_abbr}/2025-26.json.gz",
+        )
+        assert status_artifact["currentGame"] is None
+
+
+def test_update_team_live_artifacts_for_schedule_game_writes_team_and_status_files():
     s3 = FakeS3()
     schedule_game = {
         "id": "2026-02-04-phi-lal",
@@ -217,6 +285,7 @@ def test_update_team_live_artifacts_for_schedule_game_writes_team_files_only():
 
     assert result == {
         "teamFiles": 2,
+        "teamStatusFiles": 2,
         "playerFiles": 0,
         "teams": ["PHI", "LAL"],
         "players": [],
@@ -225,6 +294,8 @@ def test_update_team_live_artifacts_for_schedule_game_writes_team_files_only():
         "seasonType": "regular",
     }
     assert sorted(key for _, key in s3.objects) == [
+        "data/pages/team-status/LAL/2025-26.json.gz",
+        "data/pages/team-status/PHI/2025-26.json.gz",
         "data/pages/teams/LAL/2025-26.json.gz",
         "data/pages/teams/PHI/2025-26.json.gz",
     ]
@@ -241,10 +312,34 @@ def test_update_team_live_artifacts_for_schedule_game_writes_team_files_only():
     assert live_row["recordAfterBySeasonType"] is None
     assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
     assert team_artifact["players"] == []
+    status_key = ("test-bucket", "data/pages/team-status/PHI/2025-26.json.gz")
+    status_artifact = json.loads(gzip.decompress(s3.objects[status_key]).decode("utf-8"))
+    assert status_artifact["team"]["abbr"] == "PHI"
+    assert status_artifact["currentGame"]["gameId"] == "2026-02-04-phi-lal"
+    assert status_artifact["currentGame"]["status"] == "Q1 06:12"
+    assert status_artifact["currentGame"]["gamepackKey"] == "data/gamepack/2026-02-04-phi-lal.json.gz"
 
 
 def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes():
     s3 = FakeS3()
+    _put_json(
+        s3,
+        "test-bucket",
+        "data/pages/team-status/BOS/2025-26.json.gz",
+        {
+            "schemaVersion": 1,
+            "season": "2025-26",
+            "team": {"id": 1610612738, "abbr": "BOS", "name": ""},
+            "currentGame": {
+                "gameId": "2026-05-10-bos-nyk",
+                "date": "2026-05-10",
+                "start": "2026-05-10T20:00:00-04:00",
+                "status": "Scheduled",
+                "played": False,
+                "result": None,
+            },
+        },
+    )
     schedule_games = [
         {
             "id": "2026-05-12-nyk-bos",
@@ -309,6 +404,7 @@ def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes()
 
     assert result == {
         "teamFiles": 2,
+        "teamStatusFiles": 2,
         "playerFiles": 0,
         "teams": ["NYK", "BOS"],
         "players": [],
@@ -317,6 +413,8 @@ def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes()
         "seasonTypes": ["playoffs"],
     }
     assert sorted(key for _, key in s3.objects) == [
+        "data/pages/team-status/BOS/2025-26.json.gz",
+        "data/pages/team-status/NYK/2025-26.json.gz",
         "data/pages/teams/BOS/2025-26.json.gz",
         "data/pages/teams/NYK/2025-26.json.gz",
     ]
@@ -331,6 +429,11 @@ def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes()
     assert all(game["gamepackKey"] is None for game in team_artifact["games"])
     assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
     assert team_artifact["players"] == []
+    status_key = ("test-bucket", "data/pages/team-status/BOS/2025-26.json.gz")
+    status_artifact = json.loads(gzip.decompress(s3.objects[status_key]).decode("utf-8"))
+    assert status_artifact["team"]["abbr"] == "BOS"
+    assert status_artifact["currentGame"]["gameId"] == "2026-05-12-nyk-bos"
+    assert status_artifact["currentGame"]["opponentAbbr"] == "NYK"
 
 
 def test_team_recalc_keeps_future_unplayed_schedule_rows_out_of_totals():

@@ -974,12 +974,13 @@ def process_game(game_item, user_agent=None, date_str=None):
                         page_prefix=PAGE_PREFIX,
                         schedule_game=live_schedule_game,
                     )
-                    if live_artifact_result.get("teamFiles"):
+                    if live_artifact_result.get("teamFiles") or live_artifact_result.get("teamStatusFiles"):
                         updates["teamPageLiveUpdated"] = True
                         print(
                             "Poller: Marked live team page rows for "
                             f"{live_artifact_result['gameId']} "
-                            f"({live_artifact_result['teamFiles']} team)."
+                            f"({live_artifact_result.get('teamFiles', 0)} team, "
+                            f"{live_artifact_result.get('teamStatusFiles', 0)} status)."
                         )
                         request_minutesmap_revalidation(live_artifact_result)
                 except Exception as exc:
@@ -1852,11 +1853,12 @@ def reconcile_schedule_date(date_str, feed_games, team_page_sync_today=None):
                 schedule_games=merged,
                 today=team_page_sync_today,
             )
-            if artifact_result.get("teamFiles"):
+            if artifact_result.get("teamFiles") or artifact_result.get("teamStatusFiles"):
                 print(
                     "Reconcile: Updated scheduled team page rows for "
                     f"{len(artifact_result.get('gameIds') or [])} game(s) "
-                    f"({artifact_result['teamFiles']} team)."
+                    f"({artifact_result.get('teamFiles', 0)} team, "
+                    f"{artifact_result.get('teamStatusFiles', 0)} status)."
                 )
                 request_minutesmap_revalidation(artifact_result)
         except Exception as exc:

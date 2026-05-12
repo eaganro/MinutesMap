@@ -200,6 +200,7 @@ class TestNbaGamePollerLambda:
         self.module.upload_schedule_s3 = MagicMock()
         artifact_result = {
             "teamFiles": 2,
+            "teamStatusFiles": 2,
             "playerFiles": 0,
             "teams": ["BOS", "NYK"],
             "players": [],
@@ -393,6 +394,7 @@ class TestNbaGamePollerLambda:
         artifact_result = {
             "gameId": "2026-02-04-phi-lal",
             "teamFiles": 2,
+            "teamStatusFiles": 2,
             "playerFiles": 0,
             "teams": ["PHI", "LAL"],
             "players": [],
@@ -474,6 +476,7 @@ class TestNbaGamePollerLambda:
         live_artifact_result = {
             "gameId": "2026-02-04-phi-lal",
             "teamFiles": 2,
+            "teamStatusFiles": 2,
             "playerFiles": 0,
             "teams": ["PHI", "LAL"],
             "players": [],

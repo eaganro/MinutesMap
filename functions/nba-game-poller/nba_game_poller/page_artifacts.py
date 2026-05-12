@@ -816,6 +816,10 @@ def _season_key_for_team(page_prefix, team_abbr, season):
     return f"{page_prefix}teams/{team_abbr}/{season}.json"
 
 
+def _team_status_key(page_prefix, team_abbr, season):
+    return f"{page_prefix}team-status/{team_abbr}/{season}.json"
+
+
 def _season_key_for_player(page_prefix, player_id, season):
     return f"{page_prefix}players/{player_id}/{season}.json"
 
@@ -838,6 +842,193 @@ def _load_or_init_player_artifact(*, s3_client, bucket, root_prefix, key, player
         allow_missing=True,
     )
     return existing if isinstance(existing, dict) else _init_player_artifact(player, season)
+
+
+def _init_team_status_artifact(team, season):
+    return {
+        "schemaVersion": 1,
+        "updatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "season": season,
+        "team": {"id": _safe_int(team.get("id")), "abbr": team.get("abbr"), "name": team.get("name") or ""},
+        "currentGame": None,
+    }
+
+
+def _load_or_init_team_status_artifact(*, s3_client, bucket, root_prefix, key, team, season):
+    existing = _load_json_from_s3(
+        s3_client=s3_client,
+        bucket=bucket,
+        key=f"{root_prefix}{key}.gz",
+        allow_missing=True,
+    )
+    return existing if isinstance(existing, dict) else _init_team_status_artifact(team, season)
+
+
+def _is_live_status_text(status):
+    text = str(status or "").strip().lower()
+    if not text or _is_terminal_schedule_row({"status": text}):
+        return False
+    if text.startswith(UNPLAYED_STATUS_PREFIXES) or "tbd" in text:
+        return False
+    if ":" in text and (" am" in text or " pm" in text or text.endswith("am") or text.endswith("pm") or " et" in text):
+        return False
+    if text.startswith("q") and any(ch.isdigit() for ch in text):
+        return True
+    if any(token in text for token in ("qtr", "quarter", "half", "halftime", "in progress", "end of")):
+        return True
+    if "overtime" in text or text == "ot" or " ot" in text:
+        return True
+    if text.endswith("ot") and text[:-2].isdigit():
+        return True
+    return False
+
+
+def _parse_game_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _status_game_priority(game):
+    if not isinstance(game, dict):
+        return (3, datetime.max.replace(tzinfo=timezone.utc), "")
+    status_priority = 0 if _is_live_status_text(game.get("status")) else 1
+    start = _parse_game_datetime(game.get("start"))
+    if start is None:
+        parsed_date = _parse_date(_date_str_for_game(game))
+        if parsed_date:
+            start = datetime(parsed_date.year, parsed_date.month, parsed_date.day, tzinfo=timezone.utc)
+        else:
+            start = datetime.max.replace(tzinfo=timezone.utc)
+    return (status_priority, start, str(game.get("gameId") or ""))
+
+
+def _choose_team_status_game(existing_game, candidate_game):
+    if not existing_game:
+        return candidate_game
+    if not candidate_game:
+        return existing_game
+    return min(existing_game, candidate_game, key=_status_game_priority)
+
+
+def _active_team_status_game(game, today=None):
+    if not isinstance(game, dict):
+        return None
+    if today is None:
+        return game
+    parsed_date = _parse_date(_date_str_for_game(game))
+    if parsed_date and parsed_date < today:
+        return None
+    return game
+
+
+def _build_team_status_game(row):
+    return {
+        "gameId": row.get("gameId"),
+        "nbaGameId": row.get("nbaGameId"),
+        "date": row.get("date"),
+        "start": row.get("start"),
+        "homeAway": row.get("homeAway"),
+        "season": row.get("season"),
+        "seasonType": row.get("seasonType"),
+        "opponentId": row.get("opponentId"),
+        "opponentAbbr": row.get("opponentAbbr"),
+        "opponentName": row.get("opponentName"),
+        "status": row.get("status"),
+        "played": False,
+        "result": None,
+        "teamScore": row.get("teamScore", 0),
+        "oppScore": row.get("oppScore", 0),
+        "teamStats": {},
+        "leaders": {},
+        "players": [],
+        "playerCount": 0,
+        "gamepackKey": row.get("gamepackKey"),
+        "recordAfter": {"wins": 0, "losses": 0, "ties": 0},
+        "recordAfterBySeasonType": None,
+    }
+
+
+def _upsert_team_status_artifact(*, status_cache, s3_client, bucket, root_prefix, page_prefix, item, today=None):
+    team = item["team"]
+    team_abbr = str(team.get("abbr") or "").strip().upper()
+    key = _team_status_key(page_prefix, team_abbr, item["season"])
+    if key not in status_cache:
+        status_cache[key] = _load_or_init_team_status_artifact(
+            s3_client=s3_client,
+            bucket=bucket,
+            root_prefix=root_prefix,
+            key=key,
+            team=team,
+            season=item["season"],
+        )
+
+    artifact = status_cache[key]
+    current = _active_team_status_game(artifact.get("currentGame"), today=today)
+    candidate = _build_team_status_game(item["row"])
+    next_game = _choose_team_status_game(current, candidate)
+    if next_game == current:
+        return key, False
+
+    artifact["currentGame"] = next_game
+    artifact["updatedAt"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    artifact["season"] = item["season"]
+    artifact["team"] = {"id": _safe_int(team.get("id")), "abbr": team_abbr, "name": team.get("name") or ""}
+    return key, True
+
+
+def _flush_team_status_artifacts(*, status_cache, changed_keys, s3_client, bucket, root_prefix):
+    writes = 0
+    for key in sorted(changed_keys):
+        upload_json_to_s3(
+            s3_client=s3_client,
+            bucket=bucket,
+            prefix=root_prefix,
+            key=key,
+            data=status_cache[key],
+            is_final=False,
+        )
+        writes += 1
+    return writes
+
+
+def _clear_team_status_for_game(*, s3_client, bucket, root_prefix, page_prefix, team, season, game_id):
+    team_abbr = str(team.get("abbr") or "").strip().upper()
+    key = _team_status_key(page_prefix, team_abbr, season)
+    artifact = _load_or_init_team_status_artifact(
+        s3_client=s3_client,
+        bucket=bucket,
+        root_prefix=root_prefix,
+        key=key,
+        team=team,
+        season=season,
+    )
+    current_game = artifact.get("currentGame")
+    if not isinstance(current_game, dict) or current_game.get("gameId") != game_id:
+        return False
+
+    artifact["currentGame"] = None
+    artifact["updatedAt"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    artifact["season"] = season
+    artifact["team"] = {"id": _safe_int(team.get("id")), "abbr": team_abbr, "name": team.get("name") or ""}
+    upload_json_to_s3(
+        s3_client=s3_client,
+        bucket=bucket,
+        prefix=root_prefix,
+        key=key,
+        data=artifact,
+        is_final=False,
+    )
+    return True
 
 
 def _derive_live_team_artifacts(schedule_game, *, root_prefix):
@@ -984,7 +1175,9 @@ def update_team_schedule_artifacts_for_schedule_games(
     today=None,
 ):
     team_cache = {}
+    status_cache = {}
     changed_keys = set()
+    changed_status_keys = set()
     affected_teams = []
     game_ids = []
     seasons = set()
@@ -1015,15 +1208,28 @@ def update_team_schedule_artifacts_for_schedule_games(
 
             artifact = team_cache[key]
             games, changed = _upsert_unplayed_game_row(artifact.get("games"), item["row"])
+            seasons.add(item["season"])
+            season_types.add(item["seasonType"])
+            if team_abbr and team_abbr not in affected_teams:
+                affected_teams.append(team_abbr)
+
+            status_key, status_changed = _upsert_team_status_artifact(
+                status_cache=status_cache,
+                s3_client=s3_client,
+                bucket=bucket,
+                root_prefix=root_prefix,
+                page_prefix=page_prefix,
+                item=item,
+                today=today,
+            )
+            if status_changed:
+                changed_status_keys.add(status_key)
+
             if not changed:
                 continue
 
             artifact["games"] = games
             changed_keys.add(key)
-            seasons.add(item["season"])
-            season_types.add(item["seasonType"])
-            if team_abbr and team_abbr not in affected_teams:
-                affected_teams.append(team_abbr)
 
     team_writes = 0
     for key in sorted(changed_keys):
@@ -1038,9 +1244,17 @@ def update_team_schedule_artifacts_for_schedule_games(
             is_final=False,
         )
         team_writes += 1
+    status_writes = _flush_team_status_artifacts(
+        status_cache=status_cache,
+        changed_keys=changed_status_keys,
+        s3_client=s3_client,
+        bucket=bucket,
+        root_prefix=root_prefix,
+    )
 
     return {
         "teamFiles": team_writes,
+        "teamStatusFiles": status_writes,
         "playerFiles": 0,
         "teams": affected_teams,
         "players": [],
@@ -1056,11 +1270,15 @@ def update_team_live_artifacts_for_schedule_game(*, s3_client, bucket, root_pref
     season = items[0]["season"] if items else ""
     season_type = items[0]["seasonType"] if items else ""
     team_writes = 0
+    status_cache = {}
+    changed_status_keys = set()
     affected_teams = []
 
     for item in items:
         team = item["team"]
         team_abbr = str(team.get("abbr") or "").strip().upper()
+        if team_abbr and team_abbr not in affected_teams:
+            affected_teams.append(team_abbr)
         key = _season_key_for_team(page_prefix, team_abbr, item["season"])
         artifact = _load_or_init_team_artifact(
             s3_client=s3_client,
@@ -1072,6 +1290,16 @@ def update_team_live_artifacts_for_schedule_game(*, s3_client, bucket, root_pref
         )
         games, changed = _upsert_unplayed_game_row(artifact.get("games"), item["row"])
         if not changed:
+            status_key, status_changed = _upsert_team_status_artifact(
+                status_cache=status_cache,
+                s3_client=s3_client,
+                bucket=bucket,
+                root_prefix=root_prefix,
+                page_prefix=page_prefix,
+                item=item,
+            )
+            if status_changed:
+                changed_status_keys.add(status_key)
             continue
 
         artifact["games"] = games
@@ -1085,11 +1313,29 @@ def update_team_live_artifacts_for_schedule_game(*, s3_client, bucket, root_pref
             is_final=False,
         )
         team_writes += 1
-        if team_abbr and team_abbr not in affected_teams:
-            affected_teams.append(team_abbr)
+
+        status_key, status_changed = _upsert_team_status_artifact(
+            status_cache=status_cache,
+            s3_client=s3_client,
+            bucket=bucket,
+            root_prefix=root_prefix,
+            page_prefix=page_prefix,
+            item=item,
+        )
+        if status_changed:
+            changed_status_keys.add(status_key)
+
+    status_writes = _flush_team_status_artifacts(
+        status_cache=status_cache,
+        changed_keys=changed_status_keys,
+        s3_client=s3_client,
+        bucket=bucket,
+        root_prefix=root_prefix,
+    )
 
     return {
         "teamFiles": team_writes,
+        "teamStatusFiles": status_writes,
         "playerFiles": 0,
         "teams": affected_teams,
         "players": [],
@@ -1137,6 +1383,7 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
         ("home", home_team, away_team, home_players, home_score, away_score),
     ]
     team_writes = 0
+    team_status_writes = 0
     player_writes = 0
     affected_teams = []
     affected_players = []
@@ -1180,6 +1427,16 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
         team_writes += 1
         if team_abbr and team_abbr not in affected_teams:
             affected_teams.append(team_abbr)
+        if _clear_team_status_for_game(
+            s3_client=s3_client,
+            bucket=bucket,
+            root_prefix=root_prefix,
+            page_prefix=page_prefix,
+            team=team,
+            season=season,
+            game_id=game_id,
+        ):
+            team_status_writes += 1
 
     player_inputs = [
         (away_team, home_team, "away", away_score, home_score, away_players, away_player_map, away_segments_map),
@@ -1248,6 +1505,7 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
 
     return {
         "teamFiles": team_writes,
+        "teamStatusFiles": team_status_writes,
         "playerFiles": player_writes,
         "teams": affected_teams,
         "players": affected_players,
