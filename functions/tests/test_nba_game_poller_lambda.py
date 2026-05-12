@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -194,6 +194,76 @@ class TestNbaGamePollerLambda:
 
         assert changed is False
         self.module.upload_schedule_s3.assert_not_called()
+
+    def test_reconcile_schedule_date_syncs_current_future_team_pages(self):
+        self.module.get_games_from_s3 = MagicMock(return_value=[])
+        self.module.upload_schedule_s3 = MagicMock()
+        artifact_result = {
+            "teamFiles": 2,
+            "playerFiles": 0,
+            "teams": ["BOS", "NYK"],
+            "players": [],
+            "gameIds": ["2026-05-12-nyk-bos"],
+        }
+        self.module.update_team_schedule_artifacts_for_schedule_games = MagicMock(
+            return_value=artifact_result
+        )
+        self.module.request_minutesmap_revalidation = MagicMock()
+
+        changed = self.module.reconcile_schedule_date(
+            "2026-05-12",
+            {
+                "2026-05-12-nyk-bos": {
+                    "id": "2026-05-12-nyk-bos",
+                    "date": "2026-05-12",
+                    "starttime": "2026-05-12T19:30:00-04:00",
+                    "hometeam": "BOS",
+                    "awayteam": "NYK",
+                    "homescore": 0,
+                    "awayscore": 0,
+                    "status": "7:30 PM ET",
+                    "time": "",
+                    "seasonType": "playoffs",
+                }
+            },
+            team_page_sync_today=date(2026, 5, 12),
+        )
+
+        assert changed is True
+        self.module.update_team_schedule_artifacts_for_schedule_games.assert_called_once()
+        sync_call = self.module.update_team_schedule_artifacts_for_schedule_games.call_args.kwargs
+        assert sync_call["schedule_games"] == self.module.upload_schedule_s3.call_args.kwargs["games_list"]
+        assert sync_call["today"] == date(2026, 5, 12)
+        self.module.request_minutesmap_revalidation.assert_called_once_with(artifact_result)
+
+    def test_reconcile_schedule_date_does_not_sync_past_team_pages(self):
+        self.module.get_games_from_s3 = MagicMock(return_value=[])
+        self.module.upload_schedule_s3 = MagicMock()
+        self.module.update_team_schedule_artifacts_for_schedule_games = MagicMock()
+        self.module.request_minutesmap_revalidation = MagicMock()
+
+        changed = self.module.reconcile_schedule_date(
+            "2026-05-10",
+            {
+                "2026-05-10-den-okc": {
+                    "id": "2026-05-10-den-okc",
+                    "date": "2026-05-10",
+                    "starttime": "2026-05-10T20:00:00-04:00",
+                    "hometeam": "OKC",
+                    "awayteam": "DEN",
+                    "homescore": 0,
+                    "awayscore": 0,
+                    "status": "Scheduled",
+                    "time": "",
+                    "seasonType": "playoffs",
+                }
+            },
+            team_page_sync_today=date(2026, 5, 12),
+        )
+
+        assert changed is True
+        self.module.update_team_schedule_artifacts_for_schedule_games.assert_not_called()
+        self.module.request_minutesmap_revalidation.assert_not_called()
 
     def test_process_game_promotes_play_final_when_box_regresses(self):
         game_item = {

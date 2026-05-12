@@ -37,6 +37,7 @@ from nba_game_poller.captioning import (
 )
 from nba_game_poller.page_artifacts import (
     update_page_artifacts_for_gamepack,
+    update_team_schedule_artifacts_for_schedule_games,
     update_team_live_artifacts_for_schedule_game,
 )
 from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
@@ -1790,7 +1791,7 @@ def reconcile_recent_schedule():
     for offset in range(start_offset, end_offset + 1):
         date_str = (today + timedelta(days=offset)).strftime("%Y-%m-%d")
         feed_games = feed_map.get(date_str, {})
-        if reconcile_schedule_date(date_str, feed_games):
+        if reconcile_schedule_date(date_str, feed_games, team_page_sync_today=today):
             updated += 1
         map_for_date = build_game_id_map_from_feed(feed, date_str)
         if map_for_date:
@@ -1799,7 +1800,7 @@ def reconcile_recent_schedule():
     if updated:
         print(f"Reconcile: Updated {updated} schedule file(s).")
 
-def reconcile_schedule_date(date_str, feed_games):
+def reconcile_schedule_date(date_str, feed_games, team_page_sync_today=None):
     existing = get_games_from_s3(date_str)
     existing_by_id = {
         str(game.get("id")): game
@@ -1835,6 +1836,31 @@ def reconcile_schedule_date(date_str, feed_games):
         date_str=date_str,
         prefix=SCHEDULE_PREFIX,
     )
+    parsed_date = None
+    try:
+        parsed_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        parsed_date = None
+
+    if team_page_sync_today is not None and parsed_date and parsed_date >= team_page_sync_today:
+        try:
+            artifact_result = update_team_schedule_artifacts_for_schedule_games(
+                s3_client=s3_client,
+                bucket=BUCKET,
+                root_prefix=PREFIX,
+                page_prefix=PAGE_PREFIX,
+                schedule_games=merged,
+                today=team_page_sync_today,
+            )
+            if artifact_result.get("teamFiles"):
+                print(
+                    "Reconcile: Updated scheduled team page rows for "
+                    f"{len(artifact_result.get('gameIds') or [])} game(s) "
+                    f"({artifact_result['teamFiles']} team)."
+                )
+                request_minutesmap_revalidation(artifact_result)
+        except Exception as exc:
+            print(f"Reconcile: Failed to update scheduled team page rows for {date_str}: {exc}")
     return True
 
 def fetch_schedule_feed():

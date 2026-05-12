@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "functions" / "nba-game-poller"))
 from nba_game_poller.page_artifacts import (  # noqa: E402
     _recalc_player_artifact,
     _recalc_team_artifact,
+    update_team_schedule_artifacts_for_schedule_games,
     update_team_live_artifacts_for_schedule_game,
     update_page_artifacts_for_gamepack,
 )
@@ -238,6 +239,96 @@ def test_update_team_live_artifacts_for_schedule_game_writes_team_files_only():
     assert live_row["oppScore"] == 14
     assert live_row["gamepackKey"] == "data/gamepack/2026-02-04-phi-lal.json.gz"
     assert live_row["recordAfterBySeasonType"] is None
+    assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
+    assert team_artifact["players"] == []
+
+
+def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes():
+    s3 = FakeS3()
+    schedule_games = [
+        {
+            "id": "2026-05-12-nyk-bos",
+            "nbaGameId": "0042500201",
+            "date": "2026-05-12",
+            "starttime": "2026-05-12T19:30:00-04:00",
+            "awayteam": "NYK",
+            "hometeam": "BOS",
+            "awayTeamId": 1610612752,
+            "homeTeamId": 1610612738,
+            "awayscore": 0,
+            "homescore": 0,
+            "status": "7:30 PM ET",
+            "time": "",
+            "seasonType": "playoffs",
+        },
+        {
+            "id": "2026-05-14-bos-nyk",
+            "nbaGameId": "0042500202",
+            "date": "2026-05-14",
+            "starttime": "2026-05-14T20:00:00-04:00",
+            "awayteam": "BOS",
+            "hometeam": "NYK",
+            "awayTeamId": 1610612738,
+            "homeTeamId": 1610612752,
+            "awayscore": 0,
+            "homescore": 0,
+            "status": "Scheduled",
+            "time": "",
+            "seasonType": "playoffs",
+        },
+        {
+            "id": "2026-05-10-den-okc",
+            "nbaGameId": "0042500101",
+            "date": "2026-05-10",
+            "starttime": "2026-05-10T20:00:00-04:00",
+            "awayteam": "DEN",
+            "hometeam": "OKC",
+            "status": "Scheduled",
+            "seasonType": "playoffs",
+        },
+        {
+            "id": "2026-05-15-tbd-tbd",
+            "nbaGameId": "0042500301",
+            "date": "2026-05-15",
+            "starttime": "2026-05-15T20:00:00-04:00",
+            "awayteam": "",
+            "hometeam": "",
+            "status": "TBD",
+            "seasonType": "playoffs",
+        },
+    ]
+
+    result = update_team_schedule_artifacts_for_schedule_games(
+        s3_client=s3,
+        bucket="test-bucket",
+        root_prefix="data/",
+        page_prefix="pages/",
+        schedule_games=schedule_games,
+        today=date(2026, 5, 12),
+    )
+
+    assert result == {
+        "teamFiles": 2,
+        "playerFiles": 0,
+        "teams": ["NYK", "BOS"],
+        "players": [],
+        "gameIds": ["2026-05-12-nyk-bos", "2026-05-14-bos-nyk"],
+        "seasons": ["2025-26"],
+        "seasonTypes": ["playoffs"],
+    }
+    assert sorted(key for _, key in s3.objects) == [
+        "data/pages/teams/BOS/2025-26.json.gz",
+        "data/pages/teams/NYK/2025-26.json.gz",
+    ]
+
+    team_key = ("test-bucket", "data/pages/teams/BOS/2025-26.json.gz")
+    team_artifact = json.loads(gzip.decompress(s3.objects[team_key]).decode("utf-8"))
+    assert [game["gameId"] for game in team_artifact["games"]] == [
+        "2026-05-12-nyk-bos",
+        "2026-05-14-bos-nyk",
+    ]
+    assert all(game["played"] is False for game in team_artifact["games"])
+    assert all(game["gamepackKey"] is None for game in team_artifact["games"])
     assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
     assert team_artifact["players"] == []
 
