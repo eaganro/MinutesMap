@@ -337,6 +337,38 @@ def _build_team_game_row(*, season, season_type, game_id, nba_game_id, start, da
     }
 
 
+def _build_live_team_game_row(*, season, season_type, schedule_game, side, opponent, gamepack_key):
+    if side == "home":
+        team_score = _safe_int(schedule_game.get("homescore"))
+        opp_score = _safe_int(schedule_game.get("awayscore"))
+    else:
+        team_score = _safe_int(schedule_game.get("awayscore"))
+        opp_score = _safe_int(schedule_game.get("homescore"))
+
+    return {
+        "gameId": str(schedule_game.get("id") or "").strip(),
+        "nbaGameId": str(schedule_game.get("nbaGameId") or "").strip(),
+        "date": str(schedule_game.get("date") or "").strip(),
+        "start": str(schedule_game.get("starttime") or "").strip() or None,
+        "homeAway": side,
+        "season": season,
+        "seasonType": season_type,
+        "opponentId": _safe_int(opponent.get("id")),
+        "opponentAbbr": opponent.get("abbr"),
+        "opponentName": opponent.get("name"),
+        "status": str(schedule_game.get("status") or "").strip(),
+        "played": False,
+        "result": None,
+        "teamScore": team_score,
+        "oppScore": opp_score,
+        "teamStats": {},
+        "leaders": {},
+        "players": [],
+        "playerCount": 0,
+        "gamepackKey": gamepack_key,
+    }
+
+
 def _build_player_game_row(*, season, season_type, date_str, game_id, nba_game_id, start, gamepack_key, team, opponent, side, result, team_score, opp_score, player, box_stats, actions, segments):
     row = {
         "gameId": game_id,
@@ -382,6 +414,37 @@ def _upsert_game_row(games, row):
         updated.append(row)
     updated.sort(key=lambda item: (item.get("date") or "", item.get("start") or "", item.get("gameId") or ""))
     return updated
+
+
+def _upsert_unplayed_game_row(games, row):
+    row = dict(row)
+    game_id = row.get("gameId")
+    updated = []
+    replaced = False
+    changed = False
+
+    for existing in games or []:
+        if existing.get("gameId") != game_id:
+            updated.append(existing)
+            continue
+
+        replaced = True
+        if not _is_unplayed_game_row(existing):
+            updated.append(existing)
+            continue
+
+        merged = {**existing, **row}
+        if not merged.get("opponentName") and existing.get("opponentName"):
+            merged["opponentName"] = existing.get("opponentName")
+        updated.append(merged)
+        changed = changed or merged != existing
+
+    if not replaced:
+        updated.append(row)
+        changed = True
+
+    updated.sort(key=lambda item: (item.get("date") or "", item.get("start") or "", item.get("gameId") or ""))
+    return updated, changed
 
 
 def _average_numeric_fields(totals, games_played, exclude=None):
@@ -763,6 +826,120 @@ def _load_or_init_player_artifact(*, s3_client, bucket, root_prefix, key, player
         allow_missing=True,
     )
     return existing if isinstance(existing, dict) else _init_player_artifact(player, season)
+
+
+def _derive_live_team_artifacts(schedule_game, *, root_prefix):
+    if not isinstance(schedule_game, dict):
+        return []
+
+    game_id = str(schedule_game.get("id") or "").strip()
+    date_str = str(schedule_game.get("date") or "").strip()
+    start = str(schedule_game.get("starttime") or "").strip()
+    if not date_str and start:
+        date_str = start[:10]
+    if not game_id or not date_str:
+        return []
+
+    away_abbr = str(schedule_game.get("awayteam") or "").strip().upper()
+    home_abbr = str(schedule_game.get("hometeam") or "").strip().upper()
+    if not away_abbr or not home_abbr:
+        return []
+
+    season = _derive_season_label(date_str)
+    season_type = derive_season_type(
+        schedule_game,
+        nba_game_id=schedule_game.get("nbaGameId"),
+    )
+    gamepack_key = f"{root_prefix}gamepack/{game_id}.json.gz"
+    away_team = {
+        "id": _safe_int(schedule_game.get("awayTeamId")),
+        "abbr": away_abbr,
+        "name": "",
+    }
+    home_team = {
+        "id": _safe_int(schedule_game.get("homeTeamId")),
+        "abbr": home_abbr,
+        "name": "",
+    }
+    schedule_game = {**schedule_game, "date": date_str}
+
+    return [
+        {
+            "team": away_team,
+            "season": season,
+            "seasonType": season_type,
+            "row": _build_live_team_game_row(
+                season=season,
+                season_type=season_type,
+                schedule_game=schedule_game,
+                side="away",
+                opponent=home_team,
+                gamepack_key=gamepack_key,
+            ),
+        },
+        {
+            "team": home_team,
+            "season": season,
+            "seasonType": season_type,
+            "row": _build_live_team_game_row(
+                season=season,
+                season_type=season_type,
+                schedule_game=schedule_game,
+                side="home",
+                opponent=away_team,
+                gamepack_key=gamepack_key,
+            ),
+        },
+    ]
+
+
+def update_team_live_artifacts_for_schedule_game(*, s3_client, bucket, root_prefix, page_prefix, schedule_game):
+    items = _derive_live_team_artifacts(schedule_game, root_prefix=root_prefix)
+    game_id = str((schedule_game or {}).get("id") or "").strip()
+    season = items[0]["season"] if items else ""
+    season_type = items[0]["seasonType"] if items else ""
+    team_writes = 0
+    affected_teams = []
+
+    for item in items:
+        team = item["team"]
+        team_abbr = str(team.get("abbr") or "").strip().upper()
+        key = _season_key_for_team(page_prefix, team_abbr, item["season"])
+        artifact = _load_or_init_team_artifact(
+            s3_client=s3_client,
+            bucket=bucket,
+            root_prefix=root_prefix,
+            key=key,
+            team=team,
+            season=item["season"],
+        )
+        games, changed = _upsert_unplayed_game_row(artifact.get("games"), item["row"])
+        if not changed:
+            continue
+
+        artifact["games"] = games
+        _recalc_team_artifact(artifact, today=_parse_date(_date_str_for_game(item["row"])))
+        upload_json_to_s3(
+            s3_client=s3_client,
+            bucket=bucket,
+            prefix=root_prefix,
+            key=key,
+            data=artifact,
+            is_final=False,
+        )
+        team_writes += 1
+        if team_abbr and team_abbr not in affected_teams:
+            affected_teams.append(team_abbr)
+
+    return {
+        "teamFiles": team_writes,
+        "playerFiles": 0,
+        "teams": affected_teams,
+        "players": [],
+        "gameId": game_id,
+        "season": season,
+        "seasonType": season_type,
+    }
 
 
 def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_prefix, gamepack):

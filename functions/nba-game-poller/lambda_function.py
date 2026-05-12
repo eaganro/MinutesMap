@@ -35,7 +35,10 @@ from nba_game_poller.captioning import (
     extract_closed_periods,
     select_caption_checkpoint_periods,
 )
-from nba_game_poller.page_artifacts import update_page_artifacts_for_gamepack
+from nba_game_poller.page_artifacts import (
+    update_page_artifacts_for_gamepack,
+    update_team_live_artifacts_for_schedule_game,
+)
 from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
 
 # --- Configuration & Environment ---
@@ -950,6 +953,36 @@ def process_game(game_item, user_agent=None, date_str=None):
                 data=gamepack,
                 is_final=is_game_final,
             )
+            live_schedule_game = {
+                **game_item,
+                **updates,
+                "id": game_key,
+                "date": date_str or game_item.get("date"),
+                "nbaGameId": nba_game_id,
+            }
+            if (
+                not is_game_final
+                and not game_item.get("teamPageLiveUpdated")
+                and status_indicates_live(live_schedule_game)
+            ):
+                try:
+                    live_artifact_result = update_team_live_artifacts_for_schedule_game(
+                        s3_client=s3_client,
+                        bucket=BUCKET,
+                        root_prefix=PREFIX,
+                        page_prefix=PAGE_PREFIX,
+                        schedule_game=live_schedule_game,
+                    )
+                    if live_artifact_result.get("teamFiles"):
+                        updates["teamPageLiveUpdated"] = True
+                        print(
+                            "Poller: Marked live team page rows for "
+                            f"{live_artifact_result['gameId']} "
+                            f"({live_artifact_result['teamFiles']} team)."
+                        )
+                        request_minutesmap_revalidation(live_artifact_result)
+                except Exception as exc:
+                    print(f"Poller: Failed to mark live team page rows for {game_key}: {exc}")
             if is_game_final:
                 try:
                     artifact_result = update_page_artifacts_for_gamepack(

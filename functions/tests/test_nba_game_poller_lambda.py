@@ -343,6 +343,123 @@ class TestNbaGamePollerLambda:
         assert uploaded_gamepack["seasonType"] == "regular"
         assert self.module.update_page_artifacts_for_gamepack.call_args.kwargs["gamepack"] == uploaded_gamepack
 
+    def test_process_game_marks_live_team_artifacts_once(self):
+        game_item = {
+            "id": "2026-02-04-phi-lal",
+            "nbaGameId": "0022500001",
+            "date": "2026-02-04",
+            "starttime": "2026-02-04T19:30:00-05:00",
+            "awayteam": "PHI",
+            "hometeam": "LAL",
+            "status": "Scheduled",
+            "homescore": 0,
+            "awayscore": 0,
+        }
+
+        play_payload = {
+            "game": {
+                "homeTeamId": 1610612747,
+                "awayTeamId": 1610612755,
+                "actions": [
+                    {
+                        "description": "Tyrese Maxey makes 2-foot layup",
+                        "period": 1,
+                        "clock": "PT10M45.00S",
+                        "scoreHome": "2",
+                        "scoreAway": "4",
+                    }
+                ],
+            }
+        }
+        box_payload = {
+            "game": {
+                "gameStatusText": "Q1 10:45",
+                "gameClock": "PT10M45.00S",
+                "homeTeam": {
+                    "teamId": 1610612747,
+                    "teamTricode": "LAL",
+                    "score": 2,
+                    "wins": 10,
+                    "losses": 5,
+                    "players": [],
+                },
+                "awayTeam": {
+                    "teamId": 1610612755,
+                    "teamTricode": "PHI",
+                    "score": 4,
+                    "wins": 12,
+                    "losses": 3,
+                    "players": [],
+                },
+            }
+        }
+
+        def fake_fetch(url, _etag=None, _ua=None):
+            if "playbyplay" in url:
+                return play_payload, "play-etag"
+            if "boxscore" in url:
+                return box_payload, "box-etag"
+            return None, None
+
+        live_artifact_result = {
+            "gameId": "2026-02-04-phi-lal",
+            "teamFiles": 2,
+            "playerFiles": 0,
+            "teams": ["PHI", "LAL"],
+            "players": [],
+        }
+        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.process_playbyplay_payload = MagicMock(
+            return_value={
+                "v": 2,
+                "players": {"away": {}, "home": {}},
+                "segments": {"away": {}, "home": {}},
+                "last": {"awayScore": 4, "homeScore": 2},
+            }
+        )
+        self.module.build_box_payload = MagicMock(
+            return_value={
+                "start": "2026-02-04T19:30:00-05:00",
+                "teams": {
+                    "away": {"id": 1610612755, "abbr": "PHI", "name": "76ers", "players": []},
+                    "home": {"id": 1610612747, "abbr": "LAL", "name": "Lakers", "players": []},
+                },
+            }
+        )
+        self.module.upload_json_to_s3 = MagicMock()
+        self.module.update_page_artifacts_for_gamepack = MagicMock()
+        self.module.update_team_live_artifacts_for_schedule_game = MagicMock(return_value=live_artifact_result)
+        self.module.request_minutesmap_revalidation = MagicMock()
+        self.module.load_gamepack = MagicMock(return_value=None)
+
+        is_final, updates = self.module.process_game(game_item, user_agent="ua", date_str="2026-02-04")
+
+        assert is_final is False
+        assert updates["status"] == "Q1 10:45"
+        assert updates["teamPageLiveUpdated"] is True
+        self.module.update_team_live_artifacts_for_schedule_game.assert_called_once()
+        live_call = self.module.update_team_live_artifacts_for_schedule_game.call_args.kwargs
+        assert live_call["schedule_game"]["status"] == "Q1 10:45"
+        assert live_call["schedule_game"]["homescore"] == 2
+        assert live_call["schedule_game"]["awayscore"] == 4
+        assert live_call["schedule_game"]["homeTeamId"] == 1610612747
+        assert live_call["schedule_game"]["awayTeamId"] == 1610612755
+        self.module.request_minutesmap_revalidation.assert_called_once_with(live_artifact_result)
+        self.module.update_page_artifacts_for_gamepack.assert_not_called()
+
+        self.module.update_team_live_artifacts_for_schedule_game.reset_mock()
+        self.module.request_minutesmap_revalidation.reset_mock()
+        is_final, updates = self.module.process_game(
+            {**game_item, "teamPageLiveUpdated": True},
+            user_agent="ua",
+            date_str="2026-02-04",
+        )
+
+        assert is_final is False
+        assert "teamPageLiveUpdated" not in updates
+        self.module.update_team_live_artifacts_for_schedule_game.assert_not_called()
+        self.module.request_minutesmap_revalidation.assert_not_called()
+
     def test_request_minutesmap_revalidation_posts_paths_and_logs_response(self):
         artifact_result = {
             "teams": ["phi", "LAL", "PHI"],

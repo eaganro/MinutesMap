@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "functions" / "nba-game-poller"))
 from nba_game_poller.page_artifacts import (  # noqa: E402
     _recalc_player_artifact,
     _recalc_team_artifact,
+    update_team_live_artifacts_for_schedule_game,
     update_page_artifacts_for_gamepack,
 )
 
@@ -185,6 +186,60 @@ def test_update_page_artifacts_for_gamepack_writes_team_and_player_files():
     assert team_artifact["players"][0]["name"] == "Tyrese Maxey"
     assert team_artifact["players"][0]["games"] == 1
     assert team_artifact["players"][0]["box"]["pts"] == 27
+
+
+def test_update_team_live_artifacts_for_schedule_game_writes_team_files_only():
+    s3 = FakeS3()
+    schedule_game = {
+        "id": "2026-02-04-phi-lal",
+        "nbaGameId": "0022500001",
+        "date": "2026-02-04",
+        "starttime": "2026-02-04T19:30:00-05:00",
+        "awayteam": "PHI",
+        "hometeam": "LAL",
+        "awayTeamId": 1610612755,
+        "homeTeamId": 1610612747,
+        "awayscore": 18,
+        "homescore": 14,
+        "status": "Q1 06:12",
+        "time": "06:12",
+        "seasonType": "regular",
+    }
+
+    result = update_team_live_artifacts_for_schedule_game(
+        s3_client=s3,
+        bucket="test-bucket",
+        root_prefix="data/",
+        page_prefix="pages/",
+        schedule_game=schedule_game,
+    )
+
+    assert result == {
+        "teamFiles": 2,
+        "playerFiles": 0,
+        "teams": ["PHI", "LAL"],
+        "players": [],
+        "gameId": "2026-02-04-phi-lal",
+        "season": "2025-26",
+        "seasonType": "regular",
+    }
+    assert sorted(key for _, key in s3.objects) == [
+        "data/pages/teams/LAL/2025-26.json.gz",
+        "data/pages/teams/PHI/2025-26.json.gz",
+    ]
+
+    team_key = ("test-bucket", "data/pages/teams/PHI/2025-26.json.gz")
+    team_artifact = json.loads(gzip.decompress(s3.objects[team_key]).decode("utf-8"))
+    live_row = team_artifact["games"][0]
+    assert live_row["status"] == "Q1 06:12"
+    assert live_row["played"] is False
+    assert live_row["result"] is None
+    assert live_row["teamScore"] == 18
+    assert live_row["oppScore"] == 14
+    assert live_row["gamepackKey"] == "data/gamepack/2026-02-04-phi-lal.json.gz"
+    assert live_row["recordAfterBySeasonType"] is None
+    assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
+    assert team_artifact["players"] == []
 
 
 def test_team_recalc_keeps_future_unplayed_schedule_rows_out_of_totals():
