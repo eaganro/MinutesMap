@@ -2,6 +2,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Boxscore from './Boxscore';
 
+const mocks = vi.hoisted(() => ({
+  trackBoxscoreFeatureUseMock: vi.fn(),
+}));
+
 vi.mock('./processTeamStats', () => ({
   default: vi.fn((team, isHome, showMore, setShowMore, tableWrapperRef, onScroll) => (
     <div>
@@ -20,7 +24,7 @@ vi.mock('../hooks/ui/useTheme', () => ({
 }));
 
 vi.mock('../hooks/analytics/useTrackFeatureUseOnce', () => ({
-  useTrackFeatureUseOnce: () => vi.fn(),
+  useTrackFeatureUseOnce: () => mocks.trackBoxscoreFeatureUseMock,
 }));
 
 const buildBox = () => ({
@@ -36,6 +40,7 @@ describe('Boxscore', () => {
   });
 
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.clear();
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
@@ -98,5 +103,18 @@ describe('Boxscore', () => {
 
     expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
     expect(screen.queryByText('Show more stats')).not.toBeInTheDocument();
+  });
+
+  it('tracks boxscore feature use from click, touch, and wheel interactions', () => {
+    const { container } = render(
+      <Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />,
+    );
+    const box = container.querySelector('.box');
+
+    fireEvent.click(box);
+    fireEvent.touchStart(box);
+    fireEvent.wheel(box);
+
+    expect(mocks.trackBoxscoreFeatureUseMock).toHaveBeenCalledTimes(3);
   });
 });

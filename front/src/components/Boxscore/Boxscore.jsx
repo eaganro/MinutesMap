@@ -154,6 +154,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
       className={`box ${isDataLoading ? 'isLoading' : ''}`}
       onClick={trackBoxscoreFeatureUse}
       onTouchStart={trackBoxscoreFeatureUse}
+      onWheel={trackBoxscoreFeatureUse}
     >
       {showLoadingOverlay && (
         <div className="loadingOverlay">
