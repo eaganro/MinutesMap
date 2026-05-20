@@ -5,6 +5,7 @@ import { usePlayPointerHandlers } from './usePlayPointerHandlers';
 const mocks = vi.hoisted(() => ({
   buildNbaEventUrlMock: vi.fn(),
   resolveVideoActionMock: vi.fn(),
+  trackFeatureUseMock: vi.fn(),
   trackFeatureUseOnceMock: vi.fn(),
 }));
 
@@ -15,6 +16,10 @@ vi.mock('../../../helpers/nbaEvents', () => ({
 
 vi.mock('../../hooks/analytics/useTrackFeatureUseOnce', () => ({
   useTrackFeatureUseOnce: () => mocks.trackFeatureUseOnceMock,
+}));
+
+vi.mock('../../../helpers/analytics', () => ({
+  trackFeatureUse: mocks.trackFeatureUseMock,
 }));
 
 const buildMatchMedia = (matches = true) => ({
@@ -77,6 +82,11 @@ describe('usePlayPointerHandlers', () => {
       '_blank',
       'noopener',
     );
+    expect(mocks.trackFeatureUseMock).toHaveBeenCalledWith('stat-video', {
+      source: 'chart-marker',
+      gameId: '0022500001',
+      actionNumber: 55,
+    });
     expect(props.setInfoLocked).not.toHaveBeenCalled();
   });
 

@@ -7,6 +7,7 @@ import {
 import { clampWinProbability, formatWinProbabilityPercent } from '../../helpers/odds';
 import { LegendShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
 import { formatClock, formatPeriod } from '../../helpers/utils';
+import { trackFeatureUse } from '../../helpers/analytics';
 import { buildNbaEventUrl, resolveVideoAction } from '../../helpers/nbaEvents';
 import { buildTooltipStyle, computeTooltipLayout } from './model/layoutModel';
 import {
@@ -120,9 +121,10 @@ export default function PlayTooltip({
   const baseVideoAction =
     safeDescriptionArray.find((action) => !isSubstitutionAction(action)) || null;
   const resolvedVideoAction = resolveVideoAction(baseVideoAction, allActions);
+  const videoActionNumber = resolvedVideoAction?.actionNumber ?? baseVideoAction?.actionNumber;
   const videoUrl = buildNbaEventUrl({
     gameId: nbaGameId,
-    actionNumber: resolvedVideoAction?.actionNumber ?? baseVideoAction?.actionNumber,
+    actionNumber: videoActionNumber,
     description: resolvedVideoAction?.description ?? baseVideoAction?.description,
   });
 
@@ -169,7 +171,13 @@ export default function PlayTooltip({
             teamColors={teamColors}
             renderItems={renderItems}
           />
-          {showLockedVideoLink && <LockedVideoLink videoUrl={videoUrl} />}
+          {showLockedVideoLink && (
+            <LockedVideoLink
+              videoUrl={videoUrl}
+              nbaGameId={nbaGameId}
+              actionNumber={videoActionNumber}
+            />
+          )}
           {primaryAction && (
             <TooltipHeader
               primaryAction={primaryAction}
@@ -197,7 +205,13 @@ export default function PlayTooltip({
             teamColors={teamColors}
             renderItems={renderItems}
           />
-          {showLockedVideoLink && <LockedVideoLink videoUrl={videoUrl} />}
+          {showLockedVideoLink && (
+            <LockedVideoLink
+              videoUrl={videoUrl}
+              nbaGameId={nbaGameId}
+              actionNumber={videoActionNumber}
+            />
+          )}
           {showNavControls && (
             <div className="tooltipNav">
               <button
@@ -382,14 +396,21 @@ function TooltipActions({ descriptionArray, awayTeamNames, teamColors, renderIte
   );
 }
 
-function LockedVideoLink({ videoUrl }) {
+function LockedVideoLink({ videoUrl, nbaGameId, actionNumber }) {
   return (
     <div style={{ fontSize: '0.85em', color: 'var(--text-tertiary)', marginTop: 6 }}>
       <a
         href={videoUrl}
         target="_blank"
         rel="noopener"
-        onClick={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          trackFeatureUse('stat-video', {
+            source: 'tooltip-link',
+            gameId: nbaGameId,
+            actionNumber,
+          });
+        }}
         onTouchStart={(event) => event.stopPropagation()}
         style={{
           color: 'var(--score-diff-icon-color, #2563EB)',

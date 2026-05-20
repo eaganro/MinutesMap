@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildNbaEventUrl, resolveVideoAction } from '../../../helpers/nbaEvents';
+import { trackFeatureUse } from '../../../helpers/analytics';
 import { useTrackFeatureUseOnce } from '../../hooks/analytics/useTrackFeatureUseOnce';
 import { findActionMetaFromTarget } from '../model/interactionModel';
 
@@ -79,6 +80,11 @@ export function usePlayPointerHandlers({
           description: targetAction?.description ?? action?.description,
         });
         if (url && typeof window !== 'undefined') {
+          trackFeatureUse('stat-video', {
+            source: 'chart-marker',
+            gameId: nbaGameId,
+            actionNumber: targetAction?.actionNumber ?? action?.actionNumber ?? actionNumber,
+          });
           window.open(url, '_blank', 'noopener');
           return;
         }
