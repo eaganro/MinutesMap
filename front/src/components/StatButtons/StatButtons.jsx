@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EVENT_TYPES, LegendShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
 import './StatButtons.scss';
 
 const STAT_HOVER_PREVIEW_DELAY_MS = 500;
+const STAT_HOLD_ISOLATE_DELAY_MS = 500;
+const EVENT_KEYS = Object.keys(EVENT_TYPES);
 
 export default function StatButtons({
   statOn,
@@ -15,10 +17,14 @@ export default function StatButtons({
   statusMessage,
   onStatHoverChange = () => {},
 }) {
-  const eventKeys = Object.keys(EVENT_TYPES);
   const isInteractive = !isLoading && !statusMessage;
   const hoverPreviewTimeoutRef = useRef(null);
   const activeHoverStatRef = useRef(null);
+  const holdTimeoutRef = useRef(null);
+  const holdActiveRef = useRef(false);
+  const holdCompletedRef = useRef(false);
+  const suppressNextClickRef = useRef(false);
+  const [holdStatIndex, setHoldStatIndex] = useState(null);
 
   const clearStatHoverPreview = useCallback(() => {
     if (hoverPreviewTimeoutRef.current) {
@@ -35,7 +41,7 @@ export default function StatButtons({
   const startStatHoverPreview = useCallback(
     (index) => {
       clearStatHoverPreview();
-      if (!isInteractive || statOn[index] === false) return;
+      if (!isInteractive || statOn[index] === false || holdActiveRef.current) return;
 
       hoverPreviewTimeoutRef.current = window.setTimeout(() => {
         hoverPreviewTimeoutRef.current = null;
@@ -55,7 +61,86 @@ export default function StatButtons({
     }
   }, [clearStatHoverPreview, isInteractive, statOn]);
 
+  const clearStatHold = useCallback(() => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
+    }
+    holdActiveRef.current = false;
+    setHoldStatIndex(null);
+  }, []);
+
+  const isolateStat = useCallback(
+    (index) => {
+      const activeStatCount = statOn.filter(Boolean).length;
+      const shouldTurnAllOn = activeStatCount === 0 || (activeStatCount === 1 && statOn[index]);
+
+      if (shouldTurnAllOn) {
+        EVENT_KEYS.forEach((_, statIndex) => {
+          if (!statOn[statIndex]) {
+            changeStatOn(statIndex);
+          }
+        });
+        return;
+      }
+
+      if (statOn[index] === false) {
+        changeStatOn(index);
+      }
+
+      EVENT_KEYS.forEach((_, statIndex) => {
+        if (statIndex !== index && statOn[statIndex]) {
+          changeStatOn(statIndex);
+        }
+      });
+    },
+    [changeStatOn, statOn],
+  );
+
+  const completeStatHold = useCallback(
+    (index) => {
+      holdTimeoutRef.current = null;
+      holdActiveRef.current = false;
+      holdCompletedRef.current = true;
+      setHoldStatIndex(null);
+      clearStatHoverPreview();
+      isolateStat(index);
+    },
+    [clearStatHoverPreview, isolateStat],
+  );
+
+  const startStatHold = useCallback(
+    (event, index) => {
+      if (!isInteractive || (event.button !== undefined && event.button !== 0)) return;
+
+      clearStatHold();
+      clearStatHoverPreview();
+      holdActiveRef.current = true;
+      holdCompletedRef.current = false;
+      setHoldStatIndex(index);
+      holdTimeoutRef.current = window.setTimeout(() => {
+        completeStatHold(index);
+      }, STAT_HOLD_ISOLATE_DELAY_MS);
+    },
+    [clearStatHold, clearStatHoverPreview, completeStatHold, isInteractive],
+  );
+
+  const endStatHold = useCallback(() => {
+    const completed = holdCompletedRef.current;
+    clearStatHold();
+    if (completed) {
+      suppressNextClickRef.current = true;
+      holdCompletedRef.current = false;
+    }
+  }, [clearStatHold]);
+
+  useEffect(() => clearStatHold, [clearStatHold]);
+
   const handleToggle = (index) => {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
     if (!isInteractive) return;
     clearStatHoverPreview();
     changeStatOn(index);
@@ -83,7 +168,7 @@ export default function StatButtons({
     );
   };
 
-  const buttons = eventKeys.map((key, i) => {
+  const buttons = EVENT_KEYS.map((key, i) => {
     const isActive = statOn[i];
     const isPoint = key === 'point';
     const isMiss = key === 'miss';
@@ -91,11 +176,18 @@ export default function StatButtons({
 
     return (
       <div
-        className={`buttonGroup ${isActive ? '' : 'off'} ${isPoint || isMiss ? 'subLegend' : ''}`}
+        className={`buttonGroup ${isActive ? '' : 'off'} ${isPoint || isMiss ? 'subLegend' : ''} ${holdStatIndex === i ? 'isHoldCharging' : ''}`}
         key={key}
         onClick={() => handleToggle(i)}
         onMouseEnter={() => startStatHoverPreview(i)}
         onMouseLeave={clearStatHoverPreview}
+        onPointerDown={(event) => startStatHold(event, i)}
+        onPointerUp={endStatHold}
+        onPointerCancel={endStatHold}
+        onPointerLeave={(event) => {
+          clearStatHoverPreview(event);
+          endStatHold();
+        }}
         aria-disabled={!isInteractive}
       >
         {isPoint ? (

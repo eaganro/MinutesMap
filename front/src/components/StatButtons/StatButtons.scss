@@ -22,16 +22,39 @@
 }
 
 .buttonGroup {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
   cursor: pointer;
   padding: 3px 6px;
   border-radius: 6px;
+  overflow: hidden;
   transition: all 0.15s ease;
   user-select: none;
 
-  &:hover {
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    height: 0;
+    background-color: var(--bg-hover);
+    pointer-events: none;
+  }
+
+  &.isHoldCharging::before {
+    animation: statHoldFill 0.5s linear forwards;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  &:hover:not(.isHoldCharging) {
     background-color: var(--bg-hover);
   }
 
@@ -99,6 +122,16 @@
     .scoreDiffIcon {
       color: var(--score-diff-icon-color, #6366f1);
     }
+  }
+}
+
+@keyframes statHoldFill {
+  from {
+    height: 0;
+  }
+
+  to {
+    height: 100%;
   }
 }
 
