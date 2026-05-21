@@ -29,6 +29,7 @@ export default function Play({
   showOdds = false,
   statOn,
   changeStatOn,
+  emphasizedStatIndex = null,
   onPlayerDetailModeChange,
 }) {
   const {
@@ -494,6 +495,7 @@ export default function Play({
                     highlight={highlightActionIds}
                     leftMargin={leftMargin}
                     timelineWindow={timelineWindow}
+                    emphasizedStatIndex={emphasizedStatIndex}
                     onSelect={
                       isMobilePlayerSheetEnabled
                         ? () => handlePlayerSelect('away', name)
@@ -519,6 +521,7 @@ export default function Play({
                     highlight={highlightActionIds}
                     leftMargin={leftMargin}
                     timelineWindow={timelineWindow}
+                    emphasizedStatIndex={emphasizedStatIndex}
                     onSelect={
                       isMobilePlayerSheetEnabled
                         ? () => handlePlayerSelect('home', name)

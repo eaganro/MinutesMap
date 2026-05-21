@@ -300,6 +300,14 @@ describe('Play', () => {
     expect(graphLines[2]).toHaveStyle({ strokeWidth: '0.5' });
   });
 
+  it('sizes up matching stat markers and deemphasizes others when a legend stat is previewed', () => {
+    const { container } = renderPlay(buildProps({ emphasizedStatIndex: 0 }));
+
+    expect(container.querySelector('[data-action-number="11"]')).toHaveClass('statHoverMatch');
+    expect(container.querySelector('[data-action-number="12"]')).toHaveClass('statHoverOther');
+    expect(container.querySelector('[data-action-number="21"]')).toHaveClass('statHoverOther');
+  });
+
   it('does not render a win-odds line when the odds data is missing', () => {
     const { container } = renderPlay(
       buildProps({

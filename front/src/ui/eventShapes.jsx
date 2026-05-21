@@ -68,6 +68,7 @@ export function renderFreeThrowRing({
   subType,
   isAnd1 = false,
   actionNumber = null,
+  className = '',
 }) {
   const isMiss = isMissDescription(description);
   const strokeWidth = Math.max(1, size * 0.2);
@@ -97,6 +98,7 @@ export function renderFreeThrowRing({
       stroke={ringColor}
       strokeWidth={strokeWidth}
       pointerEvents="all"
+      className={className || undefined}
       {...dataAttrs}
     />
   );
@@ -111,6 +113,7 @@ export function renderEventShape(
   is3PT = false,
   actionNumber = null,
   markerScaleOverride = null,
+  className = '',
 ) {
   const config = EVENT_TYPES[eventType];
   if (!config) return null;
@@ -130,11 +133,13 @@ export function renderEventShape(
 
   const markerColor = 'var(--event-3pt-marker, #DC2626)';
   const markerRadius = s * (markerScaleOverride ?? 0.6);
+  const shapeClassName = !is3PT && className ? className : undefined;
+  const shapeDataAttrs = is3PT ? {} : dataAttrs;
 
   const wrapWith3PT = (mainShape) => {
     if (!is3PT) return mainShape;
     return (
-      <g key={key} {...dataAttrs}>
+      <g key={key} className={className || undefined} {...dataAttrs}>
         {mainShape}
         <circle
           cx={cx}
@@ -150,7 +155,15 @@ export function renderEventShape(
   switch (shape) {
     case 'circle': {
       const element = (
-        <circle key={key} cx={cx} cy={cy} r={s} fill={color} {...(is3PT ? {} : dataAttrs)} />
+        <circle
+          key={key}
+          cx={cx}
+          cy={cy}
+          r={s}
+          fill={color}
+          className={shapeClassName}
+          {...shapeDataAttrs}
+        />
       );
       return wrapWith3PT(element);
     }
@@ -172,14 +185,22 @@ export function renderEventShape(
         L ${cx - s + t} ${cy - s}
         Z
       `;
-      const element = <path key={key} d={path} fill={color} {...(is3PT ? {} : dataAttrs)} />;
+      const element = (
+        <path key={key} d={path} fill={color} className={shapeClassName} {...shapeDataAttrs} />
+      );
       return wrapWith3PT(element);
     }
 
     case 'diamond': {
       const points = `${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`;
       const element = (
-        <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />
+        <polygon
+          key={key}
+          points={points}
+          fill={color}
+          className={shapeClassName}
+          {...shapeDataAttrs}
+        />
       );
       return wrapWith3PT(element);
     }
@@ -187,7 +208,13 @@ export function renderEventShape(
     case 'chevron': {
       const points = `${cx - s * 0.6},${cy - s} ${cx + s},${cy} ${cx - s * 0.6},${cy + s}`;
       const element = (
-        <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />
+        <polygon
+          key={key}
+          points={points}
+          fill={color}
+          className={shapeClassName}
+          {...shapeDataAttrs}
+        />
       );
       return wrapWith3PT(element);
     }
@@ -195,7 +222,13 @@ export function renderEventShape(
     case 'triangleDown': {
       const points = `${cx},${cy + s} ${cx - s},${cy - s * 0.7} ${cx + s},${cy - s * 0.7}`;
       const element = (
-        <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />
+        <polygon
+          key={key}
+          points={points}
+          fill={color}
+          className={shapeClassName}
+          {...shapeDataAttrs}
+        />
       );
       return wrapWith3PT(element);
     }
@@ -203,7 +236,13 @@ export function renderEventShape(
     case 'triangleUp': {
       const points = `${cx},${cy - s} ${cx - s},${cy + s * 0.7} ${cx + s},${cy + s * 0.7}`;
       const element = (
-        <polygon key={key} points={points} fill={color} {...(is3PT ? {} : dataAttrs)} />
+        <polygon
+          key={key}
+          points={points}
+          fill={color}
+          className={shapeClassName}
+          {...shapeDataAttrs}
+        />
       );
       return wrapWith3PT(element);
     }
@@ -217,7 +256,8 @@ export function renderEventShape(
           width={s * 1.6}
           height={s * 1.6}
           fill={color}
-          {...(is3PT ? {} : dataAttrs)}
+          className={shapeClassName}
+          {...shapeDataAttrs}
         />
       );
       return wrapWith3PT(element);
@@ -230,14 +270,28 @@ export function renderEventShape(
         points.push(`${cx + s * Math.cos(angle)},${cy + s * Math.sin(angle)}`);
       }
       const element = (
-        <polygon key={key} points={points.join(' ')} fill={color} {...(is3PT ? {} : dataAttrs)} />
+        <polygon
+          key={key}
+          points={points.join(' ')}
+          fill={color}
+          className={shapeClassName}
+          {...shapeDataAttrs}
+        />
       );
       return wrapWith3PT(element);
     }
 
     default: {
       const element = (
-        <circle key={key} cx={cx} cy={cy} r={s} fill={color} {...(is3PT ? {} : dataAttrs)} />
+        <circle
+          key={key}
+          cx={cx}
+          cy={cy}
+          r={s}
+          fill={color}
+          className={shapeClassName}
+          {...shapeDataAttrs}
+        />
       );
       return wrapWith3PT(element);
     }

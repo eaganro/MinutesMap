@@ -4,6 +4,7 @@ import {
   isFreeThrowAction,
   isThreePointAction,
 } from '../../../domain/events/classification';
+import { getActionStatToggleIndex } from '../../../domain/game-data/filterActions';
 import { renderEventShape, renderFreeThrowRing } from '../../../ui/eventShapes.jsx';
 
 import './Player.scss';
@@ -19,6 +20,7 @@ export default function Player({
   leftMargin,
   timelineWindow,
   onSelect,
+  emphasizedStatIndex = null,
 }) {
   const playerName = name;
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
@@ -65,11 +67,17 @@ export default function Player({
   const buildActionShapes = (actionList, size) => {
     const shapes = [];
     const freeThrowShapes = [];
+    const hasStatEmphasis = Number.isInteger(emphasizedStatIndex);
 
     actionList.forEach((a) => {
       const pos = getXPosition(a.period, a.clock);
       const isFreeThrow = isFreeThrowAction(a.description, a.actionType);
       const timeKey = `${a.period}|${a.clock}`;
+      const markerClassName = hasStatEmphasis
+        ? getActionStatToggleIndex(a) === emphasizedStatIndex
+          ? 'statHoverMatch'
+          : 'statHoverOther'
+        : '';
 
       if (isFreeThrow) {
         const isAnd1 = isOneOfOneFreeThrow(a) && pointAtTime.has(timeKey);
@@ -82,6 +90,7 @@ export default function Player({
           subType: a.subType,
           isAnd1,
           actionNumber: a.actionNumber,
+          className: markerClassName,
         });
         if (ring) {
           freeThrowShapes.push(ring);
@@ -103,6 +112,7 @@ export default function Player({
         is3PT,
         a.actionNumber,
         markerScaleOverride,
+        markerClassName,
       );
       if (shape) {
         shapes.push(shape);

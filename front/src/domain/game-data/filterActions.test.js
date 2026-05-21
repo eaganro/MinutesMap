@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   filterActions,
   filterPlayerActions,
+  getActionStatToggleIndex,
   sortActions,
   STAT_TOGGLE_INDEX,
 } from './filterActions';
@@ -37,6 +38,37 @@ describe('filterActions', () => {
 
     expect(filterActions(missAction, toggleVector([STAT_TOGGLE_INDEX.MISS]))).toBe(true);
     expect(filterActions(missAction, toggleVector([STAT_TOGGLE_INDEX.MAKE]))).toBe(false);
+  });
+
+  it('returns the stat toggle index for each supported action type', () => {
+    expect(
+      getActionStatToggleIndex({ actionType: 'freethrow', description: 'Free Throw 1 of 1' }),
+    ).toBe(STAT_TOGGLE_INDEX.MAKE);
+    expect(
+      getActionStatToggleIndex({
+        actionType: '3pt',
+        description: 'MISS 3PT jump shot',
+        result: 'x',
+      }),
+    ).toBe(STAT_TOGGLE_INDEX.MISS);
+    expect(getActionStatToggleIndex({ actionType: 'rebound', description: 'rebound' })).toBe(
+      STAT_TOGGLE_INDEX.REBOUND,
+    );
+    expect(getActionStatToggleIndex({ actionType: 'assist', description: 'assist' })).toBe(
+      STAT_TOGGLE_INDEX.ASSIST,
+    );
+    expect(getActionStatToggleIndex({ actionType: 'turnover', description: 'turnover' })).toBe(
+      STAT_TOGGLE_INDEX.TURNOVER,
+    );
+    expect(getActionStatToggleIndex({ actionType: 'block', description: 'block' })).toBe(
+      STAT_TOGGLE_INDEX.BLOCK,
+    );
+    expect(getActionStatToggleIndex({ actionType: 'steal', description: 'steal' })).toBe(
+      STAT_TOGGLE_INDEX.STEAL,
+    );
+    expect(getActionStatToggleIndex({ actionType: 'foul', description: 'foul' })).toBe(
+      STAT_TOGGLE_INDEX.FOUL,
+    );
   });
 
   it('filters player maps using the requested toggles', () => {

@@ -22,7 +22,7 @@ const isShotType = (actionType, description) =>
   actionType.includes('shot') ||
   description.includes('free throw');
 
-export function filterActions(action, statOn) {
+export function getActionStatToggleIndex(action) {
   const type = normalize(action?.actionType);
   const desc = normalize(action?.description);
   const result = normalize(action?.result || action?.r);
@@ -32,15 +32,20 @@ export function filterActions(action, statOn) {
     result === 'x' || result === 'miss' || type.includes('miss') || isMissDescription(desc);
   const isMake = result === 'm' || result === 'make' || (shotType && !isMiss);
 
-  if (statOn[STAT_TOGGLE_INDEX.MAKE] && shotType && isMake) return true;
-  if (statOn[STAT_TOGGLE_INDEX.MISS] && shotType && isMiss) return true;
-  if (statOn[STAT_TOGGLE_INDEX.REBOUND] && type.includes('rebound')) return true;
-  if (statOn[STAT_TOGGLE_INDEX.ASSIST] && type.includes('assist')) return true;
-  if (statOn[STAT_TOGGLE_INDEX.TURNOVER] && type.includes('turnover')) return true;
-  if (statOn[STAT_TOGGLE_INDEX.BLOCK] && type.includes('block')) return true;
-  if (statOn[STAT_TOGGLE_INDEX.STEAL] && type.includes('steal')) return true;
-  if (statOn[STAT_TOGGLE_INDEX.FOUL] && type.includes('foul')) return true;
-  return false;
+  if (shotType && isMake) return STAT_TOGGLE_INDEX.MAKE;
+  if (shotType && isMiss) return STAT_TOGGLE_INDEX.MISS;
+  if (type.includes('rebound')) return STAT_TOGGLE_INDEX.REBOUND;
+  if (type.includes('assist')) return STAT_TOGGLE_INDEX.ASSIST;
+  if (type.includes('turnover')) return STAT_TOGGLE_INDEX.TURNOVER;
+  if (type.includes('block')) return STAT_TOGGLE_INDEX.BLOCK;
+  if (type.includes('steal')) return STAT_TOGGLE_INDEX.STEAL;
+  if (type.includes('foul')) return STAT_TOGGLE_INDEX.FOUL;
+  return null;
+}
+
+export function filterActions(action, statOn) {
+  const statIndex = getActionStatToggleIndex(action);
+  return statIndex !== null && Boolean(statOn[statIndex]);
 }
 
 export function filterPlayerActions(playerMap, statOn) {

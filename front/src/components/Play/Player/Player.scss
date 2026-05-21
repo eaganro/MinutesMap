@@ -42,6 +42,23 @@
       stroke-width 0.2s ease;
   }
 
+  .statHoverMatch,
+  .statHoverOther {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+  }
+
+  .statHoverMatch {
+    transform: scale(1.25);
+  }
+
+  .statHoverOther {
+    opacity: 0.14;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     &:hover .playerTimeline {
       stroke: var(--playline-hover);

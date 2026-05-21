@@ -1,5 +1,8 @@
+import { useCallback, useEffect, useRef } from 'react';
 import { EVENT_TYPES, LegendShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
 import './StatButtons.scss';
+
+const STAT_HOVER_PREVIEW_DELAY_MS = 500;
 
 export default function StatButtons({
   statOn,
@@ -10,11 +13,51 @@ export default function StatButtons({
   setShowOdds = () => {},
   isLoading,
   statusMessage,
+  onStatHoverChange = () => {},
 }) {
   const eventKeys = Object.keys(EVENT_TYPES);
   const isInteractive = !isLoading && !statusMessage;
+  const hoverPreviewTimeoutRef = useRef(null);
+  const activeHoverStatRef = useRef(null);
+
+  const clearStatHoverPreview = useCallback(() => {
+    if (hoverPreviewTimeoutRef.current) {
+      clearTimeout(hoverPreviewTimeoutRef.current);
+      hoverPreviewTimeoutRef.current = null;
+    }
+
+    if (activeHoverStatRef.current !== null) {
+      activeHoverStatRef.current = null;
+      onStatHoverChange(null);
+    }
+  }, [onStatHoverChange]);
+
+  const startStatHoverPreview = useCallback(
+    (index) => {
+      clearStatHoverPreview();
+      if (!isInteractive || statOn[index] === false) return;
+
+      hoverPreviewTimeoutRef.current = window.setTimeout(() => {
+        hoverPreviewTimeoutRef.current = null;
+        activeHoverStatRef.current = index;
+        onStatHoverChange(index);
+      }, STAT_HOVER_PREVIEW_DELAY_MS);
+    },
+    [clearStatHoverPreview, isInteractive, onStatHoverChange, statOn],
+  );
+
+  useEffect(() => clearStatHoverPreview, [clearStatHoverPreview]);
+
+  useEffect(() => {
+    const activeHoverStat = activeHoverStatRef.current;
+    if (!isInteractive || (activeHoverStat !== null && statOn[activeHoverStat] === false)) {
+      clearStatHoverPreview();
+    }
+  }, [clearStatHoverPreview, isInteractive, statOn]);
+
   const handleToggle = (index) => {
     if (!isInteractive) return;
+    clearStatHoverPreview();
     changeStatOn(index);
   };
 
@@ -51,6 +94,8 @@ export default function StatButtons({
         className={`buttonGroup ${isActive ? '' : 'off'} ${isPoint || isMiss ? 'subLegend' : ''}`}
         key={key}
         onClick={() => handleToggle(i)}
+        onMouseEnter={() => startStatHoverPreview(i)}
+        onMouseLeave={clearStatHoverPreview}
         aria-disabled={!isInteractive}
       >
         {isPoint ? (

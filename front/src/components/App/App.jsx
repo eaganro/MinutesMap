@@ -15,6 +15,7 @@ import './App.scss';
 export default function App() {
   const { scheduleVm, scoreVm, playVm, statControlsVm, boxVm, lineupsVm } = useMinutesMap();
   const [isPlayerDetailOpen, setIsPlayerDetailOpen] = useState(false);
+  const [emphasizedStatIndex, setEmphasizedStatIndex] = useState(null);
 
   return (
     <div className="topLevel">
@@ -89,6 +90,7 @@ export default function App() {
             showOdds={playVm.showOdds}
             statOn={playVm.statOn}
             changeStatOn={statControlsVm.changeStatOn}
+            emphasizedStatIndex={emphasizedStatIndex}
             onPlayerDetailModeChange={setIsPlayerDetailOpen}
           />
           {!isPlayerDetailOpen && (
@@ -101,6 +103,7 @@ export default function App() {
               setShowOdds={statControlsVm.setShowOdds}
               isLoading={statControlsVm.isLoading}
               statusMessage={statControlsVm.statusMessage}
+              onStatHoverChange={setEmphasizedStatIndex}
             />
           )}
         </div>
