@@ -232,6 +232,49 @@ def _build_recent_events(flow_payload, period, limit=8):
     return events[-limit:]
 
 
+def _latest_flow_period(flow_payload):
+    periods = []
+    score_timeline = (flow_payload or {}).get("score") or []
+    for entry in score_timeline:
+        if not isinstance(entry, dict):
+            continue
+        period = _safe_int(entry.get("quarter") or entry.get("period"), 0) or 0
+        if period > 0:
+            periods.append(period)
+
+    last = (flow_payload or {}).get("last")
+    if isinstance(last, dict):
+        period = _safe_int(last.get("quarter") or last.get("period"), 0) or 0
+        if period > 0:
+            periods.append(period)
+
+    return max(periods) if periods else 0
+
+
+def _is_final_caption_checkpoint(flow_payload, period, is_final_game):
+    if not is_final_game:
+        return False
+    latest_period = _latest_flow_period(flow_payload)
+    return period > 0 and (latest_period <= 0 or period >= latest_period)
+
+
+def _should_generate_caption_checkpoint(period, flow_payload, is_final_game):
+    if period < 4:
+        return True
+    if _is_final_caption_checkpoint(flow_payload, period, is_final_game):
+        return True
+    latest_period = _latest_flow_period(flow_payload)
+    return latest_period > period
+
+
+def filter_caption_checkpoint_periods(selected_periods, flow_payload, is_final_game=False):
+    return [
+        period
+        for period in selected_periods or []
+        if _should_generate_caption_checkpoint(period, flow_payload, is_final_game)
+    ]
+
+
 def _compute_player_metrics(actions, period):
     points = 0
     assists = 0
@@ -349,7 +392,7 @@ def _top_player_candidates(flow_payload, period, max_candidates=6):
     return output
 
 
-def _build_summary(flow_payload, box_payload, period):
+def _build_summary(flow_payload, box_payload, period, is_final_game=False):
     score_timeline = (flow_payload or {}).get("score") or []
     away_total, home_total = _score_at_period(score_timeline, period)
     if away_total is None or home_total is None:
@@ -363,10 +406,15 @@ def _build_summary(flow_payload, box_payload, period):
     players_by_team = _top_player_candidates(flow_payload, period)
     period_splits = _period_splits(score_timeline, period)
     recent_events = _build_recent_events(flow_payload, period, limit=8)
+    is_final_checkpoint = _is_final_caption_checkpoint(flow_payload, period, is_final_game)
 
     return {
         "period": period,
         "periodLabel": _period_label(period),
+        "gameState": {
+            "isFinal": is_final_checkpoint,
+            "checkpointType": "game_final" if is_final_checkpoint else "period_checkpoint",
+        },
         "score": {
             "awayTeam": away_abbr,
             "homeTeam": home_abbr,
@@ -382,6 +430,7 @@ def _build_summary(flow_payload, box_payload, period):
 def _build_prompt(summary, max_players_per_team):
     context = {
         "checkpoint": summary.get("periodLabel"),
+        "gameState": summary.get("gameState"),
         "score": summary.get("score"),
         "periodSplits": summary.get("periodSplits"),
         "recentEvents": summary.get("recentEvents"),
@@ -401,6 +450,8 @@ def _build_prompt(summary, max_players_per_team):
         "- No emojis.\n"
         "- No hashtags.\n"
         f"- full_caption should be <= {FULL_CAPTION_MAX_CHARS} chars and focus on the game story up to this checkpoint.\n"
+        "- If gameState.isFinal is true, write full_caption as a completed-game result: make it clear the winner has won and avoid in-progress phrases like leads, takes a lead, heads into, or through Q4.\n"
+        "- If gameState.isFinal is false, do not imply the game is over.\n"
         f"- player_stories should be <= {PLAYER_CAPTION_MAX_CHARS} chars each.\n"
         f"- At most {max_players_per_team} player stories per team.\n"
         "- Only use player names from playerCandidates.\n"
@@ -664,8 +715,9 @@ def request_period_caption(
     model,
     max_players_per_team=2,
     timeout_seconds=8.0,
+    is_final_game=False,
 ):
-    summary = _build_summary(flow_payload, box_payload, period)
+    summary = _build_summary(flow_payload, box_payload, period, is_final_game=is_final_game)
     if not summary:
         return None
 
@@ -779,6 +831,13 @@ def _initialize_captions(existing_captions, model):
     return merged
 
 
+def _finalize_captions(captions, model):
+    captions["provider"] = "gemini"
+    captions["model"] = model
+    captions["updatedAt"] = datetime.now(timezone.utc).isoformat()
+    return captions
+
+
 def build_period_captions(
     *,
     actions=None,
@@ -790,9 +849,12 @@ def build_period_captions(
     max_players_per_team=2,
     timeout_seconds=8.0,
     include_final_overtime=False,
+    is_final_game=False,
 ):
     if not api_key or not isinstance(flow_payload, dict):
         return existing_captions
+
+    effective_is_final_game = bool(is_final_game or include_final_overtime)
 
     if actions is not None:
         closed_periods = extract_closed_periods(actions)
@@ -800,13 +862,20 @@ def build_period_captions(
         closed_periods = extract_closed_periods_from_flow(flow_payload)
     if not closed_periods:
         return existing_captions
+
+    captions = _initialize_captions(existing_captions, model)
+    changed = isinstance(existing_captions, dict) and captions != existing_captions
     selected_periods = select_caption_checkpoint_periods(
         closed_periods,
         include_final_overtime=include_final_overtime,
     )
-
-    captions = _initialize_captions(existing_captions, model)
-    changed = isinstance(existing_captions, dict) and captions != existing_captions
+    selected_periods = filter_caption_checkpoint_periods(
+        selected_periods,
+        flow_payload,
+        is_final_game=effective_is_final_game,
+    )
+    if not selected_periods:
+        return _finalize_captions(captions, model) if changed else existing_captions
 
     for period in selected_periods:
         period_key = str(period)
@@ -821,6 +890,7 @@ def build_period_captions(
             model=model,
             max_players_per_team=max_players_per_team,
             timeout_seconds=timeout_seconds,
+            is_final_game=effective_is_final_game,
         )
         if not generated:
             continue
@@ -835,7 +905,4 @@ def build_period_captions(
     if not changed:
         return existing_captions
 
-    captions["provider"] = "gemini"
-    captions["model"] = model
-    captions["updatedAt"] = datetime.now(timezone.utc).isoformat()
-    return captions
+    return _finalize_captions(captions, model)

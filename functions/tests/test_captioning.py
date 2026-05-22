@@ -175,6 +175,89 @@ def test_build_period_captions_only_generates_final_overtime_when_final(monkeypa
     assert set(merged["periods"].keys()) == {"2", "4", "6"}
 
 
+def test_build_period_captions_defers_fourth_quarter_until_final(monkeypatch):
+    flow_payload = {
+        "last": {"quarter": 4, "time": "00:00"},
+        "score": [
+            {"quarter": 1, "awayScore": 28, "homeScore": 24},
+            {"quarter": 2, "awayScore": 52, "homeScore": 50},
+            {"quarter": 3, "awayScore": 80, "homeScore": 74},
+            {"quarter": 4, "awayScore": 108, "homeScore": 101},
+        ],
+        "players": {"away": {}, "home": {}},
+        "events": [],
+    }
+    box_payload = {
+        "teams": {
+            "away": {"abbr": "DAL"},
+            "home": {"abbr": "MIN"},
+        }
+    }
+    requested_periods = []
+    existing_captions = {
+        "v": 1,
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "updatedAt": "2026-02-01T00:00:00+00:00",
+        "limits": {
+            "full": captioning.FULL_CAPTION_MAX_CHARS,
+            "player": captioning.PLAYER_CAPTION_MAX_CHARS,
+        },
+        "periods": {
+            "2": {
+                "generatedAt": "2026-02-01T00:00:00+00:00",
+                "full": "Existing halftime caption.",
+                "players": [],
+            }
+        },
+    }
+
+    def fake_request_period_caption(**kwargs):
+        requested_periods.append(kwargs.get("period"))
+        return {"full": f"Generated for period {kwargs.get('period')}.", "players": []}
+
+    monkeypatch.setattr(captioning, "request_period_caption", fake_request_period_caption)
+
+    deferred = captioning.build_period_captions(
+        actions=None,
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        existing_captions=existing_captions,
+        api_key="test-key",
+        model="gemini-2.5-flash",
+        is_final_game=False,
+    )
+    final = captioning.build_period_captions(
+        actions=None,
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        existing_captions=existing_captions,
+        api_key="test-key",
+        model="gemini-2.5-flash",
+        is_final_game=True,
+    )
+
+    assert deferred == existing_captions
+    assert requested_periods == [4]
+    assert final["periods"]["4"]["full"] == "Generated for period 4."
+
+
+def test_filter_caption_checkpoints_allows_fourth_when_overtime_starts():
+    flow_payload = {
+        "last": {"quarter": 5, "time": "04:30"},
+        "score": [
+            {"quarter": 4, "awayScore": 104, "homeScore": 104},
+            {"quarter": 5, "awayScore": 106, "homeScore": 104},
+        ],
+    }
+
+    assert captioning.filter_caption_checkpoint_periods(
+        [2, 4],
+        flow_payload,
+        is_final_game=False,
+    ) == [2, 4]
+
+
 def test_build_period_captions_normalizes_limits_even_when_no_new_periods():
     existing = {
         "v": 1,
@@ -419,6 +502,68 @@ def test_request_period_caption_includes_response_schema(monkeypatch):
     prompt = captured["body"]["contents"][0]["parts"][0]["text"]
     assert f"full_caption should be <= {captioning.FULL_CAPTION_MAX_CHARS} chars" in prompt
     assert f"player_stories should be <= {captioning.PLAYER_CAPTION_MAX_CHARS} chars each" in prompt
+
+
+def test_request_period_caption_prompts_for_final_game_language(monkeypatch):
+    flow_payload = {
+        "last": {"quarter": 4, "time": "00:00"},
+        "score": [{"quarter": 4, "awayScore": 108, "homeScore": 101}],
+        "players": {"away": {}, "home": {}},
+        "events": [],
+    }
+    box_payload = {
+        "teams": {
+            "away": {"abbr": "DAL"},
+            "home": {"abbr": "MIN"},
+        }
+    }
+
+    captured = {}
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {
+                                        "text": '{"full_caption":"DAL beats MIN 108-101.","player_stories":[]}'
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(req, timeout=8.0):
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return _FakeResponse()
+
+    monkeypatch.setattr(captioning.urllib.request, "urlopen", fake_urlopen)
+
+    generated = captioning.request_period_caption(
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        period=4,
+        api_key="test-api-key",
+        model="gemini-2.5-flash",
+        is_final_game=True,
+    )
+
+    assert generated == {"full": "DAL beats MIN 108-101.", "players": []}
+    prompt = captured["body"]["contents"][0]["parts"][0]["text"]
+    assert '"gameState": {"isFinal": true, "checkpointType": "game_final"}' in prompt
+    assert "completed-game result" in prompt
+    assert "avoid in-progress phrases" in prompt
 
 
 def test_request_period_caption_retries_parse_failure_once(monkeypatch):

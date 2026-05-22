@@ -33,6 +33,7 @@ from nba_game_poller.season_types import derive_season_type
 from nba_game_poller.captioning import (
     build_period_captions,
     extract_closed_periods,
+    filter_caption_checkpoint_periods,
     select_caption_checkpoint_periods,
 )
 from nba_game_poller.page_artifacts import (
@@ -679,6 +680,7 @@ def caption_worker_logic(event):
         max_players_per_team=CAPTION_MAX_PLAYERS_PER_TEAM,
         timeout_seconds=CAPTION_TIMEOUT_SECONDS,
         include_final_overtime=is_final_status(status_text),
+        is_final_game=is_final_status(status_text),
     )
     if not isinstance(merged_captions, dict):
         return
@@ -898,9 +900,15 @@ def process_game(game_item, user_agent=None, date_str=None):
     if processed is not None and AI_CAPTIONS_ENABLED and GEMINI_API_KEY and LAMBDA_ARN:
         closed_periods = extract_closed_periods(actions)
         status_for_worker = updates.get("status") or game_item.get("status") or ""
+        is_final_for_worker = is_final_status(status_for_worker)
         caption_checkpoints = select_caption_checkpoint_periods(
             closed_periods,
-            include_final_overtime=is_final_status(status_for_worker),
+            include_final_overtime=is_final_for_worker,
+        )
+        caption_checkpoints = filter_caption_checkpoint_periods(
+            caption_checkpoints,
+            processed,
+            is_final_game=is_final_for_worker,
         )
         if caption_checkpoints:
             latest_closed_period = max(caption_checkpoints)

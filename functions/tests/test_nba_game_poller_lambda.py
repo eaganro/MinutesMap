@@ -758,6 +758,96 @@ class TestNbaGamePollerLambda:
         self.module.lambda_client.invoke.assert_not_called()
         assert "captions_requested_through" not in updates
 
+    def test_process_game_defers_fourth_quarter_caption_until_final(self):
+        game_item = {
+            "id": "2026-02-04-phi-lal",
+            "nbaGameId": "0022500001",
+            "status": "Q4 00:05",
+            "captions_requested_through": 2,
+        }
+
+        play_payload = {
+            "game": {
+                "homeTeamId": 1610612747,
+                "awayTeamId": 1610612755,
+                "actions": [
+                    {
+                        "description": "End of 4th Period",
+                        "period": 4,
+                        "clock": "PT00M00.00S",
+                        "scoreHome": "101",
+                        "scoreAway": "108",
+                    }
+                ],
+            }
+        }
+        box_payload = {
+            "game": {
+                "gameStatusText": "Q4 00:00",
+                "gameClock": "PT00M00.00S",
+                "homeTeam": {
+                    "teamId": 1610612747,
+                    "teamTricode": "LAL",
+                    "score": 101,
+                    "wins": 0,
+                    "losses": 0,
+                    "players": [],
+                },
+                "awayTeam": {
+                    "teamId": 1610612755,
+                    "teamTricode": "PHI",
+                    "score": 108,
+                    "wins": 0,
+                    "losses": 0,
+                    "players": [],
+                },
+            }
+        }
+
+        def fake_fetch(url, _etag=None, _ua=None):
+            if "playbyplay" in url:
+                return play_payload, "play-etag"
+            if "boxscore" in url:
+                return box_payload, "box-etag"
+            return None, None
+
+        processed_flow = {
+            "v": 2,
+            "periods": 4,
+            "last": {"quarter": 4, "time": "00:00", "awayScore": 108, "homeScore": 101},
+            "score": [
+                {"quarter": 2, "time": "00:00", "awayScore": 55, "homeScore": 52},
+                {"quarter": 4, "time": "00:00", "awayScore": 108, "homeScore": 101},
+            ],
+            "players": {"away": {}, "home": {}},
+            "segments": {"away": {}, "home": {}},
+        }
+        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.process_playbyplay_payload = MagicMock(return_value=processed_flow)
+        self.module.build_box_payload = MagicMock(
+            return_value={
+                "teams": {
+                    "away": {"abbr": "PHI", "players": []},
+                    "home": {"abbr": "LAL", "players": []},
+                }
+            }
+        )
+        self.module.upload_json_to_s3 = MagicMock()
+        self.module.load_gamepack = MagicMock(return_value=None)
+        self.module.lambda_client = MagicMock()
+        self.module.lambda_client.invoke = MagicMock(return_value={})
+        self.module.AI_CAPTIONS_ENABLED = True
+        self.module.GEMINI_API_KEY = "test-api-key"
+        self.module.GEMINI_MODEL = "gemini-2.5-flash"
+        self.module.LAMBDA_ARN = "arn:aws:lambda:us-east-1:123:function:test"
+
+        is_final, updates = self.module.process_game(game_item, user_agent="ua", date_str="2026-02-04")
+
+        assert is_final is False
+        self.module.lambda_client.invoke.assert_not_called()
+        assert updates["status"] == "Q4 00:00"
+        assert "captions_requested_through" not in updates
+
     def test_caption_worker_generates_and_uploads_captions(self):
         existing_gamepack = {
             "v": 1,
