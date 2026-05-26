@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMinutesMap } from '../hooks';
+import { useMinutesMap } from '../hooks/data/useMinutesMap';
 
 import Schedule from '../Schedule/Schedule';
 import Score from '../Score/Score';

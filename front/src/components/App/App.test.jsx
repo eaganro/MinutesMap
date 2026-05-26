@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   footerMock: vi.fn(() => <div data-testid="footer" />),
 }));
 
-vi.mock('../hooks', () => ({
+vi.mock('../hooks/data/useMinutesMap', () => ({
   useMinutesMap: mocks.useMinutesMapMock,
 }));
 
