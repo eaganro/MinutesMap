@@ -1,334 +1,201 @@
-# [MinutesMap](https://MinutesMap.com) 🏀
-**Serverless Real-Time Basketball Analytics & Play-by-Play Visualization**
+# [MinutesMap](https://minutesmap.com) 🏀
 
-![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-blue) ![DynamoDB](https://img.shields.io/badge/Database-DynamoDB-blueviolet) ![License](https://img.shields.io/badge/License-MIT-green)
+**Interactive live basketball play-by-play visualization.**
+
+![AWS](https://img.shields.io/badge/AWS-Serverless-orange) ![React](https://img.shields.io/badge/Frontend-React%20%7C%20Vite-blue) ![DynamoDB](https://img.shields.io/badge/Database-DynamoDB-blueviolet)
 ![Backend Build](https://github.com/eaganro/MinutesMap/actions/workflows/infra.yml/badge.svg) ![Frontend Build](https://github.com/eaganro/MinutesMap/actions/workflows/frontend.yml/badge.svg)
 
-[ **Launch Live App** ](https://MinutesMap.com)
+[Launch Live App](https://minutesmap.com)
 
 ![MinutesMap Dashboard](docs/images/overview-desktop-dark.png)
 
-## 📖 Introduction
-**MinutesMap** is a web dashboard for visualizing live basketball games with high-density, interactive play-by-play views (beyond a standard scoreboard). I built it because I wanted a specific way to follow games live while watching, and I use it regularly.
+## Introduction
 
-The app runs on a **serverless AWS architecture** and uses a **hybrid push/pull real-time pattern**:
-- WebSockets notify clients when new data is available.
-- Clients then fetch the latest game + schedule data through **CloudFront → S3**, benefiting from CDN caching.
+MinutesMap is built around a dense, interactive play-by-play visualization for following NBA games in a way a standard play-by-play log cannot show. The core view maps game events over time so scoring runs, player stretches, lineup changes, stat filters, and win/odds movement can be inspected together.
 
-## ☁️ Architecture & Data Flow
+Score state, boxscore detail, lineup/minute views, schedule navigation, and export tools support that central play-by-play surface.
+
+The app runs on a serverless AWS architecture and uses a hybrid push/pull real-time pattern:
+
+- WebSockets notify clients when game or schedule data changed.
+- Clients fetch the latest JSON from CloudFront-backed S3 paths.
+- The poller writes compressed gamepack and schedule artifacts that are cheap to serve and cache.
+
+## Architecture And Data Flow
 
 ```mermaid
 flowchart TD
-    %% --- Styling ---
     classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white,font-weight:bold;
     classDef storage fill:#E05243,stroke:#232F3E,stroke-width:2px,color:white;
     classDef db fill:#3F8624,stroke:#232F3E,stroke-width:2px,color:white;
     classDef client fill:#61DAFB,stroke:#20232a,stroke-width:2px,color:black,font-weight:bold;
     classDef ext fill:#333,stroke:#fff,stroke-width:2px,color:white;
 
-    %% --- Nodes ---
-    subgraph External [External Source]
-        DataAPI[("🏀 Basketball Data API")]:::ext
+    subgraph External["External Data"]
+        NBA["NBA JSON feeds"]:::ext
+        Odds["Odds/market data"]:::ext
+        AI["Caption generation"]:::ext
     end
 
-    subgraph Ingestion [Ingestion Layer]
-        EB[EventBridge<br/>Cron/Rules]:::aws
-        L_Poller[Lambda<br/>Poller & Manager]:::aws
+    subgraph Ingestion["Ingestion"]
+        Manager["EventBridge manager"]:::aws
+        Poller["NBAGamePoller Lambda"]:::aws
+        Scoreboard["FetchTodaysScoreboard Lambda"]:::aws
     end
 
-    subgraph Core [AWS Core Infrastructure]
-        %% We group S3 and CF together to force them to the right side
-        subgraph Static [Static Delivery]
-            direction TB
-            S3[("S3 Bucket<br/>Data Lake")]:::storage
-            CF[CloudFront CDN]:::aws
-        end
-
-        subgraph RealTime [Real-Time Backend]
-            L_Event[Lambda<br/>S3 Trigger]:::aws
-            L_WS[Lambda<br/>WS Handler]:::aws
-            DDB[("DynamoDB<br/>Connection State")]:::db
-            APIG[API Gateway<br/>WebSocket]:::aws
-        end
+    subgraph AWS["AWS Core"]
+        S3["S3 processed-data bucket"]:::storage
+        CF["CloudFront"]:::aws
+        GameNotifier["ws-sendGameUpdate Lambda"]:::aws
+        DateNotifier["gameDateUpdates Lambda"]:::aws
+        WsHandlers["WebSocket route Lambdas"]:::aws
+        DDB["DynamoDB connection tables"]:::db
+        APIG["API Gateway WebSocket API"]:::aws
     end
 
-    subgraph Frontend [User Interface]
-        Browser[("💻 React Client")]:::client
+    subgraph Client["Client"]
+        Browser["React app"]:::client
     end
 
-    %% --- Connections ---
+    Manager --> Poller
+    Poller --> NBA
+    Poller --> Odds
+    Poller --> AI
+    Poller --> S3
+    Scoreboard --> NBA
+    Scoreboard --> S3
 
-    %% 1. Ingestion Flow (Top to Bottom)
-    EB --> L_Poller
-    L_Poller -- 1. Polls --> DataAPI
-    L_Poller -- 2. Uploads JSON --> S3
+    S3 --> GameNotifier
+    S3 --> DateNotifier
+    GameNotifier --> DDB
+    DateNotifier --> DDB
+    GameNotifier --> APIG
+    DateNotifier --> APIG
 
-    %% 2. Notification Flow (Left Side)
-    S3 -- 3. Trigger --> L_Event
-    L_Event -. Query Subs .-> DDB
-    L_Event -- 4. Broadcast --> APIG
-    APIG -- Push Data --> Browser
+    Browser --> APIG
+    APIG --> WsHandlers
+    WsHandlers --> DDB
+    APIG --> Browser
 
-    %% 3. Static Data Flow (Right Side)
-    %% CHANGED: We model this as Data Flow (S3 -> CF) to avoid the upward arrow crossing
-    S3 -- Origin Read --> CF
-    CF -- 5. Fetch via Edge --> Browser
-
-    %% 4. WebSocket Connection (Bottom Up - inevitable, but cleaner now)
-    Browser -- Connect/Sub --> APIG
-    APIG -- Route --> L_WS
-    L_WS -- Manage Conn --> DDB
-
+    S3 --> CF
+    CF --> Browser
 ```
 
-### High-Level Components
+### Main Components
 
-* **Frontend:** React (Vite) static app served via **CloudFront** (origin: **S3**).
-* **Game + schedule data storage:** JSON files in **S3** (`data/` payloads + `schedule/` daily schedule), served through **CloudFront**.
-* **Real-time signaling:** **API Gateway WebSocket API** with **Lambda** handlers.
-* **Connection/session state:** **DynamoDB** (stores connection IDs + current subscription info such as game/date).
-* **Ingestion:** **AWS Lambda** (Poller) triggered by **EventBridge** (Cron/Rate) polls a basketball data API and uploads new data to S3.
+- **Frontend:** Vite + React static app served from S3 through CloudFront.
+- **Primary data artifacts:** compressed JSON under `data/gamepack/*.json.gz` for game state and `schedule/YYYY-MM-DD.json.gz` for daily schedules.
+- **Page artifacts:** generated team/player data under `data/pages/` for derived views and navigation surfaces.
+- **Realtime layer:** API Gateway WebSocket API with Lambda routes for `followDate`, `followGame`, `unfollowDate`, and `unfollowGame`.
+- **Connection state:** DynamoDB tables for game subscriptions and date subscriptions.
+- **Ingestion:** Python `NBAGamePoller` Lambda manages schedule reconciliation, live game polling, gamepack uploads, page artifact updates, optional captions, and poller scheduling.
+- **Utility jobs:** scripts in `jobs/` support backfills, repairs, manifest rebuilds, page artifact builds, and one-off processing.
 
-### 1) Client Subscription Model
+## Data Model
 
-Clients “subscribe” to a **game + date**:
+The frontend bootstraps from `data/init.json`, loads the selected date's schedule from `schedule/<date>.json.gz`, and loads game detail from `data/gamepack/<game-key>.json.gz`.
 
-* The WebSocket connection is established via API Gateway.
-* The backend stores the connection/session in DynamoDB.
-* When the user changes game/date, the subscription info updates so notifications can be targeted.
+Gamepack payloads combine the current boxscore and processed play flow, including normalized teams, players, lineup segments, last action, period metadata, odds data when available, and generated captions when available. The client adapts older and newer payload shapes in `front/src/data/` so stored artifacts can evolve without forcing large UI rewrites.
 
-### 2) Data Update Flow (Hybrid Push/Pull)
+When a gamepack changes, S3 invokes `ws-sendGameUpdate-handler`, which finds WebSocket connections subscribed to that game and sends a small message containing the changed key and version. The browser then fetches the fresh CloudFront URL. Schedule updates follow the same pattern through `gameDateUpdates` and date subscriptions.
 
-1. **EventBridge** triggers the **Poller Lambda** during active games.
-2. The Lambda fetches data from basketball data endpoints and uploads compressed JSON to **S3** (game payloads + daily schedule updates).
-3. **S3 event notification** triggers a **Lambda**.
-4. Lambda queries **DynamoDB** (via a GSI keyed by `gameId`) to find connections currently subscribed to that game/date.
-5. Lambda sends a **small WebSocket message** like “new data available.”
-6. The browser fetches the updated JSON via **CloudFront → S3**.
+## Play-By-Play Visualization
 
-### 3) Schedule Updates
+- Dense timeline of game events, scoring flow, player actions, and period context.
+- Interactive inspection with hover/pointer state and focused player detail.
+- Stat filters for isolating specific event types and player contributions.
+- Score differential and odds overlays for reading momentum alongside the event stream.
+- Export rendering for sharing selected play views.
 
-* Daily schedule JSON is stored in **S3** under `schedule/YYYY-MM-DD.json.gz` and served via **CloudFront**.
-* An **S3 notification** triggers a Lambda that broadcasts a lightweight `date_update` message over WebSockets.
-* Clients fetch the updated schedule from **CloudFront → S3** when notified or when navigating dates.
+## Supporting Features
 
-## ⚡ Key Features
+- Schedule/date selection with URL state.
+- Live score, status, and last-action summary.
+- Player detail and lineup/minute views.
+- Boxscore panel with stale-while-loading behavior for live refreshes.
+- Dark mode and responsive layout.
+- Static `about` and `privacy` pages generated during the frontend build.
 
-### 📊 High-Density Visualization
-
-* **Interactive SVG charting** (pure SVG — no Canvas/D3 requirement).
-* Hover/tooltip-style inspection of game events and game state.
-
-### 🔌 Real-Time Updates
-
-* WebSocket “data changed” notifications keep the UI feeling live.
-* Data is fetched via CloudFront for caching efficiency.
-
-### 🎨 UI/UX
-
-* Dark-mode friendly layout.
-* Designed for desktop-first analysis, usable on smaller screens.
-
-## 📂 Repository Structure
-
-The codebase is organized into three distinct logical units:
+## Repository Structure
 
 | Directory | Description |
 | --- | --- |
-| **`front/`** | **Frontend Client.** A Vite + React application. Contains the WebSocket connection manager, visualization components, and global state management logic. |
-| **`functions/`** | **Serverless Backend.** AWS Lambda functions written in **Python + TypeScript**. Handles WebSocket lifecycle events, polls external basketball data APIs (Ingestion), and broadcasts updates via API Gateway. |
-| **`terraform/`** | **Infrastructure as Code.** Contains all AWS resource definitions (S3, DynamoDB, Lambda, IAM, EventBridge) to deploy the stack automatically. |
+| `front/` | Vite + React app, component/domain/data modules, Vitest tests, Playwright E2E tests, static page generator, and frontend deployment scripts. |
+| `functions/` | AWS Lambda code in Python and TypeScript, shared Lambda helpers, pytest tests, Vitest tests, and generated JS bundles for TypeScript Lambdas. |
+| `jobs/` | Local utility and backfill scripts for schedules, gamepacks, player IDs, page artifacts, and manifests. Some scripts can write to AWS when run with upload/write flags. |
+| `terraform/` | AWS infrastructure: S3, CloudFront, DynamoDB, API Gateway WebSockets, Lambdas, IAM, EventBridge, and scheduler wiring. |
+| `docs/` | Repository images and supporting documentation assets. |
 
-## 🛠️ Local Development & Setup
+## Testing
 
-<details>
-<summary><strong>Click to expand Setup Instructions</strong></summary>
+Targeted checks are usually enough before broader suites:
 
-### Prerequisites
-
-* **Node.js** v20+ (frontend + TypeScript Lambdas)
-* **Python** 3.11+ (for Python Lambdas)
-
-### Frontend Setup
-
-1. Clone the repository:
 ```bash
-git clone [https://github.com/eaganro/MinutesMap.git](https://github.com/eaganro/MinutesMap.git)
-
+npm --prefix front run test:unit
+npm --prefix front test -- --list
+npm --prefix front test -- e2e/app.spec.js --project=chromium -g "<pattern>"
+npm --prefix functions run test
+source functions/.venv/bin/activate && python -m pytest -q functions/tests/test_nba_game_poller_processing.py
+python -m pytest -q jobs/tests
 ```
 
+See `front/TESTING.md` for frontend test placement, impact mapping, and preferred commands.
 
-2. Install dependencies:
+## Infrastructure
+
+Terraform in `terraform/` manages:
+
+- S3 buckets for frontend hosting and processed data.
+- CloudFront distribution, SPA rewrites, and data path routing.
+- DynamoDB tables for game and date WebSocket subscriptions.
+- API Gateway WebSocket API and Lambda integrations.
+- Python and TypeScript Lambda functions for polling, schedule updates, WebSocket routes, and update broadcasts.
+- EventBridge rules and Scheduler roles for daily management, live polling, and reconciliation.
+- IAM roles and policies for each Lambda.
+
+Typical validation flow:
+
 ```bash
-cd front
-npm install
-
+terraform -chdir=terraform fmt
+terraform -chdir=terraform validate
 ```
 
+Deployments are handled by GitHub Actions on `main`. Running `terraform apply`, frontend S3 syncs, or job upload/write commands can modify production infrastructure or data, so treat them as explicit deployment operations.
 
-3. Configure Environment:
-Create a `.env.local` file in the `front/` directory:
-```env
-VITE_WS_LOCATION=wss://<your-api-gateway-websocket-endpoint>
-VITE_PREFIX=https://<your-s3-cdn-url>
+## CI/CD
 
-```
+### Frontend Deploy (`frontend.yml`)
 
+Triggered by pushes to `main` that touch `front/**`.
 
-4. Run the development server:
+- Installs frontend dependencies with `npm ci`.
+- Runs ESLint, Prettier check, Vitest unit tests, and an informational coverage report.
+- Runs Playwright Chromium smoke tests in the Playwright container.
+- Builds the app with static page generation.
+- Syncs built assets to S3 and invalidates CloudFront.
+
+### Backend & Infra (`infra.yml`)
+
+Triggered by pushes to `main` that touch `terraform/**` or `functions/**`.
+
+- Installs Lambda Node dependencies.
+- Installs Python test dependencies.
+- Runs Vitest for TypeScript Lambda/shared code.
+- Runs pytest for Python Lambda code.
+- Builds TypeScript Lambda bundles.
+- Runs `terraform init` and `terraform apply -auto-approve` with deployment secrets from GitHub Actions.
+
+## Generated Artifacts
+
+Do not hand-edit generated Lambda bundles:
+
+- `functions/gameDateUpdates/lambda_function.js`
+- `functions/ws-sendGameUpdate-handler/lambda_function.js`
+
+Regenerate them after changing the corresponding `.ts` sources:
+
 ```bash
-npm run dev
-
+npm --prefix functions run build:lambdas
 ```
 
-
-
-### Backend Setup (Optional)
-
-To build and test the TypeScript Lambdas locally:
-
-1. Install Node dependencies:
-```bash
-cd functions
-npm install
-
-```
-
-
-2. Build the Lambda bundles:
-```bash
-npm run build:lambdas
-
-```
-
-
-3. Run Vitest:
-```bash
-npm run test
-
-```
-
-
-To run the Python Lambda unit tests locally:
-
-1. Install test dependencies:
-```bash
-pip install -r functions/requirements-dev.txt
-
-```
-
-
-2. Run Pytest:
-```bash
-python -m pytest functions/tests
-
-```
-
-
-
-</details>
-
-## 🏗️ Infrastructure as Code (Terraform)
-
-The entire AWS serverless architecture (S3, DynamoDB, Lambda, API Gateway, EventBridge, and CloudFront) is defined and managed using **Terraform**. This ensures the infrastructure is reproducible, version-controlled, and automated.
-
-The configuration in `terraform/` handles:
-
-* **Storage:** S3 buckets (hosting, game data, schedule data) and DynamoDB tables (connection state).
-* **Compute:** Lambda functions for WebSocket handlers, data polling, and self-scheduling logic.
-* **Networking:** API Gateway (WebSocket API) and CloudFront CDN.
-* **Orchestration:** EventBridge Rules (Cron & Rate) and Scheduler Roles for automated data ingestion.
-* **Security:** Granular IAM Roles and Policies attached directly to each Lambda function.
-* **Build Automation:** Zips Lambda functions from functions/ into artifacts during deployment (run the TypeScript build before apply).
-
-### Deploying Infrastructure
-
-1. **Navigate to the Terraform directory:**
-```bash
-cd terraform
-
-```
-
-
-2. **Initialize Terraform:** Downloads required providers (AWS, Archive, Null).
-```bash
-terraform init
-
-```
-
-
-3. **Apply Changes:** This will build the local Lambda functions and deploy any infrastructure changes to AWS.
-```bash
-terraform apply
-
-```
-
-
-
-### Project Structure (Terraform)
-
-The configuration is split into domain-specific files to maintain readability:
-
-* **`main.tf`:** Provider config, backend state, and global settings.
-* **`locals.tf`:** Centralized variables (source paths, build directories).
-* **`storage.tf`:** S3 Buckets and Notifications.
-* **`database.tf`:** DynamoDB Tables and Indexes.
-* **`api_gateway.tf`:** WebSocket API definitions, routes, and stages.
-* **`fn_*.tf`:** Modular files for each Lambda function (e.g., `fn_nba_poller.tf`), containing the Function resource, IAM Role, and Triggers.
-
-## 🚀 CI/CD Pipelines
-
-This project uses **GitHub Actions** to automate testing, infrastructure provisioning, and deployment.
-
-### 1. Frontend Pipeline (`frontend.yml`)
-
-Triggered on changes to `front/**`.
-
-* **Quality Gate:** Runs frontend **lint**, **format check**, **unit tests**, and an **informational unit coverage report**.
-* **Automated Browser Smoke Tests:** Runs **Playwright smoke tests** (`@smoke`) on **Chromium** in a single job.
-* **Report Generation:** Uploads a single Playwright HTML report artifact.
-* **Continuous Deployment:** If tests pass on `main`:
-    1.  Builds the Vite application.
-    2.  Syncs static assets to **S3**.
-    3.  Invalidates the **CloudFront** cache to ensure users see the latest version immediately.
-* **Testing Reference:** See `front/TESTING.md` for unit/integration/E2E policy and impact map.
-
-### 2. Infrastructure Pipeline (`infra.yml`)
-
-Triggered on changes to `terraform/**` or `functions/**`.
-
-* **Backend Verification:** Sets up Node.js 20 + Python 3.11 and runs **Vitest** + **pytest** for the Lambda functions.
-* **Infrastructure as Code:** If tests pass, automatically runs `terraform init` and `terraform apply`.
-* **Updates:** Because Lambda functions are deployed via Terraform, this single pipeline handles both code logic updates and AWS resource changes.
-
-### Automation Workflow
-
-```mermaid
-flowchart LR
-    %% Styles
-    classDef git fill:#F05032,stroke:#333,stroke-width:2px,color:white;
-    classDef action fill:#2088FF,stroke:#333,stroke-width:2px,color:white;
-    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white;
-
-    subgraph GitHub_Actions["GitHub Actions"]
-        direction TB
-        Push["Push to Main"]:::git
-
-        subgraph Infra_Job["Backend and Infra"]
-            PyTest["Backend Tests - Vitest and Pytest"]:::action
-            TF["Terraform Apply"]:::action
-            PyTest --> TF
-        end
-
-        subgraph Front_Job["Frontend Deploy"]
-            Quality["Lint/Format/Unit/Coverage"]:::action
-            Test["Playwright Smoke - Chromium"]:::action
-            Build["Vite Build"]:::action
-            Sync["S3 Sync and CF Invalidation"]:::action
-            Quality --> Test --> Build --> Sync
-        end
-    end
-
-    Push -->|terraform/**| PyTest
-    Push -->|front/**| Quality
-```
+The frontend build also generates `front/public/about/index.html`, `front/public/privacy/index.html`, and static-page assets from `front/static-pages/`.
