@@ -56,6 +56,26 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Bootstrap response headers deployment permission
+        working-directory: ./terraform
+        env:
+          TF_VAR_gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          TF_VAR_minutesmap_revalidate_secret: ${{ secrets.MINUTESMAP_REVALIDATE_SECRET }}
+        run: |
+          terraform init -input=false
+          terraform console <<<'data.aws_iam_policy_document.github_shard_compute.json' | jq -r . > "$RUNNER_TEMP/github-shard-compute.json"
+
+          account_id="$(aws sts get-caller-identity --query Account --output text)"
+          policy_arn="arn:aws:iam::${account_id}:policy/GitHubActions-Shard-Compute"
+          default_version="$(aws iam get-policy --policy-arn "$policy_arn" --query Policy.DefaultVersionId --output text)"
+          aws iam get-policy-version --policy-arn "$policy_arn" --version-id "$default_version" --query PolicyVersion.Document --output json > "$RUNNER_TEMP/current-shard-compute.json"
+
+          if jq -e '[.Statement[].Sid] | (index("CloudFrontResponseHeadersPolicyCreateAndList") != null and index("CloudFrontResponseHeadersPolicyManage") != null)' "$RUNNER_TEMP/current-shard-compute.json" >/dev/null; then
+            exit 0
+          fi
+
+          aws iam create-policy-version --policy-arn "$policy_arn" --policy-document "file://$RUNNER_TEMP/github-shard-compute.json" --set-as-default
+
       - name: Terraform Init & Apply
         working-directory: ./terraform
         env:
