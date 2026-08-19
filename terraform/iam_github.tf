@@ -351,28 +351,6 @@ data "aws_iam_policy_document" "github_shard_compute" {
     ]
     resources = ["*"]
   }
-
-  statement {
-    sid    = "CloudFrontResponseHeadersPolicyCreateAndList"
-    effect = "Allow"
-    actions = [
-      "cloudfront:CreateResponseHeadersPolicy",
-      "cloudfront:ListResponseHeadersPolicies"
-    ]
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "CloudFrontResponseHeadersPolicyManage"
-    effect = "Allow"
-    actions = [
-      "cloudfront:DeleteResponseHeadersPolicy",
-      "cloudfront:GetResponseHeadersPolicy",
-      "cloudfront:GetResponseHeadersPolicyConfig",
-      "cloudfront:UpdateResponseHeadersPolicy"
-    ]
-    resources = ["arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:response-headers-policy/*"]
-  }
 }
 
 resource "aws_iam_policy" "github_shard_compute" {

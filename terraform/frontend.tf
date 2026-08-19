@@ -131,81 +131,30 @@ resource "aws_cloudfront_cache_policy" "posthog_no_cache" {
   }
 }
 
-resource "aws_cloudfront_response_headers_policy" "frontend_security" {
-  name    = "minutesmap-frontend-security"
-  comment = "Browser security headers for frontend pages and assets"
+resource "aws_cloudfront_function" "frontend_security_headers" {
+  name    = "minutesmap-frontend-security-headers"
+  runtime = "cloudfront-js-2.0"
+  comment = "Add browser security headers to frontend responses"
+  publish = true
+  code    = <<EOF
+function handler(event) {
+  var response = event.response;
+  var headers = response.headers;
 
-  # Apply the deployment permission before CloudFront attempts to create the
-  # headers policy.
-  depends_on = [aws_iam_policy.github_shard_compute]
+  headers['content-security-policy'] = {
+    value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://analytics.minutesmap.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://analytics.minutesmap.com ${aws_apigatewayv2_api.websocket_api.api_endpoint}; worker-src 'none'; media-src 'none'; manifest-src 'self'; upgrade-insecure-requests"
+  };
+  headers['permissions-policy'] = {
+    value: 'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), usb=()'
+  };
+  headers['referrer-policy'] = { value: 'strict-origin-when-cross-origin' };
+  headers['strict-transport-security'] = { value: 'max-age=63072000; includeSubDomains; preload' };
+  headers['x-content-type-options'] = { value: 'nosniff' };
+  headers['x-frame-options'] = { value: 'DENY' };
 
-  security_headers_config {
-    content_security_policy {
-      content_security_policy = join("; ", [
-        "default-src 'self'",
-        "base-uri 'self'",
-        "object-src 'none'",
-        "frame-ancestors 'none'",
-        "form-action 'self'",
-        "script-src 'self' https://analytics.minutesmap.com",
-        # React and Emotion render runtime style attributes and style elements.
-        "style-src 'self' 'unsafe-inline'",
-        # Blob/data images are limited to generated export previews and downloads.
-        "img-src 'self' data: blob:",
-        "font-src 'self' data:",
-        "connect-src 'self' https://analytics.minutesmap.com ${aws_apigatewayv2_api.websocket_api.api_endpoint}",
-        "worker-src 'none'",
-        "media-src 'none'",
-        "manifest-src 'self'",
-        "upgrade-insecure-requests",
-      ])
-      override = true
-    }
-
-    content_type_options {
-      override = true
-    }
-
-    frame_options {
-      frame_option = "DENY"
-      override     = true
-    }
-
-    referrer_policy {
-      referrer_policy = "strict-origin-when-cross-origin"
-      override        = true
-    }
-
-    strict_transport_security {
-      access_control_max_age_sec = 63072000
-      include_subdomains         = true
-      preload                    = true
-      override                   = true
-    }
-  }
-
-  custom_headers_config {
-    items {
-      header = "Permissions-Policy"
-      value  = join(", ", [
-        "accelerometer=()",
-        "autoplay=()",
-        "camera=()",
-        "display-capture=()",
-        "encrypted-media=()",
-        "fullscreen=(self)",
-        "geolocation=()",
-        "gyroscope=()",
-        "magnetometer=()",
-        "microphone=()",
-        "payment=()",
-        "picture-in-picture=()",
-        "publickey-credentials-get=()",
-        "usb=()",
-      ])
-      override = true
-    }
-  }
+  return response;
+}
+EOF
 }
 
 resource "aws_cloudfront_distribution" "main" {
@@ -306,13 +255,17 @@ resource "aws_cloudfront_distribution" "main" {
     target_origin_id = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
 
     # Modern Policy IDs
-    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-    origin_request_policy_id   = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.frontend_security.id
+    cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
 
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.spa_rewrite.arn
+    }
+
+    function_association {
+      event_type   = "viewer-response"
+      function_arn = aws_cloudfront_function.frontend_security_headers.arn
     }
 
     compress               = true

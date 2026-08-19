@@ -57,35 +57,6 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Bootstrap response headers deployment permission
-        working-directory: ./terraform
-        run: |
-          account_id="$(aws sts get-caller-identity --query Account --output text)"
-          policy_arn="arn:aws:iam::${account_id}:policy/GitHubActions-Shard-Compute"
-          default_version="$(aws iam get-policy --policy-arn "$policy_arn" --query Policy.DefaultVersionId --output text)"
-          aws iam get-policy-version --policy-arn "$policy_arn" --version-id "$default_version" --query PolicyVersion.Document --output json > "$RUNNER_TEMP/current-shard-compute.json"
-
-          if jq -e '[.Statement[].Sid] | (index("CloudFrontResponseHeadersPolicyCreateAndList") != null and index("CloudFrontResponseHeadersPolicyManage") != null)' "$RUNNER_TEMP/current-shard-compute.json" >/dev/null; then
-            exit 0
-          fi
-
-          jq --arg account_id "$account_id" '.Statement += [
-            {
-              "Sid": "CloudFrontResponseHeadersPolicyCreateAndList",
-              "Effect": "Allow",
-              "Action": ["cloudfront:ListResponseHeadersPolicies", "cloudfront:CreateResponseHeadersPolicy"],
-              "Resource": "*"
-            },
-            {
-              "Sid": "CloudFrontResponseHeadersPolicyManage",
-              "Effect": "Allow",
-              "Action": ["cloudfront:UpdateResponseHeadersPolicy", "cloudfront:GetResponseHeadersPolicyConfig", "cloudfront:GetResponseHeadersPolicy", "cloudfront:DeleteResponseHeadersPolicy"],
-              "Resource": "arn:aws:cloudfront::\($account_id):response-headers-policy/*"
-            }
-          ]' "$RUNNER_TEMP/current-shard-compute.json" > "$RUNNER_TEMP/github-shard-compute.json"
-
-          aws iam create-policy-version --policy-arn "$policy_arn" --policy-document "file://$RUNNER_TEMP/github-shard-compute.json" --set-as-default
-
       - name: Terraform Init & Apply
         working-directory: ./terraform
         env:
