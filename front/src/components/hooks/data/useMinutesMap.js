@@ -302,13 +302,6 @@ export function useMinutesMap() {
       detail: gameDataError.message,
       retry: retryGameData,
     };
-  } else if (isGameDataStale) {
-    dataNotice = {
-      tone: 'status',
-      message: 'Loading the selected game. Showing data from the previous game.',
-      detail: null,
-      retry: null,
-    };
   }
 
   const scoreVm = {

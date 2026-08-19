@@ -330,7 +330,7 @@ describe('useMinutesMap', () => {
     expect(mocks.changeGameMock).toHaveBeenCalledWith('2026-02-03-lal-bos');
   });
 
-  it('labels retained data when it belongs to the previously selected game', () => {
+  it('does not add a redundant notice while loading over data from the previous game', () => {
     mocks.gameDataOverrides = {
       loadedGameId: '2026-02-02-lal-bos',
       gameDataError: null,
@@ -340,12 +340,7 @@ describe('useMinutesMap', () => {
 
     const { result } = renderHook(() => useMinutesMap());
 
-    expect(result.current.scoreVm.dataNotice).toEqual({
-      tone: 'status',
-      message: 'Loading the selected game. Showing data from the previous game.',
-      detail: null,
-      retry: null,
-    });
+    expect(result.current.scoreVm.dataNotice).toBeNull();
     expect(result.current.scoreVm.gameStatus).toBeNull();
     expect(result.current.playVm.gameStatus).toBeNull();
     expect(result.current.playVm.gameId).toBe('2026-02-02-lal-bos');
