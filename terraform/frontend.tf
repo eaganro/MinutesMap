@@ -135,6 +135,10 @@ resource "aws_cloudfront_response_headers_policy" "frontend_security" {
   name    = "minutesmap-frontend-security"
   comment = "Browser security headers for frontend pages and assets"
 
+  # The deployment role manages this permission through Terraform. Apply the
+  # policy update before CloudFront attempts to create the headers policy.
+  depends_on = [aws_iam_policy.github_shard_compute]
+
   security_headers_config {
     content_security_policy {
       content_security_policy = join("; ", [
