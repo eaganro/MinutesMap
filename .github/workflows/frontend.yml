@@ -37,6 +37,9 @@ jobs:
       - name: Unit Tests
         run: npm run test:unit
 
+      - name: Cache Policy Tests
+        run: npm run test:cache-policy
+
       - name: Unit Coverage Report (Informational)
         run: npm run test:unit:coverage
 
