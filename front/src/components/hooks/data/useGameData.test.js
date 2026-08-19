@@ -19,6 +19,16 @@ function createResponse(payload, { status = 200, ok = true } = {}) {
   };
 }
 
+function createGamePack(id) {
+  return {
+    v: 2,
+    id,
+    periods: 4,
+    last: null,
+    actions: [{ actionNumber: Number(id) }],
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -130,6 +140,191 @@ describe('useGameData', () => {
 
     expect(result.current.isBoxLoading).toBe(false);
     expect(result.current.isPlayLoading).toBe(false);
+  });
+
+  it('ignores a previous date response and keeps loading until the current schedule resolves', async () => {
+    const previousDate = createDeferred();
+    const currentDate = createDeferred();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockReturnValueOnce(previousDate.promise)
+      .mockReturnValueOnce(currentDate.promise);
+
+    const { result } = renderHook(() => useGameData());
+
+    let previousRequest;
+    act(() => {
+      previousRequest = result.current.fetchSchedule('2026-02-02');
+    });
+
+    let currentRequest;
+    act(() => {
+      currentRequest = result.current.fetchSchedule('2026-02-03');
+    });
+
+    expect(fetchSpy.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(fetchSpy.mock.calls[1][1].signal.aborted).toBe(false);
+    expect(result.current.isScheduleLoading).toBe(true);
+
+    await act(async () => {
+      previousDate.resolve(createResponse([{ id: 'previous-game' }]));
+      await previousRequest;
+    });
+
+    expect(result.current.schedule).toEqual([]);
+    expect(result.current.isScheduleLoading).toBe(true);
+
+    await act(async () => {
+      currentDate.resolve(createResponse([{ id: 'current-game' }]));
+      await currentRequest;
+    });
+
+    expect(result.current.schedule).toEqual([{ id: 'current-game' }]);
+    expect(result.current.isScheduleLoading).toBe(false);
+  });
+
+  it('ignores a previous game response after the selected game request changes', async () => {
+    const previousGame = createDeferred();
+    const currentGame = createDeferred();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockReturnValueOnce(previousGame.promise)
+      .mockReturnValueOnce(currentGame.promise);
+
+    const { result } = renderHook(() => useGameData());
+
+    let previousRequest;
+    act(() => {
+      previousRequest = result.current.fetchGamePack({ gameId: 'previous-game' });
+    });
+
+    let currentRequest;
+    act(() => {
+      currentRequest = result.current.fetchGamePack({ gameId: 'current-game' });
+    });
+
+    expect(fetchSpy.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(result.current.isBoxLoading).toBe(true);
+
+    await act(async () => {
+      currentGame.resolve(createResponse(createGamePack('200')));
+      await currentRequest;
+    });
+
+    expect(result.current.nbaGameId).toBe('200');
+    expect(result.current.isBoxLoading).toBe(false);
+
+    await act(async () => {
+      previousGame.resolve(createResponse(createGamePack('100')));
+      await previousRequest;
+    });
+
+    expect(result.current.nbaGameId).toBe('200');
+    expect(result.current.playByPlay.actions).toEqual([{ actionNumber: 200 }]);
+  });
+
+  it('lets the latest background refresh own game state and inherited loading completion', async () => {
+    const initialRequest = createDeferred();
+    const latestRefresh = createDeferred();
+    vi.spyOn(globalThis, 'fetch')
+      .mockReturnValueOnce(initialRequest.promise)
+      .mockReturnValueOnce(latestRefresh.promise);
+
+    const { result } = renderHook(() => useGameData());
+
+    let initialPromise;
+    act(() => {
+      initialPromise = result.current.fetchGamePack({
+        gameId: 'current-game',
+        showLoading: true,
+      });
+    });
+
+    let refreshPromise;
+    act(() => {
+      refreshPromise = result.current.fetchGamePack({
+        url: '/gamepack/current-game?v=2',
+        showLoading: false,
+      });
+    });
+
+    await act(async () => {
+      initialRequest.resolve(createResponse(createGamePack('100')));
+      await initialPromise;
+    });
+
+    expect(result.current.nbaGameId).toBeNull();
+    expect(result.current.isBoxLoading).toBe(true);
+
+    await act(async () => {
+      latestRefresh.resolve(createResponse(createGamePack('200')));
+      await refreshPromise;
+    });
+
+    expect(result.current.nbaGameId).toBe('200');
+    expect(result.current.isBoxLoading).toBe(false);
+    expect(result.current.isPlayLoading).toBe(false);
+  });
+
+  it('invalidates an in-flight game response when the selected game resets', async () => {
+    const deferred = createDeferred();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockReturnValue(deferred.promise);
+    const { result } = renderHook(() => useGameData());
+
+    let requestPromise;
+    act(() => {
+      requestPromise = result.current.fetchGamePack({ gameId: 'previous-game' });
+    });
+
+    act(() => {
+      result.current.resetLoadingStates();
+    });
+
+    expect(fetchSpy.mock.calls[0][1].signal.aborted).toBe(true);
+
+    await act(async () => {
+      deferred.resolve(createResponse(createGamePack('100')));
+      await requestPromise;
+    });
+
+    expect(result.current.nbaGameId).toBeNull();
+    expect(result.current.isBoxLoading).toBe(true);
+    expect(result.current.isPlayLoading).toBe(true);
+  });
+
+  it('does not log an aborted stale request as a failure', async () => {
+    const currentRequest = createDeferred();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    fetchSpy
+      .mockImplementationOnce((_url, { signal }) => {
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        });
+      })
+      .mockReturnValueOnce(currentRequest.promise);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useGameData());
+
+    let abortedPromise;
+    act(() => {
+      abortedPromise = result.current.fetchGamePack({ gameId: 'previous-game' });
+    });
+
+    let currentPromise;
+    act(() => {
+      currentPromise = result.current.fetchGamePack({ gameId: 'current-game' });
+    });
+
+    await act(async () => {
+      currentRequest.resolve(createResponse(createGamePack('200')));
+      await Promise.all([abortedPromise, currentPromise]);
+    });
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(result.current.nbaGameId).toBe('200');
   });
 
   it('handles v2, schemaVersion=1, and combined gamepack payload shapes', async () => {

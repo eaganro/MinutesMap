@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { PREFIX } from '../../../environment';
 import { GAME_NOT_STARTED_MESSAGE } from '../../../domain/game-selection/status';
-import { classifyFetchResult, fetchJson } from '../../../data/apiClient';
+import { classifyFetchResult, fetchJson, isAbortError } from '../../../data/apiClient';
 import { adaptGamePackPayload, DEFAULT_GAMEPACK_STATE } from '../../../data/gamepackAdapter';
 import { normalizeSchedulePayload } from '../../../data/scheduleAdapter';
 
@@ -9,6 +9,9 @@ import { normalizeSchedulePayload } from '../../../data/scheduleAdapter';
  * Hook for fetching and managing game data (box score, play-by-play, and schedule)
  */
 export function useGameData() {
+  const scheduleRequestRef = useRef({ id: 0, controller: null });
+  const gameRequestRef = useRef({ id: 0, controller: null, completesLoading: false });
+
   const [box, setBox] = useState(DEFAULT_GAMEPACK_STATE.box);
   const [playByPlay, setPlayByPlay] = useState(DEFAULT_GAMEPACK_STATE.playByPlay);
   const [awayTeamId, setAwayTeamId] = useState(DEFAULT_GAMEPACK_STATE.awayTeamId);
@@ -80,14 +83,48 @@ export function useGameData() {
     setIsPlayLoading(false);
   }, []);
 
+  const cancelGameRequest = useCallback(() => {
+    const current = gameRequestRef.current;
+    current.controller?.abort();
+    gameRequestRef.current = {
+      id: current.id + 1,
+      controller: null,
+      completesLoading: false,
+    };
+  }, []);
+
+  useEffect(
+    () => () => {
+      const scheduleRequest = scheduleRequestRef.current;
+      scheduleRequest.controller?.abort();
+      scheduleRequestRef.current = {
+        id: scheduleRequest.id + 1,
+        controller: null,
+      };
+      cancelGameRequest();
+    },
+    [cancelGameRequest],
+  );
+
   const fetchSchedule = useCallback(async (dateString) => {
     if (!dateString) return;
+
+    const previousRequest = scheduleRequestRef.current;
+    previousRequest.controller?.abort();
+    const request = {
+      id: previousRequest.id + 1,
+      controller: new AbortController(),
+    };
+    scheduleRequestRef.current = request;
 
     setIsScheduleLoading(true);
     const url = `${PREFIX}/schedule/${dateString}.json.gz`;
 
     try {
-      const result = await fetchJson(url);
+      const result = await fetchJson(url, { signal: request.controller.signal });
+      if (scheduleRequestRef.current.id !== request.id) {
+        return;
+      }
       const outcome = classifyFetchResult(result);
 
       if (outcome === 'success') {
@@ -100,13 +137,21 @@ export function useGameData() {
         return;
       }
 
-      console.error(
-        'Error in fetchSchedule:',
-        result.error || `Schedule fetch failed: ${result.status}`,
-      );
+      if (!isAbortError(result.error)) {
+        console.error(
+          'Error in fetchSchedule:',
+          result.error || `Schedule fetch failed: ${result.status}`,
+        );
+      }
       setSchedule([]);
     } finally {
-      setIsScheduleLoading(false);
+      if (scheduleRequestRef.current.id === request.id) {
+        scheduleRequestRef.current = {
+          id: request.id,
+          controller: null,
+        };
+        setIsScheduleLoading(false);
+      }
     }
   }, []);
 
@@ -114,10 +159,21 @@ export function useGameData() {
     async ({ gameId, url, showLoading = true } = {}) => {
       if (!gameId && !url) return;
       const requestUrl = url || `${PREFIX}/data/gamepack/${gameId}.json.gz`;
+      const previousRequest = gameRequestRef.current;
+      previousRequest.controller?.abort();
+      const request = {
+        id: previousRequest.id + 1,
+        controller: new AbortController(),
+        completesLoading: showLoading || previousRequest.completesLoading,
+      };
+      gameRequestRef.current = request;
       transitionGameLoading(showLoading);
 
       try {
-        const result = await fetchJson(requestUrl);
+        const result = await fetchJson(requestUrl, { signal: request.controller.signal });
+        if (gameRequestRef.current.id !== request.id) {
+          return;
+        }
         const outcome = classifyFetchResult(result);
 
         if (outcome === 'not-available') {
@@ -126,13 +182,22 @@ export function useGameData() {
         }
 
         if (outcome !== 'success') {
-          transitionGameError(result.error || new Error(`S3 fetch failed: ${result.status}`));
+          if (!isAbortError(result.error)) {
+            transitionGameError(result.error || new Error(`S3 fetch failed: ${result.status}`));
+          }
           return;
         }
 
         transitionGameSuccess(result.data);
       } finally {
-        completeGameLoading(showLoading);
+        if (gameRequestRef.current.id === request.id) {
+          gameRequestRef.current = {
+            id: request.id,
+            controller: null,
+            completesLoading: false,
+          };
+          completeGameLoading(request.completesLoading);
+        }
       }
     },
     [
@@ -145,20 +210,22 @@ export function useGameData() {
   );
 
   const setGameNotStarted = useCallback(() => {
+    cancelGameRequest();
     transitionGameNotStarted();
     setIsBoxLoading(false);
     setIsPlayLoading(false);
-  }, [transitionGameNotStarted]);
+  }, [cancelGameRequest, transitionGameNotStarted]);
 
   /**
    * Reset loading states when game changes
    */
   const resetLoadingStates = useCallback(() => {
+    cancelGameRequest();
     setIsBoxLoading(true);
     setIsPlayLoading(true);
     setGameStatusMessage(null);
     setNbaGameId(null);
-  }, []);
+  }, [cancelGameRequest]);
 
   return {
     box,

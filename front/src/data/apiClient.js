@@ -10,7 +10,9 @@ export const classifyFetchResult = ({ ok, status, error }) => {
   return 'http-error';
 };
 
-export async function fetchJson(url, { fetchImpl = globalThis.fetch } = {}) {
+export const isAbortError = (error) => error?.name === 'AbortError';
+
+export async function fetchJson(url, { fetchImpl = globalThis.fetch, signal } = {}) {
   if (!fetchImpl) {
     return {
       ok: false,
@@ -21,7 +23,7 @@ export async function fetchJson(url, { fetchImpl = globalThis.fetch } = {}) {
   }
 
   try {
-    const response = await fetchImpl(url);
+    const response = signal ? await fetchImpl(url, { signal }) : await fetchImpl(url);
     if (!response.ok) {
       return {
         ok: false,
