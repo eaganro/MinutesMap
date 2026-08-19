@@ -17,7 +17,7 @@ export function useGamePackSync({
   const fetchGamePackWithReason = useCallback(
     (params, reason) => {
       lastGamePackFetchRef.current = { at: Date.now(), reason };
-      fetchGamePack(params);
+      return fetchGamePack(params);
     },
     [fetchGamePack],
   );
@@ -28,7 +28,7 @@ export function useGamePackSync({
         return;
       }
       lastScheduleFetchRef.current = { at: Date.now(), reason };
-      fetchSchedule(dateString);
+      return fetchSchedule(dateString);
     },
     [fetchSchedule],
   );

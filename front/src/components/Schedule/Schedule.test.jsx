@@ -174,4 +174,36 @@ describe('Schedule', () => {
 
     expect(screen.queryByLabelText('Live game')).not.toBeInTheDocument();
   });
+
+  it('shows schedule errors with a retry action instead of an empty-schedule message', () => {
+    const onRetry = vi.fn();
+    render(
+      <Schedule
+        {...buildProps({
+          games: [],
+          status: 'error',
+          error: { message: 'Check your connection and try again.' },
+          onRetry,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t load games');
+    expect(screen.queryByText('No Games Scheduled')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('only shows No Games Scheduled after a successful empty response', () => {
+    const { rerender } = render(
+      <Schedule {...buildProps({ games: [], status: 'loading', isPending: true })} />,
+    );
+
+    expect(screen.queryByText('No Games Scheduled')).not.toBeInTheDocument();
+
+    rerender(<Schedule {...buildProps({ games: [], status: 'success', isPending: false })} />);
+
+    expect(screen.getByText('No Games Scheduled')).toBeInTheDocument();
+  });
 });

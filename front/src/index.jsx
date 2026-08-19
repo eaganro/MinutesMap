@@ -1,8 +1,10 @@
 import ReactDOM from 'react-dom/client';
 import App from './components/App/App';
+import RootErrorBoundary from './components/App/RootErrorBoundary';
 import { ThemeProvider } from './components/hooks/ui/useTheme';
 import posthog from 'posthog-js';
 import { trackPostHogPageView } from './helpers/analytics';
+import { reportError } from './errors/reportError';
 import './theme.scss';
 
 const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
@@ -19,12 +21,21 @@ if (posthogKey) {
 
 function RootComponent() {
   return (
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    <RootErrorBoundary>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </RootErrorBoundary>
   );
 }
 
 const container = document.getElementById('root');
-const root = ReactDOM.createRoot(container);
+const root = ReactDOM.createRoot(container, {
+  onRecoverableError: (error, errorInfo) => {
+    reportError(error, {
+      boundary: 'react-recoverable',
+      component_stack: errorInfo?.componentStack,
+    });
+  },
+});
 root.render(<RootComponent />);

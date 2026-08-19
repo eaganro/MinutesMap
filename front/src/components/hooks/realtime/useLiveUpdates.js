@@ -14,9 +14,9 @@ export function useLiveUpdates({
   const handleGameUpdate = useCallback(
     (key, version) => {
       const url = `${PREFIX}/${encodeURIComponent(key)}?v=${version}`;
-      fetchGamePackWithReason({ url, showLoading: false }, 'ws');
+      fetchGamePackWithReason({ gameId, url, showLoading: false }, 'ws');
     },
-    [fetchGamePackWithReason],
+    [fetchGamePackWithReason, gameId],
   );
 
   const handleDateUpdate = useCallback(

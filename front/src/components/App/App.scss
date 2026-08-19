@@ -131,3 +131,46 @@
 .dataRefresh .MuiCircularProgress-root {
   color: var(--circular-progress-color);
 }
+
+.appMain > .dataNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  color: var(--text-primary);
+  border: 1px solid var(--border-medium);
+
+  &.error {
+    border-color: var(--border-strong);
+  }
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  button {
+    flex: 0 0 auto;
+    padding: 7px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-primary);
+    background: var(--bg-hover);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+}

@@ -57,6 +57,10 @@ export default function Schedule({
   changeDate,
   changeGame,
   isLoading,
+  isPending,
+  status,
+  error,
+  onRetry,
   selectedGameId,
 }) {
   const trackDateFeatureUse = useTrackFeatureUseOnce('date-selector');
@@ -134,7 +138,7 @@ export default function Schedule({
 
   useEffect(() => {
     const gamesNode = scrollRef.current;
-    if (!gamesNode || isLoading || !gamesList.length) {
+    if (!gamesNode || !gamesList.length) {
       setCanScrollGames(false);
       return undefined;
     }
@@ -162,7 +166,7 @@ export default function Schedule({
         window.removeEventListener('resize', updateCanScrollGames);
       }
     };
-  }, [games, gamesList.length, isLoading, scrollRef]);
+  }, [games, gamesList.length, scrollRef]);
 
   const dateDown = () => {
     shiftDate(-DATE_NAVIGATION_STEP_DAYS);
@@ -205,28 +209,54 @@ export default function Schedule({
           >
             <NavigateBefore />
           </IconButton>
-          {isLoading ? (
+          {gamesList.length ? (
+            <div className="gamesState">
+              {isPending && (
+                <span className="scheduleUpdating" role="status">
+                  Updating games…
+                </span>
+              )}
+              <div
+                className="games"
+                ref={scrollRef}
+                onMouseDown={dragHandlers.onMouseDown}
+                onMouseLeave={dragHandlers.onMouseLeave}
+                onMouseUp={dragHandlers.onMouseUp}
+                onMouseMove={dragHandlers.onMouseMove}
+                onTouchStart={dragHandlers.onTouchStart}
+                onTouchEnd={dragHandlers.onTouchEnd}
+                onTouchCancel={dragHandlers.onTouchCancel}
+                onTouchMove={dragHandlers.onTouchMove}
+              >
+                {gamesList}
+              </div>
+            </div>
+          ) : isPending || isLoading ? (
             <div className="loadingIndicator">
               <CircularProgress size={24} thickness={5} />
               <span>Loading games...</span>
             </div>
-          ) : gamesList.length ? (
-            <div
-              className="games"
-              ref={scrollRef}
-              onMouseDown={dragHandlers.onMouseDown}
-              onMouseLeave={dragHandlers.onMouseLeave}
-              onMouseUp={dragHandlers.onMouseUp}
-              onMouseMove={dragHandlers.onMouseMove}
-              onTouchStart={dragHandlers.onTouchStart}
-              onTouchEnd={dragHandlers.onTouchEnd}
-              onTouchCancel={dragHandlers.onTouchCancel}
-              onTouchMove={dragHandlers.onTouchMove}
-            >
-              {gamesList}
+          ) : status === 'error' ? (
+            <div className="scheduleError" role="alert">
+              <span>Couldn’t load games. {error?.message}</span>
+              <button type="button" onClick={onRetry}>
+                Retry
+              </button>
             </div>
-          ) : (
+          ) : status === 'not-available' ? (
+            <div className="scheduleError" role="status">
+              <span>Schedule unavailable for this date.</span>
+              <button type="button" onClick={onRetry}>
+                Retry
+              </button>
+            </div>
+          ) : status === 'success' ? (
             <div className="noGames">No Games Scheduled</div>
+          ) : (
+            <div className="loadingIndicator">
+              <CircularProgress size={24} thickness={5} />
+              <span>Loading games...</span>
+            </div>
           )}
           <IconButton
             className={`scheduleButton end${canScrollGames ? '' : ' isHidden'}`}

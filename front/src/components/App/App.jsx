@@ -58,8 +58,29 @@ export default function App() {
           changeDate={scheduleVm.changeDate}
           changeGame={scheduleVm.changeGame}
           isLoading={scheduleVm.isLoading}
+          isPending={scheduleVm.isPending}
+          status={scheduleVm.status}
+          error={scheduleVm.error}
+          onRetry={scheduleVm.retry}
           selectedGameId={scheduleVm.gameId}
         />
+
+        {scoreVm.dataNotice && (
+          <div
+            className={`dataNotice ${scoreVm.dataNotice.tone}`}
+            role={scoreVm.dataNotice.tone === 'error' ? 'alert' : 'status'}
+          >
+            <div>
+              <strong>{scoreVm.dataNotice.message}</strong>
+              {scoreVm.dataNotice.detail && <span>{scoreVm.dataNotice.detail}</span>}
+            </div>
+            {scoreVm.dataNotice.retry && (
+              <button type="button" onClick={scoreVm.dataNotice.retry}>
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         <Score
           homeTeam={scoreVm.homeTeam}

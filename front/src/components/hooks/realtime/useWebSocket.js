@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { wsLocation } from '../../../environment';
+import { reportError } from '../../../errors/reportError';
 
 /**
  * Hook for managing WebSocket connection to the game server
@@ -138,7 +139,10 @@ export function useWebSocket({
       try {
         msg = JSON.parse(event.data);
       } catch (err) {
-        console.error('Malformed WS message', event.data, err);
+        reportError(err, {
+          boundary: 'websocket-message',
+          message_type: 'malformed',
+        });
         return;
       }
 
@@ -149,7 +153,10 @@ export function useWebSocket({
           onDateUpdate?.(msg.date);
         }
       } catch (err) {
-        console.error('Error handling WS message', msg, err);
+        reportError(err, {
+          boundary: 'websocket-message',
+          message_type: msg?.type || (msg?.key ? 'gamepack' : 'unknown'),
+        });
       }
     };
 

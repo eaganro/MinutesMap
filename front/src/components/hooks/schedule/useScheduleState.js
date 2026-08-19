@@ -7,6 +7,7 @@ import {
 import { PREFIX } from '../../../environment';
 import { classifyFetchResult, fetchJson } from '../../../data/apiClient';
 import { normalizeInitPayload } from '../../../data/scheduleAdapter';
+import { reportError } from '../../../errors/reportError';
 
 export function useScheduleState({
   initialDate,
@@ -44,7 +45,10 @@ export function useScheduleState({
         }
         setDate(fallbackDate);
       } catch (err) {
-        console.error('Init fetch failed:', err);
+        reportError(err, {
+          boundary: 'data-fetch',
+          resource: 'initial application state',
+        });
         setDate(fallbackDate);
       } finally {
         setIsInitLoading(false);

@@ -33,6 +33,8 @@ export function useMinutesMap() {
     schedule,
     fetchSchedule,
     isScheduleLoading,
+    scheduleStatus,
+    scheduleError,
     box,
     playByPlay,
     nbaGameId,
@@ -40,6 +42,8 @@ export function useMinutesMap() {
     lastAction,
     captions,
     gameStatusMessage,
+    gameDataError,
+    loadedGameId,
     isBoxLoading,
     isPlayLoading,
     fetchGamePack,
@@ -104,6 +108,18 @@ export function useMinutesMap() {
   });
 
   scheduleFetchRef.current = fetchScheduleWithReason;
+
+  const retrySchedule = useCallback(() => {
+    if (date) {
+      fetchScheduleWithReason(date, 'retry');
+    }
+  }, [date, fetchScheduleWithReason]);
+
+  const retryGameData = useCallback(() => {
+    if (gameId) {
+      fetchGamePackWithReason({ gameId, showLoading: true }, 'retry');
+    }
+  }, [fetchGamePackWithReason, gameId]);
 
   const { ws } = useLiveUpdates({
     gameId,
@@ -213,6 +229,9 @@ export function useMinutesMap() {
 
   const awayTeam = box?.teams?.away;
   const homeTeam = box?.teams?.home;
+  const isGameDataStale = Boolean(
+    gameId && loadedGameId && String(gameId) !== String(loadedGameId),
+  );
 
   const awayTeamName = useMemo(
     () => ({
@@ -230,9 +249,11 @@ export function useMinutesMap() {
     [homeTeam?.name, homeTeam?.abbr],
   );
 
-  const scoreAwayTeam = awayTeam?.abbr || stableGameMeta?.awayteam || null;
-  const scoreHomeTeam = homeTeam?.abbr || stableGameMeta?.hometeam || null;
-  const scoreGameDate = box?.start || stableGameMeta?.starttime || null;
+  const scoreAwayTeam = awayTeam?.abbr || (!isGameDataStale && stableGameMeta?.awayteam) || null;
+  const scoreHomeTeam = homeTeam?.abbr || (!isGameDataStale && stableGameMeta?.hometeam) || null;
+  const scoreGameDate = box?.start || (!isGameDataStale && stableGameMeta?.starttime) || null;
+  const displayedGameStatus = isGameDataStale ? null : currentScheduleGameStatus;
+  const displayedGameId = isGameDataStale ? loadedGameId : gameId;
 
   const isScheduleVisible = isGlobalLoading && showLoading;
   const isGameDataVisible = isBoxLoading || isPlayLoading;
@@ -246,7 +267,32 @@ export function useMinutesMap() {
     changeDate,
     changeGame: changeGameWithHistory,
     isLoading: isScheduleVisible,
+    isPending: isGlobalLoading,
+    status: scheduleStatus,
+    error: scheduleError,
+    retry: retrySchedule,
   };
+
+  let dataNotice = null;
+  if (gameDataError) {
+    dataNotice = {
+      tone: 'error',
+      message: isGameDataStale
+        ? 'Couldn’t load the selected game. Showing data from the previous game.'
+        : loadedGameId
+          ? 'Game data couldn’t be refreshed. Showing the latest available data.'
+          : 'Couldn’t load game data.',
+      detail: gameDataError.message,
+      retry: retryGameData,
+    };
+  } else if (isGameDataStale) {
+    dataNotice = {
+      tone: 'status',
+      message: 'Loading the selected game. Showing data from the previous game.',
+      detail: null,
+      retry: null,
+    };
+  }
 
   const scoreVm = {
     homeTeam: scoreHomeTeam,
@@ -256,13 +302,14 @@ export function useMinutesMap() {
     gameStatusMessage,
     isLoading: isGameDataVisible,
     lastAction,
-    gameStatus: currentScheduleGameStatus,
+    gameStatus: displayedGameStatus,
+    dataNotice,
   };
 
   const playVm = {
-    gameId,
+    gameId: displayedGameId,
     nbaGameId,
-    gameStatus: currentScheduleGameStatus,
+    gameStatus: displayedGameStatus,
     box,
     playData: {
       awayTeamNames: awayTeamName,
@@ -299,14 +346,14 @@ export function useMinutesMap() {
   };
 
   const boxVm = {
-    gameId,
+    gameId: displayedGameId,
     box,
     isLoading: isBoxVisible,
     statusMessage: gameStatusMessage,
   };
 
   const lineupsVm = {
-    gameId,
+    gameId: displayedGameId,
     awayTeam: awayTeamName,
     homeTeam: homeTeamName,
     awayLineups: lineupStats?.away || [],

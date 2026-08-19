@@ -34,6 +34,71 @@ afterEach(() => {
 });
 
 describe('useGameData', () => {
+  it('exposes an offline schedule error and recovers when retried', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(createResponse([{ id: 'retry-game' }]));
+
+    const { result } = renderHook(() => useGameData());
+
+    await act(async () => {
+      await result.current.fetchSchedule('2026-02-03');
+    });
+
+    expect(result.current.schedule).toEqual([]);
+    expect(result.current.scheduleStatus).toBe('error');
+    expect(result.current.scheduleError).toEqual(
+      expect.objectContaining({ kind: 'network', status: null }),
+    );
+
+    await act(async () => {
+      await result.current.fetchSchedule('2026-02-03');
+    });
+
+    expect(result.current.schedule).toEqual([{ id: 'retry-game' }]);
+    expect(result.current.scheduleStatus).toBe('success');
+    expect(result.current.scheduleError).toBeNull();
+  });
+
+  it('exposes non-404 gamepack HTTP errors without treating the game as not started', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      createResponse(null, { status: 500, ok: false }),
+    );
+
+    const { result } = renderHook(() => useGameData());
+
+    await act(async () => {
+      await result.current.fetchGamePack({ gameId: '2026-02-03-phi-gsw' });
+    });
+
+    expect(result.current.gameDataError).toEqual(
+      expect.objectContaining({ kind: 'http', status: 500 }),
+    );
+    expect(result.current.gameStatusMessage).toBeNull();
+    expect(result.current.isBoxLoading).toBe(false);
+    expect(result.current.isPlayLoading).toBe(false);
+  });
+
+  it('retains the loaded game identity and data during a normal game transition', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(createResponse(createGamePack('100')));
+    const { result } = renderHook(() => useGameData());
+
+    await act(async () => {
+      await result.current.fetchGamePack({ gameId: 'previous-game' });
+    });
+
+    expect(result.current.loadedGameId).toBe('previous-game');
+    expect(result.current.playByPlay.actions).toEqual([{ actionNumber: 100 }]);
+
+    act(() => {
+      result.current.resetLoadingStates();
+    });
+
+    expect(result.current.loadedGameId).toBe('previous-game');
+    expect(result.current.playByPlay.actions).toEqual([{ actionNumber: 100 }]);
+    expect(result.current.isPlayLoading).toBe(true);
+  });
+
   it.each([403, 404])(
     'handles gamepack %s responses as not-started and clears game state',
     async (statusCode) => {

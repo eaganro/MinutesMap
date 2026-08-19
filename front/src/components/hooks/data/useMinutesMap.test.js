@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   useAnalyticsSignalsMock: vi.fn(),
   playRef: { current: null },
   currentUrlParams: { date: '2026-02-03', gameId: '2026-02-03-phi-gsw' },
+  gameDataOverrides: {},
 }));
 
 vi.mock('../schedule/useQueryParams', () => ({
@@ -82,6 +83,7 @@ vi.mock('./useGameData', () => ({
     fetchGamePack: vi.fn(),
     setGameNotStarted: vi.fn(),
     resetLoadingStates: vi.fn(),
+    ...mocks.gameDataOverrides,
   }),
 }));
 
@@ -175,6 +177,7 @@ describe('useMinutesMap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.currentUrlParams = { date: '2026-02-03', gameId: '2026-02-03-phi-gsw' };
+    mocks.gameDataOverrides = {};
   });
 
   it('keeps the App-facing return contract stable and wires orchestration hooks', () => {
@@ -325,5 +328,56 @@ describe('useMinutesMap', () => {
 
     expect(mocks.changeDateMock).not.toHaveBeenCalled();
     expect(mocks.changeGameMock).toHaveBeenCalledWith('2026-02-03-lal-bos');
+  });
+
+  it('labels retained data when it belongs to the previously selected game', () => {
+    mocks.gameDataOverrides = {
+      loadedGameId: '2026-02-02-lal-bos',
+      gameDataError: null,
+      isBoxLoading: true,
+      isPlayLoading: true,
+    };
+
+    const { result } = renderHook(() => useMinutesMap());
+
+    expect(result.current.scoreVm.dataNotice).toEqual({
+      tone: 'status',
+      message: 'Loading the selected game. Showing data from the previous game.',
+      detail: null,
+      retry: null,
+    });
+    expect(result.current.scoreVm.gameStatus).toBeNull();
+    expect(result.current.playVm.gameStatus).toBeNull();
+    expect(result.current.playVm.gameId).toBe('2026-02-02-lal-bos');
+    expect(result.current.boxVm.gameId).toBe('2026-02-02-lal-bos');
+    expect(result.current.lineupsVm.gameId).toBe('2026-02-02-lal-bos');
+  });
+
+  it('provides a retry action when loading the selected game fails', () => {
+    mocks.gameDataOverrides = {
+      loadedGameId: '2026-02-02-lal-bos',
+      gameDataError: { message: 'Check your connection and try again.' },
+      isBoxLoading: false,
+      isPlayLoading: false,
+    };
+
+    const { result } = renderHook(() => useMinutesMap());
+
+    expect(result.current.scoreVm.dataNotice).toEqual(
+      expect.objectContaining({
+        tone: 'error',
+        message: 'Couldn’t load the selected game. Showing data from the previous game.',
+        retry: expect.any(Function),
+      }),
+    );
+
+    act(() => {
+      result.current.scoreVm.dataNotice.retry();
+    });
+
+    expect(mocks.fetchGamePackWithReasonMock).toHaveBeenCalledWith(
+      { gameId: '2026-02-03-phi-gsw', showLoading: true },
+      'retry',
+    );
   });
 });
