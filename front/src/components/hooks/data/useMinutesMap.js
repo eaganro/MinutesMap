@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQueryParams } from '../schedule/useQueryParams';
 import { useLocalStorageState } from '../state/useLocalStorageState';
+import { isBooleanArrayPreference, isBooleanPreference } from '../state/storage';
 import { useGameData } from './useGameData';
 import { useGameTimeline } from './useGameTimeline';
 import { useElementWidth } from '../ui/useElementWidth';
@@ -13,6 +14,10 @@ import { useResumeRefresh } from '../realtime/useResumeRefresh';
 import { useAnalyticsSignals } from '../analytics/useAnalyticsSignals';
 
 const DEFAULT_STAT_ON = [true, false, false, true, false, false, false, false];
+const BOOLEAN_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
+const STAT_PREFERENCE_OPTIONS = {
+  validate: isBooleanArrayPreference(DEFAULT_STAT_ON.length),
+};
 const LOADING_DELAY_MS = 500;
 
 /**
@@ -24,9 +29,21 @@ export function useMinutesMap() {
   const initialParams = useMemo(() => getInitialParams(), [getInitialParams]);
 
   // === USER PREFERENCES ===
-  const [statOn, setStatOn] = useLocalStorageState('statOn', DEFAULT_STAT_ON);
-  const [showScoreDiff, setShowScoreDiff] = useLocalStorageState('showScoreDiff', true);
-  const [showOdds, setShowOdds] = useLocalStorageState('showOddsOverlay', false);
+  const [statOn, setStatOn] = useLocalStorageState(
+    'statOn',
+    DEFAULT_STAT_ON,
+    STAT_PREFERENCE_OPTIONS,
+  );
+  const [showScoreDiff, setShowScoreDiff] = useLocalStorageState(
+    'showScoreDiff',
+    true,
+    BOOLEAN_PREFERENCE_OPTIONS,
+  );
+  const [showOdds, setShowOdds] = useLocalStorageState(
+    'showOddsOverlay',
+    false,
+    BOOLEAN_PREFERENCE_OPTIONS,
+  );
 
   // === GAME DATA ===
   const {

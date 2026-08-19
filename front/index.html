@@ -29,21 +29,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>MinutesMap</title>
     <!-- Flash Prevention: Set theme BEFORE React loads -->
-    <script>
-      (function () {
-        var saved = localStorage.getItem('darkMode');
-        var isDark;
-
-        if (saved !== null) {
-          isDark = JSON.parse(saved);
-        } else {
-          // Check system preference
-          isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        }
-
-        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-      })();
-    </script>
+    <script src="/theme-init.js"></script>
     <script
       async
       defer

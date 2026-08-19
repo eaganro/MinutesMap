@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { isBooleanPreference, readStoredValue, writeStoredValue } from '../state/storage';
 
 const ThemeContext = createContext();
+const DARK_MODE_STORAGE_KEY = 'darkMode';
+const DARK_MODE_STORAGE_OPTIONS = { validate: isBooleanPreference };
 
 // Check if user has a system color scheme preference
 function getSystemPreference() {
@@ -17,16 +20,11 @@ function getSystemPreference() {
 
 export function ThemeProvider({ children }) {
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved !== null) {
-      return JSON.parse(saved);
-    }
-    // Check system preference, default to dark if none set
-    return getSystemPreference();
+    return readStoredValue(DARK_MODE_STORAGE_KEY, getSystemPreference(), DARK_MODE_STORAGE_OPTIONS);
   });
 
   useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+    writeStoredValue(DARK_MODE_STORAGE_KEY, isDarkMode);
     document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
@@ -34,8 +32,8 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = () => {
-      const saved = localStorage.getItem('darkMode');
       // Only follow system if user hasn't explicitly set a preference
+      const saved = readStoredValue(DARK_MODE_STORAGE_KEY, null, DARK_MODE_STORAGE_OPTIONS);
       if (saved === null) {
         setIsDarkMode(getSystemPreference());
       }

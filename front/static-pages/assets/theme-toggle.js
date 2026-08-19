@@ -1,8 +1,9 @@
 (function () {
   const toggle = document.querySelector('.dark-mode-toggle');
   const thumb = document.querySelector('.toggle-thumb');
+  const theme = window.MinutesMapTheme;
 
-  if (!toggle || !thumb) {
+  if (!toggle || !thumb || !theme) {
     return;
   }
 
@@ -13,18 +14,15 @@
     toggle.setAttribute('title', isDark ? 'Switch to light mode' : 'Switch to dark mode');
   }
 
-  const stored = localStorage.getItem('darkMode');
-  const isDark =
-    stored !== null
-      ? JSON.parse(stored)
-      : document.documentElement.getAttribute('data-theme') === 'dark';
+  const stored = theme.readPreference();
+  const isDark = stored ?? document.documentElement.getAttribute('data-theme') === 'dark';
   setToggleState(isDark);
 
   toggle.addEventListener('click', function () {
     const current = document.documentElement.getAttribute('data-theme') === 'dark';
     const next = !current;
-    document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
-    localStorage.setItem('darkMode', JSON.stringify(next));
+    theme.applyTheme(next);
+    theme.writePreference(next);
     setToggleState(next);
   });
 })();
