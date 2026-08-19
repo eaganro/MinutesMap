@@ -291,7 +291,9 @@ export function useMinutesMap() {
   };
 
   let dataNotice = null;
-  if (gameDataError) {
+  // A previous or just-set error can coexist with the loading transition for
+  // one render. Only announce it once the selected-game request has settled.
+  if (gameDataError && !isGameDataVisible) {
     dataNotice = {
       tone: 'error',
       message: isGameDataStale

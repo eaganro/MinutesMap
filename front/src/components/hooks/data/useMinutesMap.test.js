@@ -330,10 +330,10 @@ describe('useMinutesMap', () => {
     expect(mocks.changeGameMock).toHaveBeenCalledWith('2026-02-03-lal-bos');
   });
 
-  it('does not add a redundant notice while loading over data from the previous game', () => {
+  it('does not flash a stale error notice while loading the selected game', () => {
     mocks.gameDataOverrides = {
       loadedGameId: '2026-02-02-lal-bos',
-      gameDataError: null,
+      gameDataError: { message: 'Check your connection and try again.' },
       isBoxLoading: true,
       isPlayLoading: true,
     };
