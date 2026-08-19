@@ -160,6 +160,22 @@ terraform -chdir=terraform fmt
 terraform -chdir=terraform validate
 ```
 
+After the frontend response headers policy has deployed and CloudFront has propagated it, verify
+the production headers with:
+
+```bash
+npm --prefix front run check:security-headers -- \
+  https://minutesmap.com/ \
+  https://minutesmap.com/about/ \
+  https://minutesmap.com/privacy/ \
+  https://minutesmap.com/theme-init.js
+```
+
+The CSP is enforced. Scripts are limited to same-origin bundles and the analytics host; it does not
+allow `unsafe-inline` or `unsafe-eval`. Runtime React/Emotion styles still require the narrower
+`style-src 'unsafe-inline'` exception. Blob URLs are allowed only for generated image previews, and
+WebSocket connections are limited to the Terraform-managed API Gateway origin.
+
 Deployments are handled by GitHub Actions on `main`. Running `terraform apply`, frontend S3 syncs, or job upload/write commands can modify production infrastructure or data, so treat them as explicit deployment operations.
 
 ## CI/CD

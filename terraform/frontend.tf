@@ -131,6 +131,79 @@ resource "aws_cloudfront_cache_policy" "posthog_no_cache" {
   }
 }
 
+resource "aws_cloudfront_response_headers_policy" "frontend_security" {
+  name    = "minutesmap-frontend-security"
+  comment = "Browser security headers for frontend pages and assets"
+
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = join("; ", [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "script-src 'self' https://analytics.minutesmap.com",
+        # React and Emotion render runtime style attributes and style elements.
+        "style-src 'self' 'unsafe-inline'",
+        # Blob/data images are limited to generated export previews and downloads.
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self' https://analytics.minutesmap.com ${aws_apigatewayv2_api.websocket_api.api_endpoint}",
+        "worker-src 'none'",
+        "media-src 'none'",
+        "manifest-src 'self'",
+        "upgrade-insecure-requests",
+      ])
+      override = true
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+
+    strict_transport_security {
+      access_control_max_age_sec = 63072000
+      include_subdomains         = true
+      preload                    = true
+      override                   = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header = "Permissions-Policy"
+      value  = join(", ", [
+        "accelerometer=()",
+        "autoplay=()",
+        "camera=()",
+        "display-capture=()",
+        "encrypted-media=()",
+        "fullscreen=(self)",
+        "geolocation=()",
+        "gyroscope=()",
+        "magnetometer=()",
+        "microphone=()",
+        "payment=()",
+        "picture-in-picture=()",
+        "publickey-credentials-get=()",
+        "usb=()",
+      ])
+      override = true
+    }
+  }
+}
+
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
   is_ipv6_enabled     = true
@@ -229,8 +302,9 @@ resource "aws_cloudfront_distribution" "main" {
     target_origin_id = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
 
     # Modern Policy IDs
-    cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-    origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    origin_request_policy_id   = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.frontend_security.id
 
     function_association {
       event_type   = "viewer-request"

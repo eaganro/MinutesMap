@@ -20,6 +20,8 @@
     "build:prod:upload": "npm run build && npm run verify:cache-policy && npm run sync:classified",
     "verify:cache-policy": "node scripts/deploy-static-site.cjs",
     "test:cache-policy": "node scripts/cache-policy.test.cjs",
+    "test:security-headers": "node scripts/security-headers.test.cjs",
+    "check:security-headers": "node scripts/security-headers.cjs",
     "sync:classified": "node scripts/deploy-static-site.cjs --upload --bucket roryeagan.com-nba",
     "test": "playwright test",
     "test:smoke": "playwright test -g \"@smoke\" --project=chromium",

@@ -40,6 +40,9 @@ jobs:
       - name: Cache Policy Tests
         run: npm run test:cache-policy
 
+      - name: Security Header Tests
+        run: npm run test:security-headers
+
       - name: Unit Coverage Report (Informational)
         run: npm run test:unit:coverage
 
