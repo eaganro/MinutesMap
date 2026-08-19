@@ -17,6 +17,7 @@ export function useWebSocket({
   const [ws, setWs] = useState(null);
   const wsRef = useRef(null);
   const connectRef = useRef(null);
+  const mountedRef = useRef(true);
   const lastFollowDateRef = useRef(null);
   const lastFollowGameRef = useRef(null);
   const followDateRef = useRef(followDate);
@@ -24,16 +25,21 @@ export function useWebSocket({
   const reconnectTimerRef = useRef(null);
   const reconnectAttemptRef = useRef(0);
   const allowReconnectRef = useRef(enabled);
+  const enabledRef = useRef(enabled);
 
   // Keep refs updated for callbacks
   const gameIdRef = useRef(gameId);
   const dateRef = useRef(date);
+  const onPlayByPlayUpdateRef = useRef(onPlayByPlayUpdate);
+  const onDateUpdateRef = useRef(onDateUpdate);
 
   gameIdRef.current = gameId;
   dateRef.current = date;
   followDateRef.current = followDate;
   followGameRef.current = followGame;
-  allowReconnectRef.current = enabled;
+  enabledRef.current = enabled;
+  onPlayByPlayUpdateRef.current = onPlayByPlayUpdate;
+  onDateUpdateRef.current = onDateUpdate;
 
   useEffect(() => {
     if (!gameId) {
@@ -92,7 +98,7 @@ export function useWebSocket({
   }, []);
 
   const scheduleReconnect = useCallback(() => {
-    if (!allowReconnectRef.current) {
+    if (!mountedRef.current || !enabledRef.current || !allowReconnectRef.current) {
       return;
     }
 
@@ -109,13 +115,51 @@ export function useWebSocket({
 
     reconnectTimerRef.current = setTimeout(() => {
       reconnectTimerRef.current = null;
+      if (!mountedRef.current || !enabledRef.current || !allowReconnectRef.current) {
+        return;
+      }
       reconnectAttemptRef.current = Math.min(reconnectAttemptRef.current + 1, 10);
       connectRef.current?.();
     }, jitteredDelay);
   }, [clearReconnectTimer]);
 
-  const connect = useCallback(() => {
-    if (!enabled) {
+  const releaseSocket = useCallback((socket, { closeSocket = false } = {}) => {
+    if (!socket) {
+      return;
+    }
+
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onclose = null;
+    socket.onerror = null;
+
+    if (wsRef.current === socket) {
+      wsRef.current = null;
+      lastFollowDateRef.current = null;
+      lastFollowGameRef.current = null;
+      if (mountedRef.current) {
+        setWs(null);
+      }
+    }
+
+    if (
+      closeSocket &&
+      socket.readyState !== WebSocket.CLOSING &&
+      socket.readyState !== WebSocket.CLOSED
+    ) {
+      socket.close();
+    }
+  }, []);
+
+  const disconnect = useCallback(() => {
+    const socket = wsRef.current;
+    if (socket) {
+      releaseSocket(socket, { closeSocket: true });
+    }
+  }, [releaseSocket]);
+
+  const openSocket = useCallback(() => {
+    if (!mountedRef.current || !enabledRef.current || !allowReconnectRef.current) {
       return;
     }
     if (
@@ -130,11 +174,28 @@ export function useWebSocket({
     setWs(newWs);
 
     newWs.onopen = () => {
+      if (
+        !mountedRef.current ||
+        !enabledRef.current ||
+        wsRef.current !== newWs ||
+        !allowReconnectRef.current
+      ) {
+        return;
+      }
       resetReconnectState();
       sendSubscriptions();
     };
 
     newWs.onmessage = async (event) => {
+      if (
+        !mountedRef.current ||
+        !enabledRef.current ||
+        wsRef.current !== newWs ||
+        !allowReconnectRef.current
+      ) {
+        return;
+      }
+
       let msg;
       try {
         msg = JSON.parse(event.data);
@@ -148,9 +209,9 @@ export function useWebSocket({
 
       try {
         if (msg.key?.includes('gamepack')) {
-          onPlayByPlayUpdate?.(msg.key, msg.version);
+          onPlayByPlayUpdateRef.current?.(msg.key, msg.version);
         } else if (msg.type === 'date_update') {
-          onDateUpdate?.(msg.date);
+          onDateUpdateRef.current?.(msg.date);
         }
       } catch (err) {
         reportError(err, {
@@ -161,36 +222,46 @@ export function useWebSocket({
     };
 
     newWs.onclose = () => {
-      lastFollowDateRef.current = null;
-      lastFollowGameRef.current = null;
-      wsRef.current = null;
-      setWs(null);
+      if (!mountedRef.current || wsRef.current !== newWs) {
+        return;
+      }
+      releaseSocket(newWs);
       scheduleReconnect();
     };
 
     newWs.onerror = () => {
+      if (!mountedRef.current || wsRef.current !== newWs) {
+        return;
+      }
       if (newWs.readyState !== WebSocket.OPEN) {
         scheduleReconnect();
       }
     };
-  }, [
-    enabled,
-    sendSubscriptions,
-    onPlayByPlayUpdate,
-    onDateUpdate,
-    resetReconnectState,
-    scheduleReconnect,
-  ]);
+  }, [releaseSocket, resetReconnectState, scheduleReconnect, sendSubscriptions]);
 
-  useEffect(() => {
-    connectRef.current = connect;
-  }, [connect]);
-
-  useEffect(() => {
-    if (!enabled) {
-      resetReconnectState();
+  const connect = useCallback(() => {
+    if (!mountedRef.current || !enabledRef.current) {
+      return;
     }
-  }, [enabled, resetReconnectState]);
+    allowReconnectRef.current = true;
+    resetReconnectState();
+    openSocket();
+  }, [openSocket, resetReconnectState]);
+
+  useEffect(() => {
+    connectRef.current = openSocket;
+  }, [openSocket]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      allowReconnectRef.current = false;
+      resetReconnectState();
+      disconnect();
+    };
+  }, [disconnect, resetReconnectState]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -250,30 +321,31 @@ export function useWebSocket({
   // Connection lifecycle
   useEffect(() => {
     if (enabled) {
-      connect();
+      allowReconnectRef.current = true;
+      resetReconnectState();
+      openSocket();
       return;
     }
-    wsRef.current?.close();
-  }, [enabled, connect]);
+    allowReconnectRef.current = false;
+    resetReconnectState();
+    disconnect();
+  }, [enabled, disconnect, openSocket, resetReconnectState]);
 
   useEffect(() => {
     if (!enabled) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       sendSubscriptions();
     } else if (wsRef.current !== null) {
-      connect();
+      openSocket();
     }
-  }, [enabled, date, gameId, followDate, followGame, connect, sendSubscriptions]);
+  }, [enabled, date, gameId, followDate, followGame, openSocket, sendSubscriptions]);
 
+  // Remains closed until connect() is called or enabled cycles from false to true.
   const close = useCallback(() => {
-    wsRef.current?.close();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      resetReconnectState();
-    };
-  }, [resetReconnectState]);
+    allowReconnectRef.current = false;
+    resetReconnectState();
+    disconnect();
+  }, [disconnect, resetReconnectState]);
 
   return { ws, connect, close };
 }
