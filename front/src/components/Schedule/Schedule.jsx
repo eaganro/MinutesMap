@@ -43,7 +43,8 @@ function TeamLogo({ team }) {
         loading="lazy"
         className="teamLogo"
         src={buildLogoSrc(team)}
-        alt={team}
+        alt=""
+        aria-hidden="true"
         onLoad={() => setIsLoaded(true)}
         onError={() => setIsLoaded(false)}
       />
@@ -73,8 +74,10 @@ export default function Schedule({
   const { scrollRef, dragHandlers, didDrag, scrollBy, resetScrollPosition } =
     useHorizontalDragScroll();
 
-  const handleGameClick = (id) => {
-    if (didDrag()) return; // suppress click if user dragged
+  const handleGameClick = (event, id) => {
+    // Keyboard-generated clicks have no click count and should not inherit a
+    // previous pointer drag's suppression state.
+    if (event.detail > 0 && didDrag()) return;
     changeGame(id);
   };
 
@@ -83,10 +86,30 @@ export default function Schedule({
     const isSelected = g.id === selectedGameId;
     const gameClassName = `game${isSelected ? ' selected' : ''}`;
     const statusText = formatStatusText(g.status);
+    const hasScore =
+      g.awayscore !== null &&
+      g.awayscore !== undefined &&
+      g.homescore !== null &&
+      g.homescore !== undefined;
+    const gameLabel = [
+      !isUpcoming && hasScore
+        ? `${g.awayteam} ${g.awayscore}, ${g.hometeam} ${g.homescore}`
+        : `${g.awayteam} at ${g.hometeam}`,
+      statusText,
+    ]
+      .filter(Boolean)
+      .join(', ');
 
     if (!isUpcoming) {
       return (
-        <div className={gameClassName} key={g.id} onClick={() => handleGameClick(g.id)}>
+        <button
+          type="button"
+          className={gameClassName}
+          key={g.id}
+          onClick={(event) => handleGameClick(event, g.id)}
+          aria-label={gameLabel}
+          aria-pressed={isSelected}
+        >
           <div className="iconRow">
             <TeamLogo team={g.awayteam} />
             {g.awayteam} - {g.hometeam}
@@ -103,11 +126,18 @@ export default function Schedule({
               </span>
             )}
           </div>
-        </div>
+        </button>
       );
     } else {
       return (
-        <div className={gameClassName} key={g.id} onClick={() => handleGameClick(g.id)}>
+        <button
+          type="button"
+          className={gameClassName}
+          key={g.id}
+          onClick={(event) => handleGameClick(event, g.id)}
+          aria-label={gameLabel}
+          aria-pressed={isSelected}
+        >
           <div className="iconRow">
             <TeamLogo team={g.awayteam} />
             {g.awayteam} - {g.hometeam}
@@ -125,7 +155,7 @@ export default function Schedule({
               </span>
             )}
           </div>
-        </div>
+        </button>
       );
     }
   });

@@ -27,11 +27,24 @@
   align-items: center;
   gap: 4px;
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   padding: 3px 6px;
   border-radius: 6px;
   overflow: hidden;
   transition: all 0.15s ease;
   user-select: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+  }
 
   &::before {
     content: '';

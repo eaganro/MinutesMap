@@ -193,6 +193,41 @@ test.describe('MinutesMap Smoke', () => {
     await expect(firstGame).toHaveClass(/selected/);
   });
 
+  test('primary controls support keyboard-only operation @smoke', async ({ page }) => {
+    await page.goto(`/${SMOKE_GAME_ID}`);
+    await waitForAppReady(page);
+
+    const secondGame = page.getByRole('button', { name: /LAL 110, BOS 107, Final/i });
+    await secondGame.focus();
+    await expect(secondGame).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/${ALT_SMOKE_GAME_ID}$`));
+    await expect(secondGame).toHaveAttribute('aria-pressed', 'true');
+
+    const pointToggle = page.getByRole('button', { name: 'Point' });
+    const missToggle = page.getByRole('button', { name: 'Miss' });
+    await pointToggle.focus();
+    await page.keyboard.press('Space');
+    await expect(pointToggle).toHaveAttribute('aria-pressed', 'false');
+
+    await page.keyboard.press('Tab');
+    await expect(missToggle).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(missToggle).toHaveAttribute('aria-pressed', 'false');
+
+    const datePicker = page.getByLabel('Select game date');
+    const nextDateButton = page.getByRole('button', { name: 'Next date' });
+    await nextDateButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(datePicker).toHaveValue('2025-01-16');
+
+    const scoreDateButton = page.getByRole('button', { name: /Show schedule for/ });
+    await expect(scoreDateButton).toBeEnabled();
+    await scoreDateButton.focus();
+    await page.keyboard.press('Space');
+    await expect(datePicker).toHaveValue('2025-01-15');
+  });
+
   test('mobile browser back closes player detail @smoke', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/${SMOKE_GAME_ID}`);

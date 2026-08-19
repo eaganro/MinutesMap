@@ -129,13 +129,17 @@ export default function Score({
         </div>
       )}
       <div className="scoreContent">
-        <div
-          onClick={gameDate ? changeToGameDate : undefined}
+        <button
+          type="button"
+          onClick={changeToGameDate}
           className="gameDate"
-          style={{ cursor: gameDate ? 'pointer' : 'default' }}
+          disabled={!gameDate || isDataLoading}
+          aria-label={
+            gameDate ? `Show schedule for ${gameDate.toDateString().slice(4)}` : undefined
+          }
         >
           {gameDate ? gameDate.toDateString().slice(4) : '---'}
-        </div>
+        </button>
         <div className="scoreArea">
           <div>{displayData.score ? displayData.score.away : '--'}</div>
           {displayData.awayTeam && (

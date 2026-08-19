@@ -41,14 +41,25 @@ describe('Score', () => {
     expect(screen.queryByText('99')).not.toBeInTheDocument();
   });
 
-  it('changes date using value-based API when clicking the score date', () => {
+  it('exposes score-date navigation as a named native button', () => {
     const changeDate = vi.fn();
-    const { container } = render(<Score {...buildProps({ changeDate })} />);
-    const dateNode = container.querySelector('.gameDate');
+    render(<Score {...buildProps({ changeDate })} />);
+    const dateButton = screen.getByRole('button', { name: /Show schedule for/ });
 
-    fireEvent.click(dateNode);
+    expect(dateButton.tagName).toBe('BUTTON');
+    dateButton.focus();
+    fireEvent.click(dateButton, { detail: 0 });
 
+    expect(dateButton).toHaveFocus();
     expect(changeDate).toHaveBeenCalledWith('2026-02-03');
+  });
+
+  it('disables score-date navigation while score data is loading', () => {
+    const { rerender } = render(<Score {...buildProps()} />);
+
+    rerender(<Score {...buildProps({ isLoading: true })} />);
+
+    expect(screen.getByRole('button', { name: /Show schedule for/ })).toBeDisabled();
   });
 
   it('shows loading indicator when no prior display data is available', () => {

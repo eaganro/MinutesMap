@@ -175,7 +175,8 @@ export default function StatButtons({
     const pointLegendSize = 12;
 
     return (
-      <div
+      <button
+        type="button"
         className={`buttonGroup ${isActive ? '' : 'off'} ${isPoint || isMiss ? 'subLegend' : ''} ${holdStatIndex === i ? 'isHoldCharging' : ''}`}
         key={key}
         onClick={() => handleToggle(i)}
@@ -188,7 +189,9 @@ export default function StatButtons({
           clearStatHoverPreview(event);
           endStatHold();
         }}
-        aria-disabled={!isInteractive}
+        aria-label={EVENT_TYPES[key].label}
+        aria-pressed={isActive}
+        disabled={!isInteractive}
       >
         {isPoint ? (
           <div className="subLegendRow" aria-hidden="true">
@@ -228,19 +231,21 @@ export default function StatButtons({
             <span className="label">{EVENT_TYPES[key].label}</span>
           </>
         )}
-      </div>
+      </button>
     );
   });
 
   // Score differential toggle
   const scoreDiffButton = (
-    <div
+    <button
+      type="button"
       className={`buttonGroup scoreDiff ${showScoreDiff ? '' : 'off'}`}
       onClick={() => {
         if (!isInteractive) return;
         setShowScoreDiff(!showScoreDiff);
       }}
-      aria-disabled={!isInteractive}
+      aria-pressed={showScoreDiff}
+      disabled={!isInteractive}
     >
       <div className="shapeContainer scoreDiffIcon">
         <svg width="18" height="18" viewBox="0 0 18 18">
@@ -256,17 +261,19 @@ export default function StatButtons({
         </svg>
       </div>
       <span className="label">Score Lead</span>
-    </div>
+    </button>
   );
 
   const oddsButton = (
-    <div
+    <button
+      type="button"
       className={`buttonGroup oddsOverlay ${showOdds ? '' : 'off'}`}
       onClick={() => {
         if (!isInteractive) return;
         setShowOdds(!showOdds);
       }}
-      aria-disabled={!isInteractive}
+      aria-pressed={showOdds}
+      disabled={!isInteractive}
     >
       <div className="shapeContainer oddsIcon">
         <svg width="18" height="18" viewBox="0 0 18 18">
@@ -281,13 +288,17 @@ export default function StatButtons({
         </svg>
       </div>
       <span className="label">Win Odds</span>
-    </div>
+    </button>
   );
 
   return (
-    <div className={`statButtons ${!isInteractive ? 'isLoading' : ''}`}>
+    <div
+      className={`statButtons ${!isInteractive ? 'isLoading' : ''}`}
+      role="group"
+      aria-label="Play filters"
+    >
       {buttons}
-      <div className="separator" />
+      <div className="separator" aria-hidden="true" />
       {scoreDiffButton}
       {oddsButton}
     </div>

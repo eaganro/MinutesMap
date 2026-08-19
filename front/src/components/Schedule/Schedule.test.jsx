@@ -109,16 +109,33 @@ describe('Schedule', () => {
     const changeGame = vi.fn();
     render(<Schedule {...buildProps({ changeGame })} />);
 
-    fireEvent.click(screen.getAllByText('PHI - GSW')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /PHI 54, GSW 49/ }), { detail: 1 });
 
     expect(changeGame).not.toHaveBeenCalled();
+  });
+
+  it('exposes selected games as native buttons and allows keyboard-generated activation', () => {
+    mocks.didDragMock.mockReturnValue(true);
+    const changeGame = vi.fn();
+    const { container } = render(<Schedule {...buildProps({ changeGame })} />);
+    const gameButton = screen.getByRole('button', { name: /PHI 54, GSW 49/ });
+
+    expect(gameButton.tagName).toBe('BUTTON');
+    expect(gameButton).toHaveAttribute('aria-pressed', 'true');
+    expect(container.querySelectorAll('.game img[alt=""][aria-hidden="true"]')).toHaveLength(2);
+
+    gameButton.focus();
+    fireEvent.click(gameButton, { detail: 0 });
+
+    expect(gameButton).toHaveFocus();
+    expect(changeGame).toHaveBeenCalledWith('2026-02-03-phi-gsw');
   });
 
   it('supports game selection and horizontal scroll controls when not dragging', () => {
     const changeGame = vi.fn();
     render(<Schedule {...buildProps({ changeGame })} />);
 
-    fireEvent.click(screen.getAllByText('PHI - GSW')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /PHI 54, GSW 49/ }));
     fireEvent.click(screen.getByLabelText('Scroll games left'));
     fireEvent.click(screen.getByLabelText('Scroll games right'));
 

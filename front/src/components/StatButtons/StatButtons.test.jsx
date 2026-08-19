@@ -27,6 +27,50 @@ afterEach(() => {
 });
 
 describe('StatButtons', () => {
+  it('exposes toggles as native buttons with pressed state', () => {
+    const changeStatOn = vi.fn();
+    const setShowScoreDiff = vi.fn();
+    const setShowOdds = vi.fn();
+    renderStatButtons({ changeStatOn, setShowScoreDiff, setShowOdds });
+
+    const pointButton = screen.getByRole('button', { name: 'Point' });
+    const scoreLeadButton = screen.getByRole('button', { name: 'Score Lead' });
+    const oddsButton = screen.getByRole('button', { name: 'Win Odds' });
+
+    expect(pointButton.tagName).toBe('BUTTON');
+    expect(pointButton).toHaveAttribute('aria-pressed', 'true');
+    expect(scoreLeadButton).toHaveAttribute('aria-pressed', 'true');
+    expect(oddsButton).toHaveAttribute('aria-pressed', 'false');
+
+    pointButton.focus();
+    fireEvent.click(pointButton, { detail: 0 });
+    fireEvent.click(scoreLeadButton, { detail: 0 });
+    fireEvent.click(oddsButton, { detail: 0 });
+
+    expect(pointButton).toHaveFocus();
+    expect(changeStatOn).toHaveBeenCalledWith(0);
+    expect(setShowScoreDiff).toHaveBeenCalledWith(false);
+    expect(setShowOdds).toHaveBeenCalledWith(true);
+  });
+
+  it('uses native disabled state and blocks activation while unavailable', () => {
+    const changeStatOn = vi.fn();
+    const setShowScoreDiff = vi.fn();
+    renderStatButtons({ changeStatOn, setShowScoreDiff, isLoading: true });
+
+    const pointButton = screen.getByRole('button', { name: 'Point' });
+    const scoreLeadButton = screen.getByRole('button', { name: 'Score Lead' });
+
+    expect(pointButton).toBeDisabled();
+    expect(scoreLeadButton).toBeDisabled();
+
+    fireEvent.click(pointButton);
+    fireEvent.click(scoreLeadButton);
+
+    expect(changeStatOn).not.toHaveBeenCalled();
+    expect(setShowScoreDiff).not.toHaveBeenCalled();
+  });
+
   it('starts stat hover preview after a half-second hover and clears it on leave', () => {
     vi.useFakeTimers();
     const onStatHoverChange = vi.fn();
