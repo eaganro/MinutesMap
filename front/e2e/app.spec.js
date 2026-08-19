@@ -222,8 +222,9 @@ test.describe('MinutesMap Smoke', () => {
 
     await page.keyboard.press('Tab');
     await expect(missToggle).toBeFocused();
-    await page.keyboard.press('Enter');
     await expect(missToggle).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('Enter');
+    await expect(missToggle).toHaveAttribute('aria-pressed', 'true');
 
     const datePicker = page.getByLabel('Select game date');
     const nextDateButton = page.getByRole('button', { name: 'Next date' });
