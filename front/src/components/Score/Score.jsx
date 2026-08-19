@@ -87,8 +87,8 @@ export default function Score({
 
   if (isLoading && !hasDisplayData) {
     return (
-      <div className="scoreElement">
-        <div className="loadingIndicator">
+      <div className="scoreElement" role="region" aria-label="Game score" aria-busy="true">
+        <div className="loadingIndicator" role="status">
           <CircularProgress size={24} thickness={5} />
           <span>Loading game...</span>
         </div>
@@ -121,9 +121,14 @@ export default function Score({
   };
 
   return (
-    <div className={`scoreElement ${isDataLoading ? 'isLoading' : ''}`}>
+    <div
+      className={`scoreElement ${isDataLoading ? 'isLoading' : ''}`}
+      role="region"
+      aria-label="Game score"
+      aria-busy={isLoading}
+    >
       {showOverlay && (
-        <div className="loadingOverlay">
+        <div className="loadingOverlay" role="status">
           <CircularProgress size={20} thickness={5} />
           <span>Loading game...</span>
         </div>

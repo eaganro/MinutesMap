@@ -35,7 +35,7 @@ export default function Lineups({
   const homeTopRef = useRef(null);
   const { isDarkMode } = useTheme();
   const trackLineupsFeatureUse = useTrackFeatureUseOnce('lineups');
-  const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode);
+  const matchupColors = getMatchupColors(awayTeam?.abr, homeTeam?.abr, isDarkMode, true);
 
   useEffect(() => {
     setSortConfig(INITIAL_SORT_CONFIG);
@@ -138,14 +138,23 @@ export default function Lineups({
   }, [showLoadingIndicator, showStatusMessage]);
 
   return (
-    <div className="lineups" onClick={trackLineupsFeatureUse} onTouchStart={trackLineupsFeatureUse}>
+    <div
+      className="lineups"
+      role="region"
+      aria-label="Lineups"
+      aria-busy={isLoading}
+      onClick={trackLineupsFeatureUse}
+      onTouchStart={trackLineupsFeatureUse}
+    >
       {showLoadingIndicator ? (
-        <div className="lineupsLoading">
+        <div className="lineupsLoading" role="status">
           <CircularProgress size={22} thickness={5} />
           <span>Loading lineups...</span>
         </div>
       ) : showStatusMessage ? (
-        <div className="lineupsStatus">{statusMessage}</div>
+        <div className="lineupsStatus" role="status">
+          {statusMessage}
+        </div>
       ) : (
         <div className="lineupsGrid">
           <LineupsTeamPanel

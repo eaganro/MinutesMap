@@ -104,17 +104,32 @@ function areColorsTooClose(hex1, hex2, threshold = 220) {
   return colorDistance(hex1, hex2) < threshold;
 }
 
+function ensureTextContrast(hexColor, darkMode = false) {
+  const background = darkMode ? '#1e1e1e' : '#fafafa';
+  let color = tinycolor(hexColor);
+  let attempts = 0;
+
+  while (tinycolor.readability(color, background) < 4.5 && attempts < 20) {
+    color = darkMode ? color.lighten(3) : color.darken(3);
+    attempts += 1;
+  }
+
+  return color.toHexString();
+}
+
 // Get team colors for a matchup, using secondary for away if colors clash
-// Pass isDarkMode explicitly for React state synchronization
-function getMatchupColors(awayAbr, homeAbr, darkMode = false) {
+// Text consumers can request WCAG AA contrast without changing chart/marker brand colors.
+function getMatchupColors(awayAbr, homeAbr, darkMode = false, ensureReadableText = false) {
   const colorSet = darkMode ? nbaTeamColorsDark : nbaTeamColors;
   const awayTeam = colorSet[awayAbr];
   const homeTeam = colorSet[homeAbr];
+  const resolveColor = (color) =>
+    ensureReadableText ? ensureTextContrast(color, darkMode) : color;
 
   if (!awayTeam || !homeTeam) {
     return {
-      away: awayTeam?.primary || '#888888',
-      home: homeTeam?.primary || '#888888',
+      away: resolveColor(awayTeam?.primary || '#888888'),
+      home: resolveColor(homeTeam?.primary || '#888888'),
     };
   }
 
@@ -125,8 +140,8 @@ function getMatchupColors(awayAbr, homeAbr, darkMode = false) {
   const awayColor = areColorsTooClose(awayPrimary, homePrimary) ? awayTeam.secondary : awayPrimary;
 
   return {
-    away: awayColor,
-    home: homePrimary,
+    away: resolveColor(awayColor),
+    home: resolveColor(homePrimary),
   };
 }
 
@@ -161,6 +176,7 @@ export {
   hexToRgb,
   colorDistance,
   areColorsTooClose,
+  ensureTextContrast,
   getMatchupColors,
   getSafeBackground,
   nbaTeamColorsDark,

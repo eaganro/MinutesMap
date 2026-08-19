@@ -76,7 +76,8 @@ describe('Score', () => {
       />,
     );
 
-    expect(screen.getByText('Loading game...')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Game score' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading game...');
   });
 
   it('does not show the live indicator for TBD games', () => {

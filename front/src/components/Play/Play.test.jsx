@@ -292,6 +292,24 @@ describe('Play', () => {
     expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
   });
 
+  it('lets keyboard users inspect chart events and reach video actions', () => {
+    renderPlay(buildProps({ sectionWidth: 900 }));
+
+    const chart = screen.getByRole('region', { name: 'Play-by-play chart' });
+    chart.focus();
+    fireEvent.focus(chart);
+
+    expect(chart).toHaveFocus();
+    expect(within(chart).getByRole('status')).toHaveTextContent('J. Embiid makes driving layup');
+    expect(screen.getByRole('link', { name: /open video on nba\.com/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(chart, { key: 'ArrowRight' });
+    expect(within(chart).getByRole('status')).toHaveTextContent('S. Curry misses 3PT jump shot');
+
+    fireEvent.keyDown(chart, { key: 'End' });
+    expect(within(chart).getByRole('status')).toHaveTextContent('J. Embiid defensive rebound');
+  });
+
   it('renders the win-odds overlay when enabled', () => {
     const { container } = renderPlay(buildProps({ showOdds: true }));
     const graphLines = container.querySelectorAll('.playGrid polyline');

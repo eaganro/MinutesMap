@@ -10,6 +10,9 @@ export default function PlayExportControls({
   onExportInteractionStart,
 }) {
   const exportPreviewRef = useRef(null);
+  const exportTriggerRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const wasPreviewOpenRef = useRef(false);
   const captionTextareaId = useId();
   const hasDisplayData = exportData.hasDisplayData;
   const isOvertimeGame = Number(exportData?.numPeriods) > 4;
@@ -50,12 +53,60 @@ export default function PlayExportControls({
     exportData,
     onExportInteractionStart,
   });
+  const isPreviewOpen = Boolean(exportPreview);
 
   useEffect(() => {
-    if (!exportPreview) return undefined;
+    if (isPreviewOpen) {
+      wasPreviewOpenRef.current = true;
+      closeButtonRef.current?.focus();
+      return;
+    }
+    if (wasPreviewOpenRef.current) {
+      wasPreviewOpenRef.current = false;
+      exportTriggerRef.current?.focus();
+    }
+  }, [isPreviewOpen]);
+
+  useEffect(
+    () => () => {
+      if (wasPreviewOpenRef.current) {
+        exportTriggerRef.current?.focus();
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!isPreviewOpen) return undefined;
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
         closeExportPreview();
+        return;
+      }
+      if (event.key !== 'Tab' || !exportPreviewRef.current) {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        exportPreviewRef.current.querySelectorAll(
+          'a[href], button:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (!focusableElements.length) {
+        event.preventDefault();
+        exportPreviewRef.current.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
       }
     };
     const handlePointerDown = (event) => {
@@ -70,12 +121,13 @@ export default function PlayExportControls({
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('pointerdown', handlePointerDown);
     };
-  }, [exportPreview, closeExportPreview]);
+  }, [isPreviewOpen, closeExportPreview]);
 
   return (
     <>
       {hasDisplayData && (
         <button
+          ref={exportTriggerRef}
           type="button"
           className={`playExportButton${isOvertimeGame ? ' isIconOnlyDesktop' : ''}`}
           onClick={handleExportImage}
@@ -124,11 +176,14 @@ export default function PlayExportControls({
           className="playExportPreview"
           role="dialog"
           aria-label="Play-by-play image preview"
+          aria-modal="true"
+          tabIndex={-1}
           ref={exportPreviewRef}
         >
           <div className="playExportPreviewHeader">
             <span>Image Builder</span>
             <button
+              ref={closeButtonRef}
               type="button"
               className="playExportPreviewClose"
               onClick={closeExportPreview}

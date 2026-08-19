@@ -298,9 +298,13 @@ export default function (
       }
     };
     return (
-      <div key={rowKey} className={'rowGrid stat ' + (i % 2 === 0 ? 'even' : 'odd')}>
+      <div key={rowKey} className={'rowGrid stat ' + (i % 2 === 0 ? 'even' : 'odd')} role="row">
         {columnOrder.map((key) => (
-          <span key={`${rowKey}-${key}`} className={getCellClassName(key)}>
+          <span
+            key={`${rowKey}-${key}`}
+            className={getCellClassName(key)}
+            role={key === 'player' ? 'rowheader' : 'cell'}
+          >
             {getPlayerValue(key)}
           </span>
         ))}
@@ -318,6 +322,7 @@ export default function (
     <div
       key="team-total-row"
       className={'rowGrid stat ' + (playerRows.length % 2 === 0 ? 'even' : 'odd')}
+      role="row"
     >
       {columnOrder.map((key) => {
         let value = '';
@@ -375,7 +380,11 @@ export default function (
             break;
         }
         return (
-          <span key={`team-${key}`} className={getCellClassName(key)}>
+          <span
+            key={`team-${key}`}
+            className={getCellClassName(key)}
+            role={key === 'player' ? 'rowheader' : 'cell'}
+          >
             {value}
           </span>
         );
@@ -384,20 +393,38 @@ export default function (
   );
 
   const statHeadings = (
-    <div key="stat-headings" className="rowGrid statHeadings">
-      {columnOrder.map((key) => (
-        <button
-          key={`heading-${key}`}
-          type="button"
-          className={`${getCellClassName(key)} statHeadingButton${sortConfig?.key === key ? ' isActive' : ''}`}
-          onClick={() => onSort?.(key)}
-          data-indicator={
-            sortConfig?.key === key ? (sortConfig?.direction === 'desc' ? '▼' : '▲') : undefined
-          }
-        >
-          {COLUMN_LABELS[key]}
-        </button>
-      ))}
+    <div key="stat-headings" className="rowGrid statHeadings" role="row">
+      {columnOrder.map((key) => {
+        const isActiveSort = sortConfig?.key === key;
+        const sortDirection = isActiveSort
+          ? sortConfig?.direction === 'desc'
+            ? 'descending'
+            : 'ascending'
+          : 'none';
+        const nextDirection =
+          isActiveSort && sortConfig?.direction === 'desc' ? 'ascending' : 'descending';
+
+        return (
+          <span
+            key={`heading-${key}`}
+            className={`${getCellClassName(key)} statHeadingCell`}
+            role="columnheader"
+            aria-sort={sortDirection}
+          >
+            <button
+              type="button"
+              className={`statHeadingButton${isActiveSort ? ' isActive' : ''}`}
+              onClick={() => onSort?.(key)}
+              data-indicator={
+                isActiveSort ? (sortConfig?.direction === 'desc' ? '▼' : '▲') : undefined
+              }
+              aria-label={`${COLUMN_LABELS[key]}${isActiveSort ? `, sorted ${sortDirection}` : ''}. Sort ${nextDirection}.`}
+            >
+              {COLUMN_LABELS[key]}
+            </button>
+          </span>
+        );
+      })}
     </div>
   );
   const teamBox = playerRows;
@@ -421,7 +448,15 @@ export default function (
           )}
         </div>
       </div>
-      <div ref={tableWrapperRef} className="tableWrapper" onScroll={onScroll}>
+      <div
+        ref={tableWrapperRef}
+        className="tableWrapper"
+        role="table"
+        aria-label={`${team?.name || team?.abbr || 'Team'} box score`}
+        aria-colcount={columnOrder.length}
+        tabIndex={0}
+        onScroll={onScroll}
+      >
         {teamBox}
       </div>
     </div>

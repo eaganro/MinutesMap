@@ -217,6 +217,11 @@ describe('Schedule', () => {
       <Schedule {...buildProps({ games: [], status: 'loading', isPending: true })} />,
     );
 
+    expect(screen.getByRole('region', { name: 'Game schedule' })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Loading games...');
     expect(screen.queryByText('No Games Scheduled')).not.toBeInTheDocument();
 
     rerender(<Schedule {...buildProps({ games: [], status: 'success', isPending: false })} />);

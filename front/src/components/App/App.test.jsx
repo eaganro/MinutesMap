@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import App from './App';
 
@@ -141,6 +141,8 @@ describe('App', () => {
     });
 
     render(<App />);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'MinutesMap' })).toBeInTheDocument();
 
     expect(mocks.useMinutesMapMock).toHaveBeenCalledTimes(1);
 

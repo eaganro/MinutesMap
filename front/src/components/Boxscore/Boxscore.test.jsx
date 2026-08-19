@@ -74,6 +74,13 @@ describe('Boxscore', () => {
     expect(screen.getByText('Game has not started.')).toBeInTheDocument();
   });
 
+  it('announces loading when no box score data exists', () => {
+    render(<Boxscore box={{}} isLoading statusMessage={null} />);
+
+    expect(screen.getByRole('region', { name: 'Box score' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status')).toHaveTextContent('Loading box score...');
+  });
+
   it('persists expanded stats and resets table scroll when the selected game changes', () => {
     const { rerender } = render(
       <Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />,

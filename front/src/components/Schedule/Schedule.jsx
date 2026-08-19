@@ -208,7 +208,12 @@ export default function Schedule({
   };
 
   return (
-    <div className="schedule">
+    <div
+      className="schedule"
+      role="region"
+      aria-label="Game schedule"
+      aria-busy={isPending || isLoading}
+    >
       <div className="scheduleContent">
         <div className="datePick">
           <label className="visuallyHidden" htmlFor="scheduleDate">
@@ -262,7 +267,7 @@ export default function Schedule({
               </div>
             </div>
           ) : isPending || isLoading ? (
-            <div className="loadingIndicator">
+            <div className="loadingIndicator" role="status">
               <CircularProgress size={24} thickness={5} />
               <span>Loading games...</span>
             </div>
@@ -283,7 +288,7 @@ export default function Schedule({
           ) : status === 'success' ? (
             <div className="noGames">No Games Scheduled</div>
           ) : (
-            <div className="loadingIndicator">
+            <div className="loadingIndicator" role="status">
               <CircularProgress size={24} thickness={5} />
               <span>Loading games...</span>
             </div>

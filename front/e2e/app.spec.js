@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const SMOKE_GAME_ID = '2025-01-15-phi-gsw';
 const ALT_SMOKE_GAME_ID = '2025-01-15-lal-bos';
@@ -154,6 +155,15 @@ async function waitForAppReady(page) {
   await expect(page.locator('.topLevel')).toBeVisible();
   await expect(page.locator('input[type="date"]')).toBeVisible();
   await expect(page.locator('.scoreElement')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Show schedule for/ })).toBeEnabled();
+}
+
+async function expectNoSeriousAccessibilityViolations(page) {
+  const results = await new AxeBuilder({ page }).analyze();
+  const blockingViolations = results.violations.filter(
+    ({ impact }) => impact === 'serious' || impact === 'critical',
+  );
+  expect(blockingViolations, JSON.stringify(blockingViolations, null, 2)).toEqual([]);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -274,6 +284,11 @@ test.describe('MinutesMap Smoke', () => {
 
     const previewDialog = page.getByRole('dialog', { name: 'Play-by-play image preview' });
     await expect(previewDialog).toBeVisible();
+    const closePreviewButton = previewDialog.getByRole('button', {
+      name: 'Close image preview',
+    });
+    await expect(closePreviewButton).toBeFocused();
+    await expect(previewDialog).toHaveAttribute('aria-modal', 'true');
     await expect(page.getByAltText('Play-by-play export preview')).toBeVisible();
 
     const viewSelect = previewDialog.locator('select').first();
@@ -282,6 +297,56 @@ test.describe('MinutesMap Smoke', () => {
 
     const playerSelect = previewDialog.locator('select').nth(1);
     await expect(playerSelect).toBeEnabled({ timeout: 10000 });
+
+    await closePreviewButton.focus();
+    await page.keyboard.press('Shift+Tab');
+    await expect(previewDialog.getByRole('button', { name: 'Download image' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(closePreviewButton).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(previewDialog).toBeHidden();
+    await expect(exportButton).toBeFocused();
+  });
+
+  test('chart events and box-score sorting support keyboard access @smoke', async ({ page }) => {
+    await page.goto(`/${SMOKE_GAME_ID}`);
+    await waitForAppReady(page);
+
+    const chart = page.getByRole('region', { name: 'Play-by-play chart' });
+    await chart.focus();
+    await expect(chart).toBeFocused();
+    await expect(chart.getByRole('status')).toContainText('Joel Embiid makes 2-pt shot');
+
+    await page.keyboard.press('ArrowRight');
+    await expect(chart.getByRole('status')).toContainText('Stephen Curry makes 2-pt shot');
+    const videoLink = page.getByRole('link', { name: /open video on nba\.com/i });
+    for (let index = 0; index < 3; index += 1) {
+      if (await videoLink.evaluate((element) => document.activeElement === element)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(videoLink).toBeFocused();
+
+    const awayTable = page.getByRole('table', { name: 'Philadelphia 76ers box score' });
+    const minuteHeader = awayTable.getByRole('columnheader', { name: /MIN/i });
+    await expect(minuteHeader).toHaveAttribute('aria-sort', 'descending');
+    await awayTable.getByRole('button', { name: /PTS.*Sort descending/i }).click();
+    await expect(awayTable.getByRole('columnheader', { name: /PTS/i })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+  });
+
+  test('desktop and mobile main flows have no serious axe violations @smoke', async ({ page }) => {
+    for (const viewport of [
+      { width: 1280, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto(`/${SMOKE_GAME_ID}`);
+      await waitForAppReady(page);
+      await expectNoSeriousAccessibilityViolations(page);
+    }
   });
 
   test('dark mode preference persists after reload @smoke', async ({ page }) => {

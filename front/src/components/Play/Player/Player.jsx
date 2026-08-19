@@ -167,7 +167,13 @@ export default function Player({
           playerName
         )}
       </div>
-      <svg width={width + rightMargin} height="28" className="line" style={{ left: leftMargin }}>
+      <svg
+        width={width + rightMargin}
+        height="28"
+        className="line"
+        style={{ left: leftMargin }}
+        aria-hidden="true"
+      >
         {playTimeLines}
         {nonHighlightedDots}
         {highlightedDots}

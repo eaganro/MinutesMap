@@ -79,6 +79,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
     displayBox?.teams?.away?.abbr,
     displayBox?.teams?.home?.abbr,
     isDarkMode,
+    true,
   );
 
   useEffect(() => {
@@ -158,24 +159,29 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   return (
     <div
       className={`box ${isDataLoading ? 'isLoading' : ''}`}
+      role="region"
+      aria-label="Box score"
+      aria-busy={isLoading}
       onClick={trackBoxscoreFeatureUse}
       onTouchStart={trackBoxscoreFeatureUse}
       onWheel={trackBoxscoreFeatureUse}
     >
       {showLoadingOverlay && (
-        <div className="loadingOverlay">
+        <div className="loadingOverlay" role="status">
           <CircularProgress size={20} thickness={5} />
           <span>Loading box score...</span>
         </div>
       )}
       {showLoadingIndicator ? (
-        <div className="loadingIndicator">
+        <div className="loadingIndicator" role="status">
           <CircularProgress size={24} thickness={5} />
           <span>Loading box score...</span>
         </div>
       ) : showStatusMessage ? (
         <div className="boxContent">
-          <div className="statusMessage">{displayStatusMessage}</div>
+          <div className="statusMessage" role="status">
+            {displayStatusMessage}
+          </div>
         </div>
       ) : (
         <div className="boxContent">

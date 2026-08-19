@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { resolveFullNameFromRoster } from './PlayExport/playExportModel';
 import MobilePlayerSheet from './MobilePlayerSheet';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -91,6 +91,8 @@ export default function Play({
   });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [playerDetailPeriod, setPlayerDetailPeriod] = useState(0);
+  const chartInstructionsId = useId();
+  const chartAnnouncementId = useId();
 
   const clearSelectedPlayer = useCallback(() => {
     setSelectedPlayer(null);
@@ -111,6 +113,7 @@ export default function Play({
     hasPrevAction,
     hasNextAction,
     navigateAction,
+    selectBoundaryAction,
     setInfoLocked,
     mousePosition,
     setMousePosition,
@@ -127,6 +130,73 @@ export default function Play({
     oddsTimeline: stablePlayData.oddsTimeline,
     playRef,
   });
+
+  const chartAnnouncement = useMemo(() => {
+    if (!descriptionArray.length) return 'No chart event selected.';
+    return descriptionArray
+      .map((action) => action.description)
+      .filter(Boolean)
+      .join('. ');
+  }, [descriptionArray]);
+
+  const handleChartFocus = useCallback(
+    (event) => {
+      if (event.target !== event.currentTarget) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      setMousePosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top + Math.min(rect.height / 2, 280),
+      });
+      if (!descriptionArray.length) {
+        selectBoundaryAction('first');
+      }
+      setInfoLocked(true);
+    },
+    [descriptionArray.length, selectBoundaryAction, setInfoLocked, setMousePosition],
+  );
+
+  const handleChartBlur = useCallback(
+    (event) => {
+      if (event.currentTarget.contains(event.relatedTarget)) return;
+      setInfoLocked(false);
+      resetInteraction(true);
+    },
+    [resetInteraction, setInfoLocked],
+  );
+
+  const handleChartKeyDown = useCallback(
+    (event) => {
+      if (event.key === 'Escape' && event.currentTarget.contains(event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+        setInfoLocked(false);
+        resetInteraction(true);
+        event.currentTarget.focus({ preventScroll: true });
+        return;
+      }
+      if (event.target !== event.currentTarget) return;
+
+      let handled = true;
+      if (event.key === 'ArrowLeft') {
+        if (!navigateAction(-1)) selectBoundaryAction('first');
+      } else if (event.key === 'ArrowRight') {
+        if (!navigateAction(1)) selectBoundaryAction('last');
+      } else if (event.key === 'Home') {
+        selectBoundaryAction('first');
+      } else if (event.key === 'End') {
+        selectBoundaryAction('last');
+      } else {
+        handled = false;
+      }
+
+      if (handled) {
+        event.preventDefault();
+        event.stopPropagation();
+        setInfoLocked(true);
+      }
+    },
+    [navigateAction, resetInteraction, selectBoundaryAction, setInfoLocked],
+  );
 
   useEffect(() => {
     setInfoLocked(false);
@@ -317,7 +387,7 @@ export default function Play({
       <div className="playWrapper">
         {quarterSwitcher}
         <div className="play">
-          <div className="loadingIndicator">
+          <div className="loadingIndicator" role="status">
             <CircularProgress size={24} thickness={5} />
             <span>Loading play-by-play...</span>
           </div>
@@ -332,7 +402,9 @@ export default function Play({
         {quarterSwitcher}
         <div className={`play ${isDataLoading ? 'isLoading' : ''}`}>
           <div className="playContent">
-            <div className="statusMessage">{displayStatusMessage}</div>
+            <div className="statusMessage" role="status">
+              {displayStatusMessage}
+            </div>
           </div>
         </div>
       </div>
@@ -370,10 +442,22 @@ export default function Play({
           resetInteraction(true);
         }}
       />
+      <p id={chartInstructionsId} className="playChartInstructions">
+        Interactive play-by-play chart. Use Left and Right Arrow to inspect events, Home and End to
+        jump to the first or last event, and Tab to reach available event actions.
+      </p>
       <div
         ref={playRef}
         className={`play ${isDataLoading ? 'isLoading' : ''}`}
         style={{ width: sectionWidth }}
+        role="region"
+        aria-label="Play-by-play chart"
+        aria-describedby={`${chartInstructionsId} ${chartAnnouncementId}`}
+        aria-busy={isDataLoading}
+        tabIndex={isDataLoading ? -1 : 0}
+        onFocus={handleChartFocus}
+        onBlur={handleChartBlur}
+        onKeyDown={handleChartKeyDown}
         onMouseMove={isDataLoading ? undefined : handleMouseMove}
         onMouseLeave={isDataLoading ? undefined : handleMouseLeave}
         onClick={isDataLoading ? undefined : handleClick}
@@ -382,6 +466,15 @@ export default function Play({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
       >
+        <span
+          id={chartAnnouncementId}
+          className="playChartAnnouncement"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {chartAnnouncement}
+        </span>
         {!isDataLoading && !isShowingMobilePlayerDetail && (
           <PlayTooltip
             descriptionArray={descriptionArray}
@@ -403,7 +496,7 @@ export default function Play({
         )}
 
         {showLoadingOverlay && !isShowingMobilePlayerDetail && (
-          <div className="loadingOverlay">
+          <div className="loadingOverlay" role="status">
             <CircularProgress size={20} thickness={5} />
             <span>Loading play-by-play...</span>
           </div>
@@ -429,7 +522,7 @@ export default function Play({
             />
           ) : (
             <>
-              <svg height="600" width={sectionWidth} className="line playGrid">
+              <svg height="600" width={sectionWidth} className="line playGrid" aria-hidden="true">
                 <TimelineGrid
                   width={width}
                   leftMargin={leftMargin}

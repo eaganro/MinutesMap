@@ -33,7 +33,7 @@ export default function App() {
               className="appLogo"
             />
           </picture>
-          <span className="appName">MinutesMap</span>
+          <h1 className="appName">MinutesMap</h1>
         </a>
         <div className="appHeaderActions">
           {/*

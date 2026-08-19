@@ -84,6 +84,15 @@ export const usePlayInteraction = ({
     [getAdjacentAction, applyActionSelection],
   );
 
+  const selectBoundaryAction = useCallback(
+    (boundary) => {
+      if (!allActions?.length) return false;
+      const action = boundary === 'last' ? allActions[allActions.length - 1] : allActions[0];
+      return applyActionSelection(action);
+    },
+    [allActions, applyActionSelection],
+  );
+
   const hasPrevAction = useMemo(() => Boolean(getAdjacentAction(-1)), [getAdjacentAction]);
   const hasNextAction = useMemo(() => Boolean(getAdjacentAction(1)), [getAdjacentAction]);
 
@@ -253,6 +262,7 @@ export const usePlayInteraction = ({
     hasPrevAction,
     hasNextAction,
     navigateAction,
+    selectBoundaryAction,
     setInfoLocked,
     mousePosition,
     setMousePosition,

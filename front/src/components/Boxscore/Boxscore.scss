@@ -63,8 +63,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: auto;
+    width: 100%;
     white-space: nowrap;
+  }
+
+  .statHeadingCell {
+    padding: 0;
   }
 
   .statHeadingButton.isActive {
