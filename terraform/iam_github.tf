@@ -351,7 +351,20 @@ data "aws_iam_policy_document" "github_shard_compute" {
     ]
     resources = ["*"]
   }
+}
 
+resource "aws_iam_policy" "github_shard_compute" {
+  name   = "GitHubActions-Shard-Compute"
+  path   = "/"
+  policy = data.aws_iam_policy_document.github_shard_compute.json
+}
+
+resource "aws_iam_role_policy_attachment" "attach_shard_compute" {
+  role       = "GitHubActionRole"
+  policy_arn = aws_iam_policy.github_shard_compute.arn
+}
+
+data "aws_iam_policy_document" "github_cloudfront_response_headers" {
   statement {
     sid    = "CloudFrontResponseHeadersPolicyCreateAndList"
     effect = "Allow"
@@ -375,13 +388,13 @@ data "aws_iam_policy_document" "github_shard_compute" {
   }
 }
 
-resource "aws_iam_policy" "github_shard_compute" {
-  name   = "GitHubActions-Shard-Compute"
+resource "aws_iam_policy" "github_cloudfront_response_headers" {
+  name   = "GitHubActions-CloudFront-Response-Headers"
   path   = "/"
-  policy = data.aws_iam_policy_document.github_shard_compute.json
+  policy = data.aws_iam_policy_document.github_cloudfront_response_headers.json
 }
 
-resource "aws_iam_role_policy_attachment" "attach_shard_compute" {
+resource "aws_iam_role_policy_attachment" "attach_cloudfront_response_headers" {
   role       = "GitHubActionRole"
-  policy_arn = aws_iam_policy.github_shard_compute.arn
+  policy_arn = aws_iam_policy.github_cloudfront_response_headers.arn
 }
