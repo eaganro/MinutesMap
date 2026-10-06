@@ -74,3 +74,16 @@ class TestNbaGamePollerHelpers:
         )
         assert self.module.is_confirmed_terminal_game({"status": "Final"})
         assert self.module.is_confirmed_terminal_game({"status": "Postponed"})
+
+    def test_fetch_nba_data_reads_mirror_when_configured(self):
+        from unittest.mock import MagicMock
+
+        self.module.NBA_FEED_MIRROR_PREFIX = "private/nba-feed/"
+        self.module.fetch_nba_data_from_mirror = MagicMock(return_value=({"ok": True}, '"e"'))
+        self.module.fetch_nba_data_urllib = MagicMock()
+        url = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
+        assert self.module.fetch_nba_data(url, '"old"') == ({"ok": True}, '"e"')
+        self.module.fetch_nba_data_from_mirror.assert_called_once_with(
+            self.module.s3_client, "test-bucket", "private/nba-feed/", url, '"old"'
+        )
+        self.module.fetch_nba_data_urllib.assert_not_called()

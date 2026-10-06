@@ -1,0 +1,14 @@
+[Unit]
+Description=MinutesMap NBA feed relay (cdn.nba.com -> S3 mirror)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/minutesmap-relay
+ExecStart=%h/minutesmap-relay/.venv/bin/python -u nba_feed_relay.py --bucket roryeagan.com-nba-processed-data --profile minutesmap-relay
+Restart=always
+RestartSec=30
+Nice=5
+
+[Install]
+WantedBy=default.target
