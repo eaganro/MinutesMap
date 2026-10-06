@@ -19,6 +19,7 @@ def fake_poller(**overrides):
     poller.reconcile_recent_schedule = lambda: calls.append("reconcile")
     poller.poller_logic = lambda context, schedule_half=True: calls.append(("poll", context, schedule_half))
     poller.caption_worker_logic = lambda event: calls.append(("caption", event))
+    poller.get_nba_date = lambda: "2026-10-06"
     for name, value in overrides.items():
         setattr(poller, name, value)
     return poller
@@ -54,13 +55,52 @@ def test_poller_disabling_itself_stops_polling():
     assert not runner.polling
 
 
-def test_hourly_reconcile_between_daily_manager_runs():
+def test_hourly_reconcile_once_todays_games_are_done():
     poller = fake_poller()
     runner = PiRunner(poller, InlineExecutor())
     runner.tick(NOW)
+    runner.enable()
+    runner.disable()  # all of today's games final
+    poller.calls.clear()
     runner.tick(NOW + 1800)
     runner.tick(NOW + run_poller.RECONCILE_SECONDS)
+    assert poller.calls == ["reconcile"]
+
+
+def test_hourly_reconcile_while_kickoff_is_pending():
+    poller = fake_poller()
+    runner = PiRunner(poller, InlineExecutor())
+    tip = datetime.fromtimestamp(NOW + 5 * 3600, timezone.utc)
+    poller.manager_logic = lambda: (poller.calls.append("manager"), poller.schedule_kickoff(tip))
+    runner.tick(NOW)
+    runner.tick(NOW + run_poller.RECONCILE_SECONDS)
     assert poller.calls == ["manager", "reconcile"]
+
+
+def test_manager_retries_hourly_when_nothing_was_scheduled():
+    # e.g. the first run after a power cut found no schedule because S3 was unreachable
+    poller = fake_poller()
+    runner = PiRunner(poller, InlineExecutor())
+    runner.tick(NOW)
+    assert not runner.polling and runner.kickoff_at is None
+    poller.manager_logic = lambda: (poller.calls.append("manager"), poller.enable_poller_logic())
+    runner.tick(NOW + run_poller.RECONCILE_SECONDS)
+    assert poller.calls[:3] == ["manager", "manager", ("poll", None, False)]
+
+
+def test_wait_until_ready_polls_until_network_and_clock_are_up():
+    results = iter([False, False, True])
+    sleeps = []
+    run_poller.wait_until_ready(check=lambda: next(results), sleep=sleeps.append, interval=15)
+    assert sleeps == [15, 15]
+
+
+def test_network_check_requires_time_sync_marker(tmp_path):
+    marker = tmp_path / "timesync" / "synchronized"
+    marker.parent.mkdir()
+    assert not run_poller.network_and_clock_ready(hosts=(), marker=str(marker))
+    marker.touch()
+    assert run_poller.network_and_clock_ready(hosts=(), marker=str(marker))
 
 
 def test_caption_requests_run_the_caption_worker():
