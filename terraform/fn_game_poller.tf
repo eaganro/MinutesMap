@@ -162,6 +162,7 @@ resource "aws_lambda_function" "nba_poller" {
       SCHEDULE_RECONCILE_FUTURE_DAYS = "7"
       GAME_ID_MAP_PREFIX             = "private/gameIdMap/"
       NBA_FEED_MIRROR_PREFIX         = "private/nba-feed/"
+      POLLER_DISABLED                = var.nba_poller_mode == "lambda" ? "false" : "true"
       KALSHI_ENABLED                 = "true"
       GEMINI_API_KEY                 = var.gemini_api_key
       MINUTESMAP_REVALIDATE_URL      = var.minutesmap_revalidate_url
@@ -177,6 +178,7 @@ resource "aws_cloudwatch_event_rule" "nba_daily_manager" {
   name                = "NBADailyManager"
   description         = "Daily trigger to check game schedule and set polling time"
   schedule_expression = "cron(0 11 * * ? *)"
+  state               = var.nba_poller_mode == "lambda" ? "ENABLED" : "DISABLED"
 }
 
 resource "aws_cloudwatch_event_target" "manager_target" {

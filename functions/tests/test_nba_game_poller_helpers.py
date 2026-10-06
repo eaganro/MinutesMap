@@ -87,3 +87,16 @@ class TestNbaGamePollerHelpers:
             self.module.s3_client, "test-bucket", "private/nba-feed/", url, '"old"'
         )
         self.module.fetch_nba_data_urllib.assert_not_called()
+
+    def test_main_handler_does_nothing_when_pi_runs_the_pipeline(self):
+        from unittest.mock import MagicMock
+
+        self.module.POLLER_DISABLED = True
+        self.module.manager_logic = MagicMock()
+        self.module.poller_logic = MagicMock()
+        self.module.disable_self = MagicMock()
+        assert self.module.main_handler({"task": "manager"}, None) is None
+        assert self.module.main_handler({"task": "poller"}, None) is None
+        self.module.manager_logic.assert_not_called()
+        self.module.poller_logic.assert_not_called()
+        assert self.module.disable_self.call_count == 2

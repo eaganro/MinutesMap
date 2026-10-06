@@ -20,3 +20,14 @@ variable "minutesmap_revalidate_secret" {
   sensitive   = true
   default     = ""
 }
+
+variable "nba_poller_mode" {
+  description = "Which NBA ingest pipeline is active: \"lambda\" (NBAGamePoller, reading the Pi relay's S3 mirror) or \"pi\" (pi/run_poller.py on the Raspberry Pi). See pi/README.md."
+  type        = string
+  default     = "pi"
+
+  validation {
+    condition     = contains(["lambda", "pi"], var.nba_poller_mode)
+    error_message = "nba_poller_mode must be \"lambda\" or \"pi\"."
+  }
+}
