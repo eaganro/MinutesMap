@@ -22,3 +22,5 @@ tmp/
 *.tfvars.json
 *.tfstate
 *.tfstate.*
+
+__pycache__/
