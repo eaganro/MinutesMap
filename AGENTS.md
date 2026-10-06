@@ -65,6 +65,11 @@ Run the smallest relevant checks first.
 - Frontend production build (local): `npm --prefix front run build`
 - Rebuild TypeScript Lambda bundles: `npm --prefix functions run build:lambdas`
 
+## Live NBA poller runs on the Raspberry Pi
+- Production ingest currently runs on the Pi (`nba_poller_mode = "pi"` in `terraform/variables.tf`); the `NBAGamePoller` Lambda is deployed but inert.
+- Pushing to `main` does not update the Pi. After changing `functions/nba-game-poller/**` or `pi/run_poller.py`, also run `bash pi/deploy.sh` and `ssh raspberrypi systemctl --user restart minutesmap-poller` (explicit confirmation required; avoid restarting during live games).
+- Mode switching, health checks and Pi setup: `pi/README.md`.
+
 ## Generated artifacts
 - Do not hand-edit generated Lambda bundle files:
   - `functions/gameDateUpdates/lambda_function.js`
