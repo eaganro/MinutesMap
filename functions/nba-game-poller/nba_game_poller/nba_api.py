@@ -1,6 +1,8 @@
 import gzip
 import json
 import random
+import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -74,6 +76,51 @@ def fetch_nba_data_urllib(url, etag=None, user_agent=None):
     except Exception as e:
         print(f"Network Exception {url}: {e}")
         return None, etag
+
+
+def fetch_nba_data_curl(url, etag=None, user_agent=None, timeout=10):
+    """
+    Same contract as fetch_nba_data_urllib, but via the curl binary. The NBA CDN rejects
+    Python's TLS handshake on residential hosts like the Pi while accepting curl.
+    """
+    if not user_agent:
+        user_agent = random.choice(USER_AGENTS)
+    headers = {
+        "User-Agent": user_agent,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.nba.com/",
+        "Origin": "https://www.nba.com",
+    }
+    if etag:
+        headers["If-None-Match"] = etag
+    with tempfile.NamedTemporaryFile() as body:
+        cmd = ["curl", "-s", "--compressed", "--max-time", str(timeout),
+               "-o", body.name, "-D", "-", "-w", "%{http_code}"]
+        for name, value in headers.items():
+            cmd += ["-H", f"{name}: {value}"]
+        try:
+            result = subprocess.run(cmd + [url], capture_output=True, text=True, timeout=timeout + 5)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            print(f"Network Exception {url}: {e}")
+            return None, etag
+        header_text, _, code = result.stdout.rpartition("\n")
+        if code == "304":
+            return None, etag
+        if code != "200":
+            print(f"Network Error {url}: {code or 'curl exit ' + str(result.returncode)}")
+            return None, etag
+        new_etag = etag
+        for line in header_text.splitlines():
+            name, _, value = line.partition(":")
+            if name.strip().lower() == "etag":
+                new_etag = value.strip()
+        body.seek(0)
+        try:
+            return json.loads(body.read()), new_etag
+        except json.JSONDecodeError:
+            print(f"JSON Decode Error for {url}")
+            return None, etag
 
 
 def mirror_key_for_url(url, prefix):

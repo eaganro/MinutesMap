@@ -11,7 +11,12 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from botocore.exceptions import ClientError
 
-from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_from_mirror, fetch_nba_data_urllib
+from nba_game_poller.nba_api import (
+    USER_AGENTS,
+    fetch_nba_data_curl,
+    fetch_nba_data_from_mirror,
+    fetch_nba_data_urllib,
+)
 from nba_game_poller.kalshi_api import (
     KALSHI_NBA_SERIES_SERIES,
     build_kalshi_nba_event_ticker,
@@ -68,6 +73,10 @@ if GAME_ID_MAP_PREFIX and not GAME_ID_MAP_PREFIX.endswith('/'):
 NBA_FEED_MIRROR_PREFIX = (os.environ.get("NBA_FEED_MIRROR_PREFIX") or "").strip()
 if NBA_FEED_MIRROR_PREFIX and not NBA_FEED_MIRROR_PREFIX.endswith('/'):
     NBA_FEED_MIRROR_PREFIX += '/'
+# "curl" when running on the Pi (pi/run_poller.py); the default is Python's urllib.
+NBA_FETCH_MODE = (os.environ.get("NBA_FETCH_MODE") or "urllib").strip().lower()
+# Set while the Pi runs the pipeline, so leftover schedules can't make the Lambda write too.
+POLLER_DISABLED = os.environ.get("POLLER_DISABLED", "").strip().lower() in ("1", "true", "yes", "on")
 KALSHI_ENABLED = os.environ.get("KALSHI_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
 SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
@@ -125,6 +134,10 @@ def main_handler(event, context):
     """
     task = event.get('task', 'poller')
     print(f"--- Execution started with task: {task} ---")
+    if POLLER_DISABLED:
+        print("Poller disabled (the Pi runs the pipeline). Skipping.")
+        disable_self()
+        return
 
     if task == 'manager':
         return manager_logic()
@@ -1881,6 +1894,8 @@ def reconcile_schedule_date(date_str, feed_games, team_page_sync_today=None):
 def fetch_nba_data(url, etag=None, user_agent=None):
     if NBA_FEED_MIRROR_PREFIX:
         return fetch_nba_data_from_mirror(s3_client, BUCKET, NBA_FEED_MIRROR_PREFIX, url, etag)
+    if NBA_FETCH_MODE == "curl":
+        return fetch_nba_data_curl(url, etag, user_agent)
     return fetch_nba_data_urllib(url, etag, user_agent)
 
 def fetch_schedule_feed():

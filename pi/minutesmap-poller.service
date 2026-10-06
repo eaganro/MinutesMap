@@ -1,0 +1,25 @@
+[Unit]
+Description=MinutesMap NBA poller pipeline (replaces the NBAGamePoller Lambda)
+After=network-online.target
+Wants=network-online.target
+# Never run alongside the mirror relay; only one ingest mode is active at a time.
+Conflicts=minutesmap-relay.service
+
+[Service]
+WorkingDirectory=%h/minutesmap-poller
+Environment=AWS_PROFILE=minutesmap-relay
+Environment=AWS_REGION=us-east-1
+Environment=KALSHI_ENABLED=true
+Environment=GAME_ID_MAP_PREFIX=private/gameIdMap/
+Environment=SCHEDULE_RECONCILE_DAYS=4
+Environment=SCHEDULE_RECONCILE_FUTURE_DAYS=7
+Environment=MINUTESMAP_REVALIDATE_URL=https://teams.minutesmap.com/api/revalidate
+# GEMINI_API_KEY and MINUTESMAP_REVALIDATE_SECRET (mode 600).
+EnvironmentFile=%h/minutesmap-poller/secrets.env
+ExecStart=%h/minutesmap-poller/.venv/bin/python -u run_poller.py --bucket roryeagan.com-nba-processed-data
+Restart=always
+RestartSec=30
+Nice=5
+
+[Install]
+WantedBy=default.target

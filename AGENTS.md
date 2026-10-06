@@ -7,6 +7,7 @@ Repository instructions for coding agents working in this project.
 - `functions/`: AWS Lambda code (Python + TypeScript), pytest + vitest tests.
 - `jobs/`: Utility/backfill scripts (Node + Python) that can read/write AWS data.
 - `relay/`: NBA feed relay that runs on the Raspberry Pi and mirrors cdn.nba.com feeds to S3 (see `relay/README.md`).
+- `pi/`: runs the whole NBA poller pipeline on the Raspberry Pi instead of Lambda (see `pi/README.md`).
 - `terraform/`: AWS infrastructure definitions and deployment wiring.
 
 ## General rules
