@@ -2,6 +2,8 @@ import gzip
 import json
 from decimal import Decimal
 
+from botocore.exceptions import ClientError
+
 def upload_json_to_s3(*, s3_client, bucket, prefix, key, data, is_final=False):
     json_str = json.dumps(data)
     compressed = gzip.compress(json_str.encode("utf-8"))
@@ -25,28 +27,34 @@ def upload_json_to_s3(*, s3_client, bucket, prefix, key, data, is_final=False):
 
 
 def update_manifest(*, s3_client, bucket, manifest_key, game_id):
-    """Loads manifest.json from S3, adds the game key, uploads it back."""
+    """Loads manifest.json from S3, adds the game key, uploads it back.
+
+    Only a missing manifest starts a new one. Any other read failure raises instead of
+    overwriting the archive with a single game; the poller then retries on its next tick.
+    """
     try:
-        try:
-            resp = s3_client.get_object(Bucket=bucket, Key=manifest_key)
-            content = resp["Body"].read().decode("utf-8")
-            manifest = set(json.loads(content))
-        except Exception:
-            manifest = set()
+        resp = s3_client.get_object(Bucket=bucket, Key=manifest_key)
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") not in ("NoSuchKey", "404", "NotFound"):
+            raise
+        manifest = set()
+    else:
+        decoded = json.loads(resp["Body"].read().decode("utf-8"))
+        if not isinstance(decoded, list):
+            raise ValueError(f"{manifest_key} is not a JSON array")
+        manifest = set(decoded)
 
-        if game_id in manifest:
-            return
+    if game_id in manifest:
+        return
 
-        manifest.add(game_id)
-        s3_client.put_object(
-            Bucket=bucket,
-            Key=manifest_key,
-            Body=json.dumps(list(manifest)),
-            ContentType="application/json",
-        )
-        print(f"Manifest updated with {game_id}")
-    except Exception as e:
-        print(f"Manifest Error: {e}")
+    manifest.add(game_id)
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=manifest_key,
+        Body=json.dumps(list(manifest)),
+        ContentType="application/json",
+    )
+    print(f"Manifest updated with {game_id}")
 
 def upload_schedule_s3(*, s3_client, bucket, games_list, date_str, prefix="schedule/"):
     """
