@@ -11,6 +11,7 @@ before starting this. See pi/README.md.
 """
 import argparse
 import os
+import socket
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 TICK_SECONDS = 30  # same cadence as the Lambda poller (1-minute rule plus half-minute schedule)
 RECONCILE_SECONDS = 3600
 MANAGER_HOUR_UTC = 11  # the Lambda's NBADailyManager runs cron(0 11 * * ? *)
+READY_HOSTS = ("cdn.nba.com", "s3.us-east-1.amazonaws.com")
+TIME_SYNC_MARKER = "/run/systemd/timesync/synchronized"  # created by systemd-timesyncd
 
 DEFAULT_POLLER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nba-game-poller")
 REPO_POLLER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "functions", "nba-game-poller")
@@ -34,6 +37,30 @@ def next_manager_time(now):
     if run <= current:
         run += timedelta(days=1)
     return run.timestamp()
+
+
+def network_and_clock_ready(hosts=READY_HOSTS, marker=TIME_SYNC_MARKER):
+    if os.path.isdir(os.path.dirname(marker)) and not os.path.exists(marker):
+        return False
+    for host in hosts:
+        try:
+            socket.create_connection((host, 443), timeout=5).close()
+        except OSError:
+            return False
+    return True
+
+
+def wait_until_ready(check=network_and_clock_ready, sleep=time.sleep, interval=15):
+    """After a power cut the service can start before Wi-Fi and NTP; the manager would
+    then find no games and nothing would poll until the next day's run."""
+    waited = 0
+    while not check():
+        if waited % 120 == 0:
+            log("Waiting for network and clock sync...")
+        sleep(interval)
+        waited += interval
+    if waited:
+        log(f"Network and clock ready after {waited}s.")
 
 
 def load_poller(poller_dir, bucket):
@@ -53,6 +80,7 @@ class PiRunner:
         self.poller = poller
         self.polling = False
         self.kickoff_at = None
+        self.done_date = None  # NBA date whose games all finished
         self.next_manager_at = 0  # run the manager at start-up
         self.next_reconcile_at = 0
         self.captions = caption_executor or ThreadPoolExecutor(max_workers=1)
@@ -75,6 +103,7 @@ class PiRunner:
         if self.polling:
             log("Polling disabled.")
         self.polling = False
+        self.done_date = self.poller.get_nba_date()
 
     def schedule_kickoff(self, run_at_dt):
         self.kickoff_at = run_at_dt.timestamp()
@@ -104,7 +133,12 @@ class PiRunner:
             self.next_manager_at = next_manager_time(now)
             self.next_reconcile_at = now + RECONCILE_SECONDS
         elif now >= self.next_reconcile_at:
-            self._step("reconcile", self.poller.reconcile_recent_schedule)
+            if self.polling or self.kickoff_at is not None or self.done_date == self.poller.get_nba_date():
+                self._step("reconcile", self.poller.reconcile_recent_schedule)
+            else:
+                # Nothing polling or scheduled yet today: rerun the manager in case an earlier
+                # run missed games (feed or S3 outage) or games were added since.
+                self._step("manager", self.poller.manager_logic)
             self.next_reconcile_at = now + RECONCILE_SECONDS
 
         if self.kickoff_at is not None and now >= self.kickoff_at:
@@ -127,6 +161,7 @@ def main():
     args = parser.parse_args()
 
     poller_dir = args.poller_dir or (DEFAULT_POLLER_DIR if os.path.isdir(DEFAULT_POLLER_DIR) else REPO_POLLER_DIR)
+    wait_until_ready()
     runner = PiRunner(load_poller(poller_dir, args.bucket))
     log(f"Running the NBA poller pipeline from {poller_dir} against s3://{args.bucket}")
     while True:
