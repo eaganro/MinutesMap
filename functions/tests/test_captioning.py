@@ -638,3 +638,79 @@ def test_request_period_caption_retries_parse_failure_once(monkeypatch):
     assert generated == {"full": "DAL leads after one.", "players": []}
     assert captured["calls"] == 2
     assert "Final reminder: Return a single minified JSON object only." in captured["prompts"][1]
+
+
+def test_request_period_caption_uses_openai_chat_completions_with_strict_schema(monkeypatch):
+    flow_payload = {
+        "score": [{"quarter": 4, "awayScore": 97, "homeScore": 120}],
+        "players": {"away": {}, "home": {}},
+        "events": [],
+    }
+    box_payload = {"teams": {"away": {"abbr": "NYK"}, "home": {"abbr": "PHI"}}}
+    captured = {}
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            content = '{"full_caption":"The 76ers beat the Knicks 120-97.","player_stories":[]}'
+            return json.dumps(
+                {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+            ).encode("utf-8")
+
+    def fake_urlopen(req, timeout=8.0):
+        captured["url"] = req.full_url
+        captured["auth"] = req.get_header("Authorization")
+        captured["timeout"] = timeout
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return _FakeResponse()
+
+    monkeypatch.setattr(captioning.urllib.request, "urlopen", fake_urlopen)
+
+    generated = captioning.request_period_caption(
+        flow_payload=flow_payload,
+        box_payload=box_payload,
+        period=4,
+        api_key="sk-test",
+        model="gpt-6-luna",
+        timeout_seconds=60.0,
+        is_final_game=True,
+        provider="openai",
+    )
+
+    assert generated == {"full": "The 76ers beat the Knicks 120-97.", "players": []}
+    assert captured["url"] == "https://api.openai.com/v1/chat/completions"
+    assert captured["auth"] == "Bearer sk-test"
+    assert captured["timeout"] == 60.0
+    body = captured["body"]
+    assert body["model"] == "gpt-6-luna"
+    schema_spec = body["response_format"]["json_schema"]
+    assert schema_spec["strict"] is True
+    assert schema_spec["schema"]["additionalProperties"] is False
+    assert schema_spec["schema"]["properties"]["player_stories"]["items"]["additionalProperties"] is False
+    assert '"isFinal": true' in body["messages"][0]["content"]
+
+
+def test_build_period_captions_records_provider(monkeypatch):
+    flow_payload = {
+        "score": [{"quarter": 2, "awayScore": 50, "homeScore": 48}],
+        "events": [{"type": "period", "subType": "end", "quarter": 2}],
+    }
+    monkeypatch.setattr(captioning, "extract_closed_periods_from_flow", lambda flow: [1, 2])
+    monkeypatch.setattr(
+        captioning, "request_period_caption", lambda **kwargs: {"full": kwargs["provider"], "players": []}
+    )
+    captions = captioning.build_period_captions(
+        flow_payload=flow_payload,
+        box_payload={},
+        api_key="sk-test",
+        model="gpt-6-luna",
+        provider="openai",
+    )
+    assert captions["provider"] == "openai"
+    assert captions["model"] == "gpt-6-luna"
+    assert captions["periods"]["2"]["full"] == "openai"
