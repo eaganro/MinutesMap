@@ -47,7 +47,7 @@ def season_type_from_game_id(game_id):
     prefix = raw[:3]
     if prefix == "001":
         return "preseason"
-    if prefix == "002":
+    if prefix in ("002", "006"):  # 006 = NBA Cup championship
         return "regular"
     if prefix == "004":
         return "playoffs"
