@@ -100,3 +100,9 @@ class TestNbaGamePollerHelpers:
         self.module.manager_logic.assert_not_called()
         self.module.poller_logic.assert_not_called()
         assert self.module.disable_self.call_count == 2
+
+    def test_nba_cup_final_ids_are_regular_season(self):
+        from nba_game_poller.season_types import season_type_from_game_id
+
+        assert season_type_from_game_id("0062600001") == "regular"
+        assert season_type_from_game_id("0012600024") == "preseason"

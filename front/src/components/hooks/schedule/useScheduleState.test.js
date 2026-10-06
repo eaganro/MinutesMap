@@ -1,6 +1,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { useScheduleState } from './useScheduleState';
+import { getNbaTodayString } from '../../../domain/game-selection/time';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -90,10 +91,33 @@ describe('useScheduleState', () => {
     expect(result.current.date).toBe('2026-02-05');
   });
 
+  it('falls back to the NBA day, not the UTC date, on a US evening', async () => {
+    // 10:30pm ET on Oct 5 is already Oct 6 in UTC.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-06T02:30:00.000Z'));
+    const fetchScheduleWithReason = vi.fn();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 503 });
+
+    const { result } = renderHook(() =>
+      useScheduleState({
+        initialDate: null,
+        initialGameId: null,
+        gameId: null,
+        setGameId: vi.fn(),
+        schedule: [],
+        isScheduleLoading: false,
+        fetchScheduleWithReason,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.date).toBe('2026-10-05'));
+    expect(fetchScheduleWithReason).toHaveBeenCalledWith('2026-10-05', 'date-change');
+  });
+
   it('falls back to today when init payload date is invalid', async () => {
     const setGameId = vi.fn();
     const fetchScheduleWithReason = vi.fn();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getNbaTodayString();
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,

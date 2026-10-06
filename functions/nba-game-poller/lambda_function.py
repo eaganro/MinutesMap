@@ -909,15 +909,20 @@ def process_game(game_item, user_agent=None, date_str=None):
         existing = load_existing_gamepack_once()
         existing_flow = (existing or {}).get("flow")
 
-    odds_snapshot = build_kalshi_odds_snapshot(
-        game_item=game_item,
-        box_game=box_game,
-        last_action=last_action,
-        existing_flow=existing_flow,
-        actions=actions,
-        date_str=date_str,
-        user_agent=user_agent,
-    )
+    try:
+        odds_snapshot = build_kalshi_odds_snapshot(
+            game_item=game_item,
+            box_game=box_game,
+            last_action=last_action,
+            existing_flow=existing_flow,
+            actions=actions,
+            date_str=date_str,
+            user_agent=user_agent,
+        )
+    except Exception as exc:
+        # Odds are optional; unexpected market data must not block the game itself.
+        print(f"Poller: Kalshi odds failed for {game_key}: {exc}")
+        odds_snapshot = []
 
     if play_data is None and box_data is None and not odds_snapshot:
         return False, {}

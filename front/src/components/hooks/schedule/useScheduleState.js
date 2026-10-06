@@ -4,6 +4,7 @@ import {
   scheduleMatchesDate,
   sortGamesForSelection,
 } from '../../../domain/game-selection/status';
+import { getNbaTodayString } from '../../../domain/game-selection/time';
 import { PREFIX } from '../../../environment';
 import { classifyFetchResult, fetchJson } from '../../../data/apiClient';
 import { normalizeInitPayload } from '../../../data/scheduleAdapter';
@@ -25,7 +26,8 @@ export function useScheduleState({
   useEffect(() => {
     if (date) return;
 
-    const fallbackDate = new Date().toISOString().split('T')[0];
+    // Same Eastern 4am NBA-day boundary as the poller; UTC is tomorrow on US evenings.
+    const fallbackDate = getNbaTodayString();
 
     const fetchInitState = async () => {
       try {
