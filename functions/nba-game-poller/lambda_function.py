@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from botocore.exceptions import ClientError
 
-from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_urllib
+from nba_game_poller.nba_api import USER_AGENTS, fetch_nba_data_from_mirror, fetch_nba_data_urllib
 from nba_game_poller.kalshi_api import (
     KALSHI_NBA_SERIES_SERIES,
     build_kalshi_nba_event_ticker,
@@ -63,6 +63,11 @@ PAGE_PREFIX = 'pages/'
 GAME_ID_MAP_PREFIX = os.environ.get("GAME_ID_MAP_PREFIX", "private/gameIdMap/")
 if GAME_ID_MAP_PREFIX and not GAME_ID_MAP_PREFIX.endswith('/'):
     GAME_ID_MAP_PREFIX += '/'
+# When set, NBA feeds are read from this S3 prefix (filled by relay/nba_feed_relay.py)
+# instead of cdn.nba.com, which blocks AWS addresses.
+NBA_FEED_MIRROR_PREFIX = (os.environ.get("NBA_FEED_MIRROR_PREFIX") or "").strip()
+if NBA_FEED_MIRROR_PREFIX and not NBA_FEED_MIRROR_PREFIX.endswith('/'):
+    NBA_FEED_MIRROR_PREFIX += '/'
 KALSHI_ENABLED = os.environ.get("KALSHI_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
 SCHEDULE_RECONCILE_DAYS = os.environ.get("SCHEDULE_RECONCILE_DAYS", "3")
@@ -726,8 +731,8 @@ def process_game(game_item, user_agent=None, date_str=None):
     }
 
     # Fetch Data
-    play_data, play_etag = fetch_nba_data_urllib(urls['play'], last_play_etag, user_agent)
-    box_data, box_etag = fetch_nba_data_urllib(urls['box'], last_box_etag, user_agent)
+    play_data, play_etag = fetch_nba_data(urls['play'], last_play_etag, user_agent)
+    box_data, box_etag = fetch_nba_data(urls['box'], last_box_etag, user_agent)
 
     updates = {}
     is_game_final = False
@@ -1873,8 +1878,13 @@ def reconcile_schedule_date(date_str, feed_games, team_page_sync_today=None):
             print(f"Reconcile: Failed to update scheduled team page rows for {date_str}: {exc}")
     return True
 
+def fetch_nba_data(url, etag=None, user_agent=None):
+    if NBA_FEED_MIRROR_PREFIX:
+        return fetch_nba_data_from_mirror(s3_client, BUCKET, NBA_FEED_MIRROR_PREFIX, url, etag)
+    return fetch_nba_data_urllib(url, etag, user_agent)
+
 def fetch_schedule_feed():
-    data, _ = fetch_nba_data_urllib(SCHEDULE_FEED_URL, user_agent=random.choice(USER_AGENTS))
+    data, _ = fetch_nba_data(SCHEDULE_FEED_URL, user_agent=random.choice(USER_AGENTS))
     if not data:
         return None
     league = data.get("leagueSchedule", {})

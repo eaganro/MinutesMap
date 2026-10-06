@@ -59,6 +59,13 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
           "arn:aws:s3:::roryeagan.com-nba-processed-data/private/gameIdMap/*"
         ]
       },
+      # NBA feeds mirrored by the residential relay (relay/nba_feed_relay.py).
+      {
+        Sid      = "S3ReadNbaFeedMirror"
+        Action   = "s3:GetObject"
+        Effect   = "Allow"
+        Resource = "arn:aws:s3:::roryeagan.com-nba-processed-data/private/nba-feed/*"
+      },
       {
         Sid      = "S3ListDataPrefixes"
         Action   = "s3:ListBucket"
@@ -69,7 +76,8 @@ resource "aws_iam_role_policy" "nba_poller_policy" {
             "s3:prefix" = [
               "data/*",
               "schedule/*",
-              "private/gameIdMap/*"
+              "private/gameIdMap/*",
+              "private/nba-feed/*"
             ]
           }
         }
@@ -153,6 +161,7 @@ resource "aws_lambda_function" "nba_poller" {
       SCHEDULE_RECONCILE_DAYS        = "4"
       SCHEDULE_RECONCILE_FUTURE_DAYS = "7"
       GAME_ID_MAP_PREFIX             = "private/gameIdMap/"
+      NBA_FEED_MIRROR_PREFIX         = "private/nba-feed/"
       KALSHI_ENABLED                 = "true"
       GEMINI_API_KEY                 = var.gemini_api_key
       MINUTESMAP_REVALIDATE_URL      = var.minutesmap_revalidate_url

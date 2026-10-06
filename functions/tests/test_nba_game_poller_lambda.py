@@ -316,7 +316,7 @@ class TestNbaGamePollerLambda:
                 return box_payload, "box-etag"
             return None, None
 
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.process_playbyplay_payload = MagicMock(return_value={"v": 2})
         self.module.build_box_payload = MagicMock(return_value={"teams": {}})
         self.module.upload_json_to_s3 = MagicMock()
@@ -387,7 +387,7 @@ class TestNbaGamePollerLambda:
                 return box_payload, "box-etag"
             return None, None
 
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.process_playbyplay_payload = MagicMock(return_value={"v": 2, "players": {"away": {}, "home": {}}, "segments": {"away": {}, "home": {}}, "last": {"awayScore": 118, "homeScore": 104}})
         self.module.build_box_payload = MagicMock(return_value={"start": "2026-02-04T00:00:00Z", "teams": {"away": {"id": 1610612755, "abbr": "PHI", "name": "76ers", "players": []}, "home": {"id": 1610612747, "abbr": "LAL", "name": "Lakers", "players": []}}})
         self.module.upload_json_to_s3 = MagicMock()
@@ -481,7 +481,7 @@ class TestNbaGamePollerLambda:
             "teams": ["PHI", "LAL"],
             "players": [],
         }
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.process_playbyplay_payload = MagicMock(
             return_value={
                 "v": 2,
@@ -646,7 +646,7 @@ class TestNbaGamePollerLambda:
             "players": {"away": {}, "home": {}},
             "segments": {"away": {}, "home": {}},
         }
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.process_playbyplay_payload = MagicMock(return_value=processed_flow)
         self.module.build_box_payload = MagicMock(
             return_value={
@@ -733,7 +733,7 @@ class TestNbaGamePollerLambda:
             "players": {"away": {}, "home": {}},
             "segments": {"away": {}, "home": {}},
         }
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.process_playbyplay_payload = MagicMock(return_value=processed_flow)
         self.module.build_box_payload = MagicMock(
             return_value={
@@ -822,7 +822,7 @@ class TestNbaGamePollerLambda:
             "players": {"away": {}, "home": {}},
             "segments": {"away": {}, "home": {}},
         }
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.process_playbyplay_payload = MagicMock(return_value=processed_flow)
         self.module.build_box_payload = MagicMock(
             return_value={
@@ -981,7 +981,7 @@ class TestNbaGamePollerLambda:
             "segments": {"away": {}, "home": {}},
         }
 
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.process_playbyplay_payload = MagicMock(return_value=processed_flow)
         self.module.build_box_payload = MagicMock(
             return_value={
@@ -1037,7 +1037,7 @@ class TestNbaGamePollerLambda:
             },
         }
 
-        self.module.fetch_nba_data_urllib = MagicMock(return_value=(None, None))
+        self.module.fetch_nba_data = MagicMock(return_value=(None, None))
         self.module.fetch_kalshi_event_markets = MagicMock(
             return_value=[
                 {
@@ -1188,7 +1188,7 @@ class TestNbaGamePollerLambda:
                 return box_payload, "box-etag"
             return None, None
 
-        self.module.fetch_nba_data_urllib = fake_fetch
+        self.module.fetch_nba_data = fake_fetch
         self.module.fetch_kalshi_event_markets = MagicMock(
             return_value=[
                 {

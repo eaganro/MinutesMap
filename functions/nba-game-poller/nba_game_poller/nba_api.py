@@ -3,6 +3,12 @@ import json
 import random
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
+
+from botocore.exceptions import ClientError
+
+CDN_JSON_ROOT = "https://cdn.nba.com/static/json/"
+MIRROR_STALE_SECONDS = 6 * 3600
 
 
 USER_AGENTS = [
@@ -69,3 +75,53 @@ def fetch_nba_data_urllib(url, etag=None, user_agent=None):
         print(f"Network Exception {url}: {e}")
         return None, etag
 
+
+def mirror_key_for_url(url, prefix):
+    """Map a cdn.nba.com/static/json URL to its key in the S3 feed mirror."""
+    if not url.startswith(CDN_JSON_ROOT):
+        return None
+    return prefix + url[len(CDN_JSON_ROOT):]
+
+
+def fetch_nba_data_from_mirror(s3_client, bucket, prefix, url, etag=None):
+    """
+    Read an NBA feed from the S3 mirror written by relay/nba_feed_relay.py.
+    AWS addresses are blocked by the NBA CDN, so a residential host fetches the feeds.
+    Same contract as fetch_nba_data_urllib: (data_or_None, etag_or_original).
+    """
+    key = mirror_key_for_url(url, prefix)
+    if not key:
+        print(f"Mirror: no mirror key for {url}")
+        return None, etag
+
+    kwargs = {"Bucket": bucket, "Key": key}
+    if etag:
+        kwargs["IfNoneMatch"] = etag
+    try:
+        response = s3_client.get_object(**kwargs)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code")
+        status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if code in ("304", "NotModified") or status == 304:
+            return None, etag
+        if code in ("NoSuchKey", "404", "NotFound"):
+            print(f"Mirror: {key} not found")
+            return None, etag
+        print(f"Mirror Error {key}: {code}")
+        return None, etag
+
+    last_modified = response.get("LastModified")
+    if last_modified:
+        age = (datetime.now(timezone.utc) - last_modified).total_seconds()
+        if age > MIRROR_STALE_SECONDS:
+            print(f"Mirror: {key} is stale ({int(age)}s old); is the relay running?")
+
+    content = response["Body"].read()
+    if content.startswith(b"\x1f\x8b"):
+        content = gzip.decompress(content)
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        print(f"Mirror: JSON Decode Error for {key}")
+        return None, etag
+    return data, response.get("ETag")
