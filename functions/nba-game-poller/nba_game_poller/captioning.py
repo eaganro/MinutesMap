@@ -25,6 +25,8 @@ _EXCLUDED_EVENT_TYPES = {
 
 FULL_CAPTION_MAX_CHARS = 180
 PLAYER_CAPTION_MAX_CHARS = 150
+CAPTION_PROVIDERS = ("gemini", "openai")
+OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
 def _safe_int(value, default=None):
@@ -533,6 +535,81 @@ def _caption_response_schema():
     }
 
 
+def _openai_caption_schema():
+    """OpenAI strict structured outputs require additionalProperties=false on every object."""
+    schema = _caption_response_schema()
+    schema["additionalProperties"] = False
+    schema["properties"]["player_stories"]["items"]["additionalProperties"] = False
+    return schema
+
+
+def _call_gemini(prompt, *, api_key, model, timeout_seconds):
+    """Returns (candidate texts, finish reasons), or None on a request error."""
+    model_id = urllib.parse.quote(model, safe=".-_")
+    api_key_q = urllib.parse.quote(api_key, safe="")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key_q}"
+    generation_config = {
+        "temperature": 0.0,
+        "topP": 0.9,
+        "maxOutputTokens": 512,
+        "responseMimeType": "application/json",
+        "responseSchema": _caption_response_schema(),
+    }
+    if "2.5" in _normalize_space(model).lower():
+        generation_config["thinkingConfig"] = {"thinkingBudget": 0}
+    body = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": generation_config}
+    payload = _post_json(url, body, headers={}, timeout_seconds=timeout_seconds)
+    if payload is None:
+        return None
+    return _extract_gemini_texts(payload), _extract_finish_reasons(payload)
+
+
+def _call_openai(prompt, *, api_key, model, timeout_seconds):
+    """Chat Completions with strict JSON schema, as used in nba-market-research."""
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "period_caption", "strict": True, "schema": _openai_caption_schema()},
+        },
+    }
+    payload = _post_json(
+        f"{OPENAI_BASE_URL}/chat/completions",
+        body,
+        headers={"Authorization": f"Bearer {api_key}"},
+        timeout_seconds=timeout_seconds,
+    )
+    if payload is None:
+        return None
+    texts, reasons = [], []
+    for choice in payload.get("choices") or []:
+        if not isinstance(choice, dict):
+            continue
+        content = (choice.get("message") or {}).get("content")
+        if isinstance(content, str) and content.strip():
+            texts.append(content)
+        if choice.get("finish_reason"):
+            reasons.append(str(choice["finish_reason"]))
+    return texts, reasons
+
+
+def _post_json(url, body, *, headers, timeout_seconds):
+    req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json")
+    for name, value in headers.items():
+        req.add_header(name, value)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as err:
+        print(f"Caption AI HTTP error: {err.code}")
+    except Exception as err:
+        print(f"Caption AI request failed: {err}")
+    return None
+
+
 def _extract_first_json_object(text):
     raw = str(text or "")
     start = raw.find("{")
@@ -716,15 +793,14 @@ def request_period_caption(
     max_players_per_team=2,
     timeout_seconds=8.0,
     is_final_game=False,
+    provider="gemini",
 ):
     summary = _build_summary(flow_payload, box_payload, period, is_final_game=is_final_game)
     if not summary:
         return None
 
     prompt = _build_prompt(summary, max_players_per_team)
-    model_id = urllib.parse.quote(model, safe=".-_")
-    api_key_q = urllib.parse.quote(api_key, safe="")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key_q}"
+    call = _call_openai if provider == "openai" else _call_gemini
     for attempt in (1, 2):
         attempt_prompt = prompt
         if attempt == 2:
@@ -733,41 +809,15 @@ def request_period_caption(
                 "No prose, no markdown fences."
             )
 
-        generation_config = {
-            "temperature": 0.0,
-            "topP": 0.9,
-            "maxOutputTokens": 512,
-            "responseMimeType": "application/json",
-            "responseSchema": _caption_response_schema(),
-        }
-        model_lower = _normalize_space(model).lower()
-        if "2.5" in model_lower:
-            generation_config["thinkingConfig"] = {"thinkingBudget": 0}
-
-        body = json.dumps(
-            {
-                "contents": [{"parts": [{"text": attempt_prompt}]}],
-                "generationConfig": generation_config,
-            }
-        ).encode("utf-8")
-        req = urllib.request.Request(url, data=body, method="POST")
-        req.add_header("Content-Type", "application/json")
-        req.add_header("Accept", "application/json")
-
-        try:
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
-                raw = response.read().decode("utf-8")
-                payload = json.loads(raw)
-        except urllib.error.HTTPError as err:
-            print(f"Caption AI HTTP error for {_period_label(period)}: {err.code}")
+        result = call(attempt_prompt, api_key=api_key, model=model, timeout_seconds=timeout_seconds)
+        if result is None:
+            print(f"Caption AI ({provider}) failed for {_period_label(period)}")
             return None
-        except Exception as err:
-            print(f"Caption AI request failed for {_period_label(period)}: {err}")
-            return None
+        texts, finish_reasons = result
 
         parsed = None
         raw_text = ""
-        for text in _extract_gemini_texts(payload):
+        for text in texts:
             raw_text = text
             parsed = _coerce_caption_payload(_parse_json_payload(text))
             if parsed:
@@ -776,10 +826,9 @@ def request_period_caption(
             break
 
         preview = _preview_raw_response(raw_text)
-        finish_reasons = ",".join(_extract_finish_reasons(payload)) or "unknown"
         print(
             f"Caption AI parse failed for {_period_label(period)} "
-            f"(attempt {attempt}/2, finish={finish_reasons}): {preview}"
+            f"(attempt {attempt}/2, finish={','.join(finish_reasons) or 'unknown'}): {preview}"
         )
     else:
         return None
@@ -797,10 +846,10 @@ def request_period_caption(
     }
 
 
-def _initialize_captions(existing_captions, model):
+def _initialize_captions(existing_captions, model, provider="gemini"):
     base = {
         "v": 1,
-        "provider": "gemini",
+        "provider": provider,
         "model": model,
         "updatedAt": "",
         "limits": {
@@ -831,8 +880,8 @@ def _initialize_captions(existing_captions, model):
     return merged
 
 
-def _finalize_captions(captions, model):
-    captions["provider"] = "gemini"
+def _finalize_captions(captions, model, provider="gemini"):
+    captions["provider"] = provider
     captions["model"] = model
     captions["updatedAt"] = datetime.now(timezone.utc).isoformat()
     return captions
@@ -850,6 +899,7 @@ def build_period_captions(
     timeout_seconds=8.0,
     include_final_overtime=False,
     is_final_game=False,
+    provider="gemini",
 ):
     if not api_key or not isinstance(flow_payload, dict):
         return existing_captions
@@ -863,7 +913,7 @@ def build_period_captions(
     if not closed_periods:
         return existing_captions
 
-    captions = _initialize_captions(existing_captions, model)
+    captions = _initialize_captions(existing_captions, model, provider)
     changed = isinstance(existing_captions, dict) and captions != existing_captions
     selected_periods = select_caption_checkpoint_periods(
         closed_periods,
@@ -875,7 +925,7 @@ def build_period_captions(
         is_final_game=effective_is_final_game,
     )
     if not selected_periods:
-        return _finalize_captions(captions, model) if changed else existing_captions
+        return _finalize_captions(captions, model, provider) if changed else existing_captions
 
     for period in selected_periods:
         period_key = str(period)
@@ -891,6 +941,7 @@ def build_period_captions(
             max_players_per_team=max_players_per_team,
             timeout_seconds=timeout_seconds,
             is_final_game=effective_is_final_game,
+            provider=provider,
         )
         if not generated:
             continue
@@ -905,4 +956,4 @@ def build_period_captions(
     if not changed:
         return existing_captions
 
-    return _finalize_captions(captions, model)
+    return _finalize_captions(captions, model, provider)

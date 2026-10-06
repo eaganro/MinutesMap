@@ -87,6 +87,12 @@ POLL_WINDOW_SECONDS = float(os.environ.get("POLL_WINDOW_SECONDS", "15"))
 AI_CAPTIONS_ENABLED = os.environ.get("AI_CAPTIONS_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")
 GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
 GEMINI_MODEL = (os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+OPENAI_API_KEY = (os.environ.get("OPENAI_API_KEY") or "").strip()
+OPENAI_MODEL = (os.environ.get("OPENAI_MODEL") or "gpt-6-luna").strip() or "gpt-6-luna"
+# "openai" on the Pi; the Lambda keeps Gemini.
+CAPTION_PROVIDER = (os.environ.get("CAPTION_PROVIDER") or "gemini").strip().lower()
+CAPTION_API_KEY = OPENAI_API_KEY if CAPTION_PROVIDER == "openai" else GEMINI_API_KEY
+CAPTION_MODEL = OPENAI_MODEL if CAPTION_PROVIDER == "openai" else GEMINI_MODEL
 MINUTESMAP_REVALIDATE_URL = (os.environ.get("MINUTESMAP_REVALIDATE_URL") or "").strip()
 MINUTESMAP_REVALIDATE_SECRET = (os.environ.get("MINUTESMAP_REVALIDATE_SECRET") or "").strip()
 try:
@@ -671,8 +677,8 @@ def caption_worker_logic(event):
     if not AI_CAPTIONS_ENABLED:
         print("CaptionWorker: Disabled by configuration.")
         return
-    if not GEMINI_API_KEY:
-        print("CaptionWorker: GEMINI_API_KEY not configured.")
+    if not CAPTION_API_KEY:
+        print(f"CaptionWorker: no API key configured for {CAPTION_PROVIDER}.")
         return
 
     existing = load_gamepack(game_key)
@@ -693,8 +699,9 @@ def caption_worker_logic(event):
         flow_payload=flow_payload,
         box_payload=box_payload,
         existing_captions=existing_captions,
-        api_key=GEMINI_API_KEY,
-        model=GEMINI_MODEL,
+        api_key=CAPTION_API_KEY,
+        model=CAPTION_MODEL,
+        provider=CAPTION_PROVIDER,
         max_players_per_team=CAPTION_MAX_PLAYERS_PER_TEAM,
         timeout_seconds=CAPTION_TIMEOUT_SECONDS,
         include_final_overtime=is_final_status(status_text),
@@ -915,7 +922,7 @@ def process_game(game_item, user_agent=None, date_str=None):
     if play_data is None and box_data is None and not odds_snapshot:
         return False, {}
 
-    if processed is not None and AI_CAPTIONS_ENABLED and GEMINI_API_KEY and LAMBDA_ARN:
+    if processed is not None and AI_CAPTIONS_ENABLED and CAPTION_API_KEY:
         closed_periods = extract_closed_periods(actions)
         status_for_worker = updates.get("status") or game_item.get("status") or ""
         is_final_for_worker = is_final_status(status_for_worker)

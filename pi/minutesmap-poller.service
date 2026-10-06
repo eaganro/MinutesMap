@@ -14,7 +14,11 @@ Environment=GAME_ID_MAP_PREFIX=private/gameIdMap/
 Environment=SCHEDULE_RECONCILE_DAYS=4
 Environment=SCHEDULE_RECONCILE_FUTURE_DAYS=7
 Environment=MINUTESMAP_REVALIDATE_URL=https://teams.minutesmap.com/api/revalidate
-# GEMINI_API_KEY and MINUTESMAP_REVALIDATE_SECRET (mode 600).
+# Captions run in a background thread, so a slower reasoning model's latency doesn't delay polling.
+Environment=CAPTION_PROVIDER=openai
+Environment=OPENAI_MODEL=gpt-6-luna
+Environment=CAPTION_TIMEOUT_SECONDS=60
+# OPENAI_API_KEY, GEMINI_API_KEY and MINUTESMAP_REVALIDATE_SECRET (mode 600).
 EnvironmentFile=%h/minutesmap-poller/secrets.env
 ExecStart=%h/minutesmap-poller/.venv/bin/python -u run_poller.py --bucket roryeagan.com-nba-processed-data
 Restart=always

@@ -43,7 +43,9 @@ The two Pi services declare `Conflicts=` on each other, so starting one stops th
    Terraform. Pi mode needs its `minutesmap-poller` inline policy: Get/Put on `data/*`, `schedule/*`,
    `private/gameIdMap/*` and prefix-limited ListBucket — the same S3 access as the Lambda role.
 2. Secrets: `~/minutesmap-poller/secrets.env` (mode 600) with `GEMINI_API_KEY` and
-   `MINUTESMAP_REVALIDATE_SECRET`, copied from the Lambda's configuration.
+   `MINUTESMAP_REVALIDATE_SECRET` (copied from the Lambda's configuration) and `OPENAI_API_KEY`
+   (copied from `~/.config/wnba-pilot/credentials.env`, the nba-market-research key). The Pi
+   captions with OpenAI `gpt-6-luna` (`CAPTION_PROVIDER=openai`); the Lambda still uses Gemini.
 3. Code: `bash pi/deploy.sh` (re-run after any change to the poller or runner, then
    `ssh raspberrypi systemctl --user restart minutesmap-poller` if it is running).
 
