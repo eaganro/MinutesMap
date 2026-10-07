@@ -111,6 +111,15 @@ def test_caption_requests_run_the_caption_worker():
                                           "closedThrough": 2, "status": "Half"})]
 
 
+def test_caption_requests_pass_the_fresh_flow_and_box():
+    poller = fake_poller()
+    PiRunner(poller, InlineExecutor())
+    poller.enqueue_caption_worker(game_key="g", latest_closed_period=4, status_text="Final",
+                                  flow_payload={"score": []}, box_payload={"teams": {}})
+    assert poller.calls[0][1]["flow"] == {"score": []}
+    assert poller.calls[0][1]["box"] == {"teams": {}}
+
+
 def test_failures_do_not_stop_the_loop():
     def boom():
         raise RuntimeError("feed down")

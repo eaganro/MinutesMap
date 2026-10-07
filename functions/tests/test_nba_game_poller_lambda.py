@@ -988,6 +988,37 @@ class TestNbaGamePollerLambda:
         uploaded_payload = self.module.upload_json_to_s3.call_args.kwargs["data"]
         assert uploaded_payload["flow"]["captions"] == generated_captions
 
+    def test_caption_worker_uses_snapshot_and_writes_onto_latest_gamepack(self):
+        stale = {
+            "box": {"teams": {"away": {"abbr": "PHI"}, "home": {"abbr": "LAL"}}},
+            "flow": {"score": [{"quarter": 2, "time": "0300.00", "awayScore": 50, "homeScore": 49}]},
+        }
+        newer = {
+            "box": stale["box"],
+            "flow": {"score": [{"quarter": 3, "time": "1100.00", "awayScore": 60, "homeScore": 59}], "odds": [1]},
+        }
+        snapshot_flow = {"score": [{"quarter": 2, "time": "0000.00", "awayScore": 55, "homeScore": 52}]}
+        generated = {"v": 1, "periods": {"2": {"full": "half", "players": []}}}
+
+        self.module.load_gamepack = MagicMock(side_effect=[stale, newer])
+        self.module.build_period_captions = MagicMock(return_value=generated)
+        self.module.upload_json_to_s3 = MagicMock()
+        self.module.AI_CAPTIONS_ENABLED = True
+        self.module.CAPTION_API_KEY = "test-api-key"
+        self.module.LATEST_CAPTIONS.clear()
+
+        self.module.caption_worker_logic(
+            {"gameKey": "g", "status": "Half", "closedThrough": 2, "flow": snapshot_flow, "box": stale["box"]}
+        )
+
+        build_kwargs = self.module.build_period_captions.call_args.kwargs
+        assert build_kwargs["flow_payload"] is snapshot_flow
+        assert build_kwargs["closed_through"] == 2
+        uploaded = self.module.upload_json_to_s3.call_args.kwargs["data"]
+        assert uploaded["flow"]["odds"] == [1]
+        assert uploaded["flow"]["captions"]["periods"] == generated["periods"]
+        assert self.module.LATEST_CAPTIONS["g"]["periods"] == generated["periods"]
+
     def test_process_game_preserves_existing_captions_on_fresh_flow_upload(self):
         game_item = {
             "id": "2026-02-04-phi-lal",

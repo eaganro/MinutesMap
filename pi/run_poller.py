@@ -110,13 +110,18 @@ class PiRunner:
         log(f"Kickoff scheduled for {run_at_dt.isoformat()}.")
         return True
 
-    def enqueue_caption(self, *, game_key, latest_closed_period, status_text=""):
+    def enqueue_caption(self, *, game_key, latest_closed_period, status_text="", flow_payload=None, box_payload=None):
         payload = {
             "task": "caption_worker",
             "gameKey": game_key,
             "closedThrough": latest_closed_period,
             "status": status_text or "",
         }
+        # The worker starts before this poll uploads the gamepack, so hand it the fresh data.
+        if isinstance(flow_payload, dict):
+            payload["flow"] = flow_payload
+        if isinstance(box_payload, dict):
+            payload["box"] = box_payload
         self.captions.submit(self._run_caption, payload)
         return True
 

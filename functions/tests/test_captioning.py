@@ -500,7 +500,7 @@ def test_request_period_caption_includes_response_schema(monkeypatch):
     assert generation_config["responseSchema"]["properties"]["player_stories"]["type"] == "array"
     assert generation_config["thinkingConfig"] == {"thinkingBudget": 0}
     prompt = captured["body"]["contents"][0]["parts"][0]["text"]
-    assert f"full_caption should be <= {captioning.FULL_CAPTION_MAX_CHARS} chars" in prompt
+    assert f"full_caption must be <= {captioning.FULL_CAPTION_MAX_CHARS} chars" in prompt
     assert f"player_stories should be <= {captioning.PLAYER_CAPTION_MAX_CHARS} chars each" in prompt
 
 
@@ -561,7 +561,7 @@ def test_request_period_caption_prompts_for_final_game_language(monkeypatch):
 
     assert generated == {"full": "DAL beats MIN 108-101.", "players": []}
     prompt = captured["body"]["contents"][0]["parts"][0]["text"]
-    assert '"gameState": {"isFinal": true, "checkpointType": "game_final"}' in prompt
+    assert '"gameState": {"isFinal": true, "checkpointType": "game_final", "seasonType": "regular"}' in prompt
     assert "completed-game result" in prompt
     assert "avoid in-progress phrases" in prompt
 
@@ -714,3 +714,136 @@ def test_build_period_captions_records_provider(monkeypatch):
     assert captions["provider"] == "openai"
     assert captions["model"] == "gpt-6-luna"
     assert captions["periods"]["2"]["full"] == "openai"
+
+
+def test_build_period_captions_trusts_poller_closed_through_for_final(monkeypatch):
+    # The trimmed flow's last play is a few seconds before the buzzer, so Q4 looks open.
+    flow_payload = {
+        "last": {"quarter": 4, "time": "0003.90", "awayScore": "124", "homeScore": "90"},
+        "score": [
+            {"quarter": 2, "time": "0010.00", "awayScore": "56", "homeScore": "52"},
+            {"quarter": 4, "time": "0028.20", "awayScore": "124", "homeScore": "90"},
+        ],
+        "captions": {"v": 1, "periods": {"2": {"full": "half", "players": []}}},
+    }
+    requested = []
+    monkeypatch.setattr(
+        captioning,
+        "request_period_caption",
+        lambda **kwargs: requested.append(kwargs["period"]) or {"full": "final", "players": []},
+    )
+    kwargs = dict(
+        flow_payload=flow_payload,
+        box_payload={},
+        existing_captions=flow_payload["captions"],
+        api_key="sk-test",
+        model="gpt-6-luna",
+        provider="openai",
+        is_final_game=True,
+        include_final_overtime=True,
+    )
+    assert set(captioning.build_period_captions(**kwargs)["periods"]) == {"2"}
+    assert requested == []
+
+    captions = captioning.build_period_captions(**kwargs, closed_through=4)
+    assert requested == [4]
+    assert captions["periods"]["4"]["full"] == "final"
+    assert captions["periods"]["2"]["full"] == "half"
+
+
+def test_game_story_finds_runs_lead_changes_and_closing_stretch():
+    timeline = [
+        {"quarter": 1, "time": "1100.00", "awayScore": "2", "homeScore": "0"},
+        {"quarter": 1, "time": "1000.00", "awayScore": "2", "homeScore": "3"},
+        {"quarter": 1, "time": "0900.00", "awayScore": "4", "homeScore": "3"},
+        {"quarter": 2, "time": "0500.00", "awayScore": "6", "homeScore": "6"},
+        {"quarter": 2, "time": "0250.00", "awayScore": "6", "homeScore": "9"},
+        {"quarter": 2, "time": "0200.00", "awayScore": "6", "homeScore": "12"},
+        {"quarter": 2, "time": "0100.00", "awayScore": "6", "homeScore": "14"},
+        {"quarter": 3, "time": "1100.00", "awayScore": "9", "homeScore": "14"},
+    ]
+    story = captioning._game_story(timeline, 2, "BKN", "CHA")
+    assert story["leadChanges"] == 3
+    assert story["timesTied"] == 1
+    assert story["largestLead"] == {"BKN": 2, "CHA": 8}
+    assert story["longestUnansweredRun"] == {"team": "CHA", "points": 8, "period": "Q2"}
+    assert story["pointsInLast3MinOfQ2"] == {"BKN": 0, "CHA": 8}
+
+
+def test_recent_events_are_rebuilt_from_player_actions():
+    flow_payload = {
+        "players": {
+            "away": {"A One": [{"quarter": 2, "time": "0030.00", "type": "3pt", "text": "A. One make 3pt", "seq": 9, "awayScore": "50", "homeScore": "48"}]},
+            "home": {
+                "B Two": [
+                    {"quarter": 2, "time": "0100.00", "type": "2pt", "text": "B. Two make 2pt", "seq": 7, "awayScore": "47", "homeScore": "48"},
+                    {"quarter": 2, "time": "0000.00", "type": "substitution", "text": "sub", "seq": 10},
+                    {"quarter": 3, "time": "1100.00", "type": "2pt", "text": "later", "seq": 11},
+                ]
+            },
+        }
+    }
+    assert captioning._build_recent_events(flow_payload, 2) == [
+        "Q2 0100.00 B. Two make 2pt (47-48)",
+        "Q2 0030.00 A. One make 3pt (50-48)",
+    ]
+
+
+def test_request_period_caption_retries_request_error_once(monkeypatch):
+    calls = []
+
+    def fake_call(prompt, **kwargs):
+        calls.append(prompt)
+        if len(calls) == 1:
+            return None
+        return ['{"full_caption":"ok","player_stories":[]}'], ["stop"]
+
+    monkeypatch.setattr(captioning, "_call_openai", fake_call)
+    generated = captioning.request_period_caption(
+        flow_payload={"score": [{"quarter": 2, "time": "0000.00", "awayScore": 50, "homeScore": 48}]},
+        box_payload={},
+        period=2,
+        api_key="sk-test",
+        model="gpt-6-luna",
+        provider="openai",
+    )
+    assert generated == {"full": "ok", "players": []}
+    assert len(calls) == 2
+
+
+def test_player_candidates_come_from_box_stats_at_latest_checkpoint():
+    flow_payload = {
+        "score": [
+            {"quarter": 2, "time": "0000.00", "awayScore": "56", "homeScore": "52"},
+            {"quarter": 4, "time": "0000.00", "awayScore": "124", "homeScore": "90"},
+        ],
+        "players": {
+            "away": {
+                "Egor Dëmin": [{"quarter": 1, "time": "0500.00", "type": "2pt", "text": "E. Dëmin make 2pt", "r": "m"}],
+                "Jalen Smith#2": [],
+            },
+            "home": {},
+        },
+    }
+    box_payload = {
+        "teams": {
+            "away": {
+                "abbr": "BKN",
+                "players": [
+                    {"first": "Egor", "last": "Dëmin", "stats": {"pts": 12, "fgm": 5, "fga": 8, "tpm": 2, "tpa": 3, "oreb": 1, "dreb": 4, "ast": 6, "stl": 2, "blk": 0, "to": 1}},
+                    {"first": "Jalen", "last": "Smith", "stats": {"pts": 4, "fgm": 2, "fga": 2, "tpm": 0, "tpa": 0, "oreb": 0, "dreb": 1, "ast": 0, "stl": 0, "blk": 0, "to": 0}},
+                    {"first": "Bench", "last": "Guy", "stats": {"pts": 0, "fgm": 0, "fga": 1, "oreb": 0, "dreb": 0, "ast": 0, "to": 0}},
+                ],
+            },
+            "home": {"abbr": "CHA", "players": []},
+        }
+    }
+    summary = captioning._build_summary(flow_payload, box_payload, 4, is_final_game=True)
+    assert summary["players"]["away"] == [
+        {"name": "Egor Dëmin", "pts": 12, "reb": 5, "ast": 6, "fg": "5-8", "3p": "2-3", "stl": 2},
+        {"name": "Jalen Smith#2", "pts": 4, "reb": 1, "ast": 0, "fg": "2-2"},
+    ]
+
+    # An earlier checkpoint can't use the end-of-game box; it falls back to play-by-play counts.
+    earlier = captioning._build_summary(flow_payload, box_payload, 2, is_final_game=True)
+    assert earlier["players"]["away"] == [{"name": "Egor Dëmin", "pts": 2, "reb": 0, "ast": 0, "stl": 0, "blk": 0}]

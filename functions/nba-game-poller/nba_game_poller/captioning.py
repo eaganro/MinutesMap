@@ -206,10 +206,33 @@ def _period_splits(score_timeline, period):
     return splits
 
 
+def _flow_events(flow_payload):
+    """Flow payloads carry plays per player, not one event list; rebuild it in game order."""
+    raw_events = flow_payload.get("events") if isinstance(flow_payload, dict) else None
+    if raw_events:
+        return raw_events
+    players = (flow_payload or {}).get("players") if isinstance(flow_payload, dict) else None
+    merged = {}
+    for side in ("away", "home"):
+        player_map = players.get(side) if isinstance(players, dict) else None
+        for actions in (player_map or {}).values():
+            for action in actions or []:
+                if not isinstance(action, dict):
+                    continue
+                key = (action.get("seq"), action.get("text"))
+                merged.setdefault(key, action)
+    return sorted(
+        merged.values(),
+        key=lambda action: (
+            _safe_int(action.get("quarter") or action.get("period"), 0) or 0,
+            -_clock_to_seconds(action.get("time") or action.get("clock")),
+        ),
+    )
+
+
 def _build_recent_events(flow_payload, period, limit=8):
     events = []
-    raw_events = flow_payload.get("events") if isinstance(flow_payload, dict) else []
-    for action in raw_events or []:
+    for action in _flow_events(flow_payload):
         if not isinstance(action, dict):
             continue
         action_period = _safe_int(action.get("quarter") or action.get("period"), 0) or 0
@@ -368,7 +391,8 @@ def _compute_player_metrics(actions, period):
     }
 
 
-def _top_player_candidates(flow_payload, period, max_candidates=6):
+def _top_player_candidates(flow_payload, period, max_candidates=4):
+    """Fallback when the box has no player stats: counts rebuilt from play-by-play."""
     players = (flow_payload or {}).get("players") or {}
     output = {"away": [], "home": []}
     for side in ("away", "home"):
@@ -390,8 +414,133 @@ def _top_player_candidates(flow_payload, period, max_candidates=6):
             ),
             reverse=True,
         )
-        output[side] = ranked[:max_candidates]
+        output[side] = [
+            {key: item[key] for key in ("name", "pts", "reb", "ast", "stl", "blk")}
+            for item in ranked[:max_candidates]
+        ]
     return output
+
+
+def _box_player_candidates(box_payload, flow_payload, max_candidates=4):
+    """Top players from the official box score, which is current as of this poll."""
+    teams = (box_payload or {}).get("teams") or {}
+    flow_players = (flow_payload or {}).get("players") or {}
+    output = {"away": [], "home": []}
+    found_stats = False
+    for side in ("away", "home"):
+        # Name candidates by their flow key: the site matches player captions against it.
+        flow_names = {
+            _normalize_player_name_key(re.sub(r"#\d+$", "", name)): name
+            for name in ((flow_players.get(side) if isinstance(flow_players, dict) else None) or {})
+        }
+        ranked = []
+        for player in (teams.get(side) or {}).get("players") or []:
+            stats = (player or {}).get("stats") if isinstance(player, dict) else None
+            if not isinstance(stats, dict):
+                continue
+            found_stats = True
+            full_name = _normalize_space(f"{player.get('first') or ''} {player.get('last') or ''}")
+            if not full_name:
+                continue
+            stat = lambda key: _safe_int(stats.get(key), 0) or 0
+            line = {
+                "name": flow_names.get(_normalize_player_name_key(full_name), full_name),
+                "pts": stat("pts"),
+                "reb": stat("oreb") + stat("dreb"),
+                "ast": stat("ast"),
+                "fg": f"{stat('fgm')}-{stat('fga')}",
+            }
+            if stat("tpa"):
+                line["3p"] = f"{stat('tpm')}-{stat('tpa')}"
+            for key in ("stl", "blk"):
+                if stat(key) >= 2:
+                    line[key] = stat(key)
+            if stat("to") >= 4:
+                line["to"] = stat("to")
+            impact = (
+                line["pts"] * 3.0 + line["ast"] * 2.4 + line["reb"] * 1.2
+                + stat("stl") * 2.2 + stat("blk") * 2.0 - stat("to") * 0.8
+            )
+            if impact > 0:
+                ranked.append((impact, line))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        output[side] = [line for _, line in ranked[:max_candidates]]
+    return output if found_stats else None
+
+
+def _game_story(score_timeline, period, away_abbr, home_abbr):
+    """Facts that make a caption specific: runs, lead swings, how the period ended."""
+    names = {"away": away_abbr, "home": home_abbr}
+    prev = {"away": 0, "home": 0}
+    largest_lead = {"away": 0, "home": 0}
+    lead_changes = 0
+    times_tied = 0
+    leader = None
+    run_team, run_points, run_period = None, 0, 0
+    best_run = None
+    closing_start = None
+    last_period_entry = None
+
+    for entry in score_timeline or []:
+        if not isinstance(entry, dict):
+            continue
+        quarter = _safe_int(entry.get("quarter") or entry.get("period"), 0) or 0
+        if quarter <= 0 or quarter > period:
+            continue
+        away = _safe_int(entry.get("awayScore") if "awayScore" in entry else entry.get("away"), None)
+        home = _safe_int(entry.get("homeScore") if "homeScore" in entry else entry.get("home"), None)
+        if away is None or home is None:
+            continue
+        seconds_left = _clock_to_seconds(entry.get("time") or entry.get("clock"))
+        if closing_start is None and quarter == period and seconds_left <= 180:
+            closing_start = dict(prev)
+
+        scored = {"away": max(0, away - prev["away"]), "home": max(0, home - prev["home"])}
+        if scored["away"] and not scored["home"]:
+            side = "away"
+        elif scored["home"] and not scored["away"]:
+            side = "home"
+        else:
+            side = None
+        if side and side == run_team:
+            run_points += scored[side]
+        else:
+            run_team, run_points, run_period = side, scored[side] if side else 0, quarter
+        if run_team and (best_run is None or run_points > best_run[1]):
+            best_run = (run_team, run_points, run_period)
+
+        margin = home - away
+        current = "home" if margin > 0 else "away" if margin < 0 else None
+        if current is None and leader is not None and (prev["home"] - prev["away"]) != 0:
+            times_tied += 1
+        if current and leader and current != leader:
+            lead_changes += 1
+        if current:
+            leader = current
+            largest_lead[current] = max(largest_lead[current], abs(margin))
+        prev = {"away": away, "home": home}
+        last_period_entry = quarter
+
+    if last_period_entry is None:
+        return None
+    if closing_start is None:
+        closing_start = dict(prev)
+
+    story = {
+        "leadChanges": lead_changes,
+        "timesTied": times_tied,
+        "largestLead": {names[side]: largest_lead[side] for side in ("away", "home")},
+        f"pointsInLast3MinOf{_period_label(period)}": {
+            names[side]: prev[side] - closing_start[side] for side in ("away", "home")
+        },
+    }
+    if best_run and best_run[1] >= 6:
+        story["longestUnansweredRun"] = {
+            "team": names[best_run[0]],
+            "points": best_run[1],
+            "period": _period_label(best_run[2]),
+        }
+    return story
 
 
 def _build_summary(flow_payload, box_payload, period, is_final_game=False):
@@ -405,7 +554,13 @@ def _build_summary(flow_payload, box_payload, period, is_final_game=False):
     away_abbr = _normalize_space(away_team.get("abbr")) or "Away"
     home_abbr = _normalize_space(home_team.get("abbr")) or "Home"
 
-    players_by_team = _top_player_candidates(flow_payload, period)
+    # The box only reflects the game as of this poll, so it fits the latest checkpoint only.
+    latest_period = _latest_flow_period(flow_payload)
+    players_by_team = None
+    if period >= latest_period or _is_final_caption_checkpoint(flow_payload, period, is_final_game):
+        players_by_team = _box_player_candidates(box_payload, flow_payload)
+    if players_by_team is None:
+        players_by_team = _top_player_candidates(flow_payload, period)
     period_splits = _period_splits(score_timeline, period)
     recent_events = _build_recent_events(flow_payload, period, limit=8)
     is_final_checkpoint = _is_final_caption_checkpoint(flow_payload, period, is_final_game)
@@ -416,14 +571,18 @@ def _build_summary(flow_payload, box_payload, period, is_final_game=False):
         "gameState": {
             "isFinal": is_final_checkpoint,
             "checkpointType": "game_final" if is_final_checkpoint else "period_checkpoint",
+            "seasonType": _normalize_space((box_payload or {}).get("seasonType")) or "regular",
         },
         "score": {
             "awayTeam": away_abbr,
+            "awayName": _normalize_space(away_team.get("name")) or away_abbr,
             "homeTeam": home_abbr,
+            "homeName": _normalize_space(home_team.get("name")) or home_abbr,
             "away": away_total,
             "home": home_total,
         },
         "periodSplits": period_splits,
+        "story": _game_story(score_timeline, period, away_abbr, home_abbr),
         "recentEvents": recent_events,
         "players": players_by_team,
     }
@@ -435,28 +594,46 @@ def _build_prompt(summary, max_players_per_team):
         "gameState": summary.get("gameState"),
         "score": summary.get("score"),
         "periodSplits": summary.get("periodSplits"),
+        "story": summary.get("story"),
         "recentEvents": summary.get("recentEvents"),
         "playerCandidates": summary.get("players"),
     }
     context_json = json.dumps(context, ensure_ascii=False)
     return (
-        "Write concise NBA image captions for a play-by-play timeline.\n"
-        "Return strict JSON only (no markdown, no prose):\n"
+        "Write the captions shown under an NBA play-by-play chart at a checkpoint (halftime or the end of the game).\n"
+        "Return JSON matching this shape:\n"
         '{'
         '"full_caption":"string",'
         '"player_stories":[{"team":"away|home","player":"exact candidate name","caption":"string"}]'
         "}\n"
+        "What makes a good full_caption:\n"
+        "- Find the one thing a fan would want to know about this game so far and lead with it: a decisive run, "
+        "a quarter one team won big, a comeback, a blowout, a lead that kept changing hands, a late surge, "
+        "or a player carrying his team.\n"
+        "- Back it with a concrete number from the context (a run, a quarter split, a largest lead, a player line).\n"
+        "- Use team names (city or nickname), not abbreviations.\n"
+        "- Avoid filler that fits any game: 'traded baskets', 'back-and-forth', 'strong performance', "
+        "'both teams', 'battled', 'carries an edge'. Only call a game close or see-saw if leadChanges or timesTied "
+        "say so.\n"
+        "- Plain, confident sports-desk voice. One or two short sentences. Do not just restate the score.\n"
+        "- For preseason games keep the stakes low-key; do not call results statement wins.\n"
+        "- Example of a weak caption: 'Brooklyn carries a 56-52 edge over Charlotte into halftime after both teams "
+        "traded baskets.' Example of a strong one: 'Brooklyn turned a four-point halftime edge into a rout, "
+        "outscoring Charlotte 68-38 after the break to win 124-90.'\n"
         "Rules:\n"
-        "- Output must be valid minified JSON.\n"
-        '- Use double quotes for all keys and string values, and escape any internal quotes.\n'
-        "- No emojis.\n"
-        "- No hashtags.\n"
-        f"- full_caption should be <= {FULL_CAPTION_MAX_CHARS} chars and focus on the game story up to this checkpoint.\n"
-        "- If gameState.isFinal is true, write full_caption as a completed-game result: make it clear the winner has won and avoid in-progress phrases like leads, takes a lead, heads into, or through Q4.\n"
+        "- No emojis or hashtags.\n"
+        "- Use only facts in the context; never invent stats, streaks, injuries or records.\n"
+        "- story.longestUnansweredRun counts only points scored with no reply; describe it as an unanswered run "
+        "(e.g. '12-0 run').\n"
+        f"- full_caption must be <= {FULL_CAPTION_MAX_CHARS} chars.\n"
+        "- If gameState.isFinal is true, write full_caption as a completed-game result: make it clear the winner has won "
+        "and avoid in-progress phrases like leads, takes a lead, heads into, or through Q4.\n"
         "- If gameState.isFinal is false, do not imply the game is over.\n"
-        f"- player_stories should be <= {PLAYER_CAPTION_MAX_CHARS} chars each.\n"
+        f"- player_stories should be <= {PLAYER_CAPTION_MAX_CHARS} chars each and say what made the player matter "
+        "(efficiency, a big quarter, a scoring burst), not only list stats.\n"
         f"- At most {max_players_per_team} player stories per team.\n"
-        "- Only use player names from playerCandidates.\n"
+        "- Only use player names from playerCandidates. Their stats are as of this checkpoint; fg and 3p are "
+        "made-attempted.\n"
         "- If no player story is worth posting, return an empty player_stories list.\n"
         f"Context JSON:\n{context_json}"
     )
@@ -811,8 +988,8 @@ def request_period_caption(
 
         result = call(attempt_prompt, api_key=api_key, model=model, timeout_seconds=timeout_seconds)
         if result is None:
-            print(f"Caption AI ({provider}) failed for {_period_label(period)}")
-            return None
+            print(f"Caption AI ({provider}) failed for {_period_label(period)} (attempt {attempt}/2)")
+            continue
         texts, finish_reasons = result
 
         parsed = None
@@ -844,6 +1021,17 @@ def request_period_caption(
         "full": full_caption,
         "players": player_stories,
     }
+
+
+def merge_captions(base, extra):
+    """Union of caption periods; base wins for a period present in both."""
+    if not isinstance(extra, dict):
+        return base
+    if not isinstance(base, dict):
+        return extra
+    merged = dict(extra)
+    merged["periods"] = {**(extra.get("periods") or {}), **(base.get("periods") or {})}
+    return merged
 
 
 def _initialize_captions(existing_captions, model, provider="gemini"):
@@ -900,6 +1088,7 @@ def build_period_captions(
     include_final_overtime=False,
     is_final_game=False,
     provider="gemini",
+    closed_through=None,
 ):
     if not api_key or not isinstance(flow_payload, dict):
         return existing_captions
@@ -910,6 +1099,11 @@ def build_period_captions(
         closed_periods = extract_closed_periods(actions)
     else:
         closed_periods = extract_closed_periods_from_flow(flow_payload)
+    # The poller sees the raw feed's period-end events; the trimmed flow can miss them
+    # (its last play is often a few seconds before the buzzer).
+    closed_through = _safe_int(closed_through, 0) or 0
+    if closed_through > 0:
+        closed_periods = sorted(set(closed_periods) | set(range(1, closed_through + 1)))
     if not closed_periods:
         return existing_captions
 
