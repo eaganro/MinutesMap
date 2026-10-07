@@ -549,6 +549,45 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(q2_segments[0]["start"], "1200.00")
         self.assertEqual(q2_segments[0]["end"], "0000.00")
 
+    def test_order_number_interleaving_periods_does_not_duplicate_segments(self):
+        def shot(action_number, order_number, period, clock):
+            return {
+                "actionNumber": action_number,
+                "actionId": action_number,
+                "orderNumber": order_number,
+                "clock": clock,
+                "period": period,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 500,
+                "playerName": "Carry",
+                "playerNameI": "C. Carry",
+                "description": "C. Carry 2PT Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": "2",
+            }
+
+        # Late-Q3 actions carry higher orderNumbers than early-Q4 ones (seen in 0012600027).
+        actions = [
+            shot(1, 1000, 3, "PT11M00.00S"),
+            shot(3, 2000, 4, "PT11M00.00S"),
+            shot(2, 3000, 3, "PT02M00.00S"),
+            shot(4, 4000, 4, "PT01M00.00S"),
+        ]
+        processed = process_playbyplay_payload(
+            game_id="interleaved-order-test",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+        )
+        segments = processed["segments"]["away"]["C. Carry"]
+        self.assertEqual(
+            [(s["quarter"], s["start"], s["end"]) for s in segments],
+            [(3, "1200.00", "0000.00"), (4, "1200.00", "0100.00")],
+        )
+
     def test_players_with_same_initial_last_name_do_not_merge(self):
         actions = [
             {
