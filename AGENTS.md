@@ -67,7 +67,7 @@ Run the smallest relevant checks first.
 
 ## Live NBA poller runs on the Raspberry Pi
 - Production ingest currently runs on the Pi (`nba_poller_mode = "pi"` in `terraform/variables.tf`); the `NBAGamePoller` Lambda is deployed but inert.
-- Pushing to `main` does not update the Pi. After changing `functions/nba-game-poller/**` or `pi/run_poller.py`, also run `bash pi/deploy.sh` and `ssh raspberrypi systemctl --user restart minutesmap-poller` (explicit confirmation required; avoid restarting during live games).
+- Pushing to `main` does not update the Pi. After changing `functions/nba-game-poller/**` or `pi/run_poller.py`, push, then run `bash pi/deploy.sh` (deploys `origin/main` via the Pi's git checkout, so unpushed changes are not deployed) and `ssh raspberrypi systemctl --user restart minutesmap-poller` (explicit confirmation required; avoid restarting during live games).
 - Mode switching, health checks and Pi setup: `pi/README.md`.
 
 ## Generated artifacts
