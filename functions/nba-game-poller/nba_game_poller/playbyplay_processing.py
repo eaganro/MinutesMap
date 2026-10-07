@@ -896,12 +896,12 @@ def sort_actions_by_order(actions):
         except Exception:
             period = 0
 
-        # orderNumber is only reliable within a period: scorer edits can give
-        # late-period actions higher orderNumbers than the next period's.
-        if has_order:
-            return (0, period, order, action_num)
-
         clock = a.get("clock") or a.get("time")
+        # orderNumber only breaks ties at the same clock: scorer edits can move an
+        # action's orderNumber before its period's start or after the next period's.
+        if has_order:
+            return (0, period, -time_to_seconds(clock), order, action_num)
+
         return (1, period, -time_to_seconds(clock), action_num)
 
     return sorted(list(actions or []), key=sort_key)
