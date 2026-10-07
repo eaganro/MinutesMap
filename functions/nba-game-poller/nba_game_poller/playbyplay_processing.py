@@ -890,14 +890,17 @@ def sort_actions_by_order(actions):
         except Exception:
             action_num = 0
 
-        if has_order:
-            return (0, order, action_num)
-
         period = a.get("period") or a.get("quarter") or 0
         try:
             period = int(period)
         except Exception:
             period = 0
+
+        # orderNumber is only reliable within a period: scorer edits can give
+        # late-period actions higher orderNumbers than the next period's.
+        if has_order:
+            return (0, period, order, action_num)
+
         clock = a.get("clock") or a.get("time")
         return (1, period, -time_to_seconds(clock), action_num)
 
