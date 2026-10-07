@@ -588,6 +588,40 @@ class TestPlayByPlayProcessing(unittest.TestCase):
             [(3, "1200.00", "0000.00"), (4, "1200.00", "0100.00")],
         )
 
+    def test_edited_action_order_number_does_not_reorder_within_period(self):
+        def shot(action_number, order_number, clock, away_score):
+            return {
+                "actionNumber": action_number,
+                "actionId": action_number,
+                "orderNumber": order_number,
+                "clock": clock,
+                "period": 1,
+                "teamId": int(self.away_team_id),
+                "teamTricode": "NOP",
+                "personId": 500,
+                "playerName": "Carry",
+                "playerNameI": "C. Carry",
+                "description": "C. Carry 2PT Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": "0",
+                "scoreAway": away_score,
+            }
+
+        # An edited late-period action can get an orderNumber below the period's first actions.
+        actions = [
+            shot(3, 10, "PT00M45.00S", "6"),
+            shot(1, 1000, "PT11M00.00S", "2"),
+            shot(2, 2000, "PT06M00.00S", "4"),
+        ]
+        processed = process_playbyplay_payload(
+            game_id="edited-order-test",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+        )
+        self.assertEqual([s["awayScore"] for s in processed["score"]], ["2", "4", "6"])
+
     def test_players_with_same_initial_last_name_do_not_merge(self):
         actions = [
             {
