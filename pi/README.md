@@ -46,10 +46,15 @@ The two Pi services declare `Conflicts=` on each other, so starting one stops th
    `MINUTESMAP_REVALIDATE_SECRET` (copied from the Lambda's configuration) and `OPENAI_API_KEY`
    (copied from `~/.config/wnba-pilot/credentials.env`, the nba-market-research key). The Pi
    captions with OpenAI `gpt-6-luna` (`CAPTION_PROVIDER=openai`); the Lambda still uses Gemini.
-3. Code: `bash pi/deploy.sh` (re-run after any change to the poller or runner, then
-   `ssh raspberrypi systemctl --user restart minutesmap-poller` if it is running).
+3. Code: push to `main`, then `bash pi/deploy.sh` (re-run after any change to the poller or runner,
+   then `ssh raspberrypi systemctl --user restart minutesmap-poller` if it is running). It deploys
+   from git: it fast-forwards the Pi's `~/MinutesMap` checkout to `origin/main` and copies the
+   poller from there into `~/minutesmap-poller`, so only pushed commits go live, and edits in the
+   checkout don't reach the service until the next deploy. `~/minutesmap-poller/DEPLOYED` holds
+   the deployed commit. On the Pi itself, run `bash pi/deploy.sh` from `~/MinutesMap`.
 
 Status and recent logs: `ssh raspberrypi systemctl --user status minutesmap-poller`.
+Deployed commit: `ssh raspberrypi cat minutesmap-poller/DEPLOYED`.
 
 ## Tests
 
