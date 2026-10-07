@@ -3,6 +3,7 @@ import json
 import boto3
 import os
 import random
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -37,6 +38,7 @@ from nba_game_poller.gamepack_utils import (
 from nba_game_poller.season_types import derive_season_type
 from nba_game_poller.captioning import (
     build_period_captions,
+    merge_captions,
     extract_closed_periods,
     filter_caption_checkpoint_periods,
     select_caption_checkpoint_periods,
@@ -540,7 +542,15 @@ def disable_self():
         print(f"Poller Error: Failed to disable rule: {e}")
 
 
-def enqueue_caption_worker(*, game_key, latest_closed_period, status_text=""):
+# The Pi runs the caption worker in a thread; this lock keeps its gamepack write from
+# interleaving with the poll loop's, and the cache lets the poll loop keep captions it
+# has not read back from S3 yet.
+GAMEPACK_WRITE_LOCK = threading.Lock()
+LATEST_CAPTIONS = {}
+
+
+def enqueue_caption_worker(*, game_key, latest_closed_period, status_text="", flow_payload=None, box_payload=None):
+    # A Lambda async payload is too small for the flow; the worker reads the gamepack instead.
     if not LAMBDA_ARN:
         return False
     payload = {
@@ -682,18 +692,21 @@ def caption_worker_logic(event):
         return
 
     existing = load_gamepack(game_key)
-    if not isinstance(existing, dict):
-        print(f"CaptionWorker: No gamepack for {game_key}.")
-        return
-
-    flow_payload = existing.get("flow")
-    box_payload = existing.get("box")
+    flow_payload = event.get("flow")
+    box_payload = event.get("box")
+    if not isinstance(flow_payload, dict):
+        flow_payload = (existing or {}).get("flow")
+    if not isinstance(box_payload, dict):
+        box_payload = (existing or {}).get("box")
     if not isinstance(flow_payload, dict) or not isinstance(box_payload, dict):
         print(f"CaptionWorker: Missing flow/box for {game_key}.")
         return
 
     status_text = (event.get("status") or "").strip()
-    existing_captions = flow_payload.get("captions")
+    existing_captions = merge_captions(
+        ((existing or {}).get("flow") or {}).get("captions"),
+        LATEST_CAPTIONS.get(game_key),
+    )
     merged_captions = build_period_captions(
         actions=None,
         flow_payload=flow_payload,
@@ -706,24 +719,30 @@ def caption_worker_logic(event):
         timeout_seconds=CAPTION_TIMEOUT_SECONDS,
         include_final_overtime=is_final_status(status_text),
         is_final_game=is_final_status(status_text),
+        closed_through=event.get("closedThrough"),
     )
     if not isinstance(merged_captions, dict):
         return
     if isinstance(existing_captions, dict) and merged_captions == existing_captions:
         return
 
-    next_flow = dict(flow_payload)
-    next_flow["captions"] = merged_captions
-    gamepack = dict(existing)
-    gamepack["flow"] = next_flow
-    upload_json_to_s3(
-        s3_client=s3_client,
-        bucket=BUCKET,
-        prefix=PREFIX,
-        key=f"{GAMEPACK_PREFIX}{game_key}.json",
-        data=gamepack,
-        is_final=is_final_status(status_text),
-    )
+    with GAMEPACK_WRITE_LOCK:
+        # Write onto the newest gamepack so a poll that landed meanwhile is not rolled back.
+        latest = load_gamepack(game_key)
+        if not isinstance(latest, dict) or not isinstance(latest.get("flow"), dict):
+            latest = existing if isinstance(existing, dict) else {"flow": flow_payload, "box": box_payload}
+        captions = merge_captions(latest["flow"].get("captions"), merged_captions)
+        LATEST_CAPTIONS[game_key] = captions
+        gamepack = dict(latest)
+        gamepack["flow"] = {**latest["flow"], "captions": captions}
+        upload_json_to_s3(
+            s3_client=s3_client,
+            bucket=BUCKET,
+            prefix=PREFIX,
+            key=f"{GAMEPACK_PREFIX}{game_key}.json",
+            data=gamepack,
+            is_final=is_final_status(status_text),
+        )
     print(f"CaptionWorker: Uploaded captions for {game_key}.")
 
 # ==============================================================================
@@ -948,6 +967,8 @@ def process_game(game_item, user_agent=None, date_str=None):
                     game_key=game_key,
                     latest_closed_period=latest_closed_period,
                     status_text=status_for_worker,
+                    flow_payload=processed,
+                    box_payload=slim_box,
                 ):
                     updates["captions_requested_through"] = latest_closed_period
 
@@ -984,14 +1005,21 @@ def process_game(game_item, user_agent=None, date_str=None):
                 "box": slim_box,
                 "flow": processed,
             }
-            upload_json_to_s3(
-                s3_client=s3_client,
-                bucket=BUCKET,
-                prefix=PREFIX,
-                key=f"{GAMEPACK_PREFIX}{game_key}.json",
-                data=gamepack,
-                is_final=is_game_final,
-            )
+            with GAMEPACK_WRITE_LOCK:
+                cached_captions = LATEST_CAPTIONS.get(game_key)
+                if isinstance(processed, dict) and cached_captions:
+                    gamepack["flow"] = {
+                        **processed,
+                        "captions": merge_captions(processed.get("captions"), cached_captions),
+                    }
+                upload_json_to_s3(
+                    s3_client=s3_client,
+                    bucket=BUCKET,
+                    prefix=PREFIX,
+                    key=f"{GAMEPACK_PREFIX}{game_key}.json",
+                    data=gamepack,
+                    is_final=is_game_final,
+                )
             live_schedule_game = {
                 **game_item,
                 **updates,
