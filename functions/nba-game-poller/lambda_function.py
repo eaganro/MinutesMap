@@ -1463,7 +1463,7 @@ def resolve_odds_position(game_item, box_game=None, last_action=None, existing_f
     if not clock and isinstance(existing_flow, dict):
         clock = str((existing_flow.get("last") or {}).get("time") or "").strip()
 
-    if period <= 0 or not clock:
+    if not period or not clock:
         return None
 
     return {
