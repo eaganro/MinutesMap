@@ -22,6 +22,12 @@ RECONCILE_SECONDS = 3600
 MANAGER_HOUR_UTC = 11  # the Lambda's NBADailyManager runs cron(0 11 * * ? *)
 READY_HOSTS = ("cdn.nba.com", "s3.us-east-1.amazonaws.com")
 TIME_SYNC_MARKER = "/run/systemd/timesync/synchronized"  # created by systemd-timesyncd
+HEARTBEAT_SECONDS = 60
+GAME_WINDOW_MARGIN_SECONDS = 3600  # tighten alerting this long before the first tip
+METRIC_NAMESPACE = "MinutesMap/PiPoller"  # alarms: pi/setup_alerts.sh
+GAME_TIME_ALARM = "MinutesMap-Pi-Down-GameTime"
+# Small and always present, unlike a game's feeds, which return 403 until shortly before tip.
+SCOREBOARD_URL = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json"
 
 DEFAULT_POLLER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nba-game-poller")
 REPO_POLLER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "functions", "nba-game-poller")
@@ -73,6 +79,49 @@ def load_poller(poller_dir, bucket):
     sys.path.insert(0, poller_dir)
     import lambda_function
     return lambda_function
+
+
+class Heartbeat:
+    """Publishes a CloudWatch heartbeat every minute for the alarms in pi/setup_alerts.sh, which
+    email when it stops. The game-time alarm (a few minutes of silence) is only armed in the game
+    window; the always-on alarm waits an hour. In the window it also reports how many checks of the
+    NBA scoreboard feed in a row were refused, which catches the NBA blocking the Pi."""
+
+    def __init__(self, cloudwatch, probe):
+        self.cloudwatch = cloudwatch
+        self.probe = probe
+        self.game_alarm_armed = None  # unknown at start-up
+        self.next_at = 0
+        self.feed_refusals = 0
+
+    def update(self, now, in_game_window):
+        if self.game_alarm_armed != in_game_window:
+            toggle = self.cloudwatch.enable_alarm_actions if in_game_window else self.cloudwatch.disable_alarm_actions
+            try:
+                toggle(AlarmNames=[GAME_TIME_ALARM])
+                self.game_alarm_armed = in_game_window
+                log(f"Game-time alarm {'armed' if in_game_window else 'disarmed'}.")
+            except Exception as exc:
+                log(f"Game-time alarm update failed: {exc!r}")
+        if now < self.next_at:
+            return
+        self.next_at = now + HEARTBEAT_SECONDS
+        metrics = [{"MetricName": "Heartbeat", "Value": 1, "Unit": "Count"}]
+        if in_game_window:
+            try:
+                feed_ok = self.probe()
+            except Exception:
+                feed_ok = False
+            self.feed_refusals = 0 if feed_ok else self.feed_refusals + 1
+            if not feed_ok:
+                log(f"NBA scoreboard check refused ({self.feed_refusals} in a row).")
+            metrics.append({"MetricName": "NbaFeedRefused", "Value": self.feed_refusals, "Unit": "Count"})
+        else:
+            self.feed_refusals = 0
+        try:
+            self.cloudwatch.put_metric_data(Namespace=METRIC_NAMESPACE, MetricData=metrics)
+        except Exception as exc:
+            log(f"Heartbeat failed: {exc!r}")
 
 
 class PiRunner:
@@ -131,6 +180,15 @@ class PiRunner:
         except Exception as exc:
             log(f"Caption worker failed for {payload['gameKey']}: {exc!r}")
 
+    def in_game_window(self, now):
+        if self.polling:
+            return True
+        return self.kickoff_at is not None and now >= self.kickoff_at - GAME_WINDOW_MARGIN_SECONDS
+
+    def scoreboard_reachable(self):
+        data, _ = self.poller.fetch_nba_data(SCOREBOARD_URL)
+        return data is not None
+
     def tick(self, now=None):
         now = time.time() if now is None else now
         if now >= self.next_manager_at:
@@ -168,10 +226,17 @@ def main():
     poller_dir = args.poller_dir or (DEFAULT_POLLER_DIR if os.path.isdir(DEFAULT_POLLER_DIR) else REPO_POLLER_DIR)
     wait_until_ready()
     runner = PiRunner(load_poller(poller_dir, args.bucket))
+    heartbeat = None
+    if os.environ.get("CLOUDWATCH_HEARTBEAT") == "true":
+        import boto3
+        heartbeat = Heartbeat(boto3.client("cloudwatch"), runner.scoreboard_reachable)
     log(f"Running the NBA poller pipeline from {poller_dir} against s3://{args.bucket}")
     while True:
         started = time.time()
         runner.tick(started)
+        if heartbeat:
+            now = time.time()
+            heartbeat.update(now, runner.in_game_window(now))
         if args.once:
             runner.captions.shutdown(wait=True)
             return

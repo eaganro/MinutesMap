@@ -18,6 +18,8 @@ Environment=MINUTESMAP_REVALIDATE_URL=https://teams.minutesmap.com/api/revalidat
 Environment=CAPTION_PROVIDER=openai
 Environment=OPENAI_MODEL=gpt-6-luna
 Environment=CAPTION_TIMEOUT_SECONDS=60
+# Heartbeat for the email alarms created by pi/setup_alerts.sh.
+Environment=CLOUDWATCH_HEARTBEAT=true
 # OPENAI_API_KEY, GEMINI_API_KEY and MINUTESMAP_REVALIDATE_SECRET (mode 600).
 EnvironmentFile=%h/minutesmap-poller/secrets.env
 ExecStart=%h/minutesmap-poller/.venv/bin/python -u run_poller.py --bucket roryeagan.com-nba-processed-data
