@@ -6,7 +6,6 @@ locals {
   src_game_date_updates = "${path.module}/../functions/gameDateUpdates"
   src_ws_join_game      = "${path.module}/../functions/ws-joinGame-handler"
   src_ws_unfollow_game  = "${path.module}/../functions/ws-unfollowGame-handler"
-  src_fetch_scoreboard  = "${path.module}/../functions/FetchTodaysScoreboard"
   src_nba_poller        = "${path.module}/../functions/nba-game-poller"
   
   # Where to store temporary build artifacts

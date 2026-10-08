@@ -40,7 +40,6 @@ flowchart TD
     subgraph Ingestion["Ingestion"]
         Manager["EventBridge manager"]:::aws
         Poller["NBAGamePoller Lambda"]:::aws
-        Scoreboard["FetchTodaysScoreboard Lambda"]:::aws
     end
 
     subgraph AWS["AWS Core"]
@@ -62,8 +61,6 @@ flowchart TD
     Poller --> Odds
     Poller --> AI
     Poller --> S3
-    Scoreboard --> NBA
-    Scoreboard --> S3
 
     S3 --> GameNotifier
     S3 --> DateNotifier
