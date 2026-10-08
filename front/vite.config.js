@@ -17,8 +17,8 @@ export default defineConfig({
     emptyOutDir: true,
     assetsDir: 'assets',
     cssCodeSplit: false,
-    rollupOptions: {
-      input: resolve(__dirname, 'index.html'),
+    rolldownOptions: {
+      input: resolve(import.meta.dirname, 'index.html'),
       output: {
         entryFileNames: 'js/[name]-[hash].js',
         chunkFileNames: 'js/chunks/[name]-[hash].js',
