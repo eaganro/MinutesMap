@@ -18,7 +18,7 @@ Repository instructions for coding agents working in this project.
 - Use `rg`/`rg --files` for fast code search.
 
 ## Local environment
-- Node.js 20+ (matches CI).
+- Node.js 22.12+ (matches CI; vitest 5 requires it).
 - Python 3.11+ for Lambda Python tests.
 - Terraform 1.x for infra validation.
 - Use the project virtual environment for Python in `functions/`:
