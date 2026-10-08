@@ -229,7 +229,8 @@ def main():
     heartbeat = None
     if os.environ.get("CLOUDWATCH_HEARTBEAT") == "true":
         import boto3
-        heartbeat = Heartbeat(boto3.client("cloudwatch"), runner.scoreboard_reachable)
+        cloudwatch = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        heartbeat = Heartbeat(cloudwatch, runner.scoreboard_reachable)
     log(f"Running the NBA poller pipeline from {poller_dir} against s3://{args.bucket}")
     while True:
         started = time.time()
