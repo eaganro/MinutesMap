@@ -1654,6 +1654,16 @@ class TestNbaGamePollerLambda:
             "time": "0000.00",
         }
 
+    def test_resolve_odds_position_returns_none_before_tipoff(self):
+        position = self.module.resolve_odds_position(
+            {
+                "status": "7:30 pm ET",
+                "time": "",
+            },
+        )
+
+        assert position is None
+
     def test_poller_processes_final_games_missing_cached_etags(self):
         self.module.get_nba_date = MagicMock(return_value="2026-02-13")
         self.module.get_games_from_s3 = MagicMock(
