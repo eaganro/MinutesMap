@@ -148,3 +148,103 @@ def test_load_poller_uses_curl_and_drops_lambda_settings(monkeypatch):
     assert module.NBA_FETCH_MODE == "curl"
     assert module.NBA_FEED_MIRROR_PREFIX == ""
     assert not module.POLLER_DISABLED
+
+
+
+
+
+class FakeCloudWatch:
+    def __init__(self):
+        self.calls = []
+
+    def put_metric_data(self, Namespace, MetricData):
+        assert Namespace == "MinutesMap/PiPoller"
+        self.calls.append(("put", {m["MetricName"]: m["Value"] for m in MetricData}))
+
+    def enable_alarm_actions(self, AlarmNames):
+        self.calls.append(("arm", AlarmNames))
+
+    def disable_alarm_actions(self, AlarmNames):
+        self.calls.append(("disarm", AlarmNames))
+
+
+def heartbeat(feed_ok=True):
+    cloudwatch = FakeCloudWatch()
+    return run_poller.Heartbeat(cloudwatch, probe=lambda: feed_ok), cloudwatch.calls
+
+
+def test_heartbeat_publishes_every_minute():
+    beat, calls = heartbeat()
+    for offset in (0, 30, 59, 60):
+        beat.update(NOW + offset, False)
+    assert calls == [
+        ("disarm", ["MinutesMap-Pi-Down-GameTime"]),
+        ("put", {"Heartbeat": 1}),
+        ("put", {"Heartbeat": 1}),
+    ]
+
+
+def test_heartbeat_arms_the_game_time_alarm_only_in_the_game_window():
+    beat, calls = heartbeat()
+    beat.update(NOW, False)
+    beat.update(NOW + 60, True)
+    beat.update(NOW + 120, True)
+    beat.update(NOW + 180, False)
+    assert [c[0] for c in calls] == ["disarm", "put", "arm", "put", "put", "disarm", "put"]
+
+
+def test_heartbeat_retries_a_failed_alarm_update():
+    beat, calls = heartbeat()
+    def failing(AlarmNames):
+        raise OSError("offline")
+    real = beat.cloudwatch.enable_alarm_actions
+    beat.cloudwatch.enable_alarm_actions = failing
+    beat.update(NOW, True)
+    beat.cloudwatch.enable_alarm_actions = real
+    beat.update(NOW + 30, True)
+    assert ("arm", ["MinutesMap-Pi-Down-GameTime"]) in calls
+
+
+def test_heartbeat_counts_refused_scoreboard_checks_in_the_game_window():
+    beat, calls = heartbeat(feed_ok=False)
+    for minute in range(3):
+        beat.update(NOW + 60 * minute, True)
+    assert [c[1]["NbaFeedRefused"] for c in calls if c[0] == "put"] == [1, 2, 3]
+    beat.probe = lambda: True
+    beat.update(NOW + 180, True)
+    assert calls[-1] == ("put", {"Heartbeat": 1, "NbaFeedRefused": 0})
+
+
+def test_heartbeat_skips_the_feed_check_between_games():
+    beat, calls = heartbeat()
+    beat.probe = lambda: (_ for _ in ()).throw(AssertionError("probed"))
+    beat.update(NOW, False)
+    assert calls[-1] == ("put", {"Heartbeat": 1})
+
+
+def test_heartbeat_survives_aws_and_probe_errors():
+    def boom(**kwargs):
+        raise OSError("offline")
+    cloudwatch = SimpleNamespace(put_metric_data=boom, enable_alarm_actions=boom, disable_alarm_actions=boom)
+    beat = run_poller.Heartbeat(cloudwatch, probe=lambda: 1 / 0)
+    beat.update(NOW, True)
+    beat.update(NOW, False)
+
+
+def test_game_window_opens_an_hour_before_kickoff_and_ends_with_polling():
+    runner = PiRunner(fake_poller(), InlineExecutor())
+    assert not runner.in_game_window(NOW)
+    runner.kickoff_at = NOW + 7200
+    assert not runner.in_game_window(NOW + 3599)
+    assert runner.in_game_window(NOW + 3600)
+    runner.enable()
+    assert runner.in_game_window(NOW + 9000)
+    runner.disable()
+    assert not runner.in_game_window(NOW + 9000)
+
+
+def test_scoreboard_probe_uses_the_poller_fetch():
+    poller = fake_poller(fetch_nba_data=lambda url: ({"scoreboard": {}} if "todaysScoreboard" in url else None, None))
+    assert PiRunner(poller, InlineExecutor()).scoreboard_reachable()
+    poller.fetch_nba_data = lambda url: (None, None)
+    assert not PiRunner(poller, InlineExecutor()).scoreboard_reachable()

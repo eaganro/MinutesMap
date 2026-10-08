@@ -53,6 +53,19 @@ The two Pi services declare `Conflicts=` on each other, so starting one stops th
    checkout don't reach the service until the next deploy. `~/minutesmap-poller/DEPLOYED` holds
    the deployed commit. On the Pi itself, run `bash pi/deploy.sh` from `~/MinutesMap`.
 
+4. Alerts: run `bash pi/setup_alerts.sh you@example.com` once from the laptop (admin credentials;
+   safe to re-run), then confirm the subscription email. It creates the SNS topic, the email
+   subscription, three CloudWatch alarms and the Pi user's `minutesmap-poller-alerts` inline policy.
+   The runner publishes a heartbeat to `MinutesMap/PiPoller` every minute. Alarms (all email on
+   trouble and on recovery):
+   - `MinutesMap-Pi-Down`: no heartbeat for an hour. Always on.
+   - `MinutesMap-Pi-Down-GameTime`: no heartbeat for 3 minutes. The runner arms it from an hour
+     before the first tip until the last game ends, and disarms it otherwise.
+   - `MinutesMap-NBA-Feed-Blocked`: 3 refused checks in a row of the NBA scoreboard feed, which the
+     runner checks every minute in the game window.
+   A Pi that dies between games is reported within an hour, about 30 minutes before tip at the latest.
+   Everything stays inside CloudWatch's and SNS's always-free tiers.
+
 Status and recent logs: `ssh raspberrypi systemctl --user status minutesmap-poller`.
 Deployed commit: `ssh raspberrypi cat minutesmap-poller/DEPLOYED`.
 
