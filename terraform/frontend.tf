@@ -142,7 +142,7 @@ function handler(event) {
   var headers = response.headers;
 
   headers['content-security-policy'] = {
-    value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://analytics.minutesmap.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://analytics.minutesmap.com ${aws_apigatewayv2_api.websocket_api.api_endpoint}; worker-src 'none'; media-src 'none'; manifest-src 'self'; upgrade-insecure-requests"
+    value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ${aws_apigatewayv2_api.websocket_api.api_endpoint}; worker-src 'none'; media-src 'none'; manifest-src 'self'; upgrade-insecure-requests"
   };
   headers['permissions-policy'] = {
     value: 'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), usb=()'
