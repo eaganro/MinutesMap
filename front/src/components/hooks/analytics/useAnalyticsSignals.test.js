@@ -92,6 +92,37 @@ describe('useAnalyticsSignals', () => {
     expect(track.mock.calls.length).toBe(callCountBeforeUnmount);
   });
 
+  it('tracks the pageview once the umami script loads late', () => {
+    vi.useFakeTimers();
+
+    const { rerender } = renderHook(
+      ({ status }) =>
+        useAnalyticsSignals({
+          gameId: '2026-02-03-phi-gsw',
+          date: '2026-02-03',
+          currentScheduleGameStatus: status,
+          isInitLoading: false,
+          heartbeatIntervalMs: 60000,
+        }),
+      { initialProps: { status: 'Q1 08:12' } },
+    );
+
+    rerender({ status: 'Q1 08:11' });
+
+    const track = vi.fn();
+    window.umami = { track };
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const pageViewCalls = track.mock.calls.filter((call) => typeof call[0] === 'function');
+    expect(pageViewCalls).toHaveLength(1);
+    expect(pageViewCalls[0][0]({ website: 'w' })).toEqual(
+      expect.objectContaining({ website: 'w', url: expect.any(String) }),
+    );
+  });
+
   it('keeps heartbeat cadence stable while using latest payload values', () => {
     vi.useFakeTimers();
 
