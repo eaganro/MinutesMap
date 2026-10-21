@@ -168,7 +168,7 @@ npm --prefix front run check:security-headers -- \
   https://minutesmap.com/theme-init.js
 ```
 
-The CSP is enforced. Scripts are limited to same-origin bundles and the analytics host; it does not
+The CSP is enforced. Scripts are limited to same-origin bundles; it does not
 allow `unsafe-inline` or `unsafe-eval`. Runtime React/Emotion styles still require the narrower
 `style-src 'unsafe-inline'` exception. Blob URLs are allowed only for generated image previews, and
 WebSocket connections are limited to the Terraform-managed API Gateway origin.

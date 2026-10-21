@@ -2,8 +2,6 @@ import { useEffect, useRef } from 'react';
 import { trackPostHogEvent, trackPostHogPageView } from '../../../helpers/analytics';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 15000;
-const UMAMI_WAIT_INTERVAL_MS = 250;
-const UMAMI_WAIT_MAX_ATTEMPTS = 40;
 
 export function useAnalyticsSignals({
   gameId,
@@ -14,7 +12,6 @@ export function useAnalyticsSignals({
 }) {
   const lastTrackedGameIdRef = useRef(null);
   const closeSignalSentRef = useRef(false);
-  const umamiWaitIdsRef = useRef(new Set());
   const heartbeatPayloadRef = useRef({
     gameId: gameId || null,
     date: date || null,
@@ -34,46 +31,12 @@ export function useAnalyticsSignals({
     if (!gameId) return;
     if (lastTrackedGameIdRef.current === gameId) return;
     lastTrackedGameIdRef.current = gameId;
-    const trackedUrl = `${window.location.pathname}${window.location.search}`;
-    const trackedTitle = document.title;
-    const trackUmamiPageView = () => {
-      window.umami.track((props) => ({
-        ...props,
-        url: trackedUrl,
-        title: trackedTitle,
-      }));
-    };
-    // The umami script loads async and often arrives after the first game data,
-    // so wait for it instead of dropping the pageview.
-    if (window?.umami?.track) {
-      trackUmamiPageView();
-    } else {
-      const waitIds = umamiWaitIdsRef.current;
-      let attempts = 0;
-      const waitId = window.setInterval(() => {
-        attempts += 1;
-        const ready = Boolean(window?.umami?.track);
-        if (!ready && attempts < UMAMI_WAIT_MAX_ATTEMPTS) return;
-        window.clearInterval(waitId);
-        waitIds.delete(waitId);
-        if (ready) trackUmamiPageView();
-      }, UMAMI_WAIT_INTERVAL_MS);
-      waitIds.add(waitId);
-    }
     trackPostHogPageView({
       gameId: gameId || null,
       date: date || null,
       status: currentScheduleGameStatus || null,
     });
   }, [date, gameId, currentScheduleGameStatus, isInitLoading]);
-
-  useEffect(() => {
-    const waitIds = umamiWaitIdsRef.current;
-    return () => {
-      waitIds.forEach((waitId) => window.clearInterval(waitId));
-      waitIds.clear();
-    };
-  }, []);
 
   useEffect(() => {
     if (isInitLoading) return;
@@ -91,9 +54,6 @@ export function useAnalyticsSignals({
         date: payload.date,
         status: payload.status,
       };
-      if (window?.umami?.track) {
-        window.umami.track('heartbeat', eventData);
-      }
       trackPostHogEvent('heartbeat', eventData);
     };
 
@@ -120,9 +80,6 @@ export function useAnalyticsSignals({
         date: date || null,
         status: currentScheduleGameStatus || null,
       };
-      if (window?.umami?.track) {
-        window.umami.track('page-close', eventData);
-      }
       trackPostHogEvent('page-close', eventData);
     };
 

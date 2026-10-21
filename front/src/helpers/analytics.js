@@ -1,9 +1,3 @@
-export const trackUmamiEvent = (eventName, data = {}) => {
-  if (typeof window === 'undefined') return;
-  if (!window?.umami?.track) return;
-  window.umami.track(eventName, data);
-};
-
 export const trackPostHogEvent = (eventName, data = {}) => {
   if (typeof window === 'undefined') return;
   if (!window?.posthog?.capture) return;
@@ -23,6 +17,5 @@ export const trackPostHogPageView = (data = {}) => {
 export const trackFeatureUse = (feature, data = {}) => {
   if (!feature) return;
   const eventData = { feature, ...data };
-  trackUmamiEvent('feature-use', eventData);
   trackPostHogEvent('feature-use', eventData);
 };

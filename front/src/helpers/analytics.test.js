@@ -3,21 +3,17 @@ import { trackFeatureUse, trackPostHogPageView } from './analytics';
 
 afterEach(() => {
   vi.restoreAllMocks();
-  delete window.umami;
   delete window.posthog;
 });
 
 describe('analytics helpers', () => {
-  it('tracks feature use in configured analytics providers', () => {
-    const umamiTrack = vi.fn();
+  it('tracks feature use in PostHog', () => {
     const posthogCapture = vi.fn();
-    window.umami = { track: umamiTrack };
     window.posthog = { capture: posthogCapture };
 
     trackFeatureUse('lineups', { source: 'tap' });
 
     const eventData = { feature: 'lineups', source: 'tap' };
-    expect(umamiTrack).toHaveBeenCalledWith('feature-use', eventData);
     expect(posthogCapture).toHaveBeenCalledWith('feature-use', eventData);
   });
 
