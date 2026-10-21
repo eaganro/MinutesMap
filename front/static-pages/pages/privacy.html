@@ -1,46 +1,76 @@
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: May 4, 2026</p>
+<p class="updated">Last updated: October 15, 2026</p>
 
 <p>
-  MinutesMap is built to be lightweight and privacy-focused. We do not ask you to create an account,
-  and we do not collect personal information like names, email addresses, or payment details.
+  MinutesMap does not ask you to create an account, and we do not ask for personal information like
+  names, email addresses, or payment details.
 </p>
 
 <div class="note">
-  <strong>Short version:</strong> We collect minimal analytics and store a temporary connection ID
-  during live games. Preferences are stored locally in your browser.
+  <strong>Short version:</strong> We use PostHog to measure how the site is used, which includes
+  recordings of on-page sessions. We store a temporary connection ID during live games. Your display
+  preferences are stored locally in your browser.
 </div>
 
 <h2>Information We Collect</h2>
 <ul>
   <li>
-    <strong>Analytics:</strong> We use analytics tools to understand site usage and improve the
-    product.
+    <strong>Usage analytics:</strong> We use
+    <a href="https://posthog.com/privacy" target="_blank" rel="noopener noreferrer">PostHog</a> to
+    record page views, the games and dates you view, which features you use, clicks, and how long a
+    page stays open. Each browser is assigned a random identifier so visits can be grouped together.
+    PostHog also receives your IP address and browser details, and may use them to estimate an
+    approximate location (such as country or city).
   </li>
   <li>
-    <strong>Local preferences:</strong> We store your play-by-play stat display preferences in your
-    browser's localStorage so the site remembers your settings.
+    <strong>Session recordings:</strong> PostHog records how you interact with the page (mouse
+    movement, clicks, scrolling, and what is shown on screen) so we can find bugs and improve the
+    layout. Text you type into form fields is masked.
   </li>
   <li>
-    <strong>Live connection state:</strong> While you are connected to a live game, we store a
-    non-identifying connection ID to manage real-time updates. This is removed when you disconnect.
+    <strong>Error reports:</strong> If something breaks, we send the error details and the page you
+    were on to PostHog so we can fix it.
+  </li>
+  <li>
+    <strong>Local preferences:</strong> We store your display settings (such as dark mode and which
+    stats are shown) in your browser's localStorage so the site remembers them.
+  </li>
+  <li>
+    <strong>Live connection state:</strong> While you are following a live game, we store a
+    non-identifying connection ID to send you real-time updates. It is deleted when you disconnect,
+    and automatically expires within 12 hours in any case.
   </li>
 </ul>
 
 <h2>What We Do Not Collect</h2>
 <p>
   We do not collect names, email addresses, phone numbers, precise location, or payment information.
-  We do not use advertising pixels or sell personal data.
+  We do not use advertising pixels, and we do not sell or share data for advertising.
 </p>
 
-<h2>Client-Side Storage</h2>
-<p>We use localStorage for your preferences and analytics state.</p>
+<h2>Cookies and Client-Side Storage</h2>
+<p>
+  We do not set cookies. We use localStorage for your preferences and for PostHog's random
+  identifier and session state. You can clear this at any time from your browser settings.
+</p>
 
 <h2>Service Providers</h2>
+<ul>
+  <li>
+    <strong>Amazon Web Services</strong> hosts the site, serves content, and runs live updates. Like
+    any web host, it processes basic request data such as IP address and user agent.
+  </li>
+  <li>
+    <strong>PostHog</strong> (United States) processes the analytics, session recordings, and error
+    reports described above. Analytics requests are routed through our own domain before being
+    forwarded to PostHog.
+  </li>
+</ul>
+
+<h2>Opting Out</h2>
 <p>
-  We use trusted hosting and delivery providers to run the site and serve content quickly. These
-  providers may process basic request data (such as IP address and user agent) as part of normal
-  service operation.
+  The site works normally if you block analytics requests. If you would like recordings or analytics
+  associated with your browser deleted, email us and we will do our best to help.
 </p>
 
 <h2>Changes to This Policy</h2>

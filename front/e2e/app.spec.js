@@ -108,7 +108,6 @@ const SMOKE_GAMEPACK = {
 
 async function blockAnalytics(page) {
   const analyticsPatterns = [
-    '**/analytics.minutesmap.com/**',
     '**/www.google-analytics.com/**',
     '**/api.posthog.com/**',
     '**/minutesmap.com/ph/**',

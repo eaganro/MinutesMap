@@ -3,7 +3,6 @@ import App from './components/App/App';
 import RootErrorBoundary from './components/App/RootErrorBoundary';
 import { ThemeProvider } from './components/hooks/ui/useTheme';
 import posthog from 'posthog-js';
-import { trackPostHogPageView } from './helpers/analytics';
 import { reportError } from './errors/reportError';
 import './theme.scss';
 
@@ -16,7 +15,6 @@ if (posthogKey) {
   });
   window.posthog = posthog;
   posthog.startSessionRecording(true);
-  trackPostHogPageView();
 }
 
 function RootComponent() {
