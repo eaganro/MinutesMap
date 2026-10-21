@@ -609,6 +609,9 @@ def _seed_playtimes(playtimes, seed_names, seed_ids, seed_clock, seed_period):
     seed_ids = list(seed_ids or [])
     seed_names = list(seed_names or [])
     max_count = max(len(seed_names), len(seed_ids))
+    # The box score's on-court flags can disagree with the play-by-play, so a
+    # seeded segment must never push the team past five players on court.
+    on_count = sum(1 for state in (playtimes or {}).values() if state.get("on") is True)
     for idx in range(max_count):
         seed_name = seed_names[idx] if idx < len(seed_names) else ""
         seed_id = seed_ids[idx] if idx < len(seed_ids) else None
@@ -619,10 +622,11 @@ def _seed_playtimes(playtimes, seed_names, seed_ids, seed_clock, seed_period):
             playtimes[player_key] = {"times": [], "on": False}
         if playtimes[player_key].get("times"):
             continue
-        if seed_clock:
+        if seed_clock and on_count < 5:
             playtimes[player_key]["times"].append(
                 {"start": "PT12M00.00S", "period": 1, "end": seed_clock}
             )
+            on_count += 1
 
 
 def _should_skip_off_court_action(action):
