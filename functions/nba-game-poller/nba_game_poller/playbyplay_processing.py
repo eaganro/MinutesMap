@@ -624,7 +624,7 @@ def _seed_playtimes(playtimes, seed_names, seed_ids, seed_clock, seed_period):
             continue
         if seed_clock and on_count < 5:
             playtimes[player_key]["times"].append(
-                {"start": "PT12M00.00S", "period": 1, "end": seed_clock}
+                {"start": "PT12M00.00S", "period": 1, "end": seed_clock, "guess": True}
             )
             on_count += 1
 
@@ -673,7 +673,12 @@ def update_playtime_for_key(player_key, action, playtimes):
             return playtimes
         playtimes[player_key]["on"] = True
         playtimes[player_key]["times"].append(
-            {"start": "PT12M00.00S", "period": action.get("period"), "end": action.get("clock")}
+            {
+                "start": "PT12M00.00S",
+                "period": action.get("period"),
+                "end": action.get("clock"),
+                "guess": True,
+            }
         )
     else:
         t = playtimes[player_key]["times"]
@@ -875,6 +880,101 @@ def end_playtimes(playtimes, last_action):
             t = playtimes[player]["times"]
             t[-1]["end"] = (last_action or {}).get("clock")
         playtimes[player] = playtimes[player].get("times", [])
+    return playtimes
+
+
+def _segment_bounds(segment):
+    start = time_to_seconds(segment.get("start"))
+    end = time_to_seconds(segment.get("end"))
+    return max(start, end), min(start, end)
+
+
+def _guess_floor(segment, actions):
+    """Lowest clock (in seconds) down to which a guessed segment has no action backing it.
+
+    Seeded and auto-started segments assume the player was on from the period start; only the
+    stretch before their first action in the segment is a guess.
+    """
+    hi, lo = _segment_bounds(segment)
+    clocks = [
+        time_to_seconds(a.get("clock"))
+        for a in actions or []
+        if a.get("period") == segment.get("period")
+    ]
+    inside = [c for c in clocks if lo <= c <= hi]
+    return max(inside) if inside else lo
+
+
+def resolve_overfull_lineups(playtimes, player_actions, team_label=""):
+    """Trim guessed segment time wherever more than five players are on court.
+
+    Takes the finished playtimes ({player: [segments]}). Overfull stretches are only fixed when
+    exactly the excess number of players are on court on a guess with no action behind it;
+    anything more ambiguous is left as is and logged.
+    """
+    clock_by_seconds = {}
+    entries_by_period = {}
+    for player, segments in (playtimes or {}).items():
+        for idx, segment in enumerate(segments or []):
+            hi, lo = _segment_bounds(segment)
+            if hi <= lo:
+                continue
+            clock_by_seconds.setdefault(hi, segment.get("start"))
+            clock_by_seconds.setdefault(lo, segment.get("end"))
+            entries_by_period.setdefault(segment.get("period"), []).append((player, idx, hi, lo))
+
+    removals = {}
+    unresolved = set()
+    for period, entries in entries_by_period.items():
+        bounds = sorted({b for _, _, hi, lo in entries for b in (hi, lo)}, reverse=True)
+        for hi, lo in zip(bounds, bounds[1:]):
+            on = [(player, idx) for player, idx, s_hi, s_lo in entries if s_hi >= hi and s_lo <= lo]
+            excess = len(on) - 5
+            if excess <= 0:
+                continue
+            guessed = [
+                (player, idx)
+                for player, idx in on
+                if playtimes[player][idx].get("guess")
+                and lo >= _guess_floor(playtimes[player][idx], (player_actions or {}).get(player))
+            ]
+            if len(guessed) != excess:
+                unresolved.add(period)
+                continue
+            for key in guessed:
+                removals.setdefault(key, []).append((hi, lo))
+
+    for period in sorted(unresolved, key=lambda p: p or 0):
+        print(f"Lineup check: more than five {team_label} players on court in period {period}; left as is.")
+
+    for player, segments in (playtimes or {}).items():
+        if not any((player, idx) in removals for idx in range(len(segments or []))):
+            continue
+        rebuilt = []
+        for idx, segment in enumerate(segments):
+            cuts = removals.get((player, idx))
+            if not cuts:
+                rebuilt.append(segment)
+                continue
+            hi, lo = _segment_bounds(segment)
+            pieces = []
+            cursor = hi
+            for cut_hi, cut_lo in sorted(cuts, reverse=True):
+                if cut_hi < cursor:
+                    pieces.append((cursor, cut_hi))
+                cursor = min(cursor, cut_lo)
+            if cursor > lo:
+                pieces.append((cursor, lo))
+            for piece_hi, piece_lo in pieces:
+                rebuilt.append(
+                    {
+                        **segment,
+                        "start": clock_by_seconds.get(piece_hi, segment.get("start")),
+                        "end": clock_by_seconds.get(piece_lo, segment.get("end")),
+                    }
+                )
+            print(f"Lineup check: trimmed guessed {team_label} segment for {player} in period {segment.get('period')}.")
+        playtimes[player] = rebuilt
     return playtimes
 
 
@@ -1228,6 +1328,8 @@ def process_playbyplay_payload(
 
     away_playtimes = end_playtimes(away_playtimes, last_action)
     home_playtimes = end_playtimes(home_playtimes, last_action)
+    away_playtimes = resolve_overfull_lineups(away_playtimes, away_players, "away")
+    home_playtimes = resolve_overfull_lineups(home_playtimes, home_players, "home")
 
     away_output_labels = _build_output_player_labels(away_players, away_labels)
     home_output_labels = _build_output_player_labels(home_players, home_labels)
