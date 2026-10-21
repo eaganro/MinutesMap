@@ -154,6 +154,43 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(away_segments[0]["start"], "1200.00")
         self.assertEqual(away_segments[0]["end"], "1134.00")
 
+    def test_seed_players_never_exceed_five_on_court(self):
+        names = ["One", "Two", "Three", "Four", "Five"]
+        actions = [
+            {
+                "actionNumber": idx + 1,
+                "clock": f"PT11M{50 - idx * 5:02d}.00S",
+                "period": 1,
+                "teamId": int(self.home_team_id),
+                "teamTricode": "SAS",
+                "personId": 3000 + idx,
+                "playerName": name,
+                "playerNameI": f"P. {name}",
+                "description": f"P. {name} 2PT Jump Shot",
+                "actionType": "2pt",
+                "subType": "Jump Shot",
+                "scoreHome": str(2 * (idx + 1)),
+                "scoreAway": "0",
+            }
+            for idx, name in enumerate(names)
+        ]
+
+        processed = process_playbyplay_payload(
+            game_id="seed-sixth",
+            actions=actions,
+            away_team_id=self.away_team_id,
+            home_team_id=self.home_team_id,
+            seed_home=[f"P. {name}" for name in names] + ["D. Extra"],
+            seed_away=[],
+            seed_clock="PT11M20.00S",
+            seed_period=1,
+        )
+
+        home_segments = processed["segments"]["home"]
+        self.assertEqual(home_segments.get("D. Extra", []), [])
+        on_court = [name for name, segments in home_segments.items() if segments]
+        self.assertEqual(len(on_court), 5)
+
     def test_seed_players_without_clock_have_no_segments(self):
         processed = process_playbyplay_payload(
             game_id="seed-no-clock",
