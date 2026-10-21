@@ -1,7 +1,11 @@
 import json
 import os
 import unittest
-from nba_game_poller.playbyplay_processing import process_playbyplay_payload, time_to_seconds
+from nba_game_poller.playbyplay_processing import (
+    process_playbyplay_payload,
+    resolve_overfull_lineups,
+    time_to_seconds,
+)
 
 class TestPlayByPlayProcessing(unittest.TestCase):
     @classmethod
@@ -190,6 +194,52 @@ class TestPlayByPlayProcessing(unittest.TestCase):
         self.assertEqual(home_segments.get("D. Extra", []), [])
         on_court = [name for name, segments in home_segments.items() if segments]
         self.assertEqual(len(on_court), 5)
+
+    @staticmethod
+    def _full_quarter_five():
+        return {
+            name: [{"start": "PT12M00.00S", "end": "PT00M00.00S", "period": 1}]
+            for name in ("One", "Two", "Three", "Four", "Five")
+        }
+
+    def test_overfull_lineup_drops_unbacked_guess(self):
+        playtimes = self._full_quarter_five()
+        playtimes["Extra"] = [
+            {"start": "PT12M00.00S", "end": "PT03M00.00S", "period": 1, "guess": True}
+        ]
+
+        resolved = resolve_overfull_lineups(playtimes, {"Extra": []}, "home")
+
+        self.assertEqual(resolved["Extra"], [])
+        self.assertEqual(len(resolved["One"]), 1)
+
+    def test_overfull_lineup_trims_guess_to_first_action(self):
+        playtimes = self._full_quarter_five()
+        playtimes["Five"] = [{"start": "PT12M00.00S", "end": "PT06M00.00S", "period": 1}]
+        playtimes["Late"] = [
+            {"start": "PT12M00.00S", "end": "PT00M00.00S", "period": 1, "guess": True}
+        ]
+        actions = {"Late": [{"clock": "PT06M00.00S", "period": 1}]}
+
+        resolved = resolve_overfull_lineups(playtimes, actions, "home")
+
+        self.assertEqual(
+            [(seg["start"], seg["end"]) for seg in resolved["Late"]],
+            [("PT06M00.00S", "PT00M00.00S")],
+        )
+
+    def test_overfull_lineup_leaves_ambiguous_guesses(self):
+        playtimes = self._full_quarter_five()
+        del playtimes["Five"]
+        for name in ("GuessA", "GuessB"):
+            playtimes[name] = [
+                {"start": "PT12M00.00S", "end": "PT00M00.00S", "period": 1, "guess": True}
+            ]
+
+        resolved = resolve_overfull_lineups(playtimes, {}, "home")
+
+        self.assertEqual(len(resolved["GuessA"]), 1)
+        self.assertEqual(len(resolved["GuessB"]), 1)
 
     def test_seed_players_without_clock_have_no_segments(self):
         processed = process_playbyplay_payload(
