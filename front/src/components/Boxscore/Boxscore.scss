@@ -71,6 +71,10 @@
     padding: 0;
   }
 
+  .playerNameCol .statHeadingButton {
+    justify-content: flex-start;
+  }
+
   .statHeadingButton.isActive {
     color: var(--text-primary);
   }
@@ -154,6 +158,10 @@
     display: flex;
     align-items: flex-end;
     color: var(--text-primary);
+
+    > span {
+      padding: 0 8px 4px;
+    }
   }
 
   .tableWrapper {
@@ -234,6 +242,18 @@
     .rowGrid .playerNameCol {
       font-size: 0.72rem;
       padding: 4px 5px;
+    }
+
+    .rowGrid .playerNameCol.statHeadingCell {
+      padding: 0;
+    }
+
+    .playerNameCol .statHeadingButton {
+      padding: 6px 5px;
+    }
+
+    .team > span {
+      padding: 0 5px 4px;
     }
   }
 }
