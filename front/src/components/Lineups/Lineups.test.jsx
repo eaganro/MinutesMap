@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Lineups from './Lineups';
 
 vi.mock('../hooks/ui/useTheme', () => ({
@@ -111,5 +111,58 @@ describe('Lineups', () => {
     expect(playerButtons[0]).toHaveAttribute('aria-pressed', 'true');
     expect(playerButtons[1]).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(2);
+  });
+
+  describe('stacked layout', () => {
+    beforeEach(() => {
+      localStorage.clear();
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn().mockReturnValue({
+          matches: true,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }),
+      );
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('starts collapsed and remembers when it is opened', () => {
+      renderLineups();
+
+      const disclosure = screen.getByRole('button', { name: /Lineups/ });
+      expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+      expect(disclosure).toHaveTextContent('6 AWY · 6 HME');
+      expect(screen.queryByText('6 lineups')).not.toBeInTheDocument();
+
+      fireEvent.click(disclosure);
+
+      expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+      expect(localStorage.getItem('lineupsOpen')).toBe('true');
+    });
+
+    it('shows one team at a time with filters behind a toggle', () => {
+      localStorage.setItem('lineupsOpen', 'true');
+      renderLineups();
+
+      expect(screen.getAllByRole('button', { name: 'Away Player 1A' })).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: 'Home Player 1A' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Highlight' })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Filter players' }));
+      expect(screen.getByRole('button', { name: 'Highlight' })).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Away Player 1A' })).toHaveLength(2);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Home Team' }));
+      expect(screen.getByRole('button', { name: 'Home Team' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.queryByRole('button', { name: 'Away Player 1A' })).not.toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Home Player 1A' }).length).toBeGreaterThan(0);
+    });
   });
 });
