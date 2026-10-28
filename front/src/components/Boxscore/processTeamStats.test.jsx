@@ -30,18 +30,7 @@ function BoxscoreTableHarness() {
     }));
   };
 
-  return processTeamStats(
-    TEAM,
-    false,
-    true,
-    () => {},
-    tableRef,
-    () => {},
-    false,
-    '#123456',
-    sortConfig,
-    handleSort,
-  );
+  return processTeamStats(TEAM, true, tableRef, () => {}, false, '#123456', sortConfig, handleSort);
 }
 
 describe('processTeamStats accessibility', () => {

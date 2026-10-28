@@ -1,4 +1,5 @@
 import CircularProgress from '@mui/material/CircularProgress';
+import { UnfoldMore, UnfoldLess } from '@mui/icons-material';
 import './Boxscore.scss';
 import processTeamStats from './processTeamStats';
 import { useState, useEffect, useRef } from 'react';
@@ -12,6 +13,7 @@ import { isBooleanPreference } from '../hooks/state/storage';
 import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../constants/loadingUiTimings';
 
 const INITIAL_SORT_CONFIG = { key: 'min', direction: 'desc' };
+const COLLAPSED_PLAYER_COUNT = 5;
 const BOXSCORE_EXPANDED_STORAGE_KEY = 'boxscoreExpanded';
 const BOXSCORE_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
 
@@ -131,9 +133,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
 
   const awayBox = processTeamStats(
     displayBox?.teams?.away,
-    false,
     showMore,
-    setShowMore,
     awayTableRef,
     () => syncScroll(awayTableRef, homeTableRef),
     isCompact,
@@ -143,9 +143,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   );
   const homeBox = processTeamStats(
     displayBox?.teams?.home,
-    true,
     showMore,
-    setShowMore,
     homeTableRef,
     () => syncScroll(homeTableRef, awayTableRef),
     isCompact,
@@ -155,6 +153,9 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   );
 
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
+  const hasHiddenPlayers = ['away', 'home'].some(
+    (side) => (displayBox?.teams?.[side]?.players?.length || 0) > COLLAPSED_PLAYER_COUNT,
+  );
 
   return (
     <div
@@ -187,6 +188,17 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
         <div className="boxContent">
           {awayBox}
           {homeBox}
+          {hasHiddenPlayers && (
+            <button
+              type="button"
+              className="showMoreButton"
+              onClick={() => setShowMore(!showMore)}
+              aria-expanded={showMore}
+            >
+              {showMore ? <UnfoldLess fontSize="small" /> : <UnfoldMore fontSize="small" />}
+              {showMore ? 'Show fewer players' : 'Show all players'}
+            </button>
+          )}
         </div>
       )}
     </div>

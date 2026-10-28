@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   DEFAULT_VISIBLE_COUNT,
   MAX_SELECTED_PLAYERS,
@@ -25,7 +26,10 @@ export default function LineupsTeamPanel({
   onSortChange,
   topSectionRef,
   topSectionMinHeight,
+  isCompact = false,
 }) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const showFilters = !isCompact || filtersOpen;
   const visible = isExpanded ? lineups : lineups.slice(0, DEFAULT_VISIBLE_COUNT);
   const hasMore = lineups.length > DEFAULT_VISIBLE_COUNT;
   const selectionLimitReached = selectedPlayers.length >= MAX_SELECTED_PLAYERS;
@@ -51,72 +55,92 @@ export default function LineupsTeamPanel({
       : null;
 
   return (
-    <div className="lineupsTeamPanel">
+    <div className={`lineupsTeamPanel${isCompact ? ' isCompact' : ''}`}>
       <div
         className="lineupsPanelTop"
         ref={topSectionRef}
         style={topSectionMinHeight ? { minHeight: `${topSectionMinHeight}px` } : undefined}
       >
         <div className="lineupsTeamHeader">
-          <span className="lineupsTeamName" style={teamColor ? { color: teamColor } : undefined}>
-            {teamLabel}
-          </span>
+          {!isCompact && (
+            <span className="lineupsTeamName" style={teamColor ? { color: teamColor } : undefined}>
+              {teamLabel}
+            </span>
+          )}
           {lineups.length > 0 && <span className="lineupsCount">{lineups.length} lineups</span>}
-        </div>
-        <div className="lineupsFilters">
-          <span className="lineupsFilterLabel">Filter players (max {MAX_SELECTED_PLAYERS})</span>
-          <div
-            className="lineupsFilterMode"
-            role="group"
-            aria-label={`${teamLabel} selection mode`}
-          >
+          {isCompact && (
             <button
               type="button"
-              className={`lineupsFilterModeButton${selectionMode === 'filter' ? ' isActive' : ''}`}
-              onClick={() => onSelectionModeChange('filter')}
+              className={`lineupsFilterToggle${filtersOpen ? ' isOpen' : ''}`}
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              aria-expanded={filtersOpen}
             >
-              Filter
+              {selectedPlayers.length
+                ? `Filter players (${selectedPlayers.length})`
+                : 'Filter players'}
             </button>
+          )}
+        </div>
+        {showFilters && (
+          <div className="lineupsFilters">
+            <span className="lineupsFilterLabel">
+              {isCompact
+                ? `Pick up to ${MAX_SELECTED_PLAYERS}`
+                : `Filter players (max ${MAX_SELECTED_PLAYERS})`}
+            </span>
+            <div
+              className="lineupsFilterMode"
+              role="group"
+              aria-label={`${teamLabel} selection mode`}
+            >
+              <button
+                type="button"
+                className={`lineupsFilterModeButton${selectionMode === 'filter' ? ' isActive' : ''}`}
+                onClick={() => onSelectionModeChange('filter')}
+              >
+                Filter
+              </button>
+              <button
+                type="button"
+                className={`lineupsFilterModeButton${selectionMode === 'highlight' ? ' isActive' : ''}`}
+                onClick={() => onSelectionModeChange('highlight')}
+              >
+                Highlight
+              </button>
+            </div>
+            <div
+              className="lineupsFilterPills"
+              role="group"
+              aria-label={`${teamLabel} player filters`}
+            >
+              {playerOptions.map((player) => {
+                const isSelected = selectedPlayersSet.has(player);
+                const isDisabled = !isSelected && selectionLimitReached;
+                return (
+                  <button
+                    key={`${teamLabel}-${player}`}
+                    type="button"
+                    className={`lineupsFilterPill${isSelected ? ' isSelected' : ''}${isDisabled ? ' isDisabled' : ''}`}
+                    onClick={() => togglePlayerSelection(player)}
+                    aria-pressed={isSelected}
+                    disabled={isDisabled}
+                    title={player}
+                  >
+                    {player}
+                  </button>
+                );
+              })}
+            </div>
             <button
               type="button"
-              className={`lineupsFilterModeButton${selectionMode === 'highlight' ? ' isActive' : ''}`}
-              onClick={() => onSelectionModeChange('highlight')}
+              className="lineupsFilterClear"
+              onClick={() => onSelectionChange([])}
+              disabled={selectedPlayers.length === 0}
             >
-              Highlight
+              Clear
             </button>
           </div>
-          <div
-            className="lineupsFilterPills"
-            role="group"
-            aria-label={`${teamLabel} player filters`}
-          >
-            {playerOptions.map((player) => {
-              const isSelected = selectedPlayersSet.has(player);
-              const isDisabled = !isSelected && selectionLimitReached;
-              return (
-                <button
-                  key={`${teamLabel}-${player}`}
-                  type="button"
-                  className={`lineupsFilterPill${isSelected ? ' isSelected' : ''}${isDisabled ? ' isDisabled' : ''}`}
-                  onClick={() => togglePlayerSelection(player)}
-                  aria-pressed={isSelected}
-                  disabled={isDisabled}
-                  title={player}
-                >
-                  {player}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            className="lineupsFilterClear"
-            onClick={() => onSelectionChange([])}
-            disabled={selectedPlayers.length === 0}
-          >
-            Clear
-          </button>
-        </div>
+        )}
       </div>
       {lineups.length === 0 ? (
         <div className="lineupsEmpty">
