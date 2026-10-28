@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
+import { ExpandMore } from '@mui/icons-material';
 import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
+import { useMediaQuery } from '../hooks/ui/useMediaQuery';
+import { useLocalStorageState } from '../hooks/state/useLocalStorageState';
+import { isBooleanPreference } from '../hooks/state/storage';
 import LineupsTeamPanel from './LineupsTeamPanel';
 import {
   buildLastNameCounts,
@@ -14,6 +18,10 @@ import {
 import './Lineups.scss';
 
 const INITIAL_SORT_CONFIG = { key: 'minutes', direction: 'desc' };
+// Matches the breakpoint where the two team panels stack in Lineups.scss.
+const STACKED_LAYOUT_QUERY = '(max-width: 920px)';
+const LINEUPS_OPEN_STORAGE_KEY = 'lineupsOpen';
+const LINEUPS_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
 
 export default function Lineups({
   gameId,
@@ -31,6 +39,13 @@ export default function Lineups({
   const [awaySelectionMode, setAwaySelectionMode] = useState('filter');
   const [homeSelectionMode, setHomeSelectionMode] = useState('filter');
   const [topSectionMinHeight, setTopSectionMinHeight] = useState(0);
+  const [activeTeam, setActiveTeam] = useState('away');
+  const [isOpen, setIsOpen] = useLocalStorageState(
+    LINEUPS_OPEN_STORAGE_KEY,
+    false,
+    LINEUPS_PREFERENCE_OPTIONS,
+  );
+  const isStacked = useMediaQuery(STACKED_LAYOUT_QUERY);
   const awayTopRef = useRef(null);
   const homeTopRef = useRef(null);
   const { isDarkMode } = useTheme();
@@ -45,6 +60,7 @@ export default function Lineups({
     setAwaySelectionMode('filter');
     setHomeSelectionMode('filter');
     setTopSectionMinHeight(0);
+    setActiveTeam('away');
   }, [gameId]);
 
   const awayOptions = useMemo(() => buildPlayerOptions(awayLineups), [awayLineups]);
@@ -135,7 +151,96 @@ export default function Lineups({
         window.removeEventListener('resize', syncTopHeights);
       }
     };
-  }, [showLoadingIndicator, showStatusMessage]);
+  }, [showLoadingIndicator, showStatusMessage, isStacked]);
+
+  const awayLabel = awayTeam?.name || awayTeam?.abr || 'Away';
+  const homeLabel = homeTeam?.name || homeTeam?.abr || 'Home';
+  const awayPanel = (
+    <LineupsTeamPanel
+      teamLabel={awayLabel}
+      lineups={awaySorted}
+      isExpanded={showAll}
+      onToggle={() => setShowAll((prev) => !prev)}
+      lastNameCounts={awayLastNameCounts}
+      teamColor={matchupColors?.away}
+      selectedPlayers={selectedAwayPlayers}
+      onSelectionChange={setSelectedAwayPlayers}
+      selectionMode={awaySelectionMode}
+      onSelectionModeChange={setAwaySelectionMode}
+      playerOptions={awayOptions}
+      playerDisplayNames={awayPlayerDisplayNames}
+      sortConfig={sortConfig}
+      onSortChange={setSortConfig}
+      topSectionRef={awayTopRef}
+      topSectionMinHeight={topSectionMinHeight}
+      isCompact={isStacked}
+    />
+  );
+  const homePanel = (
+    <LineupsTeamPanel
+      teamLabel={homeLabel}
+      lineups={homeSorted}
+      isExpanded={showAll}
+      onToggle={() => setShowAll((prev) => !prev)}
+      lastNameCounts={homeLastNameCounts}
+      teamColor={matchupColors?.home}
+      selectedPlayers={selectedHomePlayers}
+      onSelectionChange={setSelectedHomePlayers}
+      selectionMode={homeSelectionMode}
+      onSelectionModeChange={setHomeSelectionMode}
+      playerOptions={homeOptions}
+      playerDisplayNames={homePlayerDisplayNames}
+      sortConfig={sortConfig}
+      onSortChange={setSortConfig}
+      topSectionRef={homeTopRef}
+      topSectionMinHeight={topSectionMinHeight}
+      isCompact={isStacked}
+    />
+  );
+
+  const content = showLoadingIndicator ? (
+    <div className="lineupsLoading" role="status">
+      <CircularProgress size={22} thickness={5} />
+      <span>Loading lineups...</span>
+    </div>
+  ) : showStatusMessage ? (
+    <div className="lineupsStatus" role="status">
+      {statusMessage}
+    </div>
+  ) : isStacked ? (
+    <>
+      <div className="lineupsTeamTabs" role="group" aria-label="Lineups team">
+        {[
+          { key: 'away', label: awayLabel, color: matchupColors?.away },
+          { key: 'home', label: homeLabel, color: matchupColors?.home },
+        ].map((team) => (
+          <button
+            key={team.key}
+            type="button"
+            className={`lineupsTeamTab${activeTeam === team.key ? ' isActive' : ''}`}
+            onClick={() => setActiveTeam(team.key)}
+            aria-pressed={activeTeam === team.key}
+            style={activeTeam === team.key && team.color ? { color: team.color } : undefined}
+          >
+            {team.label}
+          </button>
+        ))}
+      </div>
+      {activeTeam === 'away' ? awayPanel : homePanel}
+    </>
+  ) : (
+    <div className="lineupsGrid">
+      {awayPanel}
+      {homePanel}
+    </div>
+  );
+
+  const awayCount = awayLineups?.length || 0;
+  const homeCount = homeLineups?.length || 0;
+  const disclosureMeta =
+    awayCount || homeCount
+      ? `${awayCount} ${awayTeam?.abr || 'away'} · ${homeCount} ${homeTeam?.abr || 'home'}`
+      : null;
 
   return (
     <div
@@ -144,56 +249,24 @@ export default function Lineups({
       aria-label="Lineups"
       aria-busy={isLoading}
       onClick={trackLineupsFeatureUse}
-      onTouchStart={trackLineupsFeatureUse}
+      onTouchStart={isStacked && !isOpen ? undefined : trackLineupsFeatureUse}
     >
-      {showLoadingIndicator ? (
-        <div className="lineupsLoading" role="status">
-          <CircularProgress size={22} thickness={5} />
-          <span>Loading lineups...</span>
-        </div>
-      ) : showStatusMessage ? (
-        <div className="lineupsStatus" role="status">
-          {statusMessage}
-        </div>
+      {isStacked ? (
+        <>
+          <button
+            type="button"
+            className={`lineupsDisclosure${isOpen ? ' isOpen' : ''}`}
+            onClick={() => setIsOpen((prev) => !prev)}
+            aria-expanded={isOpen}
+          >
+            <span className="lineupsDisclosureTitle">Lineups</span>
+            {disclosureMeta && <span className="lineupsDisclosureMeta">{disclosureMeta}</span>}
+            <ExpandMore className="lineupsDisclosureIcon" aria-hidden="true" />
+          </button>
+          {isOpen && content}
+        </>
       ) : (
-        <div className="lineupsGrid">
-          <LineupsTeamPanel
-            teamLabel={awayTeam?.name || awayTeam?.abr || 'Away'}
-            lineups={awaySorted}
-            isExpanded={showAll}
-            onToggle={() => setShowAll((prev) => !prev)}
-            lastNameCounts={awayLastNameCounts}
-            teamColor={matchupColors?.away}
-            selectedPlayers={selectedAwayPlayers}
-            onSelectionChange={setSelectedAwayPlayers}
-            selectionMode={awaySelectionMode}
-            onSelectionModeChange={setAwaySelectionMode}
-            playerOptions={awayOptions}
-            playerDisplayNames={awayPlayerDisplayNames}
-            sortConfig={sortConfig}
-            onSortChange={setSortConfig}
-            topSectionRef={awayTopRef}
-            topSectionMinHeight={topSectionMinHeight}
-          />
-          <LineupsTeamPanel
-            teamLabel={homeTeam?.name || homeTeam?.abr || 'Home'}
-            lineups={homeSorted}
-            isExpanded={showAll}
-            onToggle={() => setShowAll((prev) => !prev)}
-            lastNameCounts={homeLastNameCounts}
-            teamColor={matchupColors?.home}
-            selectedPlayers={selectedHomePlayers}
-            onSelectionChange={setSelectedHomePlayers}
-            selectionMode={homeSelectionMode}
-            onSelectionModeChange={setHomeSelectionMode}
-            playerOptions={homeOptions}
-            playerDisplayNames={homePlayerDisplayNames}
-            sortConfig={sortConfig}
-            onSortChange={setSortConfig}
-            topSectionRef={homeTopRef}
-            topSectionMinHeight={topSectionMinHeight}
-          />
-        </div>
+        content
       )}
     </div>
   );

@@ -301,6 +301,13 @@ export default function StatButtons({
       <div className="separator" aria-hidden="true" />
       {scoreDiffButton}
       {oddsButton}
+      <div className="statButtonsHint" aria-hidden="true">
+        <span className="statButtonsHintTitle">Show on chart</span>
+        <span className="statButtonsHintDetail">
+          <span className="hintTap">tap</span>
+          <span className="hintClick">click</span> to toggle · hold to isolate
+        </span>
+      </div>
     </div>
   );
 }

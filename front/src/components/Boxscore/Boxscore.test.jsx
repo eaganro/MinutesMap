@@ -7,12 +7,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./processTeamStats', () => ({
-  default: vi.fn((team, isHome, showMore, setShowMore, tableWrapperRef, onScroll) => (
+  default: vi.fn((team, showMore, tableWrapperRef, onScroll) => (
     <div>
-      <button type="button" onClick={() => setShowMore(!showMore)}>
-        {showMore ? 'Show fewer stats' : 'Show more stats'}
-      </button>
-      <div data-testid={isHome ? 'home-box' : 'away-box'} ref={tableWrapperRef} onScroll={onScroll}>
+      <div
+        data-testid={team?.abbr === 'GSW' ? 'home-box' : 'away-box'}
+        ref={tableWrapperRef}
+        onScroll={onScroll}
+      >
         {team?.abbr || 'N/A'}
       </div>
     </div>
@@ -27,10 +28,12 @@ vi.mock('../hooks/analytics/useTrackFeatureUseOnce', () => ({
   useTrackFeatureUseOnce: () => mocks.trackBoxscoreFeatureUseMock,
 }));
 
-const buildBox = () => ({
+const buildPlayers = (count) => Array.from({ length: count }, (_, index) => ({ id: index }));
+
+const buildBox = (playerCount = 8) => ({
   teams: {
-    away: { abbr: 'PHI' },
-    home: { abbr: 'GSW' },
+    away: { abbr: 'PHI', players: buildPlayers(playerCount) },
+    home: { abbr: 'GSW', players: buildPlayers(playerCount) },
   },
 });
 
@@ -86,8 +89,11 @@ describe('Boxscore', () => {
       <Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />,
     );
 
-    fireEvent.click(screen.getAllByText('Show more stats')[0]);
-    expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Show all players' }));
+    expect(screen.getByRole('button', { name: 'Show fewer players' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     expect(localStorage.getItem('boxscoreExpanded')).toBe('true');
 
     const awayBox = screen.getByTestId('away-box');
@@ -97,8 +103,8 @@ describe('Boxscore', () => {
 
     rerender(<Boxscore gameId="game-2" box={buildBox()} isLoading={false} statusMessage={null} />);
 
-    expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
-    expect(screen.queryByText('Show more stats')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show fewer players' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show all players' })).not.toBeInTheDocument();
     expect(screen.getByTestId('away-box').scrollLeft).toBe(0);
     expect(screen.getByTestId('home-box').scrollLeft).toBe(0);
   });
@@ -108,8 +114,14 @@ describe('Boxscore', () => {
 
     render(<Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />);
 
-    expect(screen.getAllByText('Show fewer stats')).toHaveLength(2);
-    expect(screen.queryByText('Show more stats')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show fewer players' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show all players' })).not.toBeInTheDocument();
+  });
+
+  it('hides the expand button when no players are hidden', () => {
+    render(<Boxscore gameId="game-1" box={buildBox(5)} isLoading={false} statusMessage={null} />);
+
+    expect(screen.queryByRole('button', { name: 'Show all players' })).not.toBeInTheDocument();
   });
 
   it('tracks boxscore feature use from click, touch, and wheel interactions', () => {
