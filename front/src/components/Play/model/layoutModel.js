@@ -42,6 +42,38 @@ export function getScoreScale(scoreTimeline) {
   };
 }
 
+const MOBILE_TOOLTIP_EDGE_GAP = 10;
+const MOBILE_TOOLTIP_FINGER_GAP = 24;
+const MOBILE_TOOLTIP_VIEWPORT_PADDING = 8;
+
+// Place the mobile tooltip at the far edge of the on-screen part of the chart, on
+// the opposite side from the finger. If that would cover the finger (only a sliver
+// of chart is on screen), move it past the finger, flipping sides if needed, while
+// keeping it inside the viewport.
+function placeMobileTooltip({ fingerY, height, regionTop, regionBottom, viewportHeight }) {
+  const viewTop = MOBILE_TOOLTIP_VIEWPORT_PADDING;
+  const viewBottom = viewportHeight - MOBILE_TOOLTIP_VIEWPORT_PADDING;
+  const belowTop = Math.max(
+    regionBottom - height - MOBILE_TOOLTIP_EDGE_GAP,
+    fingerY + MOBILE_TOOLTIP_FINGER_GAP,
+  );
+  const aboveTop = Math.min(
+    regionTop + MOBILE_TOOLTIP_EDGE_GAP,
+    fingerY - MOBILE_TOOLTIP_FINGER_GAP - height,
+  );
+  const fitsBelow = belowTop + height <= viewBottom;
+  const fitsAbove = aboveTop >= viewTop;
+
+  let positionBelow = fingerY < (regionTop + regionBottom) / 2;
+  if (positionBelow && !fitsBelow && fitsAbove) positionBelow = false;
+  else if (!positionBelow && !fitsAbove && fitsBelow) positionBelow = true;
+
+  return {
+    positionBelow,
+    top: clamp(positionBelow ? belowTop : aboveTop, viewTop, viewBottom - height),
+  };
+}
+
 export function computeTooltipLayout({
   mousePosition,
   dimensions,
@@ -55,11 +87,24 @@ export function computeTooltipLayout({
   const isMobileLayout = (containerRect?.width || viewportWidth) <= MOBILE_TOOLTIP_BREAKPOINT;
   const chartTop = chartRect?.top ?? containerRect?.top ?? 0;
   const chartBottom = chartRect?.bottom ?? containerRect?.bottom ?? viewportHeight;
-  const chartCenterY = (chartTop + chartBottom) / 2;
+  // On phones the chart is usually taller than the screen, so work from the
+  // on-screen part of the chart rather than its (often off-screen) edges.
+  const visibleTop = Math.max(chartTop, 0);
+  const visibleBottom = Math.min(chartBottom, viewportHeight);
+  const hasVisibleChart = visibleBottom > visibleTop;
+  const mobilePlacement = isMobileLayout
+    ? placeMobileTooltip({
+        fingerY: mousePosition.y,
+        height: dimensions.height,
+        regionTop: hasVisibleChart ? visibleTop : chartTop,
+        regionBottom: hasVisibleChart ? visibleBottom : chartBottom,
+        viewportHeight,
+      })
+    : null;
 
   const shouldPositionLeft = !isMobileLayout && mousePosition.x > viewportWidth / 2;
-  const shouldPositionBelow = isMobileLayout
-    ? mousePosition.y < chartCenterY
+  const shouldPositionBelow = mobilePlacement
+    ? mobilePlacement.positionBelow
     : mousePosition.y < viewportHeight / 2;
 
   let preferredLeft = shouldPositionLeft
@@ -71,7 +116,7 @@ export function computeTooltipLayout({
 
   if (isMobileLayout) {
     preferredLeft = (viewportWidth - dimensions.width) / 2;
-    preferredTop = shouldPositionBelow ? chartBottom - dimensions.height - 10 : chartTop + 10;
+    preferredTop = mobilePlacement.top;
   }
 
   let finalLeft = preferredLeft;
@@ -82,11 +127,8 @@ export function computeTooltipLayout({
       const hoverPadding = 8;
       const minLeft = hoverPadding;
       const maxLeft = viewportWidth - dimensions.width - hoverPadding;
-      const minTop = chartTop + hoverPadding;
-      const maxTop = chartBottom - dimensions.height - hoverPadding;
 
       finalLeft = clamp(preferredLeft, minLeft, maxLeft);
-      finalTop = clamp(preferredTop, minTop, maxTop);
     } else {
       const hoverPadding = 5;
       const minLeft = containerRect.left + leftMargin - hoverPadding;

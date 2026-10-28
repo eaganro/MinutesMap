@@ -102,7 +102,7 @@ export default function PlayTooltip({
     containerRect,
     chartRect,
     viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
+    viewportHeight: window.visualViewport?.height ?? window.innerHeight,
     leftMargin,
     infoLocked,
   });
