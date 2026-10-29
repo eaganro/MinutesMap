@@ -7,10 +7,15 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./processTeamStats', () => ({
-  default: vi.fn((team, showMore, tableWrapperRef, onScroll) => (
+  default: vi.fn((team, showButton, showMore, setShowMore, tableWrapperRef, onScroll) => (
     <div>
+      {showButton && (
+        <button type="button" onClick={() => setShowMore(!showMore)}>
+          {showMore ? 'Show fewer stats' : 'Show more stats'}
+        </button>
+      )}
       <div
-        data-testid={team?.abbr === 'GSW' ? 'home-box' : 'away-box'}
+        data-testid={showButton ? 'home-box' : 'away-box'}
         ref={tableWrapperRef}
         onScroll={onScroll}
       >
@@ -116,6 +121,43 @@ describe('Boxscore', () => {
 
     expect(screen.getByRole('button', { name: 'Show fewer players' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show all players' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the in-between and bottom buttons in sync', () => {
+    render(<Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show more stats' }));
+    expect(screen.getByRole('button', { name: 'Show fewer players' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show fewer players' }));
+    expect(screen.getByRole('button', { name: 'Show more stats' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show all players' })).toBeInTheDocument();
+  });
+
+  it('keeps the bottom button in place when collapsing from it', () => {
+    localStorage.setItem('boxscoreExpanded', 'true');
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    render(<Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />);
+
+    const bottomButton = screen.getByRole('button', { name: 'Show fewer players' });
+    vi.spyOn(bottomButton, 'getBoundingClientRect')
+      .mockReturnValueOnce({ top: 900 })
+      .mockReturnValueOnce({ top: 600 });
+    fireEvent.click(bottomButton);
+
+    expect(scrollBy).toHaveBeenCalledWith(0, -300);
+    scrollBy.mockRestore();
+  });
+
+  it('does not adjust scroll when collapsing from the in-between button', () => {
+    localStorage.setItem('boxscoreExpanded', 'true');
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    render(<Boxscore gameId="game-1" box={buildBox()} isLoading={false} statusMessage={null} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show fewer stats' }));
+
+    expect(scrollBy).not.toHaveBeenCalled();
+    scrollBy.mockRestore();
   });
 
   it('hides the expand button when no players are hidden', () => {
