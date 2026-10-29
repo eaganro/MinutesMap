@@ -1,4 +1,5 @@
 .lineups {
+  position: relative; // anchors the first-visit tips
   display: flex;
   flex-direction: column;
   gap: 12px;

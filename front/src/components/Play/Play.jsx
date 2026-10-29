@@ -5,13 +5,16 @@ import CircularProgress from '@mui/material/CircularProgress';
 import OddsGraph from './OddsGraph';
 import PlayExportControls from './PlayExport/PlayExportControls';
 import { usePlayPointerHandlers } from './hooks/usePlayPointerHandlers';
+import { usePlayTips } from './hooks/usePlayTips';
 import { usePlayViewModel } from './hooks/usePlayViewModel';
 import Player from './Player/Player';
 import ScoreGraph from './ScoreGraph';
 import PlayTooltip from './PlayTooltip';
+import PlayTips from './PlayTips';
 import TimelineGrid from './TimelineGrid';
 import { MOBILE_TOOLTIP_BREAKPOINT } from './model/layoutModel';
 import { usePlayInteraction } from './usePlayInteraction';
+import { useMediaQuery } from '../hooks/ui/useMediaQuery';
 import './Play.scss';
 
 const PLAYER_DETAIL_HISTORY_KEY = 'minutesMapPlayerDetail';
@@ -242,6 +245,25 @@ export default function Play({
   }, [isShowingMobilePlayerDetail, onPlayerDetailModeChange]);
 
   useEffect(() => () => onPlayerDetailModeChange?.(false), [onPlayerDetailModeChange]);
+
+  const isFinePointer = useMediaQuery('(hover: hover) and (pointer: fine)');
+  const awayPlayerCount = Object.keys(filteredAwayPlayers).length;
+  const homePlayerCount = Object.keys(filteredHomePlayers).length;
+  const playTips = usePlayTips({
+    playRef,
+    enabled:
+      hasDisplayData &&
+      !isDataLoading &&
+      !showLoadingIndicator &&
+      !showStatusMessage &&
+      !isShowingMobilePlayerDetail &&
+      awayPlayerCount + homePlayerCount > 0,
+    canSelectPlayers: isMobilePlayerSheetEnabled,
+    canHover: isFinePointer,
+    hasOpenTooltip: descriptionArray.length > 0,
+    isPlayerDetailOpen: isShowingMobilePlayerDetail,
+    statsSignature: `${(statOn || []).map(Boolean).join(',')}|${showScoreDiff}|${showOdds}`,
+  });
 
   useEffect(() => {
     if (!isMobilePlayerSheetEnabled && selectedPlayer) {
@@ -492,6 +514,20 @@ export default function Play({
             homeTeamNames={displayHomeTeamNames}
             teamColors={teamColors}
             leftMargin={leftMargin}
+          />
+        )}
+
+        {playTips.activeTip && !isShowingMobilePlayerDetail && (
+          <PlayTips
+            activeTip={playTips.activeTip}
+            playRef={playRef}
+            leftMargin={leftMargin}
+            timelineWidth={width}
+            layoutKey={`${sectionWidth}|${activePeriod}|${awayPlayerCount}|${homePlayerCount}`}
+            isFinePointer={isFinePointer}
+            onCalloutHover={handleMouseLeave}
+            onDismiss={playTips.dismissTip}
+            onSkip={playTips.skipTips}
           />
         )}
 
