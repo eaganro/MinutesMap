@@ -112,7 +112,7 @@ export default function Score({
           <button
             type="button"
             className="teamLogoButton"
-            onClick={() => onSelectTeam(team)}
+            onClick={() => onSelectTeam(team, { source: 'scoreboard' })}
             aria-label={`Show ${team} season games`}
             title={`Show ${team} season games`}
           >
