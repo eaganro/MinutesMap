@@ -1,0 +1,59 @@
+// The chart's drag hint (see PlayTips.jsx); shared tip styles live in tips/Tips.scss.
+.playTipSweep {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-50%);
+}
+
+.playTipLabel {
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--tip-bg);
+  color: var(--tip-text);
+  border-radius: 12px;
+  padding: 6px 12px;
+  box-shadow: 0 6px 16px var(--tooltip-shadow);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.playTipTrack {
+  position: relative;
+  width: 100%;
+  height: 24px;
+}
+
+.playTipFinger {
+  position: absolute;
+  top: 0;
+  left: 15%;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  box-sizing: border-box;
+  border: 2px solid var(--tip-bg);
+  border-radius: 50%;
+  background: var(--tip-ring);
+  animation: playTipSweep 1.4s ease-in-out 0.4s 4 alternate both;
+}
+
+@keyframes playTipSweep {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(var(--play-tip-sweep, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playTipFinger {
+    animation: none;
+  }
+}

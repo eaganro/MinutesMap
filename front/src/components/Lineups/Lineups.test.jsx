@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Lineups from './Lineups';
+import { TIP_SHOW_DELAY_MS } from '../tips/useTipSequence';
 
 vi.mock('../hooks/ui/useTheme', () => ({
   useTheme: () => ({ isDarkMode: false }),
@@ -37,7 +38,17 @@ const renderLineups = () =>
     />,
   );
 
+const showTips = () => {
+  act(() => {
+    vi.advanceTimersByTime(TIP_SHOW_DELAY_MS);
+  });
+};
+
 describe('Lineups', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   afterEach(() => {
     cleanup();
   });
@@ -113,6 +124,34 @@ describe('Lineups', () => {
     expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(2);
   });
 
+  describe('tips', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('explains lineup rows, then filtering, until a player is picked', () => {
+      renderLineups();
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+
+      showTips();
+      expect(screen.getByText(/Each row is a group of five/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+      expect(screen.getByText(/a player to see only the lineups they were in/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'Away Player 1A' })[1]);
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem('lineupTips'))).toEqual({
+        rows: true,
+        filter: true,
+      });
+    });
+  });
+
   describe('stacked layout', () => {
     beforeEach(() => {
       localStorage.clear();
@@ -128,6 +167,21 @@ describe('Lineups', () => {
 
     afterEach(() => {
       vi.unstubAllGlobals();
+    });
+
+    it('only shows tips once the section has been opened', () => {
+      vi.useFakeTimers();
+      try {
+        renderLineups();
+        showTips();
+        expect(screen.queryByRole('note')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /Lineups/ }));
+        showTips();
+        expect(screen.getByText(/Each row is a group of five/)).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('starts collapsed and remembers when it is opened', () => {
