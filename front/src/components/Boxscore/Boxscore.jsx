@@ -2,7 +2,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { UnfoldMore, UnfoldLess } from '@mui/icons-material';
 import './Boxscore.scss';
 import processTeamStats from './processTeamStats';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useMinimumLoadingState } from '../hooks/ui/useMinimumLoadingState';
 import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
@@ -31,6 +31,8 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   const homeTableRef = useRef(null);
   const isSyncingScrollRef = useRef(false);
   const syncRafRef = useRef(null);
+  const bottomToggleRef = useRef(null);
+  const collapseAnchorTopRef = useRef(null);
   const trackBoxscoreFeatureUse = useTrackFeatureUseOnce('boxscore');
   const [isCompact, setIsCompact] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 640px)').matches : false,
@@ -131,9 +133,28 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
     });
   };
 
+  // Collapsing from the bottom button removes rows above it; keep the button
+  // where it was on screen so the reader stays at the box score.
+  const handleBottomToggle = () => {
+    if (showMore && bottomToggleRef.current) {
+      collapseAnchorTopRef.current = bottomToggleRef.current.getBoundingClientRect().top;
+    }
+    setShowMore(!showMore);
+  };
+
+  useLayoutEffect(() => {
+    const previousTop = collapseAnchorTopRef.current;
+    collapseAnchorTopRef.current = null;
+    if (previousTop === null || !bottomToggleRef.current) return;
+    const delta = bottomToggleRef.current.getBoundingClientRect().top - previousTop;
+    if (delta) window.scrollBy(0, delta);
+  }, [showMore]);
+
   const awayBox = processTeamStats(
     displayBox?.teams?.away,
+    false,
     showMore,
+    setShowMore,
     awayTableRef,
     () => syncScroll(awayTableRef, homeTableRef),
     isCompact,
@@ -143,7 +164,9 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   );
   const homeBox = processTeamStats(
     displayBox?.teams?.home,
+    true,
     showMore,
+    setShowMore,
     homeTableRef,
     () => syncScroll(homeTableRef, awayTableRef),
     isCompact,
@@ -192,7 +215,8 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
             <button
               type="button"
               className="showMoreButton"
-              onClick={() => setShowMore(!showMore)}
+              ref={bottomToggleRef}
+              onClick={handleBottomToggle}
               aria-expanded={showMore}
             >
               {showMore ? <UnfoldLess fontSize="small" /> : <UnfoldMore fontSize="small" />}

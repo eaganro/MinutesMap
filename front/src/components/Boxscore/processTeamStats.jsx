@@ -1,3 +1,5 @@
+import { UnfoldMore, UnfoldLess } from '@mui/icons-material';
+import IconButton from '@mui/material/IconButton';
 const COMPACT_LAST_NAME_MAX = 12;
 const COMPACT_LAST_NAME_KEEP = 10;
 const DEFAULT_COLUMN_ORDER = [
@@ -64,7 +66,9 @@ const HIGHLIGHT_COLUMNS = new Set(['pts', 'reb', 'ast']);
 
 export default function (
   team,
+  showButton,
   showMore,
+  setShowMore,
   tableWrapperRef,
   onScroll,
   isCompact,
@@ -432,6 +436,16 @@ export default function (
       <div className="teamRow">
         <div className="team">
           <span style={teamColor ? { color: teamColor } : undefined}>{team?.name}</span>
+          {showButton && (
+            <div className="showMore">
+              <IconButton
+                aria-label={showMore ? 'Show fewer stats' : 'Show more stats'}
+                onClick={() => setShowMore(!showMore)}
+              >
+                {showMore ? <UnfoldLess /> : <UnfoldMore />}
+              </IconButton>
+            </div>
+          )}
         </div>
       </div>
       <div
