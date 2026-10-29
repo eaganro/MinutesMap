@@ -773,6 +773,13 @@ def process_game(game_item, user_agent=None, date_str=None):
     play_data, play_etag = fetch_nba_data(urls['play'], last_play_etag, user_agent)
     box_data, box_etag = fetch_nba_data(urls['box'], last_box_etag, user_agent)
 
+    # Neither feed changed (304) or both were unavailable, so there is nothing new to
+    # publish. Kalshi odds keep moving during stoppages, but they are keyed to the game
+    # clock, so the next feed change records a fresh price anyway. Returning here skips
+    # the gamepack upload as well as the Kalshi request and the gamepack read.
+    if play_data is None and box_data is None:
+        return False, {}
+
     updates = {}
     is_game_final = False
     is_play_final = False
@@ -942,9 +949,6 @@ def process_game(game_item, user_agent=None, date_str=None):
         # Odds are optional; unexpected market data must not block the game itself.
         print(f"Poller: Kalshi odds failed for {game_key}: {exc}")
         odds_snapshot = []
-
-    if play_data is None and box_data is None and not odds_snapshot:
-        return False, {}
 
     if processed is not None and AI_CAPTIONS_ENABLED and CAPTION_API_KEY:
         closed_periods = extract_closed_periods(actions)
