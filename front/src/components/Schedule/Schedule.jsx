@@ -1,42 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import { Close, NavigateNext, NavigateBefore } from '@mui/icons-material';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Close, ExpandMore, NavigateNext, NavigateBefore } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
-import { ASSET_PREFIX } from '../../environment';
 import { parseGameStatus } from '../../domain/game-selection/status';
 import { formatStatusText } from '../../helpers/utils';
 import { formatShortDate } from '../../domain/game-selection/teamSchedule';
 import { useDateInputState } from '../hooks/schedule/useDateInputState';
 import { useHorizontalDragScroll } from '../hooks/ui/useHorizontalDragScroll';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
-import { useLoadedImage } from '../hooks/ui/useLoadedImage';
+import TeamLogo from './TeamLogo';
+import TeamPickerPanel from './TeamPickerPanel';
 
 import './Schedule.scss';
 
-const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
-const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
 const DATE_NAVIGATION_STEP_DAYS = 1;
-
-function TeamLogo({ team, size = 16 }) {
-  const { isLoaded, imgProps } = useLoadedImage(team ? buildLogoSrc(team) : null);
-
-  if (!team) return null;
-
-  return (
-    <div className={`teamLogoWrapper${!isLoaded ? ' isPending' : ''}`}>
-      <img
-        {...imgProps}
-        height={size}
-        width={size}
-        draggable={false}
-        loading="lazy"
-        className="teamLogo"
-        alt=""
-        aria-hidden="true"
-      />
-    </div>
-  );
-}
 
 function LiveDot() {
   return (
@@ -114,6 +91,26 @@ export default function Schedule({
     useHorizontalDragScroll();
 
   const isTeamMode = Boolean(teamMode);
+  const [isTeamPickerOpen, setIsTeamPickerOpen] = useState(false);
+  const teamPickerTriggerRef = useRef(null);
+  const teamPickerId = useId();
+  const closeTeamPicker = useCallback(({ restoreFocus = false } = {}) => {
+    setIsTeamPickerOpen(false);
+    if (restoreFocus) teamPickerTriggerRef.current?.focus();
+  }, []);
+  const pickTeam = (abbr) => {
+    setIsTeamPickerOpen(false);
+    onSelectTeam?.(abbr, { source: 'team-picker' });
+  };
+  const teamPickerTriggerProps = {
+    ref: teamPickerTriggerRef,
+    type: 'button',
+    onClick: () => setIsTeamPickerOpen((open) => !open),
+    'aria-expanded': isTeamPickerOpen,
+    'aria-controls': isTeamPickerOpen ? teamPickerId : undefined,
+    'aria-haspopup': 'dialog',
+  };
+
   const handleGameClick = (event, id) => {
     // Keyboard-generated clicks have no click count and should not inherit a
     // previous pointer drag's suppression state.
@@ -316,13 +313,20 @@ export default function Schedule({
         {isTeamMode ? (
           <div className="datePick">
             <div className="teamChip">
-              <TeamLogo team={teamAbbr} size={28} />
-              <div className="teamChipText">
-                <span className="teamChipName">{teamAbbr}</span>
-                <span className="teamChipMeta">
-                  {[recordText, teamMode.season].filter(Boolean).join(' · ')}
-                </span>
-              </div>
+              <button
+                {...teamPickerTriggerProps}
+                className="teamChipButton"
+                aria-label={`Change team, now ${teamAbbr}`}
+                title="Change team"
+              >
+                <TeamLogo team={teamAbbr} size={28} />
+                <div className="teamChipText">
+                  <span className="teamChipName">{teamAbbr}</span>
+                  <span className="teamChipMeta">
+                    {[recordText, teamMode.season].filter(Boolean).join(' · ')}
+                  </span>
+                </div>
+              </button>
               <IconButton
                 className="teamChipClear"
                 size="small"
@@ -352,6 +356,12 @@ export default function Schedule({
             <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
               <NavigateNext />
             </IconButton>
+            {onSelectTeam && (
+              <button {...teamPickerTriggerProps} className="teamPickerTrigger">
+                Teams
+                <ExpandMore fontSize="small" aria-hidden="true" />
+              </button>
+            )}
           </div>
         )}
         <div className="gamePick">
@@ -426,6 +436,15 @@ export default function Schedule({
           </IconButton>
         </div>
       </div>
+      {isTeamPickerOpen && (
+        <TeamPickerPanel
+          id={teamPickerId}
+          selectedTeam={teamAbbr}
+          onSelect={pickTeam}
+          onClose={closeTeamPicker}
+          triggerRef={teamPickerTriggerRef}
+        />
+      )}
     </div>
   );
 }

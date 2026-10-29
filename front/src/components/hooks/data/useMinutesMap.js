@@ -165,13 +165,14 @@ export function useMinutesMap() {
   );
   const teamRecord = useMemo(() => summarizeTeamRecord(teamGames), [teamGames]);
 
+  // `source` says how team mode was entered (e.g. 'team-picker' or 'scoreboard').
   const selectTeam = useCallback(
-    (value) => {
+    (value, { source } = {}) => {
       const nextTeam = normalizeTeamAbbr(value);
       if (nextTeam === team) return;
       pendingTeamSelectionRef.current = Boolean(nextTeam);
       if (nextTeam) {
-        trackTeamFeatureUse();
+        trackTeamFeatureUse(source ? { source } : undefined);
       }
       setTeam(nextTeam);
     },

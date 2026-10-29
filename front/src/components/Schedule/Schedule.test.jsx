@@ -229,6 +229,44 @@ describe('Schedule', () => {
     expect(screen.getByText('No Games Scheduled')).toBeInTheDocument();
   });
 
+  describe('team picker', () => {
+    it('opens from the Teams button, picks a team and closes', () => {
+      const onSelectTeam = vi.fn();
+      render(<Schedule {...buildProps({ onSelectTeam })} />);
+      const trigger = screen.getByRole('button', { name: /^Teams/ });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      const panel = screen.getByRole('dialog', { name: 'Choose a team' });
+      expect(panel.querySelectorAll('.teamPickerTeam')).toHaveLength(30);
+      expect(screen.getByRole('button', { name: 'Atlanta Hawks' })).toHaveFocus();
+
+      fireEvent.click(screen.getByRole('button', { name: 'San Antonio Spurs' }));
+      expect(onSelectTeam).toHaveBeenCalledWith('SAS', { source: 'team-picker' });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('closes on Escape and on a press outside, returning focus on Escape', () => {
+      render(<Schedule {...buildProps({ onSelectTeam: vi.fn() })} />);
+      const trigger = screen.getByRole('button', { name: /^Teams/ });
+
+      fireEvent.click(trigger);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+
+      fireEvent.click(trigger);
+      fireEvent.pointerDown(document.body);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('is not offered without a way to select a team', () => {
+      render(<Schedule {...buildProps()} />);
+      expect(screen.queryByRole('button', { name: /^Teams/ })).not.toBeInTheDocument();
+    });
+  });
+
   describe('team mode', () => {
     const buildTeamMode = (overrides = {}) => ({
       team: 'BOS',
@@ -318,6 +356,20 @@ describe('Schedule', () => {
 
       rerender(<Schedule {...buildProps({ teamMode: buildTeamMode({ record: null }) })} />);
       expect(screen.getByText('2026-27')).toBeInTheDocument();
+    });
+
+    it('lets the team chip switch to another team from the picker', () => {
+      const onSelectTeam = vi.fn();
+      render(<Schedule {...buildProps({ teamMode: buildTeamMode(), onSelectTeam })} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change team, now BOS' }));
+      expect(screen.getByRole('button', { name: 'Boston Celtics' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Los Angeles Lakers' }));
+      expect(onSelectTeam).toHaveBeenCalledWith('LAL', { source: 'team-picker' });
     });
 
     it('shows a retryable error when the team season fails to load', () => {
