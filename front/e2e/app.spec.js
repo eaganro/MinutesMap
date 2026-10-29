@@ -272,6 +272,8 @@ test.describe('MinutesMap Smoke', () => {
 
     const pointToggle = page.getByRole('button', { name: 'Point' });
     const missToggle = page.getByRole('button', { name: 'Miss' });
+    // Stat toggles are disabled while the newly selected game loads.
+    await expect(pointToggle).toBeEnabled();
     await pointToggle.focus();
     await page.keyboard.press('Space');
     await expect(pointToggle).toHaveAttribute('aria-pressed', 'false');
