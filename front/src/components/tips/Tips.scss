@@ -1,0 +1,157 @@
+// First-visit tips (see TipCallout.jsx). A section renders them in a `.tipLayer` over itself.
+.tipLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 20; // above the section, below the play tooltip
+  pointer-events: none;
+}
+
+.tipAppear {
+  animation: tipAppear 0.25s ease-out both;
+}
+
+.tipCallout {
+  position: absolute;
+  pointer-events: auto;
+  box-sizing: border-box;
+  background: var(--tip-bg);
+  color: var(--tip-text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 20px var(--tooltip-shadow);
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  cursor: default;
+
+  &.hasClose {
+    padding-right: 34px;
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--tip-text);
+    outline-offset: 2px;
+  }
+}
+
+.tipArrow {
+  position: absolute;
+  top: -5px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: var(--tip-bg);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.tipCallout.isAbove .tipArrow {
+  top: auto;
+  bottom: -5px;
+}
+
+.tipText {
+  position: relative;
+  margin: 0;
+}
+
+.tipActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.tipSkip {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+
+.tipPrimary {
+  border: 0;
+  border-radius: 999px;
+  background: var(--tip-text);
+  color: var(--tip-bg);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  cursor: pointer;
+}
+
+.tipClose {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tipPulse {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--tip-bg);
+  animation: tipPulse 1.6s ease-out 3;
+}
+
+.tipRing {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--tip-bg);
+  border-radius: 8px;
+  animation: tipPulse 1.6s ease-out 3;
+
+  &.isPill {
+    border-radius: 999px;
+  }
+}
+
+@keyframes tipAppear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tipPulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--tip-ring);
+  }
+
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tipAppear,
+  .tipPulse,
+  .tipRing {
+    animation: none;
+  }
+}

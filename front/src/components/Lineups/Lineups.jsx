@@ -8,6 +8,8 @@ import { useMediaQuery } from '../hooks/ui/useMediaQuery';
 import { useLocalStorageState } from '../hooks/state/useLocalStorageState';
 import { isBooleanPreference } from '../hooks/state/storage';
 import LineupsTeamPanel from './LineupsTeamPanel';
+import LineupsTips from './LineupsTips';
+import { useLineupsTips } from './useLineupsTips';
 import {
   buildLastNameCounts,
   buildPlayerDisplayNames,
@@ -46,6 +48,8 @@ export default function Lineups({
     LINEUPS_PREFERENCE_OPTIONS,
   );
   const isStacked = useMediaQuery(STACKED_LAYOUT_QUERY);
+  const isFinePointer = useMediaQuery('(hover: hover) and (pointer: fine)');
+  const lineupsRef = useRef(null);
   const awayTopRef = useRef(null);
   const homeTopRef = useRef(null);
   const { isDarkMode } = useTheme();
@@ -242,8 +246,20 @@ export default function Lineups({
       ? `${awayCount} ${awayTeam?.abr || 'away'} · ${homeCount} ${homeTeam?.abr || 'home'}`
       : null;
 
+  // On stacked layouts the tips wait until the section has been opened.
+  const lineupsTips = useLineupsTips({
+    lineupsRef,
+    enabled:
+      awayCount + homeCount > 0 &&
+      !showLoadingIndicator &&
+      !showStatusMessage &&
+      (!isStacked || isOpen),
+    hasSelectedPlayers: selectedAwayPlayers.length + selectedHomePlayers.length > 0,
+  });
+
   return (
     <div
+      ref={lineupsRef}
       className="lineups"
       role="region"
       aria-label="Lineups"
@@ -267,6 +283,16 @@ export default function Lineups({
         </>
       ) : (
         content
+      )}
+      {lineupsTips.activeTip && (
+        <LineupsTips
+          activeTip={lineupsTips.activeTip}
+          lineupsRef={lineupsRef}
+          layoutKey={`${isStacked}|${isOpen}|${activeTeam}|${showAll}|${sortConfig.key}|${sortConfig.direction}`}
+          isFinePointer={isFinePointer}
+          onDismiss={lineupsTips.dismissTip}
+          onSkip={lineupsTips.skipTips}
+        />
       )}
     </div>
   );
