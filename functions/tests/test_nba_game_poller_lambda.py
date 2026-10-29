@@ -1119,7 +1119,7 @@ class TestNbaGamePollerLambda:
         uploaded_payload = self.module.upload_json_to_s3.call_args.kwargs["data"]
         assert uploaded_payload["flow"]["captions"] == existing_captions
 
-    def test_process_game_merges_kalshi_odds_when_nba_feeds_are_unchanged(self):
+    def test_process_game_skips_odds_only_updates_when_nba_feeds_are_unchanged(self):
         game_item = {
             "id": "2026-04-04-det-phi",
             "nbaGameId": "0022600101",
@@ -1180,25 +1180,9 @@ class TestNbaGamePollerLambda:
 
         assert is_final is False
         assert updates == {}
-        uploaded_payload = self.module.upload_json_to_s3.call_args.kwargs["data"]
-        assert uploaded_payload["flow"]["odds"] == [
-            {
-                "quarter": 1,
-                "time": "1000.00",
-                "awayWinProb": 0.52,
-                "source": "midpoint",
-                "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
-                "eventTicker": "KXNBAGAME-26APR04DETPHI",
-            },
-            {
-                "quarter": 1,
-                "time": "09:30",
-                "awayWinProb": 0.58,
-                "source": "midpoint",
-                "marketTicker": "KXNBAGAME-26APR04DETPHI-DET",
-                "eventTicker": "KXNBAGAME-26APR04DETPHI",
-            },
-        ]
+        self.module.upload_json_to_s3.assert_not_called()
+        self.module.fetch_kalshi_event_markets.assert_not_called()
+        self.module.load_gamepack.assert_not_called()
 
     def test_process_game_backfills_kalshi_odds_for_new_actions_between_polls(self):
         game_item = {
