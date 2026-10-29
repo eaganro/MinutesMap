@@ -102,6 +102,27 @@
       filter: blur(2px);
     }
 
+    .teamLogoButton {
+      position: relative;
+      display: block;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: none;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+
+      &:hover {
+        transform: scale(1.06);
+        background-color: var(--bg-hover);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--focus-ring-color);
+        outline-offset: 2px;
+      }
+    }
+
     .teamLogo {
       display: block;
       object-fit: contain;

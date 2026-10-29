@@ -80,6 +80,18 @@ describe('Score', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading game...');
   });
 
+  it('keeps a logo shown when only the other team changes', () => {
+    const { container, rerender } = render(<Score {...buildProps()} />);
+    container.querySelectorAll('.teamLogo').forEach((img) => fireEvent.load(img));
+    expect(container.querySelectorAll('.logoWrapper.isPending')).toHaveLength(0);
+
+    rerender(<Score {...buildProps({ awayTeam: 'LAL' })} />);
+
+    const [awayWrapper, homeWrapper] = container.querySelectorAll('.logoWrapper');
+    expect(awayWrapper).toHaveClass('isPending');
+    expect(homeWrapper).not.toHaveClass('isPending');
+  });
+
   it('does not show the live indicator for TBD games', () => {
     render(<Score {...buildProps({ gameStatus: 'TBD' })} />);
 

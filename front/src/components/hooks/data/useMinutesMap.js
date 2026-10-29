@@ -12,6 +12,16 @@ import { useGamePackSync } from './useGamePackSync';
 import { useLiveUpdates } from '../realtime/useLiveUpdates';
 import { useResumeRefresh } from '../realtime/useResumeRefresh';
 import { useAnalyticsSignals } from '../analytics/useAnalyticsSignals';
+import { useTrackFeatureUseOnce } from '../analytics/useTrackFeatureUseOnce';
+import { useTeamSchedule } from '../schedule/useTeamSchedule';
+import {
+  buildTeamGames,
+  deriveSeasonLabel,
+  findNearestGameIndex,
+  gameIdIncludesTeam,
+  normalizeTeamAbbr,
+  summarizeTeamRecord,
+} from '../../../domain/game-selection/teamSchedule';
 
 const DEFAULT_STAT_ON = [true, false, false, true, false, false, false, false];
 const BOOLEAN_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
@@ -93,6 +103,13 @@ export function useMinutesMap() {
     [changeGame, gameId],
   );
 
+  // === TEAM MODE ===
+  // The strip shows one team's season; the date schedule keeps following the
+  // selected game underneath so live updates and gamepack sync are unchanged.
+  const [team, setTeam] = useState(initialParams.team || null);
+  const pendingTeamSelectionRef = useRef(Boolean(initialParams.team));
+  const trackTeamFeatureUse = useTrackFeatureUseOnce('team-schedule');
+
   const scheduleFetchRef = useRef(() => {});
   const fetchScheduleForDateChange = useCallback((dateString, reason = 'date-change') => {
     scheduleFetchRef.current?.(dateString, reason);
@@ -106,7 +123,104 @@ export function useMinutesMap() {
     schedule,
     isScheduleLoading,
     fetchScheduleWithReason: fetchScheduleForDateChange,
+    skipAutoSelect: Boolean(team),
   });
+
+  const teamSeason = team ? deriveSeasonLabel(date) : null;
+  const teamSchedule = useTeamSchedule({ team, season: teamSeason });
+
+  // Remember the latest schedule entry seen for each of the team's games, so moving to a
+  // game on another date keeps today's live score and clock instead of falling back to the
+  // season file, which only gets a game's score once it ends.
+  const [seenTeamScheduleGames, setSeenTeamScheduleGames] = useState({});
+  useEffect(() => {
+    if (!team || !Array.isArray(schedule)) return;
+    setSeenTeamScheduleGames((prev) => {
+      let next = prev;
+      for (const entry of schedule) {
+        if (
+          entry?.id &&
+          gameIdIncludesTeam(entry.id, team) &&
+          JSON.stringify(prev[entry.id]) !== JSON.stringify(entry)
+        ) {
+          if (next === prev) next = { ...prev };
+          next[entry.id] = entry;
+        }
+      }
+      return next;
+    });
+  }, [schedule, team]);
+
+  const teamGames = useMemo(
+    () =>
+      team
+        ? buildTeamGames({
+            payload: teamSchedule.payload,
+            team,
+            // The loaded date's schedule goes last so it wins over remembered entries.
+            schedule: [...Object.values(seenTeamScheduleGames), ...(schedule || [])],
+          })
+        : [],
+    [team, teamSchedule.payload, schedule, seenTeamScheduleGames],
+  );
+  const teamRecord = useMemo(() => summarizeTeamRecord(teamGames), [teamGames]);
+
+  const selectTeam = useCallback(
+    (value) => {
+      const nextTeam = normalizeTeamAbbr(value);
+      if (nextTeam === team) return;
+      pendingTeamSelectionRef.current = Boolean(nextTeam);
+      if (nextTeam) {
+        trackTeamFeatureUse();
+      }
+      setTeam(nextTeam);
+    },
+    [team, trackTeamFeatureUse],
+  );
+
+  const changeTeamGame = useCallback(
+    (id) => {
+      const game = teamGames.find((entry) => entry.id === id);
+      if (!game) return;
+      if (game.date !== date) {
+        changeDate(game.date);
+      }
+      changeGameWithHistory(game.id);
+    },
+    [changeDate, changeGameWithHistory, date, teamGames],
+  );
+
+  // The scoreboard date button means "show me that day", which leaves team mode.
+  const showDate = useCallback(
+    (nextDate) => {
+      selectTeam(null);
+      changeDate(nextDate);
+    },
+    [changeDate, selectTeam],
+  );
+
+  // Entering team mode keeps the current game when it involves the team,
+  // otherwise jumps to the team's game nearest the date being viewed.
+  useEffect(() => {
+    if (!team || !date || !pendingTeamSelectionRef.current) return;
+    if (gameId && gameIdIncludesTeam(gameId, team)) {
+      pendingTeamSelectionRef.current = false;
+      return;
+    }
+    if (teamSchedule.status === 'loading' || teamSchedule.status === 'idle') return;
+    if (!teamGames.length) {
+      if (teamSchedule.status !== 'error') {
+        pendingTeamSelectionRef.current = false;
+      }
+      return;
+    }
+    pendingTeamSelectionRef.current = false;
+    const target = teamGames[findNearestGameIndex(teamGames, date)];
+    if (target.date !== date) {
+      changeDate(target.date);
+    }
+    changeGame(target.id);
+  }, [changeDate, changeGame, date, gameId, team, teamGames, teamSchedule.status]);
 
   const {
     fetchGamePackWithReason,
@@ -149,15 +263,21 @@ export function useMinutesMap() {
   // === URL SYNC ===
   useEffect(() => {
     if (date) {
-      updateQueryParams(date, gameId, { mode: nextUrlHistoryModeRef.current });
+      updateQueryParams(date, gameId, { mode: nextUrlHistoryModeRef.current, team });
       nextUrlHistoryModeRef.current = 'replace';
     }
-  }, [date, gameId, updateQueryParams]);
+  }, [date, gameId, team, updateQueryParams]);
 
   useEffect(() => {
     const handlePopState = () => {
       const nextParams = getInitialParams();
       nextUrlHistoryModeRef.current = 'replace';
+
+      const nextTeam = nextParams.team ?? null;
+      if (nextTeam !== team) {
+        pendingTeamSelectionRef.current = false;
+        setTeam(nextTeam);
+      }
 
       if (nextParams.date && nextParams.date !== date) {
         changeDate(nextParams.date);
@@ -178,7 +298,7 @@ export function useMinutesMap() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [changeDate, changeGame, date, gameId, getInitialParams, resetLoadingStates, setGameId]);
+  }, [changeDate, changeGame, date, gameId, getInitialParams, resetLoadingStates, setGameId, team]);
 
   // === PROCESSED TIMELINES ===
   const {
@@ -288,6 +408,20 @@ export function useMinutesMap() {
     status: scheduleStatus,
     error: scheduleError,
     retry: retrySchedule,
+    selectTeam,
+    showDate,
+    teamMode: team
+      ? {
+          team,
+          season: teamSeason,
+          games: teamGames,
+          status: teamSchedule.status,
+          error: teamSchedule.error,
+          retry: teamSchedule.retry,
+          record: teamRecord,
+          changeGame: changeTeamGame,
+        }
+      : null,
   };
 
   let dataNotice = null;

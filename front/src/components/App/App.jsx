@@ -63,6 +63,8 @@ export default function App() {
           error={scheduleVm.error}
           onRetry={scheduleVm.retry}
           selectedGameId={scheduleVm.gameId}
+          onSelectTeam={scheduleVm.selectTeam}
+          teamMode={scheduleVm.teamMode}
         />
 
         {scoreVm.dataNotice && (
@@ -87,11 +89,12 @@ export default function App() {
           awayTeam={scoreVm.awayTeam}
           score={scoreVm.currentScore}
           date={scoreVm.gameDate}
-          changeDate={scheduleVm.changeDate}
+          changeDate={scheduleVm.showDate}
           isLoading={scoreVm.isLoading}
           statusMessage={scoreVm.gameStatusMessage}
           lastAction={scoreVm.lastAction}
           gameStatus={scoreVm.gameStatus}
+          onSelectTeam={scheduleVm.selectTeam}
         />
 
         <div

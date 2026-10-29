@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { parseGameSlug } from '../../../domain/game-selection/status';
+import { normalizeTeamAbbr } from '../../../domain/game-selection/teamSchedule';
 
 const DATE_PATH_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -41,17 +42,19 @@ export function useQueryParams() {
    * Get initial params from the URL (path preferred, query fallback)
    */
   const getInitialParams = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const team = normalizeTeamAbbr(params.get('team'));
     const pathParams = parsePathParams(window.location.pathname);
     if (pathParams.date) {
-      return pathParams;
+      return { ...pathParams, team };
     }
 
-    const params = new URLSearchParams(window.location.search);
     const rawGameId = params.get('gameid');
     const slugParams = parseGameSlug(rawGameId);
     return {
       date: slugParams?.date ?? params.get('date'),
       gameId: slugParams?.gameId ?? null,
+      team,
     };
   }, []);
 
@@ -62,6 +65,13 @@ export function useQueryParams() {
     const params = new URLSearchParams(window.location.search);
     params.delete('date');
     params.delete('gameid');
+    if ('team' in options) {
+      if (options.team) {
+        params.set('team', options.team);
+      } else {
+        params.delete('team');
+      }
+    }
 
     const pathname = newGameId ? `/${encodeURIComponent(newGameId)}` : '/';
     const query = params.toString();
