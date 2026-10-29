@@ -106,6 +106,31 @@ const SMOKE_GAMEPACK = {
   },
 };
 
+const SMOKE_GSW_SEASON = {
+  season: '2024-25',
+  team: { abbr: 'GSW' },
+  games: [
+    {
+      gameId: '2025-01-12-gsw-mia',
+      date: '2025-01-12',
+      homeAway: 'away',
+      opponentAbbr: 'MIA',
+      result: 'W',
+      teamScore: 101,
+      oppScore: 95,
+    },
+    {
+      gameId: SMOKE_GAME_ID,
+      date: '2025-01-15',
+      homeAway: 'home',
+      opponentAbbr: 'PHI',
+      result: 'L',
+      teamScore: 98,
+      oppScore: 102,
+    },
+  ],
+};
+
 async function blockAnalytics(page) {
   const analyticsPatterns = [
     '**/www.google-analytics.com/**',
@@ -140,6 +165,14 @@ async function mockGameData(page) {
       body: JSON.stringify(payload),
     });
   });
+
+  await page.route('**/data/pages/teams/GSW/2024-25.json.gz*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(SMOKE_GSW_SEASON),
+    }),
+  );
 
   await page.route('**/data/gamepack/*.json.gz*', (route) =>
     route.fulfill({
@@ -183,6 +216,30 @@ test.describe('MinutesMap Smoke', () => {
     await firstGame.click();
 
     await expect(page).toHaveURL(/\/2025-01-15-[a-z0-9]+-[a-z0-9]+$/i);
+  });
+
+  test('team mode browses one team season from the scoreboard logo @smoke', async ({ page }) => {
+    await page.goto(`/${SMOKE_GAME_ID}`);
+    await waitForAppReady(page);
+
+    await page.getByRole('button', { name: 'Show GSW season games' }).click();
+    await expect(page).toHaveURL(new RegExp(`/${SMOKE_GAME_ID}\\?team=GSW$`));
+    await expect(page.locator('input[type="date"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Jan 15, vs PHI, L 98-102' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await page.getByRole('button', { name: 'Jan 12, at MIA, W 101-95' }).click();
+    await expect(page).toHaveURL(/\/2025-01-12-gsw-mia\?team=GSW$/);
+    await expect(page.getByRole('button', { name: 'Jan 12, at MIA, W 101-95' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await page.getByRole('button', { name: 'Show all games' }).click();
+    await expect(page).toHaveURL(/\/2025-01-12-gsw-mia$/);
+    await expect(page.locator('input[type="date"]')).toHaveValue('2025-01-12');
   });
 
   test('browser back restores the previous selected game @smoke', async ({ page }) => {

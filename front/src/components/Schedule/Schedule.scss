@@ -21,6 +21,51 @@
       align-items: center;
       justify-content: center;
 
+      .teamChip {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 45px;
+        margin: 10px;
+        padding: 0 4px 0 10px;
+        border: 1px solid var(--input-border);
+        border-radius: 999px;
+        background-color: var(--input-bg);
+        color: var(--input-text);
+        transition:
+          background-color 0.3s ease,
+          border-color 0.3s ease;
+
+        .teamLogo {
+          display: block;
+        }
+
+        .teamChipText {
+          display: flex;
+          flex-direction: column;
+          line-height: 1.15;
+          min-width: 72px;
+        }
+
+        .teamChipName {
+          font-weight: 700;
+        }
+
+        .teamChipMeta {
+          font-size: 0.75rem;
+          color: var(--text-tertiary);
+          white-space: nowrap;
+        }
+
+        .teamChipClear {
+          color: var(--text-secondary);
+
+          &:hover {
+            background-color: var(--bg-hover);
+          }
+        }
+      }
+
       .dateInput {
         min-width: 120px;
         height: 30px;
@@ -191,6 +236,34 @@
               opacity: 0;
             }
           }
+          &.teamGame {
+            flex: 0 0 auto;
+            min-width: 64px;
+            padding: 0 8px;
+
+            .dateRow {
+              height: 21px;
+              line-height: 21px;
+              font-size: 0.75rem;
+              color: var(--text-tertiary);
+            }
+
+            .iconRow {
+              justify-content: center;
+            }
+
+            .matchupPrefix {
+              font-size: 0.75rem;
+              color: var(--text-tertiary);
+            }
+
+            .statusText.resultW,
+            .statusText.resultL {
+              color: var(--text-primary);
+              font-weight: 600;
+            }
+          }
+
           .recordRow {
             display: flex;
             justify-content: space-evenly;

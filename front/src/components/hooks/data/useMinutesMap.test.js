@@ -18,6 +18,11 @@ const mocks = vi.hoisted(() => ({
   playRef: { current: null },
   currentUrlParams: { date: '2026-02-03', gameId: '2026-02-03-phi-gsw' },
   gameDataOverrides: {},
+  useTeamScheduleMock: vi.fn(),
+}));
+
+vi.mock('../schedule/useTeamSchedule', () => ({
+  useTeamSchedule: mocks.useTeamScheduleMock,
 }));
 
 vi.mock('../schedule/useQueryParams', () => ({
@@ -173,11 +178,128 @@ vi.mock('./useLineupStats', () => ({
   useLineupStats: () => ({ away: [], home: [] }),
 }));
 
+const TEAM_SEASON_ROWS = {
+  GSW: [
+    {
+      gameId: '2026-02-01-gsw-lal',
+      date: '2026-02-01',
+      homeAway: 'away',
+      opponentAbbr: 'LAL',
+      result: 'W',
+      teamScore: 120,
+      oppScore: 110,
+    },
+  ],
+  BOS: [
+    {
+      gameId: '2026-02-02-bos-mia',
+      date: '2026-02-02',
+      homeAway: 'away',
+      opponentAbbr: 'MIA',
+      result: 'L',
+      teamScore: 99,
+      oppScore: 101,
+    },
+    {
+      gameId: '2026-02-05-nyk-bos',
+      date: '2026-02-05',
+      homeAway: 'home',
+      opponentAbbr: 'NYK',
+      status: '7:00 pm ET',
+      played: false,
+      result: null,
+    },
+  ],
+};
+
 describe('useMinutesMap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.currentUrlParams = { date: '2026-02-03', gameId: '2026-02-03-phi-gsw' };
     mocks.gameDataOverrides = {};
+    mocks.useTeamScheduleMock.mockImplementation(({ team, season }) => ({
+      key: team && season ? `${team}/${season}` : null,
+      status: team ? 'success' : 'idle',
+      payload: team ? { games: TEAM_SEASON_ROWS[team] || [] } : null,
+      error: null,
+      retry: vi.fn(),
+    }));
+  });
+
+  it('switches the schedule strip to a team season and back', () => {
+    const { result } = renderHook(() => useMinutesMap());
+    expect(result.current.scheduleVm.teamMode).toBeNull();
+
+    act(() => {
+      result.current.scheduleVm.selectTeam('gsw');
+    });
+
+    const { teamMode } = result.current.scheduleVm;
+    expect(mocks.useTeamScheduleMock).toHaveBeenLastCalledWith({ team: 'GSW', season: '2025-26' });
+    expect(teamMode.team).toBe('GSW');
+    expect(teamMode.games.map((game) => game.id)).toEqual([
+      '2026-02-01-gsw-lal',
+      '2026-02-03-phi-gsw',
+    ]);
+    // The selected game already involves GSW, so entering team mode keeps it.
+    expect(mocks.changeGameMock).not.toHaveBeenCalled();
+    expect(teamMode.record).toEqual({ wins: 1, losses: 0, seasonType: 'regular' });
+    expect(mocks.updateQueryParamsMock).toHaveBeenLastCalledWith(
+      '2026-02-03',
+      '2026-02-03-phi-gsw',
+      { mode: 'replace', team: 'GSW' },
+    );
+
+    act(() => {
+      result.current.scheduleVm.teamMode.changeGame('2026-02-01-gsw-lal');
+    });
+    expect(mocks.changeDateMock).toHaveBeenCalledWith('2026-02-01');
+    expect(mocks.changeGameMock).toHaveBeenCalledWith('2026-02-01-gsw-lal');
+
+    act(() => {
+      result.current.scheduleVm.showDate('2026-02-03');
+    });
+    expect(result.current.scheduleVm.teamMode).toBeNull();
+    expect(mocks.changeDateMock).toHaveBeenLastCalledWith('2026-02-03');
+  });
+
+  it('keeps the last live score seen for a team game after the schedule moves to another date', () => {
+    mocks.gameDataOverrides.schedule = [
+      {
+        id: '2026-02-03-phi-gsw',
+        date: '2026-02-03',
+        status: 'Q3 05:12',
+        hometeam: 'GSW',
+        awayteam: 'PHI',
+        homescore: 80,
+        awayscore: 74,
+        starttime: '2026-02-03T20:00:00',
+      },
+    ];
+    const { result, rerender } = renderHook(() => useMinutesMap());
+    act(() => {
+      result.current.scheduleVm.selectTeam('GSW');
+    });
+
+    mocks.gameDataOverrides.schedule = [];
+    rerender();
+
+    const liveGame = result.current.scheduleVm.teamMode.games.find(
+      (game) => game.id === '2026-02-03-phi-gsw',
+    );
+    expect(liveGame).toMatchObject({ status: 'Q3 05:12', teamScore: 80, oppScore: 74 });
+    delete mocks.gameDataOverrides.schedule;
+  });
+
+  it('jumps to the team game nearest the viewed date when the current game is another team', () => {
+    const { result } = renderHook(() => useMinutesMap());
+
+    act(() => {
+      result.current.scheduleVm.selectTeam('BOS');
+    });
+
+    expect(mocks.changeDateMock).toHaveBeenCalledWith('2026-02-02');
+    expect(mocks.changeGameMock).toHaveBeenCalledWith('2026-02-02-bos-mia');
   });
 
   it('keeps the App-facing return contract stable and wires orchestration hooks', () => {
@@ -300,6 +422,7 @@ describe('useMinutesMap', () => {
     );
     expect(mocks.updateQueryParamsMock).toHaveBeenCalledWith('2026-02-03', '2026-02-03-phi-gsw', {
       mode: 'replace',
+      team: null,
     });
 
     act(() => {

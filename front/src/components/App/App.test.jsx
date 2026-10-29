@@ -57,6 +57,7 @@ describe('App', () => {
 
   it('wires grouped minutes-map view models into child component props', () => {
     const changeDate = vi.fn();
+    const showDate = vi.fn();
     const changeGame = vi.fn();
     const changeStatOn = vi.fn();
     const setShowScoreDiff = vi.fn();
@@ -71,6 +72,7 @@ describe('App', () => {
         changeDate,
         changeGame,
         isLoading: false,
+        showDate,
       },
       scoreVm: {
         homeTeam: 'GSW',
@@ -162,7 +164,7 @@ describe('App', () => {
         homeTeam: 'GSW',
         awayTeam: 'PHI',
         score: { scoreAway: 92, scoreHome: 95 },
-        changeDate,
+        changeDate: showDate,
         statusMessage: null,
         gameStatus: 'Q4 00:20',
       }),

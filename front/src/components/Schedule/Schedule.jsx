@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavigateNext, NavigateBefore } from '@mui/icons-material';
+import { Close, NavigateNext, NavigateBefore } from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import { ASSET_PREFIX } from '../../environment';
 import { parseGameStatus } from '../../domain/game-selection/status';
 import { formatStatusText } from '../../helpers/utils';
+import { formatShortDate } from '../../domain/game-selection/teamSchedule';
 import { useDateInputState } from '../hooks/schedule/useDateInputState';
 import { useHorizontalDragScroll } from '../hooks/ui/useHorizontalDragScroll';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
+import { useLoadedImage } from '../hooks/ui/useLoadedImage';
 
 import './Schedule.scss';
 
@@ -15,40 +17,75 @@ const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
 const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
 const DATE_NAVIGATION_STEP_DAYS = 1;
 
-function TeamLogo({ team }) {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const imgRef = useRef(null);
-
-  useEffect(() => {
-    setIsLoaded(false);
-  }, [team]);
-
-  useEffect(() => {
-    const img = imgRef.current;
-    if (!img) return;
-    if (img.complete && img.naturalWidth > 0) {
-      setIsLoaded(true);
-    }
-  }, [team]);
+function TeamLogo({ team, size = 16 }) {
+  const { isLoaded, imgProps } = useLoadedImage(team ? buildLogoSrc(team) : null);
 
   if (!team) return null;
 
   return (
     <div className={`teamLogoWrapper${!isLoaded ? ' isPending' : ''}`}>
       <img
-        ref={imgRef}
-        height="16"
-        width="16"
+        {...imgProps}
+        height={size}
+        width={size}
         draggable={false}
         loading="lazy"
         className="teamLogo"
-        src={buildLogoSrc(team)}
         alt=""
         aria-hidden="true"
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setIsLoaded(false)}
       />
     </div>
+  );
+}
+
+function LiveDot() {
+  return (
+    <span className="liveDotIndicator" role="img" aria-label="Live game">
+      <span className="liveDot" />
+    </span>
+  );
+}
+
+function TeamGameButton({ game, isSelected, onClick }) {
+  const { isLive, isUpcoming } = parseGameStatus(game.status);
+  const hasScore = !isUpcoming && game.teamScore !== null && game.oppScore !== null;
+  const dateText = formatShortDate(game.date);
+  const statusText = formatStatusText(game.status);
+  const scoreText = hasScore ? `${game.teamScore}-${game.oppScore}` : '';
+  const outcomeText =
+    game.result && hasScore ? `${game.result} ${scoreText}` : isLive ? scoreText : statusText;
+  const label = [
+    dateText,
+    `${game.isHome ? 'vs' : 'at'} ${game.opponent}`,
+    outcomeText,
+    isLive ? statusText : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  return (
+    <button
+      type="button"
+      className={`game teamGame${isSelected ? ' selected' : ''}`}
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={isSelected}
+      data-game-id={game.id}
+    >
+      <div className="dateRow">{dateText}</div>
+      <div className="iconRow">
+        <TeamLogo team={game.team} />
+        <span className="matchupPrefix">{game.isHome ? 'vs' : '@'}</span>
+        <TeamLogo team={game.opponent} />
+        {game.opponent}
+      </div>
+      <div className="statusRow">
+        <span className={`statusText${game.result ? ` result${game.result}` : ''}`}>
+          {isLive ? [scoreText, statusText].filter(Boolean).join(' · ') : outcomeText}
+        </span>
+        {isLive && <LiveDot />}
+      </div>
+    </button>
   );
 }
 
@@ -63,6 +100,8 @@ export default function Schedule({
   error,
   onRetry,
   selectedGameId,
+  onSelectTeam,
+  teamMode = null,
 }) {
   const trackDateFeatureUse = useTrackFeatureUseOnce('date-selector');
   const [canScrollGames, setCanScrollGames] = useState(true);
@@ -74,14 +113,30 @@ export default function Schedule({
   const { scrollRef, dragHandlers, didDrag, scrollBy, resetScrollPosition } =
     useHorizontalDragScroll();
 
+  const isTeamMode = Boolean(teamMode);
   const handleGameClick = (event, id) => {
     // Keyboard-generated clicks have no click count and should not inherit a
     // previous pointer drag's suppression state.
     if (event.detail > 0 && didDrag()) return;
+    if (isTeamMode) {
+      teamMode.changeGame(id);
+      return;
+    }
     changeGame(id);
   };
 
-  const gamesList = (games || []).map((g) => {
+  const teamGamesList = isTeamMode
+    ? teamMode.games.map((game) => (
+        <TeamGameButton
+          key={game.id}
+          game={game}
+          isSelected={game.id === selectedGameId}
+          onClick={(event) => handleGameClick(event, game.id)}
+        />
+      ))
+    : null;
+
+  const dateGamesList = (isTeamMode ? [] : games || []).map((g) => {
     const { isLive, isUpcoming } = parseGameStatus(g.status);
     const isSelected = g.id === selectedGameId;
     const gameClassName = `game${isSelected ? ' selected' : ''}`;
@@ -120,11 +175,7 @@ export default function Schedule({
           </div>
           <div className="statusRow">
             <span className="statusText">{statusText}</span>
-            {isLive && (
-              <span className="liveDotIndicator" role="img" aria-label="Live game">
-                <span className="liveDot" />
-              </span>
-            )}
+            {isLive && <LiveDot />}
           </div>
         </button>
       );
@@ -149,16 +200,13 @@ export default function Schedule({
           </div>
           <div className="statusRow">
             <span className="statusText">{statusText}</span>
-            {isLive && (
-              <span className="liveDotIndicator" role="img" aria-label="Live game">
-                <span className="liveDot" />
-              </span>
-            )}
+            {isLive && <LiveDot />}
           </div>
         </button>
       );
     }
   });
+  const gamesList = isTeamMode ? teamGamesList : dateGamesList;
   const scrollScheduleRight = () => {
     scrollBy(100);
   };
@@ -207,32 +255,105 @@ export default function Schedule({
     resetScrollPosition();
   };
 
+  // Team seasons are long: keep the selected game in view, jumping straight
+  // there when the list is (re)built and gliding on ordinary selection changes.
+  const teamAbbr = teamMode?.team ?? null;
+  const teamGameCount = teamMode?.games.length ?? 0;
+  const lastTeamListRef = useRef({ team: null, count: 0 });
+  useEffect(() => {
+    const previous = lastTeamListRef.current;
+    lastTeamListRef.current = { team: teamAbbr, count: teamGameCount };
+    if (!teamAbbr) {
+      if (previous.team) {
+        resetScrollPosition();
+      }
+      return;
+    }
+    const node = scrollRef.current;
+    if (!node || !selectedGameId) return;
+    const element = Array.from(node.children).find(
+      (child) => child.dataset?.gameId === selectedGameId,
+    );
+    if (!element) return;
+
+    const isListRebuilt = previous.team !== teamAbbr || previous.count !== teamGameCount;
+    const nodeRect = node.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    const isVisible = elementRect.left >= nodeRect.left && elementRect.right <= nodeRect.right;
+    if (isVisible && !isListRebuilt) return;
+
+    const left =
+      node.scrollLeft + elementRect.left - nodeRect.left - (nodeRect.width - elementRect.width) / 2;
+    if (typeof node.scrollTo === 'function') {
+      node.scrollTo({ left, behavior: isListRebuilt ? 'auto' : 'smooth' });
+    } else {
+      node.scrollLeft = left;
+    }
+  }, [teamAbbr, teamGameCount, selectedGameId, scrollRef, resetScrollPosition]);
+
+  const record = teamMode?.record;
+  const recordText = record
+    ? `${record.wins}-${record.losses}${record.seasonType === 'preseason' ? ' preseason' : ''}`
+    : null;
+
+  const listIsPending = isTeamMode ? teamMode.status === 'loading' : isPending;
+  const listIsLoading = isTeamMode ? teamMode.status === 'loading' : isPending || isLoading;
+  const listStatus = isTeamMode ? teamMode.status : status;
+  const listError = isTeamMode ? teamMode.error : error;
+  const listRetry = isTeamMode ? teamMode.retry : onRetry;
+  const unavailableText = isTeamMode
+    ? `No ${teamAbbr} games found for ${teamMode.season || 'this season'}.`
+    : 'Schedule unavailable for this date.';
+
   return (
     <div
-      className="schedule"
+      className={`schedule${isTeamMode ? ' isTeamMode' : ''}`}
       role="region"
-      aria-label="Game schedule"
-      aria-busy={isPending || isLoading}
+      aria-label={isTeamMode ? `${teamAbbr} schedule` : 'Game schedule'}
+      aria-busy={listIsPending || listIsLoading}
     >
       <div className="scheduleContent">
-        <div className="datePick">
-          <label className="visuallyHidden" htmlFor="scheduleDate">
-            Select game date
-          </label>
-          <IconButton className="scheduleButton" onClick={dateDown} aria-label="Previous date">
-            <NavigateBefore />
-          </IconButton>
-          <input
-            id="scheduleDate"
-            className="dateInput"
-            type="date"
-            value={date}
-            onChange={(e) => handleDateChange(e.target.value)}
-          />
-          <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
-            <NavigateNext />
-          </IconButton>
-        </div>
+        {isTeamMode ? (
+          <div className="datePick">
+            <div className="teamChip">
+              <TeamLogo team={teamAbbr} size={28} />
+              <div className="teamChipText">
+                <span className="teamChipName">{teamAbbr}</span>
+                <span className="teamChipMeta">
+                  {[recordText, teamMode.season].filter(Boolean).join(' · ')}
+                </span>
+              </div>
+              <IconButton
+                className="teamChipClear"
+                size="small"
+                onClick={() => onSelectTeam?.(null)}
+                aria-label="Show all games"
+                title="Show all games"
+              >
+                <Close fontSize="small" />
+              </IconButton>
+            </div>
+          </div>
+        ) : (
+          <div className="datePick">
+            <label className="visuallyHidden" htmlFor="scheduleDate">
+              Select game date
+            </label>
+            <IconButton className="scheduleButton" onClick={dateDown} aria-label="Previous date">
+              <NavigateBefore />
+            </IconButton>
+            <input
+              id="scheduleDate"
+              className="dateInput"
+              type="date"
+              value={date}
+              onChange={(e) => handleDateChange(e.target.value)}
+            />
+            <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
+              <NavigateNext />
+            </IconButton>
+          </div>
+        )}
         <div className="gamePick">
           <IconButton
             className={`scheduleButton${canScrollGames ? '' : ' isHidden'}`}
@@ -246,7 +367,7 @@ export default function Schedule({
           </IconButton>
           {gamesList.length ? (
             <div className="gamesState">
-              {isPending && (
+              {listIsPending && (
                 <span className="scheduleUpdating" role="status">
                   Updating games…
                 </span>
@@ -266,27 +387,27 @@ export default function Schedule({
                 {gamesList}
               </div>
             </div>
-          ) : isPending || isLoading ? (
+          ) : listIsLoading ? (
             <div className="loadingIndicator" role="status">
               <CircularProgress size={24} thickness={5} />
               <span>Loading games...</span>
             </div>
-          ) : status === 'error' ? (
+          ) : listStatus === 'error' ? (
             <div className="scheduleError" role="alert">
-              <span>Couldn’t load games. {error?.message}</span>
-              <button type="button" onClick={onRetry}>
+              <span>Couldn’t load games. {listError?.message}</span>
+              <button type="button" onClick={listRetry}>
                 Retry
               </button>
             </div>
-          ) : status === 'not-available' ? (
+          ) : listStatus === 'not-available' ? (
             <div className="scheduleError" role="status">
-              <span>Schedule unavailable for this date.</span>
-              <button type="button" onClick={onRetry}>
+              <span>{unavailableText}</span>
+              <button type="button" onClick={listRetry}>
                 Retry
               </button>
             </div>
-          ) : status === 'success' ? (
-            <div className="noGames">No Games Scheduled</div>
+          ) : listStatus === 'success' ? (
+            <div className="noGames">{isTeamMode ? unavailableText : 'No Games Scheduled'}</div>
           ) : (
             <div className="loadingIndicator" role="status">
               <CircularProgress size={24} thickness={5} />
