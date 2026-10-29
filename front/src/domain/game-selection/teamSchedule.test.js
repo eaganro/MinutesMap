@@ -5,6 +5,9 @@ import {
   findNearestGameIndex,
   formatShortDate,
   gameIdIncludesTeam,
+  NBA_CONFERENCES,
+  NBA_TEAM_ABBRS,
+  NBA_TEAM_NAMES,
   normalizeTeamAbbr,
   summarizeTeamRecord,
 } from './teamSchedule';
@@ -46,6 +49,12 @@ const SEASON_PAYLOAD = {
 };
 
 describe('teamSchedule', () => {
+  it('lists every team once across the conferences, each with a name', () => {
+    const conferenceTeams = NBA_CONFERENCES.flatMap((conference) => conference.teams);
+    expect([...conferenceTeams].sort()).toEqual([...NBA_TEAM_ABBRS].sort());
+    expect(NBA_TEAM_ABBRS.every((abbr) => NBA_TEAM_NAMES[abbr])).toBe(true);
+  });
+
   it('normalizes team abbreviations to the known list', () => {
     expect(normalizeTeamAbbr(' bos ')).toBe('BOS');
     expect(normalizeTeamAbbr('XYZ')).toBeNull();
