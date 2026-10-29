@@ -1031,6 +1031,12 @@ def _clear_team_status_for_game(*, s3_client, bucket, root_prefix, page_prefix, 
     return True
 
 
+# A game is marked live once and its row is not touched again until it ends, so a clock or
+# score copied in at that moment would go stale (e.g. "Halftime" for the rest of the game).
+# Live rows get a fixed status and the usual unplayed 0-0; live scores come from the gamepack.
+LIVE_TEAM_ROW_STATUS = "In Progress"
+
+
 def _derive_live_team_artifacts(schedule_game, *, root_prefix):
     if not isinstance(schedule_game, dict):
         return []
@@ -1064,7 +1070,13 @@ def _derive_live_team_artifacts(schedule_game, *, root_prefix):
         "abbr": home_abbr,
         "name": "",
     }
-    schedule_game = {**schedule_game, "date": date_str}
+    schedule_game = {
+        **schedule_game,
+        "date": date_str,
+        "status": LIVE_TEAM_ROW_STATUS,
+        "awayscore": 0,
+        "homescore": 0,
+    }
 
     return [
         {
