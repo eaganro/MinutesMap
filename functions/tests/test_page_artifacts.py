@@ -303,11 +303,12 @@ def test_update_team_live_artifacts_for_schedule_game_writes_team_and_status_fil
     team_key = ("test-bucket", "data/pages/teams/PHI/2025-26.json.gz")
     team_artifact = json.loads(gzip.decompress(s3.objects[team_key]).decode("utf-8"))
     live_row = team_artifact["games"][0]
-    assert live_row["status"] == "Q1 06:12"
+    # Marked once, so no clock or score that would go stale for the rest of the game.
+    assert live_row["status"] == "In Progress"
     assert live_row["played"] is False
     assert live_row["result"] is None
-    assert live_row["teamScore"] == 18
-    assert live_row["oppScore"] == 14
+    assert live_row["teamScore"] == 0
+    assert live_row["oppScore"] == 0
     assert live_row["gamepackKey"] == "data/gamepack/2026-02-04-phi-lal.json.gz"
     assert live_row["recordAfterBySeasonType"] is None
     assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
@@ -316,7 +317,7 @@ def test_update_team_live_artifacts_for_schedule_game_writes_team_and_status_fil
     status_artifact = json.loads(gzip.decompress(s3.objects[status_key]).decode("utf-8"))
     assert status_artifact["team"]["abbr"] == "PHI"
     assert status_artifact["currentGame"]["gameId"] == "2026-02-04-phi-lal"
-    assert status_artifact["currentGame"]["status"] == "Q1 06:12"
+    assert status_artifact["currentGame"]["status"] == "In Progress"
     assert status_artifact["currentGame"]["gamepackKey"] == "data/gamepack/2026-02-04-phi-lal.json.gz"
 
 
@@ -427,6 +428,8 @@ def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes()
     ]
     assert all(game["played"] is False for game in team_artifact["games"])
     assert all(game["gamepackKey"] is None for game in team_artifact["games"])
+    # Upcoming rows keep the schedule's own status (unlike live rows).
+    assert [game["status"] for game in team_artifact["games"]] == ["7:30 PM ET", "Scheduled"]
     assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
     assert team_artifact["players"] == []
     status_key = ("test-bucket", "data/pages/team-status/BOS/2025-26.json.gz")
