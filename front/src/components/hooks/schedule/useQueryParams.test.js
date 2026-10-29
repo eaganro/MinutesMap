@@ -18,6 +18,7 @@ describe('useQueryParams', () => {
     expect(result.current.getInitialParams()).toEqual({
       date: '2026-02-03',
       gameId: '2026-02-03-phi-gsw',
+      team: null,
     });
   });
 
@@ -28,6 +29,7 @@ describe('useQueryParams', () => {
     expect(result.current.getInitialParams()).toEqual({
       date: '2026-02-03',
       gameId: null,
+      team: null,
     });
   });
 
@@ -38,6 +40,7 @@ describe('useQueryParams', () => {
     expect(result.current.getInitialParams()).toEqual({
       date: '2026-02-05',
       gameId: '2026-02-05-lal-bos',
+      team: null,
     });
   });
 
@@ -48,6 +51,7 @@ describe('useQueryParams', () => {
     expect(result.current.getInitialParams()).toEqual({
       date: null,
       gameId: null,
+      team: null,
     });
   });
 
@@ -80,5 +84,34 @@ describe('useQueryParams', () => {
     expect(window.location.pathname).toBe('/2026-02-04-nyk-mia');
     expect(window.location.search).toBe('?keep=1');
     expect(window.location.hash).toBe('#details');
+  });
+
+  it('reads a known team from the query and ignores unknown ones', () => {
+    setUrl('/2026-02-03-phi-gsw?team=bos');
+    const { result } = renderHook(() => useQueryParams());
+    expect(result.current.getInitialParams().team).toBe('BOS');
+
+    setUrl('/?team=xyz');
+    expect(result.current.getInitialParams().team).toBeNull();
+  });
+
+  it('sets and clears the team query param only when asked', () => {
+    setUrl('/2026-02-03-phi-gsw?keep=1');
+    const { result } = renderHook(() => useQueryParams());
+
+    act(() => {
+      result.current.updateQueryParams('2026-02-04', '2026-02-04-nyk-bos', { team: 'BOS' });
+    });
+    expect(window.location.search).toBe('?keep=1&team=BOS');
+
+    act(() => {
+      result.current.updateQueryParams('2026-02-05', '2026-02-05-bos-mia');
+    });
+    expect(window.location.search).toBe('?keep=1&team=BOS');
+
+    act(() => {
+      result.current.updateQueryParams('2026-02-05', '2026-02-05-bos-mia', { team: null });
+    });
+    expect(window.location.search).toBe('?keep=1');
   });
 });

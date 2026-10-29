@@ -18,6 +18,7 @@ export function useScheduleState({
   schedule,
   isScheduleLoading,
   fetchScheduleWithReason,
+  skipAutoSelect = false,
 }) {
   // Start null if no URL params; wait for init.json to provide the date.
   const [date, setDate] = useState(initialDate || null);
@@ -37,7 +38,7 @@ export function useScheduleState({
         if (outcome === 'success') {
           const normalizedInit = normalizeInitPayload(result.data, { fallbackDate });
           setDate(normalizedInit.date);
-          if (normalizedInit.autoSelectGameId && !initialGameId) {
+          if (normalizedInit.autoSelectGameId && !initialGameId && !skipAutoSelect) {
             const slugParams = parseGameSlug(normalizedInit.autoSelectGameId);
             if (slugParams) {
               setGameId(slugParams.gameId);
@@ -58,7 +59,7 @@ export function useScheduleState({
     };
 
     fetchInitState();
-  }, [date, initialGameId, setGameId]);
+  }, [date, initialGameId, setGameId, skipAutoSelect]);
 
   useEffect(() => {
     if (date) {
@@ -69,7 +70,8 @@ export function useScheduleState({
   const sortedGames = useMemo(() => sortGamesForSelection(schedule || []), [schedule]);
 
   useEffect(() => {
-    if (!date || gameId || isScheduleLoading) {
+    // Team mode picks its own game from the team's season instead.
+    if (!date || gameId || isScheduleLoading || skipAutoSelect) {
       return;
     }
     if (!sortedGames.length || !scheduleMatchesDate(sortedGames, date)) {
@@ -80,7 +82,7 @@ export function useScheduleState({
       return;
     }
     setGameId(String(defaultGame.id));
-  }, [date, gameId, isScheduleLoading, sortedGames, setGameId]);
+  }, [date, gameId, isScheduleLoading, sortedGames, setGameId, skipAutoSelect]);
 
   const changeDate = useCallback(
     (newDate) => {

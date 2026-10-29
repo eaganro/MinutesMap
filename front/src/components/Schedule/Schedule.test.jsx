@@ -228,4 +228,109 @@ describe('Schedule', () => {
 
     expect(screen.getByText('No Games Scheduled')).toBeInTheDocument();
   });
+
+  describe('team mode', () => {
+    const buildTeamMode = (overrides = {}) => ({
+      team: 'BOS',
+      season: '2026-27',
+      games: [
+        {
+          id: '2026-10-20-bos-det',
+          date: '2026-10-20',
+          status: 'Final',
+          opponent: 'DET',
+          isHome: false,
+          teamScore: 113,
+          oppScore: 121,
+          result: 'L',
+        },
+        {
+          id: '2026-10-23-nyk-bos',
+          date: '2026-10-23',
+          status: 'Q3 05:12',
+          opponent: 'NYK',
+          isHome: true,
+          teamScore: 74,
+          oppScore: 70,
+          result: null,
+        },
+        {
+          id: '2026-10-26-chi-bos',
+          date: '2026-10-26',
+          status: '7:30 pm ET',
+          opponent: 'CHI',
+          isHome: true,
+          teamScore: null,
+          oppScore: null,
+          result: null,
+        },
+      ],
+      status: 'success',
+      error: null,
+      retry: vi.fn(),
+      record: { wins: 0, losses: 1, seasonType: 'regular' },
+      changeGame: vi.fn(),
+      ...overrides,
+    });
+
+    it('replaces the date controls with a team chip and team game cards', () => {
+      const teamMode = buildTeamMode();
+      const onSelectTeam = vi.fn();
+      const changeGame = vi.fn();
+      render(
+        <Schedule
+          {...buildProps({
+            teamMode,
+            onSelectTeam,
+            changeGame,
+            selectedGameId: '2026-10-23-nyk-bos',
+          })}
+        />,
+      );
+
+      expect(screen.queryByLabelText('Select game date')).not.toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'BOS schedule' })).toBeInTheDocument();
+      expect(screen.getByText('0-1 · 2026-27')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Oct 20, at DET, L 113-121' }));
+      expect(teamMode.changeGame).toHaveBeenCalledWith('2026-10-20-bos-det');
+      expect(changeGame).not.toHaveBeenCalled();
+
+      expect(
+        screen.getByRole('button', { name: 'Oct 23, vs NYK, 74-70, Q3 05:12' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('Live game')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Oct 26, vs CHI, 7:30/ })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText('Show all games'));
+      expect(onSelectTeam).toHaveBeenCalledWith(null);
+    });
+
+    it('labels a preseason record and omits a missing one', () => {
+      const { rerender } = render(
+        <Schedule
+          {...buildProps({
+            teamMode: buildTeamMode({ record: { wins: 4, losses: 0, seasonType: 'preseason' } }),
+          })}
+        />,
+      );
+      expect(screen.getByText('4-0 preseason · 2026-27')).toBeInTheDocument();
+
+      rerender(<Schedule {...buildProps({ teamMode: buildTeamMode({ record: null }) })} />);
+      expect(screen.getByText('2026-27')).toBeInTheDocument();
+    });
+
+    it('shows a retryable error when the team season fails to load', () => {
+      const teamMode = buildTeamMode({
+        games: [],
+        status: 'error',
+        error: { message: 'Check your connection and try again.' },
+      });
+      render(<Schedule {...buildProps({ teamMode, onSelectTeam: vi.fn() })} />);
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Check your connection');
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+      expect(teamMode.retry).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import './Score.scss';
 import { ASSET_PREFIX } from '../../environment';
@@ -8,6 +8,7 @@ import { useStableWhileLoading } from '../hooks/ui/useStableWhileLoading';
 import { toDateInputValue } from '../hooks/schedule/useDateInputState';
 import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../constants/loadingUiTimings';
 import { parseGameStatus } from '../../domain/game-selection/status';
+import { useLoadedImage } from '../hooks/ui/useLoadedImage';
 const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
 const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
 
@@ -20,12 +21,9 @@ export default function Score({
   isLoading,
   lastAction,
   gameStatus,
+  onSelectTeam,
 }) {
-  const [awayLogoLoaded, setAwayLogoLoaded] = useState(false);
-  const [homeLogoLoaded, setHomeLogoLoaded] = useState(false);
   const [showLoadingText, setShowLoadingText] = useState(false);
-  const awayImgRef = useRef(null);
-  const homeImgRef = useRef(null);
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
 
   const incomingData = useMemo(
@@ -46,24 +44,10 @@ export default function Score({
     isBlurred,
   });
 
-  useEffect(() => {
-    setAwayLogoLoaded(false);
-    setHomeLogoLoaded(false);
-  }, [displayData.awayTeam, displayData.homeTeam]);
-
-  useEffect(() => {
-    const awayImg = awayImgRef.current;
-    if (awayImg?.complete && awayImg.naturalWidth > 0) {
-      setAwayLogoLoaded(true);
-    }
-  }, [displayData.awayTeam]);
-
-  useEffect(() => {
-    const homeImg = homeImgRef.current;
-    if (homeImg?.complete && homeImg.naturalWidth > 0) {
-      setHomeLogoLoaded(true);
-    }
-  }, [displayData.homeTeam]);
+  // Loaded state follows each logo's URL, so a team that stays put between games keeps
+  // its logo instead of falling back to the placeholder.
+  const awayLogo = useLoadedImage(displayData.awayTeam ? buildLogoSrc(displayData.awayTeam) : null);
+  const homeLogo = useLoadedImage(displayData.homeTeam ? buildLogoSrc(displayData.homeTeam) : null);
 
   const hasDisplayData = Boolean(
     displayData?.homeTeam || displayData?.awayTeam || displayData?.score || displayData?.date,
@@ -71,8 +55,8 @@ export default function Score({
   const hasIncomingData = Boolean(
     incomingData?.homeTeam || incomingData?.awayTeam || incomingData?.score || incomingData?.date,
   );
-  const awayLogoPending = Boolean(displayData.awayTeam) && !awayLogoLoaded;
-  const homeLogoPending = Boolean(displayData.homeTeam) && !homeLogoLoaded;
+  const awayLogoPending = Boolean(displayData.awayTeam) && !awayLogo.isLoaded;
+  const homeLogoPending = Boolean(displayData.homeTeam) && !homeLogo.isLoaded;
   const isDataLoading = isBlurred && (hasDisplayData || hasIncomingData);
 
   useEffect(() => {
@@ -112,6 +96,35 @@ export default function Score({
     gameTimeLabel = `${formattedPeriod} ${formattedClock}`;
   }
 
+  const renderLogo = (team, logoImage, className, isPending) => {
+    const logo = (
+      <img
+        {...logoImage.imgProps}
+        height="80"
+        width="80"
+        className={`teamLogo ${className}`}
+        alt={onSelectTeam ? '' : team}
+      />
+    );
+    return (
+      <div className={`logoWrapper${isPending ? ' isPending' : ''}`}>
+        {onSelectTeam ? (
+          <button
+            type="button"
+            className="teamLogoButton"
+            onClick={() => onSelectTeam(team)}
+            aria-label={`Show ${team} season games`}
+            title={`Show ${team} season games`}
+          >
+            {logo}
+          </button>
+        ) : (
+          logo
+        )}
+      </div>
+    );
+  };
+
   const changeToGameDate = () => {
     const nextDate = toDateInputValue(displayData.date);
     if (!nextDate) {
@@ -147,35 +160,11 @@ export default function Score({
         </button>
         <div className="scoreArea">
           <div>{displayData.score ? displayData.score.away : '--'}</div>
-          {displayData.awayTeam && (
-            <div className={`logoWrapper${awayLogoPending ? ' isPending' : ''}`}>
-              <img
-                ref={awayImgRef}
-                height="80"
-                width="80"
-                className="teamLogo awayImg"
-                src={buildLogoSrc(displayData.awayTeam)}
-                alt={displayData.awayTeam}
-                onLoad={() => setAwayLogoLoaded(true)}
-                onError={() => setAwayLogoLoaded(false)}
-              />
-            </div>
-          )}
+          {displayData.awayTeam &&
+            renderLogo(displayData.awayTeam, awayLogo, 'awayImg', awayLogoPending)}
           <div className="at">AT</div>
-          {displayData.homeTeam && (
-            <div className={`logoWrapper${homeLogoPending ? ' isPending' : ''}`}>
-              <img
-                ref={homeImgRef}
-                height="80"
-                width="80"
-                className="teamLogo homeImg"
-                src={buildLogoSrc(displayData.homeTeam)}
-                alt={displayData.homeTeam}
-                onLoad={() => setHomeLogoLoaded(true)}
-                onError={() => setHomeLogoLoaded(false)}
-              />
-            </div>
-          )}
+          {displayData.homeTeam &&
+            renderLogo(displayData.homeTeam, homeLogo, 'homeImg', homeLogoPending)}
           <div>{displayData.score ? displayData.score.home : '--'}</div>
         </div>
         {gameTimeLabel && (
