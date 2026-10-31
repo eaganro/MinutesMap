@@ -1,7 +1,8 @@
 import { createRef } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlayExportControls from './PlayExportControls';
+import { TIP_SHOW_DELAY_MS } from '../../tips/useTipSequence';
 
 const mocks = vi.hoisted(() => ({
   controller: null,
@@ -22,6 +23,7 @@ const buildController = (overrides = {}) => ({
   resolvedExportRange: { start: 1, end: 1 },
   exportRangeOptions: [],
   filteredRangeEndOptions: [],
+  hasCaptionedPeriods: false,
   previewIsUpdating: false,
   captionText: '',
   captionMaxLength: 280,
@@ -40,6 +42,10 @@ const buildController = (overrides = {}) => ({
   handleApplyCaption: vi.fn(),
   handleClearCaption: vi.fn(),
   ...overrides,
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 const renderControls = () =>
@@ -103,5 +109,82 @@ describe('PlayExportControls accessibility', () => {
       />,
     );
     expect(trigger).toHaveFocus();
+  });
+});
+
+describe('PlayExportControls tips', () => {
+  const periods = [
+    { period: 1, label: 'Q1' },
+    { period: 2, label: 'Q2' },
+  ];
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.useFakeTimers();
+    mocks.controller = buildController({
+      exportPreview: { url: 'blob:preview', canShare: false },
+      exportRangeOptions: periods,
+      filteredRangeEndOptions: periods,
+      hasCaptionedPeriods: true,
+      captionCanApply: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const showTips = () => {
+    act(() => {
+      vi.advanceTimersByTime(TIP_SHOW_DELAY_MS);
+    });
+  };
+
+  it('walks through view, range and caption as each control is used', () => {
+    renderControls();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+
+    showTips();
+    expect(screen.getByText(/Pick a layout/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.getByText(/Choose which quarters/)).toHaveTextContent('[caption]');
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Start' }), { target: { value: '2' } });
+    expect(mocks.controller.handleExportRangeStartChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Edit the caption/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Update caption' }));
+    expect(mocks.controller.handleApplyCaption).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('exportTips'))).toEqual({
+      view: true,
+      range: true,
+      caption: true,
+    });
+  });
+
+  it('leaves out the range tip when there are no quarters to pick', () => {
+    mocks.controller = buildController({
+      exportPreview: { url: 'blob:preview', canShare: false },
+    });
+    renderControls();
+    showTips();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(screen.queryByText(/Choose which quarters/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Edit the caption/)).toBeInTheDocument();
+  });
+
+  it('stops for good when skipped', () => {
+    const { unmount } = renderControls();
+    showTips();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip tips' }));
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+
+    unmount();
+    renderControls();
+    showTips();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 });

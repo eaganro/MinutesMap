@@ -580,6 +580,7 @@ export const usePlayExportController = ({
     resolvedExportRange,
     exportRangeOptions,
     filteredRangeEndOptions,
+    hasCaptionedPeriods: captionedEndPeriods.size > 0,
     previewIsUpdating: Boolean(exportPreview?.isUpdating),
     captionText: captionDraft,
     captionMaxLength,
