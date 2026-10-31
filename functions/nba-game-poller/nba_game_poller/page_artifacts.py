@@ -1185,7 +1185,11 @@ def update_team_schedule_artifacts_for_schedule_games(
     page_prefix,
     schedule_games,
     today=None,
+    prune_unplayed_from=None,
 ):
+    """With prune_unplayed_from, schedule_games must be the complete schedule from that date on:
+    unplayed rows from then on that aren't in it (moved games, unneeded "if necessary" playoff
+    games) are dropped from every team file this call touches."""
     team_cache = {}
     status_cache = {}
     changed_keys = set()
@@ -1242,6 +1246,24 @@ def update_team_schedule_artifacts_for_schedule_games(
 
             artifact["games"] = games
             changed_keys.add(key)
+
+    if prune_unplayed_from is not None:
+        scheduled_ids = {str((game or {}).get("id") or "").strip() for game in schedule_games or []}
+        prune_from = prune_unplayed_from.isoformat()
+        for key, artifact in team_cache.items():
+            kept = [
+                game
+                for game in artifact.get("games") or []
+                if not (
+                    _is_unplayed_game_row(game)
+                    and str(game.get("date") or "") >= prune_from
+                    and game.get("gameId")
+                    and game.get("gameId") not in scheduled_ids
+                )
+            ]
+            if len(kept) != len(artifact.get("games") or []):
+                artifact["games"] = kept
+                changed_keys.add(key)
 
     team_writes = 0
     for key in sorted(changed_keys):

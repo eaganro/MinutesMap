@@ -192,6 +192,27 @@ describe('Schedule', () => {
     expect(screen.queryByLabelText('Live game')).not.toBeInTheDocument();
   });
 
+  it('labels games whose teams are not set yet as TBD', () => {
+    render(
+      <Schedule
+        {...buildProps({
+          games: [
+            {
+              id: '0062600001',
+              status: '8:30 pm ET',
+              awayteam: '',
+              hometeam: null,
+              awayscore: 0,
+              homescore: 0,
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /^TBD at TBD/ })).toHaveTextContent('TBD - TBD');
+  });
+
   it('shows schedule errors with a retry action instead of an empty-schedule message', () => {
     const onRetry = vi.fn();
     render(

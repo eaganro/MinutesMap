@@ -17,6 +17,7 @@ def fake_poller(**overrides):
     poller = SimpleNamespace(calls=calls)
     poller.manager_logic = lambda: calls.append("manager")
     poller.reconcile_recent_schedule = lambda: calls.append("reconcile")
+    poller.reconcile_season_schedule = lambda: calls.append("season")
     poller.poller_logic = lambda context, schedule_half=True: calls.append(("poll", context, schedule_half))
     poller.caption_worker_logic = lambda event: calls.append(("caption", event))
     poller.get_nba_date = lambda: "2026-10-06"
@@ -30,7 +31,7 @@ def test_manager_runs_at_start_and_enables_polling_for_started_games():
     runner = PiRunner(poller, InlineExecutor())
     poller.manager_logic = lambda: (poller.calls.append("manager"), poller.enable_poller_logic())
     runner.tick(NOW)
-    assert poller.calls == ["manager", ("poll", None, False)]
+    assert poller.calls == ["manager", "season", ("poll", None, False)]
     assert runner.next_manager_at == datetime(2026, 10, 7, 11, tzinfo=timezone.utc).timestamp()
 
 
@@ -74,7 +75,7 @@ def test_hourly_reconcile_while_kickoff_is_pending():
     poller.manager_logic = lambda: (poller.calls.append("manager"), poller.schedule_kickoff(tip))
     runner.tick(NOW)
     runner.tick(NOW + run_poller.RECONCILE_SECONDS)
-    assert poller.calls == ["manager", "reconcile"]
+    assert poller.calls == ["manager", "season", "reconcile"]
 
 
 def test_manager_retries_hourly_when_nothing_was_scheduled():
@@ -85,7 +86,28 @@ def test_manager_retries_hourly_when_nothing_was_scheduled():
     assert not runner.polling and runner.kickoff_at is None
     poller.manager_logic = lambda: (poller.calls.append("manager"), poller.enable_poller_logic())
     runner.tick(NOW + run_poller.RECONCILE_SECONDS)
-    assert poller.calls[:3] == ["manager", "manager", ("poll", None, False)]
+    # The season sweep stays daily; only the manager retries.
+    assert poller.calls[:4] == ["manager", "season", "manager", ("poll", None, False)]
+
+
+def test_season_sweep_runs_with_the_daily_manager():
+    poller = fake_poller()
+    runner = PiRunner(poller, InlineExecutor())
+    runner.tick(NOW)
+    poller.calls.clear()
+    runner.tick(runner.next_manager_at)
+    assert poller.calls == ["manager", "season"]
+
+
+def test_season_sweep_failure_does_not_stop_the_loop():
+    def fail():
+        raise RuntimeError("feed down")
+
+    poller = fake_poller(reconcile_season_schedule=fail)
+    runner = PiRunner(poller, InlineExecutor())
+    poller.manager_logic = lambda: (poller.calls.append("manager"), poller.enable_poller_logic())
+    runner.tick(NOW)
+    assert poller.calls == ["manager", ("poll", None, False)]
 
 
 def test_wait_until_ready_polls_until_network_and_clock_are_up():

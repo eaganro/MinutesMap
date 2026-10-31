@@ -14,6 +14,8 @@ import TeamPickerPanel from './TeamPickerPanel';
 import './Schedule.scss';
 
 const DATE_NAVIGATION_STEP_DAYS = 1;
+// Knockout and playoff games are scheduled before their teams are known.
+const teamLabel = (team) => team || 'TBD';
 
 function LiveDot() {
   return (
@@ -145,8 +147,8 @@ export default function Schedule({
       g.homescore !== undefined;
     const gameLabel = [
       !isUpcoming && hasScore
-        ? `${g.awayteam} ${g.awayscore}, ${g.hometeam} ${g.homescore}`
-        : `${g.awayteam} at ${g.hometeam}`,
+        ? `${teamLabel(g.awayteam)} ${g.awayscore}, ${teamLabel(g.hometeam)} ${g.homescore}`
+        : `${teamLabel(g.awayteam)} at ${teamLabel(g.hometeam)}`,
       statusText,
     ]
       .filter(Boolean)
@@ -164,7 +166,7 @@ export default function Schedule({
         >
           <div className="iconRow">
             <TeamLogo team={g.awayteam} />
-            {g.awayteam} - {g.hometeam}
+            {teamLabel(g.awayteam)} - {teamLabel(g.hometeam)}
             <TeamLogo team={g.hometeam} />
           </div>
           <div>
@@ -188,7 +190,7 @@ export default function Schedule({
         >
           <div className="iconRow">
             <TeamLogo team={g.awayteam} />
-            {g.awayteam} - {g.hometeam}
+            {teamLabel(g.awayteam)} - {teamLabel(g.hometeam)}
             <TeamLogo team={g.hometeam} />
           </div>
           <div className="recordRow">

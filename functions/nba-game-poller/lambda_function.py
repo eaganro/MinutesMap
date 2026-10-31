@@ -148,7 +148,12 @@ def main_handler(event, context):
         return
 
     if task == 'manager':
-        return manager_logic()
+        result = manager_logic()
+        try:
+            reconcile_season_schedule()
+        except Exception as exc:
+            print(f"Season sweep failed: {exc}")
+        return result
     elif task == 'enable_poller':
         return enable_poller_logic()
     elif task == 'reconcile':
@@ -1870,6 +1875,61 @@ def reconcile_recent_schedule():
 
     if updated:
         print(f"Reconcile: Updated {updated} schedule file(s).")
+
+def reconcile_season_schedule():
+    """Daily sweep of every date from tomorrow to the feed's last game, so schedule files and
+    team pages hold the whole season. It picks up games the NBA adds later (NBA Cup knockout
+    games and the makeup games set after group play, play-in and playoff games) and drops
+    moved or cancelled ones. The hourly reconcile still covers the next few days."""
+    today_str = get_nba_date()
+    try:
+        today = datetime.strptime(today_str, "%Y-%m-%d").date()
+    except ValueError:
+        print(f"Season sweep: Invalid NBA date '{today_str}', skipping.")
+        return
+
+    feed = fetch_schedule_feed()
+    feed_map = build_schedule_feed_map(feed) if feed else {}
+    start = today + timedelta(days=1)
+    future_dates = sorted(d for d in feed_map if d >= start.isoformat())
+    if not future_dates:
+        print("Season sweep: No upcoming games in the schedule feed, skipping.")
+        return
+
+    end = datetime.strptime(future_dates[-1], "%Y-%m-%d").date()
+    updated = 0
+    day = start
+    # Every day, not just game days, so a date whose games all moved away is emptied.
+    while day <= end:
+        date_str = day.strftime("%Y-%m-%d")
+        if reconcile_schedule_date(date_str, feed_map.get(date_str, {})):
+            updated += 1
+        day += timedelta(days=1)
+
+    season_games = [game for date_str in future_dates for game in feed_map[date_str].values()]
+    print(
+        f"Season sweep: {len(season_games)} games from {start} to {end}, "
+        f"updated {updated} schedule file(s)."
+    )
+    try:
+        artifact_result = update_team_schedule_artifacts_for_schedule_games(
+            s3_client=s3_client,
+            bucket=BUCKET,
+            root_prefix=PREFIX,
+            page_prefix=PAGE_PREFIX,
+            schedule_games=season_games,
+            today=today,
+            prune_unplayed_from=start,
+        )
+    except Exception as exc:
+        print(f"Season sweep: Failed to update team pages: {exc}")
+        return
+    if artifact_result.get("teamFiles") or artifact_result.get("teamStatusFiles"):
+        print(
+            f"Season sweep: Updated {artifact_result.get('teamFiles', 0)} team and "
+            f"{artifact_result.get('teamStatusFiles', 0)} status file(s)."
+        )
+        request_minutesmap_revalidation(artifact_result)
 
 def reconcile_schedule_date(date_str, feed_games, team_page_sync_today=None):
     existing = get_games_from_s3(date_str)

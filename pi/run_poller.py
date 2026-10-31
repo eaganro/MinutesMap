@@ -193,6 +193,8 @@ class PiRunner:
         now = time.time() if now is None else now
         if now >= self.next_manager_at:
             self._step("manager", self.poller.manager_logic)
+            # Daily, after the manager so it never delays today's kickoff.
+            self._step("season sweep", self.poller.reconcile_season_schedule)
             self.next_manager_at = next_manager_time(now)
             self.next_reconcile_at = now + RECONCILE_SECONDS
         elif now >= self.next_reconcile_at:

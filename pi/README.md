@@ -7,7 +7,8 @@ its Lambda-specific orchestration for an in-process loop:
 | Lambda | Pi |
 |---|---|
 | `NBADailyManager` rule at 11:00 UTC | manager at start-up and 11:00 UTC daily |
-| one-time pre-tip / late reconcile schedules | reconcile every hour |
+| one-time pre-tip / late reconcile schedules | reconcile every hour (past 4 days to next 7) |
+| full-season schedule sweep after the daily manager | same, at start-up and 11:00 UTC daily |
 | kickoff schedule + `NBAGamePollerRule` + half-minute schedules | poll every 30 s from first tip until all games are final |
 | async self-invoke for captions | caption worker in a background thread |
 | NBA feeds read from the relay's S3 mirror | NBA feeds fetched with curl (`NBA_FETCH_MODE=curl`) |

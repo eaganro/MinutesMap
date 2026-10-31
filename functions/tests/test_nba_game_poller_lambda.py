@@ -100,6 +100,66 @@ class TestNbaGamePollerLambda:
         assert actual_dates == expected_dates
         assert self.module.build_game_id_map_from_feed.call_count == 12
 
+    def test_reconcile_season_schedule_sweeps_every_day_to_the_last_game(self):
+        self.module.get_nba_date = MagicMock(return_value="2026-11-01")
+        self.module.fetch_schedule_feed = MagicMock(return_value={"gameDates": []})
+        past = {"2026-10-31-bos-nyk": {"id": "2026-10-31-bos-nyk"}}
+        today = {"2026-11-01-dal-hou": {"id": "2026-11-01-dal-hou"}}
+        later = {"2026-11-02-lal-den": {"id": "2026-11-02-lal-den"}}
+        last = {"2026-11-05-mia-chi": {"id": "2026-11-05-mia-chi"}}
+        self.module.build_schedule_feed_map = MagicMock(
+            return_value={"2026-10-31": past, "2026-11-01": today, "2026-11-02": later, "2026-11-05": last}
+        )
+        self.module.reconcile_schedule_date = MagicMock(return_value=True)
+        artifact_result = {"teamFiles": 4, "teamStatusFiles": 0, "teams": ["LAL", "DEN", "MIA", "CHI"]}
+        self.module.update_team_schedule_artifacts_for_schedule_games = MagicMock(
+            return_value=artifact_result
+        )
+        self.module.request_minutesmap_revalidation = MagicMock()
+
+        self.module.reconcile_season_schedule()
+
+        calls = self.module.reconcile_schedule_date.call_args_list
+        # Empty days are reconciled too, so games that moved away are removed.
+        assert [(c.args[0], c.args[1]) for c in calls] == [
+            ("2026-11-02", later),
+            ("2026-11-03", {}),
+            ("2026-11-04", {}),
+            ("2026-11-05", last),
+        ]
+        # Team pages are synced once for the whole season, not per date.
+        assert all("team_page_sync_today" not in c.kwargs for c in calls)
+        sync = self.module.update_team_schedule_artifacts_for_schedule_games.call_args.kwargs
+        assert sync["schedule_games"] == [later["2026-11-02-lal-den"], last["2026-11-05-mia-chi"]]
+        assert sync["today"] == date(2026, 11, 1)
+        assert sync["prune_unplayed_from"] == date(2026, 11, 2)
+        self.module.request_minutesmap_revalidation.assert_called_once_with(artifact_result)
+
+    def test_reconcile_season_schedule_skips_without_upcoming_games(self):
+        self.module.get_nba_date = MagicMock(return_value="2026-07-01")
+        self.module.fetch_schedule_feed = MagicMock(return_value={"gameDates": []})
+        self.module.build_schedule_feed_map = MagicMock(
+            return_value={"2026-06-15": {"2026-06-15-okc-ind": {"id": "2026-06-15-okc-ind"}}}
+        )
+        self.module.reconcile_schedule_date = MagicMock()
+        self.module.update_team_schedule_artifacts_for_schedule_games = MagicMock()
+
+        self.module.reconcile_season_schedule()
+
+        self.module.reconcile_schedule_date.assert_not_called()
+        self.module.update_team_schedule_artifacts_for_schedule_games.assert_not_called()
+
+    def test_reconcile_season_schedule_skips_when_feed_unavailable(self):
+        self.module.get_nba_date = MagicMock(return_value="2026-11-01")
+        self.module.fetch_schedule_feed = MagicMock(return_value=None)
+        self.module.reconcile_schedule_date = MagicMock()
+        self.module.update_team_schedule_artifacts_for_schedule_games = MagicMock()
+
+        self.module.reconcile_season_schedule()
+
+        self.module.reconcile_schedule_date.assert_not_called()
+        self.module.update_team_schedule_artifacts_for_schedule_games.assert_not_called()
+
     def test_reconcile_schedule_date_replaces_future_tbd_time_from_feed(self):
         self.module.get_games_from_s3 = MagicMock(
             return_value=[
