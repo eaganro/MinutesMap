@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { usePlayExportController } from './usePlayExportController';
+import PlayExportTips from './PlayExportTips';
+import { usePlayExportTips } from './usePlayExportTips';
 
 export default function PlayExportControls({
   playRef,
@@ -28,6 +30,7 @@ export default function PlayExportControls({
     resolvedExportRange,
     exportRangeOptions,
     filteredRangeEndOptions,
+    hasCaptionedPeriods,
     previewIsUpdating,
     captionText,
     captionMaxLength,
@@ -54,6 +57,11 @@ export default function PlayExportControls({
     onExportInteractionStart,
   });
   const isPreviewOpen = Boolean(exportPreview);
+  const exportTips = usePlayExportTips({
+    previewRef: exportPreviewRef,
+    enabled: isPreviewOpen,
+    hasRangeOptions: exportRangeOptions.length > 0,
+  });
 
   useEffect(() => {
     if (isPreviewOpen) {
@@ -192,12 +200,26 @@ export default function PlayExportControls({
               Close
             </button>
           </div>
+          {/* Before the options so tip buttons sit inside the focus trap's first/last bounds. */}
+          {exportTips.activeTip && (
+            <PlayExportTips
+              activeTip={exportTips.activeTip}
+              previewRef={exportPreviewRef}
+              layoutKey={`${exportView}|${exportRangeOptions.length}`}
+              hasCaptionedPeriods={hasCaptionedPeriods}
+              onDismiss={exportTips.dismissTip}
+              onSkip={exportTips.skipTips}
+            />
+          )}
           <div className="playExportPreviewOptions">
-            <label className="playExportOption">
+            <label className="playExportOption playExportViewOption">
               <span>View</span>
               <select
                 value={exportView}
-                onChange={(event) => setExportView(event.target.value)}
+                onChange={(event) => {
+                  setExportView(event.target.value);
+                  exportTips.completeTip('view');
+                }}
                 disabled={isExporting || previewIsUpdating}
               >
                 {exportViewOptions.map((option) => (
@@ -212,7 +234,10 @@ export default function PlayExportControls({
                 <span>Player</span>
                 <select
                   value={exportPlayerKey}
-                  onChange={(event) => setExportPlayerKey(event.target.value)}
+                  onChange={(event) => {
+                    setExportPlayerKey(event.target.value);
+                    exportTips.completeTip('view');
+                  }}
                   disabled={isExporting || previewIsUpdating || !exportPlayerOptions.length}
                 >
                   {exportPlayerOptions.length ? (
@@ -235,7 +260,10 @@ export default function PlayExportControls({
                   <span>Start</span>
                   <select
                     value={resolvedExportRange.start}
-                    onChange={handleExportRangeStartChange}
+                    onChange={(event) => {
+                      handleExportRangeStartChange(event);
+                      exportTips.completeTip('range');
+                    }}
                     disabled={isExporting || previewIsUpdating}
                   >
                     {exportRangeOptions.map(({ period, label }) => (
@@ -249,7 +277,10 @@ export default function PlayExportControls({
                   <span>End</span>
                   <select
                     value={resolvedExportRange.end}
-                    onChange={handleExportRangeEndChange}
+                    onChange={(event) => {
+                      handleExportRangeEndChange(event);
+                      exportTips.completeTip('range');
+                    }}
                     disabled={isExporting || previewIsUpdating}
                   >
                     {filteredRangeEndOptions.map(({ period, label }) => (
@@ -271,7 +302,10 @@ export default function PlayExportControls({
                   <button
                     type="button"
                     className="playExportCaptionClearButton"
-                    onClick={handleClearCaption}
+                    onClick={() => {
+                      handleClearCaption();
+                      exportTips.completeTip('caption');
+                    }}
                     disabled={isExporting || previewIsUpdating || !captionText.length}
                     aria-label="Clear caption"
                   >
@@ -280,7 +314,10 @@ export default function PlayExportControls({
                   <button
                     type="button"
                     className="playExportCaptionApplyButton"
-                    onClick={handleApplyCaption}
+                    onClick={() => {
+                      handleApplyCaption();
+                      exportTips.completeTip('caption');
+                    }}
                     disabled={isExporting || previewIsUpdating || !captionCanApply}
                   >
                     Update caption
