@@ -439,6 +439,128 @@ def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes()
     assert status_artifact["currentGame"]["opponentAbbr"] == "NYK"
 
 
+def test_update_team_schedule_artifacts_prunes_unplayed_rows_missing_from_schedule():
+    s3 = FakeS3()
+
+    def row(game_id, played=False):
+        return {
+            "gameId": game_id,
+            "date": game_id[:10],
+            "start": f"{game_id[:10]}T19:00:00",
+            "season": "2026-27",
+            "seasonType": "regular",
+            "opponentAbbr": "NYK",
+            "status": "Final" if played else "7:00 pm ET",
+            "played": played,
+            "result": "W" if played else None,
+            "teamScore": 110 if played else 0,
+            "oppScore": 100 if played else 0,
+            "teamStats": {"pts": 110} if played else {},
+            "players": [],
+        }
+
+    _put_json(
+        s3,
+        "test-bucket",
+        "data/pages/teams/BOS/2026-27.json.gz",
+        {
+            "schemaVersion": 1,
+            "season": "2026-27",
+            "team": {"id": 1610612738, "abbr": "BOS", "name": ""},
+            "games": [
+                row("2026-11-01-bos-nyk", played=True),
+                row("2026-11-02-nyk-bos"),  # today: left alone
+                row("2026-11-05-bos-nyk"),  # moved to 2026-11-20
+                row("2026-11-12-bos-nyk"),  # still scheduled
+            ],
+        },
+    )
+
+    def schedule_game(game_id, status="7:00 pm ET"):
+        away, home = game_id[11:].upper().split("-")
+        return {
+            "id": game_id,
+            "date": game_id[:10],
+            "starttime": f"{game_id[:10]}T19:00:00",
+            "awayteam": away,
+            "hometeam": home,
+            "awayTeamId": 1610612738 if away == "BOS" else 1610612752,
+            "homeTeamId": 1610612738 if home == "BOS" else 1610612752,
+            "status": status,
+            "seasonType": "regular",
+        }
+
+    update_team_schedule_artifacts_for_schedule_games(
+        s3_client=s3,
+        bucket="test-bucket",
+        root_prefix="data/",
+        page_prefix="pages/",
+        schedule_games=[schedule_game("2026-11-12-bos-nyk"), schedule_game("2026-11-20-bos-nyk")],
+        today=date(2026, 11, 2),
+        prune_unplayed_from=date(2026, 11, 3),
+    )
+
+    team_artifact = _read_json(s3, "test-bucket", "data/pages/teams/BOS/2026-27.json.gz")
+    assert [game["gameId"] for game in team_artifact["games"]] == [
+        "2026-11-01-bos-nyk",
+        "2026-11-02-nyk-bos",
+        "2026-11-12-bos-nyk",
+        "2026-11-20-bos-nyk",
+    ]
+
+
+def test_update_team_schedule_artifacts_without_prune_keeps_missing_rows():
+    s3 = FakeS3()
+    _put_json(
+        s3,
+        "test-bucket",
+        "data/pages/teams/BOS/2026-27.json.gz",
+        {
+            "schemaVersion": 1,
+            "season": "2026-27",
+            "team": {"id": 1610612738, "abbr": "BOS", "name": ""},
+            "games": [
+                {
+                    "gameId": "2026-11-05-bos-nyk",
+                    "date": "2026-11-05",
+                    "season": "2026-27",
+                    "seasonType": "regular",
+                    "status": "7:00 pm ET",
+                    "played": False,
+                    "result": None,
+                    "teamStats": {},
+                    "players": [],
+                }
+            ],
+        },
+    )
+
+    update_team_schedule_artifacts_for_schedule_games(
+        s3_client=s3,
+        bucket="test-bucket",
+        root_prefix="data/",
+        page_prefix="pages/",
+        schedule_games=[
+            {
+                "id": "2026-11-12-bos-nyk",
+                "date": "2026-11-12",
+                "starttime": "2026-11-12T19:00:00",
+                "awayteam": "BOS",
+                "hometeam": "NYK",
+                "status": "7:00 pm ET",
+                "seasonType": "regular",
+            }
+        ],
+        today=date(2026, 11, 2),
+    )
+
+    team_artifact = _read_json(s3, "test-bucket", "data/pages/teams/BOS/2026-27.json.gz")
+    assert [game["gameId"] for game in team_artifact["games"]] == [
+        "2026-11-05-bos-nyk",
+        "2026-11-12-bos-nyk",
+    ]
+
+
 def test_team_recalc_keeps_future_unplayed_schedule_rows_out_of_totals():
     artifact = {
         "games": [
