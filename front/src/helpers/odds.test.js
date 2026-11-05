@@ -35,6 +35,16 @@ describe('odds helpers', () => {
     expect(formatWinProbabilityPercent(0.58)).toBe('58%');
     expect(findWinProbabilityAtOrBefore(oddsTimeline, 1, 'PT11M00.00S')).toBe(0.54);
     expect(findWinProbabilityAtOrBefore(oddsTimeline, 1, 'PT10M00.00S')).toBe(0.67);
-    expect(findWinProbabilityAtOrBefore(oddsTimeline, 1, 'PT11M59.00S')).toBeNull();
+    expect(findWinProbabilityAtOrBefore(oddsTimeline, 1, 'PT11M59.00S')).toBe(0.54);
+  });
+
+  it('only borrows the first snapshot for plays shortly before it', () => {
+    const oddsTimeline = [{ period: 1, clock: 'PT11M53.00S', awayWinProb: 0.385 }];
+    const lateStart = [{ period: 2, clock: 'PT06M00.00S', awayWinProb: 0.6 }];
+
+    expect(findWinProbabilityAtOrBefore(oddsTimeline, 1, 'PT12M00.00S')).toBe(0.385);
+    expect(findWinProbabilityAtOrBefore(lateStart, 2, 'PT06M30.00S')).toBe(0.6);
+    expect(findWinProbabilityAtOrBefore(lateStart, 2, 'PT08M00.00S')).toBeNull();
+    expect(findWinProbabilityAtOrBefore(lateStart, 1, 'PT12M00.00S')).toBeNull();
   });
 });

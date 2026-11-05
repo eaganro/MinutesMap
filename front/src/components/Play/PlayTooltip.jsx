@@ -135,112 +135,54 @@ export default function PlayTooltip({
 
   return (
     <div className="descriptionArea" style={tooltipStyle} ref={tooltipRef}>
-      {!layout.shouldPositionBelow ? (
-        <>
-          {showNavControls && (
-            <div className="tooltipNav" style={{ marginBottom: 6 }}>
-              <button
-                type="button"
-                className="tooltipNavButton"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onNavigate(-1);
-                }}
-                onTouchStart={(event) => event.stopPropagation()}
-                disabled={!hasPrevAction}
-              >
-                ← Prev
-              </button>
-              <button
-                type="button"
-                className="tooltipNavButton"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onNavigate(1);
-                }}
-                onTouchStart={(event) => event.stopPropagation()}
-                disabled={!hasNextAction}
-              >
-                Next →
-              </button>
-            </div>
-          )}
-          <TooltipActions
-            descriptionArray={safeDescriptionArray}
-            awayTeamNames={awayTeamNames}
-            teamColors={teamColors}
-            renderItems={renderItems}
-          />
-          {showLockedVideoLink && (
-            <LockedVideoLink
-              videoUrl={videoUrl}
-              nbaGameId={nbaGameId}
-              actionNumber={videoActionNumber}
-            />
-          )}
-          {primaryAction && (
-            <TooltipHeader
-              primaryAction={primaryAction}
-              awayTeamNames={awayTeamNames}
-              homeTeamNames={homeTeamNames}
-              awayWinProb={focusActionMeta?.awayWinProb}
-              shouldPositionBelow={layout.shouldPositionBelow}
-            />
-          )}
-        </>
-      ) : (
-        <>
-          {primaryAction && (
-            <TooltipHeader
-              primaryAction={primaryAction}
-              awayTeamNames={awayTeamNames}
-              homeTeamNames={homeTeamNames}
-              awayWinProb={focusActionMeta?.awayWinProb}
-              shouldPositionBelow={layout.shouldPositionBelow}
-            />
-          )}
-          <TooltipActions
-            descriptionArray={safeDescriptionArray}
-            awayTeamNames={awayTeamNames}
-            teamColors={teamColors}
-            renderItems={renderItems}
-          />
-          {showLockedVideoLink && (
-            <LockedVideoLink
-              videoUrl={videoUrl}
-              nbaGameId={nbaGameId}
-              actionNumber={videoActionNumber}
-            />
-          )}
-          {showNavControls && (
-            <div className="tooltipNav">
-              <button
-                type="button"
-                className="tooltipNavButton"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onNavigate(-1);
-                }}
-                onTouchStart={(event) => event.stopPropagation()}
-                disabled={!hasPrevAction}
-              >
-                ← Prev
-              </button>
-              <button
-                type="button"
-                className="tooltipNavButton"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onNavigate(1);
-                }}
-                onTouchStart={(event) => event.stopPropagation()}
-                disabled={!hasNextAction}
-              >
-                Next →
-              </button>
-            </div>
-          )}
-        </>
+      {primaryAction && (
+        <TooltipHeader
+          primaryAction={primaryAction}
+          awayTeamNames={awayTeamNames}
+          homeTeamNames={homeTeamNames}
+          awayWinProb={focusActionMeta?.awayWinProb}
+        />
+      )}
+      <TooltipActions
+        descriptionArray={safeDescriptionArray}
+        awayTeamNames={awayTeamNames}
+        teamColors={teamColors}
+        renderItems={renderItems}
+      />
+      {showLockedVideoLink && (
+        <LockedVideoLink
+          videoUrl={videoUrl}
+          nbaGameId={nbaGameId}
+          actionNumber={videoActionNumber}
+        />
+      )}
+      {showNavControls && (
+        <div className="tooltipNav">
+          <button
+            type="button"
+            className="tooltipNavButton"
+            onClick={(event) => {
+              event.stopPropagation();
+              onNavigate(-1);
+            }}
+            onTouchStart={(event) => event.stopPropagation()}
+            disabled={!hasPrevAction}
+          >
+            ← Prev
+          </button>
+          <button
+            type="button"
+            className="tooltipNavButton"
+            onClick={(event) => {
+              event.stopPropagation();
+              onNavigate(1);
+            }}
+            onTouchStart={(event) => event.stopPropagation()}
+            disabled={!hasNextAction}
+          >
+            Next →
+          </button>
+        </div>
       )}
 
       {showVideoHint && (
@@ -284,18 +226,12 @@ export default function PlayTooltip({
   );
 }
 
-function TooltipHeader({
-  primaryAction,
-  awayTeamNames,
-  homeTeamNames,
-  awayWinProb,
-  shouldPositionBelow,
-}) {
+function TooltipHeader({ primaryAction, awayTeamNames, homeTeamNames, awayWinProb }) {
   const awayProbability = clampWinProbability(awayWinProb);
   const homeProbability = awayProbability === null ? null : 1 - awayProbability;
 
   return (
-    <div className={`time-score-header ${shouldPositionBelow ? 'bottom' : 'top'}`}>
+    <div className="time-score-header">
       <div className="headerRow">
         <span className="time">
           {formatPeriod(primaryAction.period)} {formatClock(primaryAction.clock)}
