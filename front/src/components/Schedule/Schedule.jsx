@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Close, ExpandMore, NavigateNext, NavigateBefore } from '@mui/icons-material';
+import {
+  CalendarTodayOutlined,
+  Close,
+  ExpandMore,
+  NavigateNext,
+  NavigateBefore,
+} from '@mui/icons-material';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import { parseGameStatus } from '../../domain/game-selection/status';
 import { formatStatusText } from '../../helpers/utils';
-import { formatShortDate } from '../../domain/game-selection/teamSchedule';
+import { formatPickerDate, formatShortDate } from '../../domain/game-selection/teamSchedule';
 import { useDateInputState } from '../hooks/schedule/useDateInputState';
 import { useHorizontalDragScroll } from '../hooks/ui/useHorizontalDragScroll';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
@@ -28,7 +34,7 @@ function LiveDot() {
 function TeamGameButton({ game, isSelected, onClick }) {
   const { isLive, isUpcoming } = parseGameStatus(game.status);
   const hasScore = !isUpcoming && game.teamScore !== null && game.oppScore !== null;
-  const dateText = formatShortDate(game.date);
+  const dateText = formatShortDate(game.date, { weekday: true });
   const statusText = formatStatusText(game.status);
   const scoreText = hasScore ? `${game.teamScore}-${game.oppScore}` : '';
   const outcomeText =
@@ -91,6 +97,17 @@ export default function Schedule({
   });
   const { scrollRef, dragHandlers, didDrag, scrollBy, resetScrollPosition } =
     useHorizontalDragScroll();
+
+  // The native input sits invisibly over the "Wed, Nov 4" text, so open its
+  // calendar from anywhere on the field rather than only from its own icon.
+  const dateInputRef = useRef(null);
+  const openDatePicker = () => {
+    try {
+      dateInputRef.current?.showPicker?.();
+    } catch {
+      // Unsupported or blocked; the focused input still accepts typed dates.
+    }
+  };
 
   const isTeamMode = Boolean(teamMode);
   const [isTeamPickerOpen, setIsTeamPickerOpen] = useState(false);
@@ -348,13 +365,27 @@ export default function Schedule({
             <IconButton className="scheduleButton" onClick={dateDown} aria-label="Previous date">
               <NavigateBefore />
             </IconButton>
-            <input
-              id="scheduleDate"
-              className="dateInput"
-              type="date"
-              value={date}
-              onChange={(e) => handleDateChange(e.target.value)}
-            />
+            <div className="dateField">
+              <span className="dateFieldText" aria-hidden="true">
+                {formatPickerDate(date)}
+              </span>
+              <CalendarTodayOutlined className="dateFieldIcon" aria-hidden="true" />
+              <input
+                id="scheduleDate"
+                ref={dateInputRef}
+                className="dateInput"
+                type="date"
+                value={date}
+                onChange={(e) => handleDateChange(e.target.value)}
+                onClick={openDatePicker}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openDatePicker();
+                  }
+                }}
+              />
+            </div>
             <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
               <NavigateNext />
             </IconButton>

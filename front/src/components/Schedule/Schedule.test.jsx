@@ -91,6 +91,7 @@ describe('Schedule', () => {
   it('uses value-based date changes and date navigation controls', () => {
     render(<Schedule {...buildProps()} />);
 
+    expect(screen.getByText(/^Tue, Feb 3/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Select game date'), {
       target: { value: '2026-02-04' },
     });
@@ -351,15 +352,15 @@ describe('Schedule', () => {
       expect(screen.getByRole('region', { name: 'BOS schedule' })).toBeInTheDocument();
       expect(screen.getByText('0-1 · 2026-27')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Oct 20, at DET, L 113-121' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Tue, Oct 20, at DET, L 113-121' }));
       expect(teamMode.changeGame).toHaveBeenCalledWith('2026-10-20-bos-det');
       expect(changeGame).not.toHaveBeenCalled();
 
       expect(
-        screen.getByRole('button', { name: 'Oct 23, vs NYK, 74-70, Q3 05:12' }),
+        screen.getByRole('button', { name: 'Fri, Oct 23, vs NYK, 74-70, Q3 05:12' }),
       ).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByLabelText('Live game')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Oct 26, vs CHI, 7:30/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Mon, Oct 26, vs CHI, 7:30/ })).toBeInTheDocument();
 
       fireEvent.click(screen.getByLabelText('Show all games'));
       expect(onSelectTeam).toHaveBeenCalledWith(null);
