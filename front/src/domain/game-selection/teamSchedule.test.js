@@ -3,7 +3,9 @@ import {
   buildTeamGames,
   deriveSeasonLabel,
   findNearestGameIndex,
+  formatPickerDate,
   formatShortDate,
+  formatWeekday,
   gameIdIncludesTeam,
   NBA_CONFERENCES,
   NBA_TEAM_ABBRS,
@@ -71,6 +73,16 @@ describe('teamSchedule', () => {
   it('formats short dates without timezone shifts', () => {
     expect(formatShortDate('2026-10-08')).toBe('Oct 8');
     expect(formatShortDate('')).toBe('');
+    expect(formatShortDate('2026-10-08', { weekday: true })).toBe('Thu, Oct 8');
+    expect(formatShortDate('2027-03-01', { weekday: true })).toBe('Mon, Mar 1');
+    expect(formatWeekday('2026-11-04')).toBe('Wed');
+    expect(formatWeekday('bad')).toBe('');
+  });
+
+  it('formats the picker date with the year only outside the current year', () => {
+    expect(formatPickerDate('2026-11-04', 2026)).toBe('Wed, Nov 4');
+    expect(formatPickerDate('2025-01-15', 2026)).toBe('Wed, Jan 15, 2025');
+    expect(formatPickerDate('', 2026)).toBe('');
   });
 
   it('matches teams against game slugs', () => {

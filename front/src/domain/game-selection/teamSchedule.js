@@ -142,12 +142,32 @@ export function deriveSeasonLabel(dateString) {
   return `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
 }
 
-export function formatShortDate(dateString) {
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Short weekday ("Thu") for an ISO date, independent of the viewer's timezone. */
+export function formatWeekday(dateString) {
   const match = ISO_DATE_RE.exec(dateString || '');
   if (!match) {
     return '';
   }
-  return `${MONTH_LABELS[Number(match[2]) - 1]} ${Number(match[3])}`;
+  const utc = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return WEEKDAY_LABELS[utc.getUTCDay()];
+}
+
+export function formatShortDate(dateString, { weekday = false } = {}) {
+  const match = ISO_DATE_RE.exec(dateString || '');
+  if (!match) {
+    return '';
+  }
+  const text = `${MONTH_LABELS[Number(match[2]) - 1]} ${Number(match[3])}`;
+  return weekday ? `${formatWeekday(dateString)}, ${text}` : text;
+}
+
+/** "Wed, Nov 4" for the date picker, adding the year when it isn't `currentYear`. */
+export function formatPickerDate(dateString, currentYear = new Date().getFullYear()) {
+  const text = formatShortDate(dateString, { weekday: true });
+  const year = Number(String(dateString).slice(0, 4));
+  return text && year !== currentYear ? `${text}, ${year}` : text;
 }
 
 export function gameIdIncludesTeam(gameId, team) {
