@@ -33,6 +33,10 @@ export const formatWinProbabilityPercent = (value) => {
   return Number.isInteger(percentage) ? `${percentage.toFixed(0)}%` : `${percentage.toFixed(1)}%`;
 };
 
+// The first odds snapshot lands a few seconds after tip-off, so plays before it (the jump
+// ball) would otherwise show no odds. Treat a snapshot this close after them as their odds.
+const OPENING_ODDS_GRACE_SECONDS = 60;
+
 export const findWinProbabilityAtOrBefore = (oddsTimeline, period, clock) => {
   if (!Array.isArray(oddsTimeline) || !oddsTimeline.length) {
     return null;
@@ -45,19 +49,33 @@ export const findWinProbabilityAtOrBefore = (oddsTimeline, period, clock) => {
 
   let resolvedProbability = null;
   let resolvedSeconds = -Infinity;
+  let earliestProbability = null;
+  let earliestSeconds = Infinity;
 
   oddsTimeline.forEach((entry) => {
     const probability = clampWinProbability(entry?.awayWinProb);
     if (probability === null) return;
 
     const entrySeconds = getSecondsElapsed(entry?.period, entry?.clock);
-    if (!Number.isFinite(entrySeconds) || entrySeconds > targetSeconds) return;
+    if (!Number.isFinite(entrySeconds)) return;
 
-    if (entrySeconds >= resolvedSeconds) {
+    if (entrySeconds < earliestSeconds) {
+      earliestProbability = probability;
+      earliestSeconds = entrySeconds;
+    }
+
+    if (entrySeconds <= targetSeconds && entrySeconds >= resolvedSeconds) {
       resolvedProbability = probability;
       resolvedSeconds = entrySeconds;
     }
   });
+
+  if (
+    resolvedProbability === null &&
+    earliestSeconds - targetSeconds <= OPENING_ODDS_GRACE_SECONDS
+  ) {
+    return earliestProbability;
+  }
 
   return resolvedProbability;
 };
