@@ -36,7 +36,8 @@ git pull --ff-only -q origin main
 mkdir -p ~/minutesmap-poller ~/.config/systemd/user
 rsync -a --delete --exclude __pycache__ "$ROOT/functions/nba-game-poller/" ~/minutesmap-poller/nba-game-poller/
 rsync -a "$ROOT/pi/run_poller.py" ~/minutesmap-poller/
-rsync -a "$ROOT/pi/minutesmap-poller.service" ~/.config/systemd/user/
+rsync -a "$ROOT/pi/minutesmap-poller.service" "$ROOT/pi/minutesmap-autodeploy.service" \
+  "$ROOT/pi/minutesmap-autodeploy.timer" ~/.config/systemd/user/
 cd ~/minutesmap-poller
 [ -d .venv ] || python3 -m venv .venv
 .venv/bin/pip install -q boto3

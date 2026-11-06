@@ -1,0 +1,8 @@
+[Unit]
+Description=Deploy pushed MinutesMap poller changes
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash %h/MinutesMap/pi/auto_deploy.sh
