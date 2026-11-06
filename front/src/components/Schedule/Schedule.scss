@@ -61,6 +61,26 @@
     justify-content: center;
     margin: auto;
 
+    // Switching between the date and team views blurs the whole schedule
+    // (the games strip blurs through its own isLoading class); the
+    // "Updating games…" note stays readable.
+    .datePick,
+    .gamePick > :not(.gamesState) {
+      filter: blur(0px);
+      transition:
+        filter 0.15s ease,
+        opacity 0.15s ease;
+    }
+
+    &.isSwitchingView {
+      .datePick,
+      .gamePick > :not(.gamesState) {
+        filter: blur(3px);
+        opacity: 0.6;
+        pointer-events: none;
+      }
+    }
+
     .datePick {
       flex: 0 0 auto;
       min-width: 210px;
@@ -289,6 +309,16 @@
         text-align: center;
         cursor: grab;
         touch-action: pan-x;
+        filter: blur(0px);
+        transition:
+          filter 0.15s ease,
+          opacity 0.15s ease;
+
+        &.isLoading {
+          filter: blur(3px);
+          opacity: 0.6;
+          pointer-events: none;
+        }
 
         &.dragging {
           cursor: grabbing;

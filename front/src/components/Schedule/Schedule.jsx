@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarTodayOutlined,
   Close,
@@ -14,6 +14,13 @@ import { formatPickerDate, formatShortDate } from '../../domain/game-selection/t
 import { useDateInputState } from '../hooks/schedule/useDateInputState';
 import { useHorizontalDragScroll } from '../hooks/ui/useHorizontalDragScroll';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
+import { useMinimumLoadingState } from '../hooks/ui/useMinimumLoadingState';
+import { useStableWhileLoading } from '../hooks/ui/useStableWhileLoading';
+import {
+  LOADING_TEXT_DELAY_MS,
+  MIN_BLUR_MS,
+  MIN_DATE_SWITCH_BLUR_MS,
+} from '../constants/loadingUiTimings';
 import TeamLogo from './TeamLogo';
 import TeamPickerPanel from './TeamPickerPanel';
 
@@ -130,7 +137,89 @@ export default function Schedule({
     'aria-haspopup': 'dialog',
   };
 
+  // Switching to another date or team keeps the previous games on screen,
+  // blurred, until the new list arrives (like the game panels below); switching
+  // between the date and team views does the same for the whole schedule,
+  // controls included. Live refreshes of the same list don't blur: a date's
+  // list is only emptied when the date changes, and a team list only reloads
+  // for a new team or season.
+  const teamAbbr = teamMode?.team ?? null;
+  const listMode = isTeamMode ? 'team' : 'date';
+  // The other view's list is often already loaded, so a view change starts the
+  // blur itself; the minimum blur time then covers the swap.
+  const [lastListMode, setLastListMode] = useState(listMode);
+  const [isModeSwitching, setIsModeSwitching] = useState(false);
+  if (lastListMode !== listMode) {
+    setLastListMode(listMode);
+    setIsModeSwitching(true);
+  }
+  useEffect(() => {
+    if (isModeSwitching) setIsModeSwitching(false);
+  }, [isModeSwitching]);
+  const isListSwitching =
+    isModeSwitching ||
+    (isTeamMode ? teamMode.status === 'loading' : Boolean(isPending && !games?.length));
+  // A switch keeps the kind it started as (a date switch, or a team or view
+  // switch), so its minimum blur time doesn't change partway through.
+  const [isDateSwitch, setIsDateSwitch] = useState(!isTeamMode);
+  const isListBlurred = useMinimumLoadingState(
+    isListSwitching,
+    isDateSwitch ? MIN_DATE_SWITCH_BLUR_MS : MIN_BLUR_MS,
+  );
+  const isStartingDateSwitch = !isTeamMode && !isModeSwitching;
+  if (isListSwitching && !isListBlurred && isDateSwitch !== isStartingDateSwitch) {
+    setIsDateSwitch(isStartingDateSwitch);
+  }
+  const liveView = useMemo(
+    () =>
+      isTeamMode
+        ? {
+            mode: 'team',
+            team: teamAbbr,
+            season: teamMode.season,
+            record: teamMode.record,
+            games: teamMode.games || [],
+            isPending: teamMode.status === 'loading',
+            isLoading: teamMode.status === 'loading',
+            status: teamMode.status,
+            error: teamMode.error,
+            retry: teamMode.retry,
+          }
+        : {
+            mode: 'date',
+            date,
+            games: games || [],
+            isPending,
+            isLoading: isPending || isLoading,
+            status,
+            error,
+            retry: onRetry,
+          },
+    [isTeamMode, teamAbbr, teamMode, date, games, isPending, isLoading, status, error, onRetry],
+  );
+  const { displayData: stableView, isShowingStableData } = useStableWhileLoading({
+    data: liveView,
+    isLoading: isListSwitching,
+    isBlurred: isListBlurred,
+  });
+  const isShowingPreviousView = isShowingStableData && stableView.mode !== listMode;
+  const isShowingPreviousList =
+    isShowingPreviousView || (isShowingStableData && stableView.games.length > 0);
+  const shownList = isShowingPreviousList ? stableView : liveView;
+  const shownHeader = isShowingPreviousView ? stableView : liveView;
+
+  const [isSlowListSwitch, setIsSlowListSwitch] = useState(false);
+  useEffect(() => {
+    if (!isListSwitching) {
+      setIsSlowListSwitch(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => setIsSlowListSwitch(true), LOADING_TEXT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isListSwitching]);
+
   const handleGameClick = (event, id) => {
+    if (isShowingPreviousList) return;
     // Keyboard-generated clicks have no click count and should not inherit a
     // previous pointer drag's suppression state.
     if (event.detail > 0 && didDrag()) return;
@@ -141,18 +230,19 @@ export default function Schedule({
     changeGame(id);
   };
 
-  const teamGamesList = isTeamMode
-    ? teamMode.games.map((game) => (
-        <TeamGameButton
-          key={game.id}
-          game={game}
-          isSelected={game.id === selectedGameId}
-          onClick={(event) => handleGameClick(event, game.id)}
-        />
-      ))
-    : null;
+  const teamGamesList =
+    shownList.mode === 'team'
+      ? shownList.games.map((game) => (
+          <TeamGameButton
+            key={game.id}
+            game={game}
+            isSelected={game.id === selectedGameId}
+            onClick={(event) => handleGameClick(event, game.id)}
+          />
+        ))
+      : null;
 
-  const dateGamesList = (isTeamMode ? [] : games || []).map((g) => {
+  const dateGamesList = (shownList.mode === 'date' ? shownList.games : []).map((g) => {
     const { isLive, isUpcoming } = parseGameStatus(g.status);
     const isSelected = g.id === selectedGameId;
     const gameClassName = `game${isSelected ? ' selected' : ''}`;
@@ -222,7 +312,7 @@ export default function Schedule({
       );
     }
   });
-  const gamesList = isTeamMode ? teamGamesList : dateGamesList;
+  const gamesList = shownList.mode === 'team' ? teamGamesList : dateGamesList;
   const scrollScheduleRight = () => {
     scrollBy(100);
   };
@@ -260,26 +350,37 @@ export default function Schedule({
         window.removeEventListener('resize', updateCanScrollGames);
       }
     };
-  }, [games, gamesList.length, scrollRef]);
+  }, [shownList.games, gamesList.length, scrollRef]);
 
   const dateDown = () => {
     shiftDate(-DATE_NAVIGATION_STEP_DAYS);
-    resetScrollPosition();
   };
   const dateUp = () => {
     shiftDate(DATE_NAVIGATION_STEP_DAYS);
-    resetScrollPosition();
   };
+
+  // The blurred previous list keeps its scroll position; the new games start
+  // from the beginning once they replace it (before they are painted). A team
+  // list then jumps to the selected game below.
+  const wasShowingPreviousListRef = useRef(false);
+  useLayoutEffect(() => {
+    if (wasShowingPreviousListRef.current && !isShowingPreviousList) {
+      resetScrollPosition();
+    }
+    wasShowingPreviousListRef.current = isShowingPreviousList;
+  }, [isShowingPreviousList, resetScrollPosition]);
 
   // Team seasons are long: keep the selected game in view, jumping straight
   // there when the list is (re)built and gliding on ordinary selection changes.
-  const teamAbbr = teamMode?.team ?? null;
-  const teamGameCount = teamMode?.games.length ?? 0;
+  // Track the team whose games are on screen, which lags the chip while a
+  // new team's list loads.
+  const listTeam = shownList.mode === 'team' ? shownList.team : null;
+  const listGameCount = shownList.mode === 'team' ? shownList.games.length : 0;
   const lastTeamListRef = useRef({ team: null, count: 0 });
-  useEffect(() => {
+  useLayoutEffect(() => {
     const previous = lastTeamListRef.current;
-    lastTeamListRef.current = { team: teamAbbr, count: teamGameCount };
-    if (!teamAbbr) {
+    lastTeamListRef.current = { team: listTeam, count: listGameCount };
+    if (!listTeam) {
       if (previous.team) {
         resetScrollPosition();
       }
@@ -292,7 +393,7 @@ export default function Schedule({
     );
     if (!element) return;
 
-    const isListRebuilt = previous.team !== teamAbbr || previous.count !== teamGameCount;
+    const isListRebuilt = previous.team !== listTeam || previous.count !== listGameCount;
     const nodeRect = node.getBoundingClientRect();
     const elementRect = element.getBoundingClientRect();
     const isVisible = elementRect.left >= nodeRect.left && elementRect.right <= nodeRect.right;
@@ -305,44 +406,50 @@ export default function Schedule({
     } else {
       node.scrollLeft = left;
     }
-  }, [teamAbbr, teamGameCount, selectedGameId, scrollRef, resetScrollPosition]);
+  }, [listTeam, listGameCount, selectedGameId, scrollRef, resetScrollPosition]);
 
-  const record = teamMode?.record;
+  // The previous team's record would be wrong next to the new team's chip.
+  const record = isShowingPreviousList && !isShowingPreviousView ? null : shownHeader.record;
   const recordText = record
     ? `${record.wins}-${record.losses}${record.seasonType === 'preseason' ? ' preseason' : ''}`
     : null;
 
-  const listIsPending = isTeamMode ? teamMode.status === 'loading' : isPending;
-  const listIsLoading = isTeamMode ? teamMode.status === 'loading' : isPending || isLoading;
-  const listStatus = isTeamMode ? teamMode.status : status;
-  const listError = isTeamMode ? teamMode.error : error;
-  const listRetry = isTeamMode ? teamMode.retry : onRetry;
-  const unavailableText = isTeamMode
-    ? `No ${teamAbbr} games found for ${teamMode.season || 'this season'}.`
+  const {
+    isPending: listIsPending,
+    isLoading: listIsLoading,
+    status: listStatus,
+    error: listError,
+    retry: listRetry,
+  } = shownList;
+  const isTeamList = shownList.mode === 'team';
+  const unavailableText = isTeamList
+    ? `No ${shownList.team} games found for ${shownList.season || 'this season'}.`
     : 'Schedule unavailable for this date.';
+  const isTeamHeader = shownHeader.mode === 'team';
+  const headerTeam = shownHeader.team;
 
   return (
     <div
-      className={`schedule${isTeamMode ? ' isTeamMode' : ''}`}
+      className={`schedule${isTeamHeader ? ' isTeamMode' : ''}`}
       role="region"
-      aria-label={isTeamMode ? `${teamAbbr} schedule` : 'Game schedule'}
-      aria-busy={listIsPending || listIsLoading}
+      aria-label={isTeamHeader ? `${headerTeam} schedule` : 'Game schedule'}
+      aria-busy={isListSwitching || listIsPending || listIsLoading}
     >
-      <div className="scheduleContent">
-        {isTeamMode ? (
+      <div className={`scheduleContent${isShowingPreviousView ? ' isSwitchingView' : ''}`}>
+        {isTeamHeader ? (
           <div className="datePick">
             <div className="teamChip">
               <button
                 {...teamPickerTriggerProps}
                 className="teamChipButton"
-                aria-label={`Change team, now ${teamAbbr}`}
+                aria-label={`Change team, now ${headerTeam}`}
                 title="Change team"
               >
-                <TeamLogo team={teamAbbr} size={28} />
+                <TeamLogo team={headerTeam} size={28} />
                 <div className="teamChipText">
-                  <span className="teamChipName">{teamAbbr}</span>
+                  <span className="teamChipName">{headerTeam}</span>
                   <span className="teamChipMeta">
-                    {[recordText, teamMode.season].filter(Boolean).join(' · ')}
+                    {[recordText, shownHeader.season].filter(Boolean).join(' · ')}
                   </span>
                 </div>
               </button>
@@ -367,7 +474,7 @@ export default function Schedule({
             </IconButton>
             <div className="dateField">
               <span className="dateFieldText" aria-hidden="true">
-                {formatPickerDate(date)}
+                {formatPickerDate(shownHeader.date)}
               </span>
               <CalendarTodayOutlined className="dateFieldIcon" aria-hidden="true" />
               <input
@@ -375,7 +482,7 @@ export default function Schedule({
                 ref={dateInputRef}
                 className="dateInput"
                 type="date"
-                value={date}
+                value={shownHeader.date}
                 onChange={(e) => handleDateChange(e.target.value)}
                 onClick={openDatePicker}
                 onKeyDown={(e) => {
@@ -410,13 +517,13 @@ export default function Schedule({
           </IconButton>
           {gamesList.length ? (
             <div className="gamesState">
-              {listIsPending && (
+              {(isShowingPreviousList ? isSlowListSwitch : listIsPending) && (
                 <span className="scheduleUpdating" role="status">
                   Updating games…
                 </span>
               )}
               <div
-                className="games"
+                className={`games${isShowingPreviousList ? ' isLoading' : ''}`}
                 ref={scrollRef}
                 onMouseDown={dragHandlers.onMouseDown}
                 onMouseLeave={dragHandlers.onMouseLeave}
@@ -450,7 +557,7 @@ export default function Schedule({
               </button>
             </div>
           ) : listStatus === 'success' ? (
-            <div className="noGames">{isTeamMode ? unavailableText : 'No Games Scheduled'}</div>
+            <div className="noGames">{isTeamList ? unavailableText : 'No Games Scheduled'}</div>
           ) : (
             <div className="loadingIndicator" role="status">
               <CircularProgress size={24} thickness={5} />
