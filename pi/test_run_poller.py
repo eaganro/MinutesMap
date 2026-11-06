@@ -31,7 +31,7 @@ def test_manager_runs_at_start_and_enables_polling_for_started_games():
     runner = PiRunner(poller, InlineExecutor())
     poller.manager_logic = lambda: (poller.calls.append("manager"), poller.enable_poller_logic())
     runner.tick(NOW)
-    assert poller.calls == ["manager", "season", ("poll", None, False)]
+    assert poller.calls == ["manager", ("poll", None, False), "season"]
     assert runner.next_manager_at == datetime(2026, 10, 7, 11, tzinfo=timezone.utc).timestamp()
 
 
@@ -270,3 +270,54 @@ def test_scoreboard_probe_uses_the_poller_fetch():
     assert PiRunner(poller, InlineExecutor()).scoreboard_reachable()
     poller.fetch_nba_data = lambda url: (None, None)
     assert not PiRunner(poller, InlineExecutor()).scoreboard_reachable()
+
+
+def test_restart_skips_the_season_sweep_after_todays_daily_run(tmp_path):
+    marker = tmp_path / "sweep"
+    marker.write_text(f"{NOW - 3600:.0f}\n")  # 10:00 ET, after the 11 UTC daily run
+    poller = fake_poller()
+    runner = PiRunner(poller, InlineExecutor(), sweep_marker=str(marker))
+    runner.tick(NOW)
+    assert poller.calls == ["manager"]
+    runner.tick(runner.next_manager_at)
+    assert poller.calls == ["manager", "manager", "season"]
+    assert marker.read_text() == f"{runner.last_sweep_at:.0f}\n"
+
+
+def test_restart_runs_a_missed_season_sweep_and_records_it(tmp_path):
+    marker = tmp_path / "sweep"
+    marker.write_text(f"{NOW - 86400:.0f}\n")  # yesterday, before today's daily run
+    poller = fake_poller()
+    runner = PiRunner(poller, InlineExecutor(), sweep_marker=str(marker))
+    runner.tick(NOW)
+    assert poller.calls == ["manager", "season"]
+    assert marker.read_text() == f"{NOW:.0f}\n"
+
+
+def test_failed_season_sweep_is_not_recorded(tmp_path):
+    def fail():
+        raise RuntimeError("feed down")
+
+    marker = tmp_path / "sweep"
+    runner = PiRunner(fake_poller(reconcile_season_schedule=fail), InlineExecutor(), sweep_marker=str(marker))
+    runner.tick(NOW)
+    assert runner.last_sweep_at is None and not marker.exists()
+
+
+def test_stop_finishes_the_tick_and_waits_for_captions():
+    import threading
+
+    class RecordingExecutor(InlineExecutor):
+        waited = None
+
+        def shutdown(self, wait=True):
+            self.waited = wait
+
+    poller = fake_poller()
+    executor = RecordingExecutor()
+    runner = PiRunner(poller, executor)
+    stop = threading.Event()
+    poller.manager_logic = lambda: (poller.calls.append("manager"), stop.set())
+    run_poller.run_loop(runner, stop)
+    assert poller.calls == ["manager", "season"]
+    assert executor.waited is True
