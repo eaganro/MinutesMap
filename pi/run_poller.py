@@ -11,8 +11,10 @@ before starting this. See pi/README.md.
 """
 import argparse
 import os
+import signal
 import socket
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -31,6 +33,8 @@ SCOREBOARD_URL = "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScor
 
 DEFAULT_POLLER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nba-game-poller")
 REPO_POLLER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "functions", "nba-game-poller")
+# When the last season sweep finished, so a restart skips it if today's daily run already happened.
+SWEEP_MARKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".last-season-sweep")
 
 
 def log(message):
@@ -125,8 +129,11 @@ class Heartbeat:
 
 
 class PiRunner:
-    def __init__(self, poller, caption_executor=None):
+    def __init__(self, poller, caption_executor=None, sweep_marker=None):
         self.poller = poller
+        self.sweep_marker = sweep_marker
+        self.last_sweep_at = read_timestamp(sweep_marker)
+        self.sweep_due = False
         self.polling = False
         self.kickoff_at = None
         self.done_date = None  # NBA date whose games all finished
@@ -193,8 +200,10 @@ class PiRunner:
         now = time.time() if now is None else now
         if now >= self.next_manager_at:
             self._step("manager", self.poller.manager_logic)
-            # Daily, after the manager so it never delays today's kickoff.
-            self._step("season sweep", self.poller.reconcile_season_schedule)
+            # Daily, after this tick's poll so it never delays polling. At start-up only if
+            # today's daily run was missed, so restarts get back to polling quickly.
+            last_daily_run = next_manager_time(now) - 86400
+            self.sweep_due = self.last_sweep_at is None or self.last_sweep_at < last_daily_run
             self.next_manager_at = next_manager_time(now)
             self.next_reconcile_at = now + RECONCILE_SECONDS
         elif now >= self.next_reconcile_at:
@@ -210,12 +219,52 @@ class PiRunner:
             self.enable()
         if self.polling:
             self._step("poller", lambda: self.poller.poller_logic(None, schedule_half=False))
+        if self.sweep_due:
+            self.sweep_due = False
+            if self._step("season sweep", self.poller.reconcile_season_schedule):
+                self.last_sweep_at = now
+                write_timestamp(self.sweep_marker, now)
 
     def _step(self, name, fn):
         try:
             fn()
+            return True
         except Exception as exc:  # keep the loop alive; the next tick retries
             log(f"{name} failed: {exc!r}")
+            return False
+
+
+def read_timestamp(path):
+    try:
+        with open(path) as handle:
+            return float(handle.read().strip())
+    except (TypeError, OSError, ValueError):
+        return None
+
+
+def write_timestamp(path, value):
+    if not path:
+        return
+    try:
+        with open(path, "w") as handle:
+            handle.write(f"{value:.0f}\n")
+    except OSError as exc:
+        log(f"Could not write {path}: {exc!r}")
+
+
+def run_loop(runner, stop, heartbeat=None, once=False):
+    """Tick every TICK_SECONDS until stop is set, then let queued captions finish. A game's
+    final caption has no later request to backfill it, so a restart must not cut it off."""
+    while not stop.is_set():
+        started = time.time()
+        runner.tick(started)
+        if heartbeat:
+            now = time.time()
+            heartbeat.update(now, runner.in_game_window(now))
+        if once:
+            break
+        stop.wait(max(1.0, TICK_SECONDS - (time.time() - started)))
+    runner.captions.shutdown(wait=True)
 
 
 def main():
@@ -227,23 +276,21 @@ def main():
 
     poller_dir = args.poller_dir or (DEFAULT_POLLER_DIR if os.path.isdir(DEFAULT_POLLER_DIR) else REPO_POLLER_DIR)
     wait_until_ready()
-    runner = PiRunner(load_poller(poller_dir, args.bucket))
+    runner = PiRunner(load_poller(poller_dir, args.bucket), sweep_marker=SWEEP_MARKER)
     heartbeat = None
     if os.environ.get("CLOUDWATCH_HEARTBEAT") == "true":
         import boto3
         cloudwatch = boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-east-1"))
         heartbeat = Heartbeat(cloudwatch, runner.scoreboard_reachable)
+    stop = threading.Event()
+
+    def request_stop(signum, frame):
+        log("Stopping after the current tick and any caption in progress.")
+        stop.set()
+
+    signal.signal(signal.SIGTERM, request_stop)
     log(f"Running the NBA poller pipeline from {poller_dir} against s3://{args.bucket}")
-    while True:
-        started = time.time()
-        runner.tick(started)
-        if heartbeat:
-            now = time.time()
-            heartbeat.update(now, runner.in_game_window(now))
-        if args.once:
-            runner.captions.shutdown(wait=True)
-            return
-        time.sleep(max(1.0, TICK_SECONDS - (time.time() - started)))
+    run_loop(runner, stop, heartbeat, once=args.once)
 
 
 if __name__ == "__main__":

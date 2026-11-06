@@ -24,6 +24,9 @@ Environment=CLOUDWATCH_HEARTBEAT=true
 EnvironmentFile=%h/minutesmap-poller/secrets.env
 ExecStart=%h/minutesmap-poller/.venv/bin/python -u run_poller.py --bucket roryeagan.com-nba-processed-data
 Restart=always
+# On stop the runner finishes its tick and any caption in progress (CAPTION_TIMEOUT_SECONDS per
+# quarter, at most three quarters); usually a few seconds.
+TimeoutStopSec=200
 RestartSec=30
 Nice=5
 
