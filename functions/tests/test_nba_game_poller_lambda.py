@@ -216,6 +216,76 @@ class TestNbaGamePollerLambda:
             }
         ]
 
+    def test_reconcile_schedule_date_keeps_played_games_missing_from_feed(self):
+        def row(game_id, status, home=0, away=0):
+            return {
+                "id": game_id,
+                "date": "2026-11-04",
+                "starttime": "2026-11-04T19:00:00",
+                "hometeam": game_id[-3:].upper(),
+                "awayteam": game_id[-7:-4].upper(),
+                "homescore": home,
+                "awayscore": away,
+                "status": status,
+                "time": "",
+            }
+
+        final = row("2026-11-04-nyk-phi", "Final", 112, 104)
+        live = row("2026-11-04-mia-orl", "Q3 5:12", 70, 66)
+        moved = row("2026-11-04-lal-den", "7:00 PM ET")
+        postponed = row("2026-11-04-chi-mil", "Postponed")
+        self.module.get_games_from_s3 = MagicMock(return_value=[final, live, moved, postponed])
+        self.module.upload_schedule_s3 = MagicMock()
+
+        changed = self.module.reconcile_schedule_date("2026-11-04", {})
+
+        assert changed is True
+        uploaded = self.module.upload_schedule_s3.call_args.kwargs["games_list"]
+        assert sorted(game["id"] for game in uploaded) == [
+            "2026-11-04-mia-orl",
+            "2026-11-04-nyk-phi",
+        ]
+
+    def test_reconcile_schedule_date_keeps_live_score_when_feed_lags(self):
+        live = {
+            "id": "2026-11-04-phi-det",
+            "date": "2026-11-04",
+            "starttime": "2026-11-04T19:00:00",
+            "hometeam": "DET",
+            "awayteam": "PHI",
+            "homescore": 54,
+            "awayscore": 61,
+            "status": "Q2 3:10",
+            "time": "3:10",
+        }
+        self.module.get_games_from_s3 = MagicMock(return_value=[live])
+        self.module.upload_schedule_s3 = MagicMock()
+
+        changed = self.module.reconcile_schedule_date(
+            "2026-11-04",
+            {
+                "2026-11-04-phi-det": {
+                    **live,
+                    "homescore": 0,
+                    "awayscore": 0,
+                    "status": "7:00 pm ET",
+                    "time": "",
+                    "homerecord": "3-2",
+                    "awayrecord": "4-1",
+                }
+            },
+        )
+
+        assert changed is True
+        uploaded = self.module.upload_schedule_s3.call_args.kwargs["games_list"][0]
+        assert (uploaded["status"], uploaded["homescore"], uploaded["awayscore"], uploaded["time"]) == (
+            "Q2 3:10",
+            54,
+            61,
+            "3:10",
+        )
+        assert uploaded["homerecord"] == "3-2"
+
     def test_reconcile_schedule_date_keeps_final_state_when_feed_regresses(self):
         self.module.get_games_from_s3 = MagicMock(
             return_value=[

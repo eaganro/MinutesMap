@@ -1697,6 +1697,32 @@ def parse_score(value):
     except (TypeError, ValueError):
         return None
 
+def schedule_game_has_started(game):
+    """True for live or final games; False for scheduled, postponed or cancelled ones."""
+    if not isinstance(game, dict):
+        return False
+    status = game.get('status')
+    if is_final_status(status):
+        return True
+    if not normalize_status(status) or is_terminal_status(status) or is_pregame_status(status):
+        return False
+    return True
+
+def protect_live_schedule_state(existing_game, incoming_updates):
+    """The season schedule feed is a static file that lags live games (pregame status, 0-0),
+    so it must not overwrite the poller's live status, score and clock."""
+    if not isinstance(existing_game, dict) or not isinstance(incoming_updates, dict):
+        return incoming_updates
+    if not schedule_game_has_started(existing_game) or is_final_status(existing_game.get('status')):
+        return incoming_updates
+    if is_terminal_status(incoming_updates.get('status')):
+        return incoming_updates
+    safe = dict(incoming_updates)
+    for key in ('status', 'homescore', 'awayscore', 'time'):
+        if key in existing_game:
+            safe[key] = existing_game[key]
+    return safe
+
 def protect_final_schedule_state(existing_game, incoming_updates):
     if not isinstance(existing_game, dict) or not isinstance(incoming_updates, dict):
         return incoming_updates
@@ -1939,12 +1965,20 @@ def reconcile_schedule_date(date_str, feed_games, team_page_sync_today=None):
         if isinstance(game, dict) and game.get("id")
     }
 
-    merged = []
+    # A game that has started or finished stays even if the feed leaves it out (season
+    # rollover, a partial feed). Unplayed games missing from the feed moved or were cancelled.
+    feed_ids = {str(game_id) for game_id in feed_games}
+    merged = [
+        dict(game)
+        for game_id, game in existing_by_id.items()
+        if game_id not in feed_ids and schedule_game_has_started(game)
+    ]
     for game_id, feed_game in feed_games.items():
         existing_game = existing_by_id.get(str(game_id))
         if existing_game:
             merged_game = {**existing_game, **feed_game}
             merged_game = protect_final_schedule_state(existing_game, merged_game)
+            merged_game = protect_live_schedule_state(existing_game, merged_game)
         else:
             merged_game = feed_game
         merged_game.pop("nbaGameId", None)
