@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Schedule from './Schedule';
 
@@ -102,7 +102,8 @@ describe('Schedule', () => {
 
     expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(1, -1);
     expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(2, 1);
-    expect(mocks.resetScrollPositionMock).toHaveBeenCalledTimes(2);
+    // Scrolling back to the start waits for the new date's games.
+    expect(mocks.resetScrollPositionMock).not.toHaveBeenCalled();
   });
 
   it('suppresses game selection click when the drag hook reports dragging', () => {
@@ -251,6 +252,178 @@ describe('Schedule', () => {
     expect(screen.getByText('No Games Scheduled')).toBeInTheDocument();
   });
 
+  describe('list switch blur', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const nextDateGames = [
+      {
+        id: '2026-02-04-phi-nyk',
+        status: 'Final',
+        awayteam: 'PHI',
+        hometeam: 'NYK',
+        awayscore: 118,
+        homescore: 110,
+      },
+    ];
+
+    it('keeps the previous date’s games blurred until the new date loads', () => {
+      vi.useFakeTimers();
+      const changeGame = vi.fn();
+      const { container, rerender } = render(<Schedule {...buildProps({ changeGame })} />);
+
+      rerender(
+        <Schedule
+          {...buildProps({
+            changeGame,
+            date: '2026-02-04',
+            games: [],
+            status: 'loading',
+            isPending: true,
+          })}
+        />,
+      );
+      expect(container.querySelector('.games')).toHaveClass('isLoading');
+      expect(screen.queryByText('Updating games…')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /PHI 54, GSW 49/ }), { detail: 1 });
+      expect(changeGame).not.toHaveBeenCalled();
+
+      act(() => vi.advanceTimersByTime(500));
+      expect(screen.getByText('Updating games…')).toBeInTheDocument();
+      expect(mocks.resetScrollPositionMock).not.toHaveBeenCalled();
+
+      rerender(
+        <Schedule
+          {...buildProps({
+            changeGame,
+            date: '2026-02-04',
+            games: nextDateGames,
+            isPending: false,
+          })}
+        />,
+      );
+      act(() => vi.advanceTimersByTime(0));
+      expect(container.querySelector('.games')).not.toHaveClass('isLoading');
+      expect(screen.getByRole('button', { name: /PHI 118, NYK 110/ })).toBeInTheDocument();
+      expect(mocks.resetScrollPositionMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('holds a shorter minimum blur when the new date loads quickly', () => {
+      vi.useFakeTimers();
+      const { container, rerender } = render(<Schedule {...buildProps()} />);
+
+      rerender(<Schedule {...buildProps({ games: [], status: 'loading', isPending: true })} />);
+      rerender(<Schedule {...buildProps({ games: nextDateGames, isPending: false })} />);
+      expect(container.querySelector('.games')).toHaveClass('isLoading');
+      expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(149));
+      expect(container.querySelector('.games')).toHaveClass('isLoading');
+
+      act(() => vi.advanceTimersByTime(1));
+      expect(container.querySelector('.games')).not.toHaveClass('isLoading');
+      expect(screen.getByRole('button', { name: /PHI 118, NYK 110/ })).toBeInTheDocument();
+    });
+
+    it('does not blur live refreshes of the same date', () => {
+      const { container, rerender } = render(<Schedule {...buildProps()} />);
+
+      rerender(<Schedule {...buildProps({ isPending: true })} />);
+
+      expect(container.querySelector('.games')).not.toHaveClass('isLoading');
+      expect(screen.getByText('Updating games…')).toBeInTheDocument();
+    });
+
+    const phiTeamMode = () => ({
+      team: 'PHI',
+      season: '2026-27',
+      games: [
+        {
+          id: '2026-10-21-phi-mil',
+          date: '2026-10-21',
+          status: 'Final',
+          opponent: 'MIL',
+          isHome: true,
+          teamScore: 120,
+          oppScore: 112,
+          result: 'W',
+        },
+      ],
+      status: 'success',
+      error: null,
+      retry: vi.fn(),
+      record: { wins: 1, losses: 0, seasonType: 'regular' },
+      changeGame: vi.fn(),
+    });
+
+    it('blurs from the date view into an already loaded team view', () => {
+      vi.useFakeTimers();
+      const { container, rerender } = render(<Schedule {...buildProps()} />);
+
+      rerender(<Schedule {...buildProps({ teamMode: phiTeamMode() })} />);
+      // The whole date view stays, blurred, until the swap.
+      expect(container.querySelector('.scheduleContent')).toHaveClass('isSwitchingView');
+      expect(container.querySelector('.games')).toHaveClass('isLoading');
+      expect(screen.getByLabelText('Select game date')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
+      expect(mocks.resetScrollPositionMock).not.toHaveBeenCalled();
+
+      act(() => vi.advanceTimersByTime(300));
+      expect(container.querySelector('.scheduleContent')).not.toHaveClass('isSwitchingView');
+      expect(container.querySelector('.games')).not.toHaveClass('isLoading');
+      expect(screen.getByRole('button', { name: 'Change team, now PHI' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /vs MIL/ })).toBeInTheDocument();
+      expect(screen.getByText(/^1-0/)).toBeInTheDocument();
+      expect(mocks.resetScrollPositionMock).toHaveBeenCalled();
+    });
+
+    it('blurs from the team view back into an already loaded date view', () => {
+      vi.useFakeTimers();
+      const { container, rerender } = render(
+        <Schedule {...buildProps({ teamMode: phiTeamMode() })} />,
+      );
+
+      rerender(<Schedule {...buildProps()} />);
+      expect(container.querySelector('.scheduleContent')).toHaveClass('isSwitchingView');
+      expect(screen.getByRole('button', { name: 'Change team, now PHI' })).toBeInTheDocument();
+      expect(screen.getByText(/^1-0/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /vs MIL/ })).toBeInTheDocument();
+
+      // A view switch keeps the longer minimum, even into the date view.
+      act(() => vi.advanceTimersByTime(150));
+      expect(container.querySelector('.scheduleContent')).toHaveClass('isSwitchingView');
+
+      act(() => vi.advanceTimersByTime(150));
+      expect(container.querySelector('.scheduleContent')).not.toHaveClass('isSwitchingView');
+      expect(container.querySelector('.games')).not.toHaveClass('isLoading');
+      expect(screen.getByLabelText('Select game date')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
+      expect(mocks.resetScrollPositionMock).toHaveBeenCalled();
+    });
+
+    it('keeps the previous team’s games blurred while a new team loads', () => {
+      const phiMode = phiTeamMode();
+      const { container, rerender } = render(<Schedule {...buildProps({ teamMode: phiMode })} />);
+      expect(screen.getByText(/^1-0/)).toBeInTheDocument();
+
+      rerender(
+        <Schedule
+          {...buildProps({
+            teamMode: { ...phiMode, team: 'NYK', games: [], status: 'loading', record: null },
+          })}
+        />,
+      );
+
+      expect(screen.getByRole('button', { name: 'Change team, now NYK' })).toBeInTheDocument();
+      expect(container.querySelector('.scheduleContent')).not.toHaveClass('isSwitchingView');
+      expect(screen.queryByText(/^1-0/)).not.toBeInTheDocument();
+      expect(container.querySelector('.games')).toHaveClass('isLoading');
+      fireEvent.click(screen.getByRole('button', { name: /vs MIL/ }), { detail: 1 });
+      expect(phiMode.changeGame).not.toHaveBeenCalled();
+    });
+  });
+
   describe('team picker', () => {
     it('opens from the Teams button, picks a team and closes', () => {
       const onSelectTeam = vi.fn();
@@ -360,7 +533,9 @@ describe('Schedule', () => {
         screen.getByRole('button', { name: 'Fri, Oct 23, vs NYK, 74-70, Q3 05:12' }),
       ).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByLabelText('Live game')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Mon, Oct 26, vs CHI, 7:30/ })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /^Mon, Oct 26, vs CHI, 7:30/ }),
+      ).toBeInTheDocument();
 
       fireEvent.click(screen.getByLabelText('Show all games'));
       expect(onSelectTeam).toHaveBeenCalledWith(null);
