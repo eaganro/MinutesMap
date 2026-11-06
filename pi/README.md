@@ -53,6 +53,15 @@ The two Pi services declare `Conflicts=` on each other, so starting one stops th
    checkout don't reach the service until the next deploy. `~/minutesmap-poller/DEPLOYED` holds
    the deployed commit. On the Pi itself, run `bash pi/deploy.sh` from `~/MinutesMap`.
 
+   Auto-deploy: `minutesmap-autodeploy.timer` runs `pi/auto_deploy.sh` every minute. When
+   `origin/main` changes the poller or its Pi files, it deploys and restarts the service as soon as
+   CI ("Backend & Infra", for changes under `functions/`) has passed, including during games (a
+   restart pauses polling for about 15 seconds). A commit whose CI failed is skipped until a newer
+   one passes. Log: `ssh raspberrypi journalctl --user -u minutesmap-autodeploy` (or `sudo
+   journalctl _SYSTEMD_USER_UNIT=minutesmap-autodeploy.service` if the user journal is empty).
+   Enable once, after a deploy has installed the units:
+   `ssh raspberrypi systemctl --user enable --now minutesmap-autodeploy.timer`.
+
 4. Alerts: run `bash pi/setup_alerts.sh you@example.com` once from the laptop (admin credentials;
    safe to re-run), then confirm the subscription email. It creates the SNS topic, the email
    subscription, three CloudWatch alarms and the Pi user's `minutesmap-poller-alerts` inline policy.
