@@ -6,14 +6,16 @@ Repository instructions for coding agents working in this project.
 - `front/`: Vite + React client, Playwright E2E tests, static-page build script.
 - `functions/`: AWS Lambda code (Python + TypeScript), pytest + vitest tests.
 - `jobs/`: Utility/backfill scripts (Node + Python) that can read/write AWS data.
-- `relay/`: NBA feed relay that runs on the Raspberry Pi and mirrors cdn.nba.com feeds to S3 (see `relay/README.md`).
-- `pi/`: runs the whole NBA poller pipeline on the Raspberry Pi instead of Lambda (see `pi/README.md`).
+- `relay/`: mirrors NBA's JSON feeds into S3 for the poller (see `relay/README.md`).
+- `pi/`: runs the whole NBA poller pipeline on a Raspberry Pi instead of Lambda (see `pi/README.md`).
 - `terraform/`: AWS infrastructure definitions and deployment wiring.
 
 ## General rules
 - Keep changes focused and minimal.
 - Prefer targeted tests for changed areas before broad suites.
 - Do not commit secrets, private endpoints, or credentials.
+- This repository is public. Keep hostnames, where credentials live, and other operational notes out of
+  tracked files; they belong in `private/` (gitignored).
 - Do not revert unrelated local changes.
 - Use `rg`/`rg --files` for fast code search.
 
@@ -65,10 +67,10 @@ Run the smallest relevant checks first.
 - Frontend production build (local): `npm --prefix front run build`
 - Rebuild TypeScript Lambda bundles: `npm --prefix functions run build:lambdas`
 
-## Live NBA poller runs on the Raspberry Pi
-- Production ingest currently runs on the Pi (`nba_poller_mode = "pi"` in `terraform/variables.tf`); the `NBAGamePoller` Lambda is deployed but inert.
-- Pushing to `main` does not update the Pi. After changing `functions/nba-game-poller/**` or `pi/run_poller.py`, push, then run `bash pi/deploy.sh` (deploys `origin/main` via the Pi's git checkout, so unpushed changes are not deployed) and `ssh raspberrypi systemctl --user restart minutesmap-poller` (explicit confirmation required; avoid restarting during live games).
-- Mode switching, health checks and Pi setup: `pi/README.md`.
+## Production ingest
+- Production ingest runs on the Pi (`nba_poller_mode = "pi"` in `terraform/variables.tf`); the `NBAGamePoller` Lambda is deployed but inert.
+- Pushes to `main` that change the poller are deployed to the Pi automatically once CI has passed (`pi/auto_deploy.sh`), including during live games. Do not deploy or restart it by hand after a push.
+- Operational notes (hosts, logs, credentials, alerts, mode switching) are not in this public repo. If `private/OPS.md` exists, read it before changing or deploying `pi/`, `relay/` or `functions/nba-game-poller/`.
 
 ## Generated artifacts
 - Do not hand-edit generated Lambda bundle files:
