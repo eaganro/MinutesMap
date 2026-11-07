@@ -27,56 +27,22 @@ Exactly one mode may be active, selected by `nba_poller_mode` in `terraform/vari
 
 The two Pi services declare `Conflicts=` on each other, so starting one stops the other.
 
-### Switch Lambda → Pi
+## Deploys
 
-1. Set `nba_poller_mode` default to `"pi"`, push to `main`, and wait for the Backend & Infra workflow.
-2. `ssh raspberrypi 'systemctl --user enable --now minutesmap-poller && systemctl --user disable minutesmap-relay'`
+`pi/deploy.sh` deploys from git: it fast-forwards the Pi's checkout to `origin/main` and copies the
+poller from there, so only pushed commits go live. `minutesmap-autodeploy.timer` runs
+`pi/auto_deploy.sh` every minute: when `origin/main` changes the poller or its Pi files, it deploys
+and restarts the service as soon as CI ("Backend & Infra", for changes under `functions/`) has
+passed, including during games (a restart pauses polling for about 15 seconds).
 
-### Switch Pi → Lambda
+## Monitoring
 
-1. `ssh raspberrypi 'systemctl --user disable --now minutesmap-poller && systemctl --user enable --now minutesmap-relay'`
-2. Set `nba_poller_mode` default to `"lambda"`, push to `main`, wait for the workflow, then invoke
-   the manager once: `aws lambda invoke --function-name NBAGamePoller --cli-binary-format raw-in-base64-out --payload '{"task":"manager"}' /dev/null`
+The runner publishes a heartbeat to CloudWatch every minute, and `pi/setup_alerts.sh` creates email
+alarms for a stopped Pi (within an hour, or 3 minutes during games) and for NBA feed errors. Everything
+stays inside CloudWatch's and SNS's always-free tiers.
 
-## One-time setup
-
-1. IAM: the Pi uses IAM user `minutesmap-nba-relay` (profile `minutesmap-relay`), managed outside
-   Terraform. Pi mode needs its `minutesmap-poller` inline policy: Get/Put on `data/*`, `schedule/*`,
-   `private/gameIdMap/*` and prefix-limited ListBucket — the same S3 access as the Lambda role.
-2. Secrets: `~/minutesmap-poller/secrets.env` (mode 600) with `GEMINI_API_KEY` and
-   `MINUTESMAP_REVALIDATE_SECRET` (copied from the Lambda's configuration) and `OPENAI_API_KEY`. The Pi
-   captions with OpenAI `gpt-6-luna` (`CAPTION_PROVIDER=openai`); the Lambda still uses Gemini.
-3. Code: push to `main`, then `bash pi/deploy.sh` (re-run after any change to the poller or runner,
-   then `ssh raspberrypi systemctl --user restart minutesmap-poller` if it is running). It deploys
-   from git: it fast-forwards the Pi's `~/MinutesMap` checkout to `origin/main` and copies the
-   poller from there into `~/minutesmap-poller`, so only pushed commits go live, and edits in the
-   checkout don't reach the service until the next deploy. `~/minutesmap-poller/DEPLOYED` holds
-   the deployed commit. On the Pi itself, run `bash pi/deploy.sh` from `~/MinutesMap`.
-
-   Auto-deploy: `minutesmap-autodeploy.timer` runs `pi/auto_deploy.sh` every minute. When
-   `origin/main` changes the poller or its Pi files, it deploys and restarts the service as soon as
-   CI ("Backend & Infra", for changes under `functions/`) has passed, including during games (a
-   restart pauses polling for about 15 seconds). A commit whose CI failed is skipped until a newer
-   one passes. Log: `ssh raspberrypi journalctl --user -u minutesmap-autodeploy` (or `sudo
-   journalctl _SYSTEMD_USER_UNIT=minutesmap-autodeploy.service` if the user journal is empty).
-   Enable once, after a deploy has installed the units:
-   `ssh raspberrypi systemctl --user enable --now minutesmap-autodeploy.timer`.
-
-4. Alerts: run `bash pi/setup_alerts.sh you@example.com` once from the laptop (admin credentials;
-   safe to re-run), then confirm the subscription email. It creates the SNS topic, the email
-   subscription, three CloudWatch alarms and the Pi user's `minutesmap-poller-alerts` inline policy.
-   The runner publishes a heartbeat to `MinutesMap/PiPoller` every minute. Alarms (all email on
-   trouble and on recovery):
-   - `MinutesMap-Pi-Down`: no heartbeat for an hour. Always on.
-   - `MinutesMap-Pi-Down-GameTime`: no heartbeat for 3 minutes. The runner arms it from an hour
-     before the first tip until the last game ends, and disarms it otherwise.
-   - `MinutesMap-NBA-Feed-Blocked`: 3 refused checks in a row of the NBA scoreboard feed, which the
-     runner checks every minute in the game window.
-   A Pi that dies between games is reported within an hour, about 30 minutes before tip at the latest.
-   Everything stays inside CloudWatch's and SNS's always-free tiers.
-
-Status and recent logs: `ssh raspberrypi systemctl --user status minutesmap-poller`.
-Deployed commit: `ssh raspberrypi cat minutesmap-poller/DEPLOYED`.
+Setup, credentials, switching modes and day-to-day commands are in the private operations notes
+(`private/OPS.md`, not in this repo).
 
 ## Tests
 

@@ -27,3 +27,6 @@ __pycache__/
 
 # Personal Claude Code settings
 .claude/settings.local.json
+
+# Private operations notes (see AGENTS.md)
+/private/
