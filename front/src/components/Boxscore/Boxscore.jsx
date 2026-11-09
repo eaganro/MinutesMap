@@ -26,7 +26,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   );
   const [sortConfig, setSortConfig] = useState(INITIAL_SORT_CONFIG);
   const [showLoadingText, setShowLoadingText] = useState(false);
-  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS, { skipFirstLoad: true });
   const { isDarkMode } = useTheme();
   const awayTableRef = useRef(null);
   const homeTableRef = useRef(null);

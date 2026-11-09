@@ -25,7 +25,7 @@ export function usePlayViewModel({
   const playRef = useRef(null);
   const [showLoadingText, setShowLoadingText] = useState(false);
   const { isDarkMode } = useTheme();
-  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS, { skipFirstLoad: true });
 
   const {
     stablePlayData,

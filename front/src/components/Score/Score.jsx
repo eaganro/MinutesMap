@@ -24,7 +24,7 @@ export default function Score({
   onSelectTeam,
 }) {
   const [showLoadingText, setShowLoadingText] = useState(false);
-  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS);
+  const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS, { skipFirstLoad: true });
 
   const incomingData = useMemo(
     () => ({
