@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { resolveFullNameFromRoster } from './PlayExport/playExportModel';
 import MobilePlayerSheet from './MobilePlayerSheet';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -13,9 +13,11 @@ import PlayTooltip from './PlayTooltip';
 import PlayTips from './PlayTips';
 import TimelineGrid from './TimelineGrid';
 import { MOBILE_TOOLTIP_BREAKPOINT } from './model/layoutModel';
+import { parseSharedView, removeSharedViewParams } from './model/sharedViewModel';
 import { usePlayInteraction } from './usePlayInteraction';
 import { useMediaQuery } from '../hooks/ui/useMediaQuery';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
+import { trackFeatureUse } from '../../helpers/analytics';
 import './Play.scss';
 
 const PLAYER_DETAIL_HISTORY_KEY = 'minutesMapPlayerDetail';
@@ -366,23 +368,103 @@ export default function Play({
     }
   }, [clearSelectedPlayer, selectedPlayer, selectedPlayerDetail]);
 
+  const openPlayerDetail = useCallback(
+    (teamKey, name) => {
+      setInfoLocked(false);
+      clearHoverIcon();
+      resetInteraction(true);
+      setSelectedPlayer({ teamKey, name });
+      setPlayerDetailPeriod(0);
+      window.history.pushState(
+        {
+          ...(window.history.state || {}),
+          [PLAYER_DETAIL_HISTORY_KEY]: { gameId, teamKey, name },
+        },
+        '',
+        window.location.href,
+      );
+    },
+    [clearHoverIcon, gameId, resetInteraction, setInfoLocked],
+  );
+
   const handlePlayerSelect = (teamKey, name) => {
     if (!isMobilePlayerSheetEnabled) return;
     trackPlayerDetail();
-    setInfoLocked(false);
-    clearHoverIcon();
-    resetInteraction(true);
-    setSelectedPlayer({ teamKey, name });
-    setPlayerDetailPeriod(0);
-    window.history.pushState(
-      {
-        ...(window.history.state || {}),
-        [PLAYER_DETAIL_HISTORY_KEY]: { gameId, teamKey, name },
-      },
-      '',
-      window.location.href,
-    );
+    openPlayerDetail(teamKey, name);
   };
+
+  // A shared link's view (see sharedViewModel), applied once to the first game shown.
+  const [initialSharedView] = useState(() =>
+    typeof window === 'undefined' ? null : parseSharedView(window.location.search),
+  );
+  const pendingSharedViewRef = useRef(initialSharedView);
+  const sharedViewGameIdRef = useRef(null);
+
+  useEffect(() => {
+    const view = pendingSharedViewRef.current;
+    if (!view || !gameId) return;
+    if (!sharedViewGameIdRef.current) sharedViewGameIdRef.current = gameId;
+    const isSharedGame = gameId === sharedViewGameIdRef.current;
+    if (isSharedGame && (!hasDisplayData || isDataLoading || !(sectionWidth > 0))) return;
+
+    pendingSharedViewRef.current = null;
+    // Drop the parameters first, so they don't follow the reader to other games and the
+    // player view below opens over a clean entry that its Back button returns to.
+    window.history.replaceState(
+      window.history.state,
+      '',
+      removeSharedViewParams(window.location.href),
+    );
+    if (!isSharedGame) return;
+
+    const { period, playerName } = view;
+    const canShowPeriod =
+      period !== null &&
+      period <= numPeriods &&
+      (period === 0 || isFinal || period <= latestStartedPeriod);
+    if (canShowPeriod && showQuarterSwitcher) selectPeriod(period);
+
+    let playerTeamKey = null;
+    let playerKey = null;
+    if (playerName && isMobilePlayerSheetEnabled) {
+      const wanted = playerName.toLowerCase();
+      for (const [teamKey, players] of [
+        ['away', displayAwayPlayers],
+        ['home', displayHomePlayers],
+      ]) {
+        playerKey = Object.keys(players || {}).find((name) => name.toLowerCase() === wanted);
+        if (playerKey) {
+          playerTeamKey = teamKey;
+          break;
+        }
+      }
+    }
+    if (playerTeamKey) {
+      openPlayerDetail(playerTeamKey, playerKey);
+      if (canShowPeriod) setPlayerDetailPeriod(period);
+    }
+
+    trackFeatureUse('shared-view', {
+      period,
+      hasPlayer: Boolean(playerName),
+      shownPeriod: canShowPeriod && showQuarterSwitcher,
+      shownPlayer: Boolean(playerTeamKey),
+    });
+  }, [
+    gameId,
+    hasDisplayData,
+    isDataLoading,
+    sectionWidth,
+    numPeriods,
+    isFinal,
+    latestStartedPeriod,
+    showQuarterSwitcher,
+    selectPeriod,
+    isMobilePlayerSheetEnabled,
+    displayAwayPlayers,
+    displayHomePlayers,
+    openPlayerDetail,
+  ]);
 
   const handlePlayerDetailClose = () => {
     if (isCurrentPlayerHistoryEntry()) {

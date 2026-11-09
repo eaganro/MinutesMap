@@ -1,5 +1,6 @@
 import { DESKTOP_EXPORT_WIDTH, MOBILE_EXPORT_MAX_WIDTH } from './playExportCore';
 import { formatPeriodLabel } from './playExportRange';
+import { buildSharedViewQuery } from '../model/sharedViewModel';
 
 export const DEFAULT_EXPORT_VIEW = 'full';
 export const EXPORT_VIEWS = ['full', 'player-stacked', 'player'];
@@ -93,10 +94,11 @@ export const buildShareText = ({ awayTeamNames, homeTeamNames, rangeLabel }) => 
   return rangeLabel ? `Play-by-play chart (${rangeLabel}).` : 'Play-by-play chart.';
 };
 
-export const buildGameShareUrl = ({ gameId, origin }) => {
+// `view` (see sharedViewModel) makes the link open on what the image shows.
+export const buildGameShareUrl = ({ gameId, origin, view = null }) => {
   const trimmed = String(gameId || '').trim();
   if (!trimmed) return null;
-  const pathname = `/${encodeURIComponent(trimmed)}`;
+  const pathname = `/${encodeURIComponent(trimmed)}${buildSharedViewQuery(view)}`;
   return origin ? `${origin}${pathname}` : pathname;
 };
 
@@ -106,10 +108,11 @@ export const buildShareMetadata = ({
   rangeLabel,
   gameId,
   origin,
+  view = null,
 }) => ({
   title: buildShareTitle({ awayTeamNames, homeTeamNames, rangeLabel }),
   text: buildShareText({ awayTeamNames, homeTeamNames, rangeLabel }),
-  url: buildGameShareUrl({ gameId, origin }),
+  url: buildGameShareUrl({ gameId, origin, view }),
 });
 
 export const buildExportPreviewKey = ({ exportRange, exportView, exportPlayerKey }) => {

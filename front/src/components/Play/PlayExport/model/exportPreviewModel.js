@@ -7,6 +7,7 @@ export const buildExportOutputMetadata = ({
   isFullGameRange,
   gameId,
   origin,
+  view = null,
 }) => {
   const fileName = buildPlayExportFileName({
     awayTeamNames,
@@ -22,6 +23,7 @@ export const buildExportOutputMetadata = ({
     rangeLabel,
     gameId,
     origin,
+    view,
   });
 
   return {

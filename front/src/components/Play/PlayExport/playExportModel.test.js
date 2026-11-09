@@ -38,6 +38,19 @@ describe('playExportModel', () => {
     });
   });
 
+  it('links to the view the image shows', () => {
+    expect(
+      buildShareMetadata({
+        awayTeamNames: { name: '76ers', abr: 'PHI' },
+        homeTeamNames: { name: 'Warriors', abr: 'GSW' },
+        rangeLabel: 'Q4',
+        gameId: '2026-02-03-phi-gsw',
+        origin: 'https://minutesmap.com',
+        view: { period: 4, playerName: 'Joel Embiid' },
+      }).url,
+    ).toBe('https://minutesmap.com/2026-02-03-phi-gsw?q=4&player=Joel+Embiid');
+  });
+
   it('resolves player initials to full roster name when unambiguous', () => {
     const roster = [
       { first: 'Jaylen', last: 'Brown' },

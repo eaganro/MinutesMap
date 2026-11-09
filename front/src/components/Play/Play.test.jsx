@@ -268,6 +268,40 @@ describe('Play', () => {
     localStorage.removeItem('playTips');
   });
 
+  it('opens a shared link on the player and period it was shared with', () => {
+    window.history.replaceState({}, '', '/2026-03-11-phi-gsw?team=PHI&q=game&player=J.+Embiid');
+    const capture = vi.fn();
+    window.posthog = { capture };
+    renderPlay(buildProps());
+
+    expect(screen.getByTestId('mobile-player-sheet')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Joel Embiid' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true');
+    // The parameters are gone, so they don't follow the reader to other games.
+    expect(window.location.search).toBe('?team=PHI');
+    expect(capture).toHaveBeenCalledWith('feature-use', {
+      feature: 'shared-view',
+      period: 0,
+      hasPlayer: true,
+      shownPeriod: true,
+      shownPlayer: true,
+    });
+
+    // Back returns to the chart, on the shared period, rather than leaving the site.
+    fireEvent.click(screen.getByRole('button', { name: /close joel embiid detail view/i }));
+    expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true');
+    delete window.posthog;
+  });
+
+  it('ignores a shared period the game has not reached', () => {
+    window.history.replaceState({}, '', '/2026-03-11-phi-gsw?q=3');
+    renderPlay(buildProps());
+
+    expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(window.location.search).toBe('');
+  });
+
   it('lets a touch that starts on a player name reach the chart, so a drag there scrubs', () => {
     const capture = vi.fn();
     window.posthog = { capture };
