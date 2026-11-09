@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Close } from '@mui/icons-material';
+import Close from '@mui/icons-material/esm/Close';
 import IconButton from '@mui/material/IconButton';
 import { NBA_CONFERENCES, NBA_TEAM_NAMES } from '../../domain/game-selection/teamSchedule';
 import TeamLogo from './TeamLogo';

@@ -1,5 +1,6 @@
 import CircularProgress from '@mui/material/CircularProgress';
-import { UnfoldMore, UnfoldLess } from '@mui/icons-material';
+import UnfoldMore from '@mui/icons-material/esm/UnfoldMore';
+import UnfoldLess from '@mui/icons-material/esm/UnfoldLess';
 import './Boxscore.scss';
 import processTeamStats from './processTeamStats';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';

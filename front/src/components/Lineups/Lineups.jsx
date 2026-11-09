@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-import { ExpandMore } from '@mui/icons-material';
+import ExpandMore from '@mui/icons-material/esm/ExpandMore';
 import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';

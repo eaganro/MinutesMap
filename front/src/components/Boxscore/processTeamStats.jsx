@@ -1,4 +1,5 @@
-import { UnfoldMore, UnfoldLess } from '@mui/icons-material';
+import UnfoldMore from '@mui/icons-material/esm/UnfoldMore';
+import UnfoldLess from '@mui/icons-material/esm/UnfoldLess';
 import IconButton from '@mui/material/IconButton';
 const COMPACT_LAST_NAME_MAX = 12;
 const COMPACT_LAST_NAME_KEEP = 10;
