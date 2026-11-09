@@ -1,0 +1,90 @@
+.chartHelp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: -4px auto 8px;
+  padding: 0 8px;
+  width: 100%;
+  max-width: 560px;
+  box-sizing: border-box;
+}
+
+.chartHelpToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
+
+  // Hover only where there is one, so a tap doesn't leave it highlighted on phones.
+  @media (hover: hover) {
+    &:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
+  }
+
+  .chartHelpIcon {
+    font-size: 15px;
+  }
+
+  .chartHelpChevron {
+    font-size: 16px;
+    transition: transform 0.2s ease;
+  }
+
+  &.isOpen .chartHelpChevron {
+    transform: rotate(180deg);
+  }
+}
+
+.chartHelpPanel {
+  width: 100%;
+  margin-top: 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-play);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 8px 12px;
+
+  &[hidden] {
+    display: none;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 16px;
+  }
+
+  li + li {
+    margin-top: 3px;
+  }
+
+  strong {
+    color: var(--text-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chartHelpToggle .chartHelpChevron {
+    transition: none;
+  }
+}

@@ -7,6 +7,7 @@ import Boxscore from '../Boxscore/Boxscore';
 import Lineups from '../Lineups/Lineups';
 import Play from '../Play/Play';
 import StatButtons from '../StatButtons/StatButtons';
+import ChartHelp from '../Play/ChartHelp';
 import DarkModeToggle from '../DarkModeToggle/DarkModeToggle';
 import Footer from '../Footer/Footer';
 
@@ -118,17 +119,20 @@ export default function App() {
             onPlayerDetailModeChange={setIsPlayerDetailOpen}
           />
           {!isPlayerDetailOpen && (
-            <StatButtons
-              statOn={statControlsVm.statOn}
-              changeStatOn={statControlsVm.changeStatOn}
-              showScoreDiff={statControlsVm.showScoreDiff}
-              setShowScoreDiff={statControlsVm.setShowScoreDiff}
-              showOdds={statControlsVm.showOdds}
-              setShowOdds={statControlsVm.setShowOdds}
-              isLoading={statControlsVm.isLoading}
-              statusMessage={statControlsVm.statusMessage}
-              onStatHoverChange={setEmphasizedStatIndex}
-            />
+            <div className="playLegend">
+              <StatButtons
+                statOn={statControlsVm.statOn}
+                changeStatOn={statControlsVm.changeStatOn}
+                showScoreDiff={statControlsVm.showScoreDiff}
+                setShowScoreDiff={statControlsVm.setShowScoreDiff}
+                showOdds={statControlsVm.showOdds}
+                setShowOdds={statControlsVm.setShowOdds}
+                isLoading={statControlsVm.isLoading}
+                statusMessage={statControlsVm.statusMessage}
+                onStatHoverChange={setEmphasizedStatIndex}
+              />
+              <ChartHelp sectionWidth={playVm.playByPlaySectionWidth} />
+            </div>
           )}
         </div>
 
