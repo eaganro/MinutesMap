@@ -2,20 +2,19 @@ import ReactDOM from 'react-dom/client';
 import App from './components/App/App';
 import RootErrorBoundary from './components/App/RootErrorBoundary';
 import { ThemeProvider } from './components/hooks/ui/useTheme';
-import posthog from 'posthog-js';
+import { configureAnalytics, startAnalytics } from './helpers/analytics';
 import { reportError } from './errors/reportError';
 import './theme.scss';
 
-const posthogKey = import.meta.env.VITE_POSTHOG_KEY;
-if (posthogKey) {
-  posthog.init(posthogKey, {
-    api_host: import.meta.env.VITE_POSTHOG_HOST,
-    capture_pageview: false,
-    persistence: 'localStorage',
-  });
-  window.posthog = posthog;
-  posthog.startSessionRecording(true);
-}
+// PostHog loads once the first game's data is in (see useAnalyticsSignals), or after this
+// long on pages without one (a game that hasn't started, an error).
+const ANALYTICS_START_FALLBACK_MS = 3000;
+
+configureAnalytics({
+  key: import.meta.env.VITE_POSTHOG_KEY,
+  host: import.meta.env.VITE_POSTHOG_HOST,
+});
+window.setTimeout(startAnalytics, ANALYTICS_START_FALLBACK_MS);
 
 function RootComponent() {
   return (
