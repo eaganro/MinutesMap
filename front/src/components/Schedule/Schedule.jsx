@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  CalendarTodayOutlined,
-  Close,
-  ExpandMore,
-  NavigateNext,
-  NavigateBefore,
-} from '@mui/icons-material';
+import CalendarTodayOutlined from '@mui/icons-material/esm/CalendarTodayOutlined';
+import Close from '@mui/icons-material/esm/Close';
+import ExpandMore from '@mui/icons-material/esm/ExpandMore';
+import NavigateNext from '@mui/icons-material/esm/NavigateNext';
+import NavigateBefore from '@mui/icons-material/esm/NavigateBefore';
 import IconButton from '@mui/material/IconButton';
 import CircularProgress from '@mui/material/CircularProgress';
 import { parseGameStatus } from '../../domain/game-selection/status';
