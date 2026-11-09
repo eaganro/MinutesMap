@@ -3,10 +3,11 @@ import { TIP_SHOW_DELAY_MS, useTipSequence } from '../../tips/useTipSequence';
 
 export const PLAY_TIPS_STORAGE_KEY = 'playTips';
 export const PLAY_TIP_SHOW_DELAY_MS = TIP_SHOW_DELAY_MS;
-// Order the tips are shown in. 'player' only applies where player names open the detail
-// view, and 'explore' only to touch screens: with a mouse, hovering the chart opens the play
-// tooltip by itself, so the 'lines' tip mentions hovering instead. 'stats' points at the
-// legend below the chart, so it comes after the tips about the chart itself.
+// Order the tips are shown in. The first tip explains the chart: 'lines' with a mouse (it
+// mentions hovering, which opens the play tooltip by itself) and 'explore' on touch screens,
+// where it also asks for a drag, so that a reader who skips the rest has still been told how
+// to see the plays. 'player' only applies where player names open the detail view. 'stats'
+// points at the legend below the chart, so it comes after the tips about the chart itself.
 export const PLAY_TIP_IDS = ['lines', 'explore', 'player', 'stats'];
 
 /** First-visit tips for the play-by-play chart and its stat legend. */
@@ -26,8 +27,12 @@ export function usePlayTips({
     tipIds: PLAY_TIP_IDS,
     targetRef: playRef,
     enabled,
-    isTipApplicable: (tip) =>
-      (tip !== 'player' || Boolean(canSelectPlayers)) && (tip !== 'explore' || !canHover),
+    isTipApplicable: (tip) => {
+      if (tip === 'lines') return Boolean(canHover);
+      if (tip === 'explore') return !canHover;
+      if (tip === 'player') return Boolean(canSelectPlayers);
+      return true;
+    },
     // The player tip points at names the open tooltip would cover; wait until it closes.
     isTipBlocked: (tip) => tip === 'player' && hasOpenTooltip,
   });

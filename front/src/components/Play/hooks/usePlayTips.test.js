@@ -46,8 +46,15 @@ describe('usePlayTips', () => {
     expect(result.current.activeTip).toBeNull();
     showTips();
 
+    expect(result.current.activeTip).toBe('explore');
+    expect(capture).toHaveBeenCalledWith('play-tip', { tip: 'explore', outcome: 'shown' });
+  });
+
+  it('starts with the lines tip instead when there is a mouse', () => {
+    const { result } = renderTips({ canHover: true });
+    showTips();
+
     expect(result.current.activeTip).toBe('lines');
-    expect(capture).toHaveBeenCalledWith('play-tip', { tip: 'lines', outcome: 'shown' });
   });
 
   it('does not show tips while the chart is unavailable', () => {
@@ -61,12 +68,12 @@ describe('usePlayTips', () => {
     const { result } = renderTips();
     showTips();
 
-    act(() => result.current.dismissTip('lines'));
+    act(() => result.current.dismissTip('explore'));
 
-    expect(result.current.activeTip).toBe('explore');
-    expect(storedProgress()).toEqual({ lines: true });
+    expect(result.current.activeTip).toBe('player');
+    expect(storedProgress()).toEqual({ explore: true });
     expect(capture).toHaveBeenCalledWith('play-tip', {
-      tip: 'lines',
+      tip: 'explore',
       outcome: 'dismissed',
       wasShown: true,
     });
@@ -74,9 +81,9 @@ describe('usePlayTips', () => {
 
   it('completes the explore tip when the play tooltip opens, even before it is shown', () => {
     const { result, rerender } = renderTips();
-    showTips();
 
     rerender({ ...baseProps, hasOpenTooltip: true });
+    showTips();
 
     expect(storedProgress()).toEqual({ explore: true });
     expect(capture).toHaveBeenCalledWith('play-tip', {
@@ -84,7 +91,33 @@ describe('usePlayTips', () => {
       outcome: 'completed',
       wasShown: false,
     });
-    expect(result.current.activeTip).toBe('lines');
+    // The player tip waits for the play tooltip to close.
+    expect(result.current.activeTip).toBeNull();
+    rerender({ ...baseProps, hasOpenTooltip: false });
+    expect(result.current.activeTip).toBe('player');
+  });
+
+  it('completes the explore tip when the reader drags while it is shown', () => {
+    const { result, rerender } = renderTips();
+    showTips();
+    expect(result.current.activeTip).toBe('explore');
+
+    rerender({ ...baseProps, hasOpenTooltip: true });
+
+    expect(capture).toHaveBeenCalledWith('play-tip', {
+      tip: 'explore',
+      outcome: 'completed',
+      wasShown: true,
+    });
+    expect(result.current.activeTip).toBeNull();
+  });
+
+  it('still shows the explore tip to touch readers who only dismissed the old lines tip', () => {
+    localStorage.setItem(PLAY_TIPS_STORAGE_KEY, JSON.stringify({ lines: true }));
+    const { result } = renderTips();
+    showTips();
+
+    expect(result.current.activeTip).toBe('explore');
   });
 
   it('holds the player tip until the play tooltip closes', () => {
@@ -153,6 +186,6 @@ describe('usePlayTips', () => {
 
     expect(result.current.activeTip).toBeNull();
     expect(storedProgress()).toEqual({ skipped: true });
-    expect(capture).toHaveBeenCalledWith('play-tip', { tip: 'lines', outcome: 'skipped' });
+    expect(capture).toHaveBeenCalledWith('play-tip', { tip: 'explore', outcome: 'skipped' });
   });
 });

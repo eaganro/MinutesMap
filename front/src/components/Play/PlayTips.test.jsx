@@ -23,8 +23,6 @@ const renderTips = (props = {}) => {
     <div onClick={onChartClick}>
       <PlayTips
         playRef={buildChart()}
-        leftMargin={96}
-        timelineWidth={240}
         layoutKey="1"
         isFinePointer={false}
         {...handlers}
@@ -67,9 +65,78 @@ describe('PlayTips', () => {
     expect(onCalloutHover).toHaveBeenCalled();
   });
 
-  it('asks touch users to drag across the chart', () => {
-    renderTips({ activeTip: 'explore' });
-    expect(screen.getByText('Drag across the chart to see every play')).toBeInTheDocument();
+  it('explains the chart and asks touch users to drag across it, in one tip', () => {
+    const { onChartClick, onDismiss, onSkip } = renderTips({ activeTip: 'explore' });
+
+    expect(screen.getByText(/Each line shows when a player was on the court/)).toBeInTheDocument();
+    expect(screen.getByText('Drag across the chart to see each one.')).toBeInTheDocument();
+    // Drags that start on the tip's text go through to the chart; only its buttons take taps.
+    expect(screen.getByRole('note')).toHaveClass('isPassThrough');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
+    expect(onDismiss).toHaveBeenCalledWith('explore');
+    fireEvent.click(screen.getByRole('button', { name: 'Skip tips' }));
+    expect(onSkip).toHaveBeenCalled();
+    expect(onChartClick).not.toHaveBeenCalled();
+  });
+
+  it('sweeps the finger only as far as the player lines reach', () => {
+    const playRef = buildChart();
+    const chart = playRef.current;
+    chart.getBoundingClientRect = () => ({ left: 0, top: 0, width: 360, height: 600 });
+    const lineRects = [
+      { left: 100, top: 40, width: 60, height: 0 },
+      { left: 120, top: 70, width: 130, height: 0 },
+    ];
+    const section = chart.querySelector('.teamSection');
+    lineRects.slice(1).forEach(() => {
+      section.insertAdjacentHTML('beforeend', '<svg><line class="playerTimeline"></line></svg>');
+    });
+    chart.querySelectorAll('.playerTimeline').forEach((line, index) => {
+      line.getBoundingClientRect = () => lineRects[index];
+    });
+
+    render(
+      <PlayTips
+        activeTip="explore"
+        playRef={playRef}
+        layoutKey="1"
+        isFinePointer={false}
+        onDismiss={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+
+    const finger = document.querySelector('.playTipFinger');
+    // Starts on the first line (100 + 60 / 2) and stops where the furthest line ends (250).
+    expect(finger).toHaveStyle({ left: '130px', top: '40px' });
+    expect(finger).toHaveClass('isSweeping');
+    expect(finger.style.getPropertyValue('--play-tip-sweep')).toBe('120px');
+  });
+
+  it('keeps the finger still when the lines are too short to sweep along', () => {
+    const playRef = buildChart();
+    const chart = playRef.current;
+    chart.getBoundingClientRect = () => ({ left: 0, top: 0, width: 360, height: 600 });
+    chart.querySelector('.playerTimeline').getBoundingClientRect = () => ({
+      left: 100,
+      top: 40,
+      width: 30,
+      height: 0,
+    });
+
+    render(
+      <PlayTips
+        activeTip="explore"
+        playRef={playRef}
+        layoutKey="1"
+        isFinePointer={false}
+        onDismiss={vi.fn()}
+        onSkip={vi.fn()}
+      />,
+    );
+
+    expect(document.querySelector('.playTipFinger')).not.toHaveClass('isSweeping');
   });
 
   it('points at player names and can be dismissed', () => {
@@ -104,8 +171,6 @@ describe('PlayTips', () => {
     const props = {
       activeTip: 'stats',
       playRef,
-      leftMargin: 96,
-      timelineWidth: 240,
       layoutKey: '1',
       isFinePointer: false,
       onDismiss: vi.fn(),
@@ -131,8 +196,6 @@ describe('PlayTips', () => {
     document.body.appendChild(legend);
     const props = {
       playRef,
-      leftMargin: 96,
-      timelineWidth: 240,
       layoutKey: '1',
       isFinePointer: true,
       onDismiss: vi.fn(),
@@ -151,8 +214,6 @@ describe('PlayTips', () => {
       <PlayTips
         activeTip="lines"
         playRef={{ current: document.createElement('div') }}
-        leftMargin={96}
-        timelineWidth={240}
         layoutKey="1"
         isFinePointer={false}
         onDismiss={vi.fn()}

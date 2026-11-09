@@ -2,6 +2,9 @@ import { TipCallout, TipDismissButton, TipFirstActions, TipRing } from '../tips/
 import { measureRelative, useTipAnchor } from '../tips/useTipAnchor';
 import './PlayTips.scss';
 
+// Shorter sweeps than this don't read as a drag, so the finger just sits on the line.
+const MIN_SWEEP_PX = 40;
+
 function measureAnchor(tip, container) {
   if (!container) return null;
   const base = {
@@ -9,22 +12,21 @@ function measureAnchor(tip, container) {
     containerHeight: container.getBoundingClientRect().height,
   };
 
-  if (tip === 'lines') {
-    const line = container.querySelector('.playerTimeline');
-    if (!line) return null;
-    const rect = measureRelative(line, container);
-    return {
-      ...base,
-      x: rect.left + Math.min(rect.width / 2, 48),
-      y: rect.top + rect.height / 2,
-    };
-  }
+  if (tip === 'lines' || tip === 'explore') {
+    const lines = Array.from(container.querySelectorAll('.playerTimeline'));
+    if (!lines.length) return null;
+    const rect = measureRelative(lines[0], container);
+    const x = rect.left + Math.min(rect.width / 2, 48);
+    const anchor = { ...base, x, y: rect.top + rect.height / 2 };
+    if (tip === 'lines') return anchor;
 
-  if (tip === 'explore') {
-    const section = container.querySelector('.teamSection');
-    if (!section) return null;
-    const rect = measureRelative(section, container);
-    return { ...base, y: rect.top + rect.height * 0.5 };
+    // Sweep only as far as the lines go, since a live game's current quarter is mostly empty.
+    const linesRight = lines.reduce((right, line) => {
+      const lineRect = measureRelative(line, container);
+      return Math.max(right, lineRect.left + lineRect.width);
+    }, 0);
+    const sweep = linesRight - x;
+    return { ...anchor, sweep: sweep >= MIN_SWEEP_PX ? Math.round(sweep) : 0 };
   }
 
   if (tip === 'player') {
@@ -52,8 +54,6 @@ function measureAnchor(tip, container) {
 export default function PlayTips({
   activeTip,
   playRef,
-  leftMargin,
-  timelineWidth,
   layoutKey,
   isFinePointer,
   onCalloutHover,
@@ -90,24 +90,27 @@ export default function PlayTips({
   }
 
   if (activeTip === 'explore') {
-    const sweepWidth = Math.max(timelineWidth, 0);
+    // Touch screens: the first tip also asks for the drag, and a finger sweeps along the line
+    // it points at. Drags that start on the tip's text reach the chart (see isPassThrough).
     return (
       <div className="tipLayer">
-        <div
-          className="playTipSweep"
-          style={{
-            left: leftMargin,
-            top: anchor.y,
-            width: sweepWidth,
-            '--play-tip-sweep': `${Math.round(sweepWidth * 0.7)}px`,
-          }}
-          role="note"
+        <span
+          className={`playTipFinger${anchor.sweep ? ' isSweeping' : ''}`}
+          style={{ left: anchor.x, top: anchor.y, '--play-tip-sweep': `${anchor.sweep}px` }}
+          aria-hidden="true"
+        />
+        <TipCallout
+          anchorX={anchor.x}
+          top={anchor.y + 16}
+          containerWidth={anchor.containerWidth}
+          className="isPassThrough"
         >
-          <div className="tipAppear playTipLabel">Drag across the chart to see every play</div>
-          <div className="playTipTrack">
-            <span className="playTipFinger" aria-hidden="true" />
-          </div>
-        </div>
+          <p className="tipText">
+            Each line shows when a player was on the court. The shapes on it are their plays.{' '}
+            <strong>Drag across the chart to see each one.</strong>
+          </p>
+          <TipFirstActions onDone={() => onDismiss('explore')} onSkip={onSkip} />
+        </TipCallout>
       </div>
     );
   }
