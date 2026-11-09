@@ -22,40 +22,6 @@
   }
 }
 
-.statButtonsHint {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 6px;
-  flex-basis: 100%;
-  white-space: nowrap;
-}
-
-.statButtonsHintTitle {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--stat-label-color);
-}
-
-.statButtonsHintDetail {
-  font-size: 11px;
-  color: var(--text-muted);
-
-  .hintClick {
-    display: none;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .hintTap {
-      display: none;
-    }
-
-    .hintClick {
-      display: inline;
-    }
-  }
-}
-
 .buttonGroup {
   position: relative;
   display: flex;
