@@ -33,6 +33,16 @@
     outline: 2px solid var(--tip-text);
     outline-offset: 2px;
   }
+
+  // For a tip that asks for a gesture on the section underneath: only its buttons take
+  // touches, so a drag that starts on its text still reaches the section.
+  &.isPassThrough {
+    pointer-events: none;
+
+    button {
+      pointer-events: auto;
+    }
+  }
 }
 
 .tipArrow {

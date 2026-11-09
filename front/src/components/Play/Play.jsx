@@ -521,8 +521,6 @@ export default function Play({
           <PlayTips
             activeTip={playTips.activeTip}
             playRef={playRef}
-            leftMargin={leftMargin}
-            timelineWidth={width}
             layoutKey={`${sectionWidth}|${activePeriod}|${awayPlayerCount}|${homePlayerCount}`}
             isFinePointer={isFinePointer}
             onCalloutHover={handleMouseLeave}
