@@ -351,6 +351,7 @@ export function useMinutesMap() {
     date,
     currentScheduleGameStatus,
     isInitLoading,
+    hasLoadedGame: Boolean(loadedGameId),
   });
 
   // === PUBLIC EVENT HANDLERS ===

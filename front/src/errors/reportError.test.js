@@ -1,8 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { reportError } from './reportError';
+import { configureAnalytics, resetAnalyticsForTests, startAnalytics } from '../helpers/analytics';
+
+const mocks = vi.hoisted(() => ({
+  posthog: { init: vi.fn(), captureException: vi.fn(), startSessionRecording: vi.fn() },
+}));
+
+vi.mock('posthog-js', () => ({ default: mocks.posthog }));
 
 afterEach(() => {
   delete window.posthog;
+  resetAnalyticsForTests();
 });
 
 describe('reportError', () => {
@@ -29,6 +37,19 @@ describe('reportError', () => {
       error_name: 'Error',
       error_message: 'render failed',
       boundary: 'root-render',
+    });
+  });
+
+  it('sends errors from before PostHog has loaded once it has', async () => {
+    configureAnalytics({ key: 'phc_test', host: '/ph' });
+    const error = new Error('early');
+
+    reportError(error, { boundary: 'react-recoverable' });
+    expect(mocks.posthog.captureException).not.toHaveBeenCalled();
+
+    await startAnalytics();
+    expect(mocks.posthog.captureException).toHaveBeenCalledWith(error, {
+      boundary: 'react-recoverable',
     });
   });
 });

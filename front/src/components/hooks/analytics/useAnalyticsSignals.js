@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { trackPostHogEvent, trackPostHogPageView } from '../../../helpers/analytics';
+import {
+  startAnalytics,
+  trackPostHogEvent,
+  trackPostHogPageView,
+} from '../../../helpers/analytics';
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 15000;
 
@@ -8,6 +12,7 @@ export function useAnalyticsSignals({
   date,
   currentScheduleGameStatus,
   isInitLoading,
+  hasLoadedGame = false,
   heartbeatIntervalMs = DEFAULT_HEARTBEAT_INTERVAL_MS,
 }) {
   const lastTrackedGameIdRef = useRef(null);
@@ -25,6 +30,11 @@ export function useAnalyticsSignals({
       status: currentScheduleGameStatus || null,
     };
   }, [date, gameId, currentScheduleGameStatus]);
+
+  // The first game's data is in, so PostHog can load without slowing it down.
+  useEffect(() => {
+    if (hasLoadedGame) startAnalytics();
+  }, [hasLoadedGame]);
 
   useEffect(() => {
     if (isInitLoading) return;
