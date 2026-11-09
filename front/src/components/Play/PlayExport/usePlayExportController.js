@@ -19,7 +19,6 @@ import {
   resolveFullCaptionPeriods,
   resolvePlayerCaptionPeriods,
 } from './model/exportCaptionModel';
-import { renderExportCanvas } from './playExportRenderer';
 import { loadTeamLogosForExport } from './playExportAssets';
 import {
   canvasToBlob,
@@ -340,6 +339,9 @@ export const usePlayExportController = ({
           awayColor,
           homeColor,
         });
+        // The drawing code loads on first use, keeping it out of the page's first download.
+        const { renderExportCanvas } = await import('./playExportRenderer');
+        if (!isCurrentRequest()) return;
         const outputCanvas = renderExportCanvas(renderInput);
 
         if (!outputCanvas) {
