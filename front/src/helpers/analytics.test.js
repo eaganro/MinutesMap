@@ -22,6 +22,8 @@ afterEach(() => {
   vi.clearAllMocks();
   delete window.posthog;
   resetAnalyticsForTests();
+  localStorage.clear();
+  window.history.replaceState({}, '', '/');
 });
 
 describe('analytics helpers', () => {
@@ -84,5 +86,42 @@ describe('analytics helpers', () => {
     configureAnalytics({ key: 'phc_test', host: '/ph' });
     await Promise.all([startAnalytics(), startAnalytics()]);
     expect(mocks.posthog.init).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips recordings, but keeps events, in a browser opened with ?recording=off', async () => {
+    window.history.replaceState({}, '', '/2026-11-06-phi-cle?team=PHI&recording=off');
+    configureAnalytics({ key: 'phc_test', host: '/ph' });
+    trackFeatureUse('lineups');
+    await startAnalytics();
+
+    expect(mocks.posthog.init).toHaveBeenCalledWith('phc_test', {
+      api_host: '/ph',
+      capture_pageview: false,
+      persistence: 'localStorage',
+      disable_session_recording: true,
+    });
+    expect(mocks.posthog.startSessionRecording).not.toHaveBeenCalled();
+    expect(mocks.posthog.capture).toHaveBeenCalledWith(
+      'feature-use',
+      { feature: 'lineups' },
+      { timestamp: expect.any(Date) },
+    );
+    // Gone from the address, so a copied link can't turn recordings off for someone else.
+    expect(window.location.search).toBe('?team=PHI');
+
+    // Later visits stay that way without the parameter.
+    resetAnalyticsForTests();
+    vi.clearAllMocks();
+    configureAnalytics({ key: 'phc_test', host: '/ph' });
+    await startAnalytics();
+    expect(mocks.posthog.startSessionRecording).not.toHaveBeenCalled();
+
+    resetAnalyticsForTests();
+    vi.clearAllMocks();
+    window.history.replaceState({}, '', '/?recording=on');
+    configureAnalytics({ key: 'phc_test', host: '/ph' });
+    await startAnalytics();
+    expect(mocks.posthog.startSessionRecording).toHaveBeenCalledWith(true);
+    expect(window.location.search).toBe('');
   });
 });

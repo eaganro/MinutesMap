@@ -1,7 +1,33 @@
+import { readStoredValue, writeStoredValue } from '../components/hooks/state/storage';
+
 // PostHog is loaded only after the page has drawn (see startAnalytics), so it stays out of the
 // download that first-time visitors wait for. Calls made before then are kept and replayed,
 // with their original time, once it has loaded.
 const MAX_PENDING_CALLS = 100;
+
+// A browser can turn session recordings off for itself (its events still go to PostHog) by
+// opening the site once with ?recording=off, and back on with ?recording=on; used for the
+// owner's own devices. The parameter is removed from the address at once, so a copied link
+// never turns recordings off for someone else.
+const RECORDING_PARAM = 'recording';
+const RECORDING_OFF_STORAGE_KEY = 'recordingOff';
+const RECORDING_OFF_OPTIONS = { validate: (value) => typeof value === 'boolean' };
+
+function isRecordingTurnedOff() {
+  if (typeof window === 'undefined') return false;
+  const url = new URL(window.location.href);
+  const requested = url.searchParams.get(RECORDING_PARAM);
+  if (requested === 'off' || requested === 'on') {
+    writeStoredValue(RECORDING_OFF_STORAGE_KEY, requested === 'off');
+    url.searchParams.delete(RECORDING_PARAM);
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }
+  return readStoredValue(RECORDING_OFF_STORAGE_KEY, false, RECORDING_OFF_OPTIONS) === true;
+}
 
 let analyticsConfig = null;
 let pendingCalls = null;
@@ -9,8 +35,9 @@ let loadPromise = null;
 
 /** Sets up PostHog for this page; nothing loads until startAnalytics(). */
 export function configureAnalytics({ key, host }) {
+  const isRecordingOff = isRecordingTurnedOff();
   if (!key || analyticsConfig) return;
-  analyticsConfig = { key, host };
+  analyticsConfig = { key, host, isRecordingOff };
   pendingCalls = [];
 }
 
@@ -23,9 +50,10 @@ export function startAnalytics() {
         api_host: analyticsConfig.host,
         capture_pageview: false,
         persistence: 'localStorage',
+        ...(analyticsConfig.isRecordingOff ? { disable_session_recording: true } : {}),
       });
       window.posthog = posthog;
-      posthog.startSessionRecording(true);
+      if (!analyticsConfig.isRecordingOff) posthog.startSessionRecording(true);
       const calls = pendingCalls || [];
       pendingCalls = null;
       calls.forEach(({ callback, queuedAt }) => {
