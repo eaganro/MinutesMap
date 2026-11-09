@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TIP_SHOW_DELAY_MS, useTipSequence } from '../../tips/useTipSequence';
 
 export const PLAY_TIPS_STORAGE_KEY = 'playTips';
@@ -50,6 +50,18 @@ export function usePlayTips({
     }
   }, [isPlayerDetailOpen, progress.player, progress.skipped, markTip]);
 
+  // The first time a player's view opens, its Back button pulses so the way back is clear.
+  // It isn't one of the sequenced tips, so it shows alongside them, but only once per browser.
+  const [showBackHint, setShowBackHint] = useState(false);
+  useEffect(() => {
+    if (!isPlayerDetailOpen) {
+      setShowBackHint(false);
+    } else if (!progress.back && !progress.skipped) {
+      setShowBackHint(true);
+      markTip('back', 'shown', { wasShown: true });
+    }
+  }, [isPlayerDetailOpen, progress.back, progress.skipped, markTip]);
+
   // Any change to the stat legend (a stat, Score Lead or Win Odds) means they found it.
   useEffect(() => {
     if (
@@ -61,5 +73,5 @@ export function usePlayTips({
     }
   }, [statsSignature, progress.stats, progress.skipped, markTip]);
 
-  return { activeTip, dismissTip, skipTips };
+  return { activeTip, dismissTip, skipTips, showBackHint };
 }

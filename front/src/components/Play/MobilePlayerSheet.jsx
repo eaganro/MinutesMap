@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   getPeriodDurationSeconds,
   getPeriodStartSeconds,
@@ -402,9 +402,12 @@ export default function MobilePlayerSheet({
   statOn,
   onToggleStat,
   teamColor,
+  showBackHint = false,
   onClose,
 }) {
   const ignoreNextCloseClickRef = useRef(false);
+  const [hasBackHintEnded, setHasBackHintEnded] = useState(false);
+  const isBackHintActive = showBackHint && !hasBackHintEnded;
   const periodRange = useMemo(
     () => buildPeriodRange(selectedPeriod, numPeriods, latestStartedPeriod, isFinal),
     [selectedPeriod, numPeriods, latestStartedPeriod, isFinal],
@@ -476,7 +479,8 @@ export default function MobilePlayerSheet({
         </h2>
         <button
           type="button"
-          className="mobilePlayerSheetClose"
+          className={`mobilePlayerSheetClose${isBackHintActive ? ' isFirstVisitHint' : ''}`}
+          onAnimationEnd={() => setHasBackHintEnded(true)}
           onClick={handleCloseClick}
           onTouchStart={consumeCloseStart}
           onTouchMove={consumeCloseStart}

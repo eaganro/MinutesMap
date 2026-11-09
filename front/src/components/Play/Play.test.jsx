@@ -250,6 +250,24 @@ describe('Play', () => {
     expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('highlights the Back button the first time a player sheet opens, until its pulse ends', () => {
+    localStorage.removeItem('playTips');
+    renderPlay(buildProps());
+    const openSheet = () =>
+      fireEvent.click(screen.getByRole('button', { name: /open player detail for j\. embiid/i }));
+    const backButton = () => screen.getByRole('button', { name: /close joel embiid detail view/i });
+
+    openSheet();
+    expect(backButton()).toHaveClass('isFirstVisitHint');
+    fireEvent.animationEnd(backButton());
+    expect(backButton()).not.toHaveClass('isFirstVisitHint');
+
+    fireEvent.click(backButton());
+    openSheet();
+    expect(backButton()).not.toHaveClass('isFirstVisitHint');
+    localStorage.removeItem('playTips');
+  });
+
   it('lets a touch that starts on a player name reach the chart, so a drag there scrubs', () => {
     const capture = vi.fn();
     window.posthog = { capture };
