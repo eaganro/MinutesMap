@@ -15,6 +15,7 @@ import TimelineGrid from './TimelineGrid';
 import { MOBILE_TOOLTIP_BREAKPOINT } from './model/layoutModel';
 import { usePlayInteraction } from './usePlayInteraction';
 import { useMediaQuery } from '../hooks/ui/useMediaQuery';
+import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
 import './Play.scss';
 
 const PLAYER_DETAIL_HISTORY_KEY = 'minutesMapPlayerDetail';
@@ -247,6 +248,16 @@ export default function Play({
   useEffect(() => () => onPlayerDetailModeChange?.(false), [onPlayerDetailModeChange]);
 
   const isFinePointer = useMediaQuery('(hover: hover) and (pointer: fine)');
+  const trackPlayInspect = useTrackFeatureUseOnce('play-inspect');
+  const trackQuarterSelect = useTrackFeatureUseOnce('quarter-select');
+  const trackPlayerDetail = useTrackFeatureUseOnce('player-detail');
+  const hasOpenTooltip = descriptionArray.length > 0;
+
+  // The first play someone opens (hover, drag, tap or keyboard), once per page load.
+  useEffect(() => {
+    if (hasOpenTooltip) trackPlayInspect({ input: isFinePointer ? 'pointer' : 'touch' });
+  }, [hasOpenTooltip, isFinePointer, trackPlayInspect]);
+
   const awayPlayerCount = Object.keys(filteredAwayPlayers).length;
   const homePlayerCount = Object.keys(filteredHomePlayers).length;
   const playTips = usePlayTips({
@@ -260,7 +271,7 @@ export default function Play({
       awayPlayerCount + homePlayerCount > 0,
     canSelectPlayers: isMobilePlayerSheetEnabled,
     canHover: isFinePointer,
-    hasOpenTooltip: descriptionArray.length > 0,
+    hasOpenTooltip,
     isPlayerDetailOpen: isShowingMobilePlayerDetail,
     statsSignature: `${(statOn || []).map(Boolean).join(',')}|${showScoreDiff}|${showOdds}`,
   });
@@ -357,6 +368,7 @@ export default function Play({
 
   const handlePlayerSelect = (teamKey, name) => {
     if (!isMobilePlayerSheetEnabled) return;
+    trackPlayerDetail();
     setInfoLocked(false);
     clearHoverIcon();
     resetInteraction(true);
@@ -389,6 +401,7 @@ export default function Play({
           type="button"
           className={`quarterTab ${period === controlActivePeriod ? 'isActive' : ''}`}
           onClick={() => {
+            trackQuarterSelect({ period: label });
             if (isShowingMobilePlayerDetail) {
               setPlayerDetailPeriod(period);
               return;

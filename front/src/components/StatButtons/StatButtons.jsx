@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EVENT_TYPES, LegendShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
+import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
 import './StatButtons.scss';
 
 const STAT_HOVER_PREVIEW_DELAY_MS = 500;
@@ -25,6 +26,7 @@ export default function StatButtons({
   const holdCompletedRef = useRef(false);
   const suppressNextClickRef = useRef(false);
   const [holdStatIndex, setHoldStatIndex] = useState(null);
+  const trackStatFilter = useTrackFeatureUseOnce('stat-filter');
 
   const clearStatHoverPreview = useCallback(() => {
     if (hoverPreviewTimeoutRef.current) {
@@ -104,9 +106,10 @@ export default function StatButtons({
       holdCompletedRef.current = true;
       setHoldStatIndex(null);
       clearStatHoverPreview();
+      trackStatFilter({ action: 'isolate', stat: EVENT_KEYS[index] });
       isolateStat(index);
     },
-    [clearStatHoverPreview, isolateStat],
+    [clearStatHoverPreview, isolateStat, trackStatFilter],
   );
 
   const startStatHold = useCallback(
@@ -143,6 +146,7 @@ export default function StatButtons({
     }
     if (!isInteractive) return;
     clearStatHoverPreview();
+    trackStatFilter({ action: 'toggle', stat: EVENT_KEYS[index] });
     changeStatOn(index);
   };
 
@@ -242,6 +246,7 @@ export default function StatButtons({
       className={`buttonGroup scoreDiff ${showScoreDiff ? '' : 'off'}`}
       onClick={() => {
         if (!isInteractive) return;
+        trackStatFilter({ action: 'toggle', stat: 'score-lead' });
         setShowScoreDiff(!showScoreDiff);
       }}
       aria-pressed={showScoreDiff}
@@ -270,6 +275,7 @@ export default function StatButtons({
       className={`buttonGroup oddsOverlay ${showOdds ? '' : 'off'}`}
       onClick={() => {
         if (!isInteractive) return;
+        trackStatFilter({ action: 'toggle', stat: 'win-odds' });
         setShowOdds(!showOdds);
       }}
       aria-pressed={showOdds}
