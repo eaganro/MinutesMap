@@ -154,11 +154,12 @@ export default function Player({
           <button
             type="button"
             className="playerNameButton"
+            // Touches go on to the chart, so a drag that starts on a name scrubs like any
+            // other; a tap ends in a click, which opens the player.
             onClick={(event) => {
               event.stopPropagation();
               onSelect();
             }}
-            onTouchStart={(event) => event.stopPropagation()}
             aria-label={`Open player detail for ${playerName}`}
           >
             {playerName}

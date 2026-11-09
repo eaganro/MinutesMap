@@ -250,6 +250,22 @@ describe('Play', () => {
     expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('lets a touch that starts on a player name reach the chart, so a drag there scrubs', () => {
+    const capture = vi.fn();
+    window.posthog = { capture };
+    renderPlay(buildProps());
+
+    fireEvent.touchStart(
+      screen.getByRole('button', { name: /open player detail for j\. embiid/i }),
+      {
+        touches: [{ clientX: 40, clientY: 100 }],
+      },
+    );
+
+    expect(capture).toHaveBeenCalledWith('feature-use', { feature: 'play-by-play' });
+    delete window.posthog;
+  });
+
   it('closes the mobile player sheet on browser back', () => {
     renderPlay(buildProps());
 
