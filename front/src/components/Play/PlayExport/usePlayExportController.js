@@ -33,6 +33,7 @@ import {
   withTimeout,
 } from './playExportTransport';
 import { trackFeatureUse } from '../../../helpers/analytics';
+import { buildSharedView } from '../model/sharedViewModel';
 
 const QUARTER_VIEW_BREAKPOINT = 700;
 const EXPORT_TIMEOUT_MS = 15000;
@@ -367,6 +368,11 @@ export const usePlayExportController = ({
           isFullGameRange: exportIsFullGameRange,
           gameId,
           origin: window.location?.origin || '',
+          view: buildSharedView({
+            exportView: effectiveExportView,
+            exportRange: snapshot.exportRangeSnapshot,
+            playerName: effectiveSelectedExportPlayer?.name,
+          }),
         });
         const { file, errorMessage: fileError } = createPngFile({ blob, fileName });
         if (fileError && isCurrentRequest()) {
