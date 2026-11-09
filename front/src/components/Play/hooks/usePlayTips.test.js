@@ -175,7 +175,36 @@ describe('usePlayTips', () => {
 
     rerender({ ...baseProps, enabled: false, isPlayerDetailOpen: true });
 
-    expect(storedProgress()).toEqual({ lines: true, explore: true, player: true });
+    expect(storedProgress()).toEqual({ lines: true, explore: true, player: true, back: true });
+  });
+
+  it('pulses the Back button the first time a player view opens, and only then', () => {
+    const { result, rerender } = renderTips();
+    expect(result.current.showBackHint).toBe(false);
+
+    rerender({ ...baseProps, isPlayerDetailOpen: true });
+    expect(result.current.showBackHint).toBe(true);
+    expect(storedProgress()).toMatchObject({ back: true });
+    expect(capture).toHaveBeenCalledWith('play-tip', {
+      tip: 'back',
+      outcome: 'shown',
+      wasShown: true,
+    });
+
+    rerender({ ...baseProps, isPlayerDetailOpen: false });
+    expect(result.current.showBackHint).toBe(false);
+
+    rerender({ ...baseProps, isPlayerDetailOpen: true });
+    expect(result.current.showBackHint).toBe(false);
+  });
+
+  it('does not pulse the Back button for readers who skipped the tips', () => {
+    localStorage.setItem(PLAY_TIPS_STORAGE_KEY, JSON.stringify({ skipped: true }));
+    const { result, rerender } = renderTips();
+
+    rerender({ ...baseProps, isPlayerDetailOpen: true });
+
+    expect(result.current.showBackHint).toBe(false);
   });
 
   it('hides every tip once skipped', () => {

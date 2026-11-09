@@ -298,10 +298,24 @@
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+  transition: border-color 0.4s ease;
 
   &:focus-visible {
     outline: 2px solid var(--text-primary);
     outline-offset: 2px;
+  }
+
+  // The first time a player's view opens (see usePlayTips): a few pulses in the tips' blue,
+  // using the same `tipPulse` as the tip rings in tips/Tips.scss.
+  &.isFirstVisitHint {
+    border-color: var(--tip-bg);
+    animation: tipPulse 1.6s ease-out 0.5s 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobilePlayerSheetClose.isFirstVisitHint {
+    animation: none;
   }
 }
 

@@ -552,6 +552,7 @@ export default function Play({
               statOn={statOn}
               onToggleStat={changeStatOn}
               teamColor={selectedPlayerDetail.teamColor}
+              showBackHint={playTips.showBackHint}
               onClose={handlePlayerDetailClose}
             />
           ) : (

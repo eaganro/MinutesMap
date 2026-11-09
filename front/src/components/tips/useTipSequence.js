@@ -42,10 +42,11 @@ export function useTipSequence({
     [eventName],
   );
 
+  // `wasShown` can be passed for hints shown outside the sequence (which this hook can't see).
   const markTip = useCallback(
-    (tip, outcome) => {
+    (tip, outcome, { wasShown = shownTipsRef.current.has(tip) } = {}) => {
       setProgress((prev) => (prev[tip] ? prev : { ...prev, [tip]: true }));
-      trackTip(tip, outcome, { wasShown: shownTipsRef.current.has(tip) });
+      trackTip(tip, outcome, { wasShown });
     },
     [setProgress, trackTip],
   );
