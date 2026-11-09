@@ -191,6 +191,17 @@ async function waitForAppReady(page) {
 }
 
 async function expectNoSeriousAccessibilityViolations(page) {
+  // Check the settled page: halfway through a section's fade-in from its loading blur, its
+  // text is briefly too faint to pass the contrast check.
+  await expect(page.locator('.isLoading')).toHaveCount(0);
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation instanceof CSSTransition)
+        .map((animation) => animation.finished.catch(() => {})),
+    ),
+  );
   const results = await new AxeBuilder({ page }).analyze();
   const blockingViolations = results.violations.filter(
     ({ impact }) => impact === 'serious' || impact === 'critical',
