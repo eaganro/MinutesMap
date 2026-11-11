@@ -27,6 +27,54 @@ TERMINAL_STATUS_PREFIXES = (
     "canceled",
     "ppd",
 )
+# The schedule feed only carries abbreviations, so team files first created from it
+# (before the team's first gamepack of the season) need names from here.
+NBA_TEAM_NAMES = {
+    "ATL": "Hawks",
+    "BOS": "Celtics",
+    "BKN": "Nets",
+    "CHA": "Hornets",
+    "CHI": "Bulls",
+    "CLE": "Cavaliers",
+    "DAL": "Mavericks",
+    "DEN": "Nuggets",
+    "DET": "Pistons",
+    "GSW": "Warriors",
+    "HOU": "Rockets",
+    "IND": "Pacers",
+    "LAC": "Clippers",
+    "LAL": "Lakers",
+    "MEM": "Grizzlies",
+    "MIA": "Heat",
+    "MIL": "Bucks",
+    "MIN": "Timberwolves",
+    "NOP": "Pelicans",
+    "NYK": "Knicks",
+    "OKC": "Thunder",
+    "ORL": "Magic",
+    "PHI": "76ers",
+    "PHX": "Suns",
+    "POR": "Trail Blazers",
+    "SAC": "Kings",
+    "SAS": "Spurs",
+    "TOR": "Raptors",
+    "UTA": "Jazz",
+    "WAS": "Wizards",
+}
+
+
+def _schedule_team_meta(team_id, abbr):
+    return {"id": _safe_int(team_id), "abbr": abbr, "name": NBA_TEAM_NAMES.get(abbr, "")}
+
+
+def _fill_missing_team_name(artifact, team):
+    """Sets the artifact's team name if it is blank and `team` has one. Returns True if it changed."""
+    name = str((team or {}).get("name") or "").strip()
+    meta = artifact.get("team")
+    if not name or not isinstance(meta, dict) or str(meta.get("name") or "").strip():
+        return False
+    meta["name"] = name
+    return True
 
 
 def _load_json_from_s3(*, s3_client, bucket, key, allow_missing=False):
@@ -1060,16 +1108,8 @@ def _derive_live_team_artifacts(schedule_game, *, root_prefix):
         nba_game_id=schedule_game.get("nbaGameId"),
     )
     gamepack_key = f"{root_prefix}gamepack/{game_id}.json.gz"
-    away_team = {
-        "id": _safe_int(schedule_game.get("awayTeamId")),
-        "abbr": away_abbr,
-        "name": "",
-    }
-    home_team = {
-        "id": _safe_int(schedule_game.get("homeTeamId")),
-        "abbr": home_abbr,
-        "name": "",
-    }
+    away_team = _schedule_team_meta(schedule_game.get("awayTeamId"), away_abbr)
+    home_team = _schedule_team_meta(schedule_game.get("homeTeamId"), home_abbr)
     schedule_game = {
         **schedule_game,
         "date": date_str,
@@ -1135,16 +1175,8 @@ def _derive_scheduled_team_artifacts(schedule_game, *, today=None):
         schedule_game,
         nba_game_id=schedule_game.get("nbaGameId"),
     )
-    away_team = {
-        "id": _safe_int(schedule_game.get("awayTeamId")),
-        "abbr": away_abbr,
-        "name": "",
-    }
-    home_team = {
-        "id": _safe_int(schedule_game.get("homeTeamId")),
-        "abbr": home_abbr,
-        "name": "",
-    }
+    away_team = _schedule_team_meta(schedule_game.get("awayTeamId"), away_abbr)
+    home_team = _schedule_team_meta(schedule_game.get("homeTeamId"), home_abbr)
     schedule_game = {**schedule_game, "date": date_str}
 
     return [
@@ -1223,6 +1255,8 @@ def update_team_schedule_artifacts_for_schedule_games(
                 )
 
             artifact = team_cache[key]
+            if _fill_missing_team_name(artifact, team):
+                changed_keys.add(key)
             games, changed = _upsert_unplayed_game_row(artifact.get("games"), item["row"])
             seasons.add(item["season"])
             season_types.add(item["seasonType"])
@@ -1322,8 +1356,9 @@ def update_team_live_artifacts_for_schedule_game(*, s3_client, bucket, root_pref
             team=team,
             season=item["season"],
         )
+        name_filled = _fill_missing_team_name(artifact, team)
         games, changed = _upsert_unplayed_game_row(artifact.get("games"), item["row"])
-        if not changed:
+        if not changed and not name_filled:
             status_key, status_changed = _upsert_team_status_artifact(
                 status_cache=status_cache,
                 s3_client=s3_client,
@@ -1448,6 +1483,7 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
             opp_score=opp_score,
             gamepack_key=gamepack_key,
         )
+        _fill_missing_team_name(artifact, team)
         artifact["games"] = _upsert_game_row(artifact.get("games"), row)
         _recalc_team_artifact(artifact)
         upload_json_to_s3(
