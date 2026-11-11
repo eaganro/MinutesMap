@@ -432,6 +432,9 @@ def test_update_team_schedule_artifacts_for_schedule_games_batches_team_writes()
     assert [game["status"] for game in team_artifact["games"]] == ["7:30 PM ET", "Scheduled"]
     assert team_artifact["record"] == {"wins": 0, "losses": 0, "ties": 0}
     assert team_artifact["players"] == []
+    # The schedule only has abbreviations; names come from the poller's own table.
+    assert team_artifact["team"]["name"] == "Celtics"
+    assert [game["opponentName"] for game in team_artifact["games"]] == ["Knicks", "Knicks"]
     status_key = ("test-bucket", "data/pages/team-status/BOS/2025-26.json.gz")
     status_artifact = json.loads(gzip.decompress(s3.objects[status_key]).decode("utf-8"))
     assert status_artifact["team"]["abbr"] == "BOS"
@@ -686,3 +689,44 @@ def test_player_recalc_removes_stale_unplayed_rows():
     assert artifact["totals"]["games"] == 1
     assert artifact["totals"]["box"]["pts"] == 27
     assert artifact["teams"] == [{"id": 1610612755, "abbr": "PHI", "name": "76ers"}]
+
+
+def test_update_team_schedule_artifacts_fills_blank_team_name_on_existing_file():
+    s3 = FakeS3()
+    team_key = "data/pages/teams/BOS/2026-27.json.gz"
+    _put_json(
+        s3,
+        "test-bucket",
+        team_key,
+        {
+            "schemaVersion": 1,
+            "season": "2026-27",
+            "team": {"id": 1610612738, "abbr": "BOS", "name": ""},
+            "games": [],
+            "players": [],
+        },
+    )
+
+    update_team_schedule_artifacts_for_schedule_games(
+        s3_client=s3,
+        bucket="test-bucket",
+        root_prefix="data/",
+        page_prefix="pages/",
+        schedule_games=[
+            {
+                "id": "2026-11-12-nyk-bos",
+                "date": "2026-11-12",
+                "starttime": "2026-11-12T19:30:00-05:00",
+                "awayteam": "NYK",
+                "hometeam": "BOS",
+                "awayTeamId": 1610612752,
+                "homeTeamId": 1610612738,
+                "status": "7:30 PM ET",
+            }
+        ],
+        today=date(2026, 11, 10),
+    )
+
+    team_artifact = _read_json(s3, "test-bucket", team_key)
+    assert team_artifact["team"]["name"] == "Celtics"
+    assert team_artifact["games"][0]["opponentName"] == "Knicks"
