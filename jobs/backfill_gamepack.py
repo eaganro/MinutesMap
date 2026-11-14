@@ -13,7 +13,7 @@ from botocore.exceptions import ClientError
 ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(ROOT, "functions", "nba-game-poller"))
 
-from nba_game_poller.nba_api import fetch_nba_data_urllib  # noqa: E402
+from nba_game_poller.nba_api import fetch_nba_data_curl, fetch_nba_data_urllib  # noqa: E402
 from nba_game_poller.playbyplay_processing import process_playbyplay_payload  # noqa: E402
 from nba_game_poller.gamepack_utils import (  # noqa: E402
     build_box_payload,
@@ -24,6 +24,16 @@ from nba_game_poller.gamepack_utils import (  # noqa: E402
 from nba_game_poller.storage import upload_json_to_s3  # noqa: E402
 
 SCHEDULE_FEED_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
+
+# cdn.nba.com refuses Python's TLS stack (and AWS addresses), so NBA feeds are
+# fetched with the curl binary by default, as the Pi poller does. Run this from a
+# residential connection; "urllib" is kept for hosts where the stdlib still works.
+FETCHERS = {"curl": fetch_nba_data_curl, "urllib": fetch_nba_data_urllib}
+fetch_mode = "curl"
+
+
+def fetch_nba_data(url):
+    return FETCHERS[fetch_mode](url)
 
 
 def parse_args():
@@ -84,6 +94,12 @@ def parse_args():
         "--use-feed",
         action="store_true",
         help="Force using the NBA schedule feed instead of S3 schedule files",
+    )
+    parser.add_argument(
+        "--fetch-mode",
+        choices=sorted(FETCHERS),
+        default="curl",
+        help="How to fetch NBA feeds (default: curl; Python's urllib is blocked by the CDN).",
     )
     parser.add_argument(
         "--sleep-seconds",
@@ -239,7 +255,7 @@ def coerce_nba_game_id(value):
 
 
 def build_feed_schedule(date_str):
-    data, _ = fetch_nba_data_urllib(SCHEDULE_FEED_URL)
+    data, _ = fetch_nba_data(SCHEDULE_FEED_URL)
     league = data.get("leagueSchedule", {}) if isinstance(data, dict) else {}
     game_dates = league.get("gameDates", []) if isinstance(league, dict) else []
     schedule = []
@@ -355,7 +371,7 @@ def build_game_id_map_from_schedule(schedule, date_str):
 
 
 def load_games_from_feed(date_str):
-    data, _ = fetch_nba_data_urllib(SCHEDULE_FEED_URL)
+    data, _ = fetch_nba_data(SCHEDULE_FEED_URL)
     league = data.get("leagueSchedule", {}) if isinstance(data, dict) else {}
     game_dates = league.get("gameDates", []) if isinstance(league, dict) else []
     games = []
@@ -378,8 +394,8 @@ def load_games_from_feed(date_str):
 def backfill_gamepack_for_game(game_key, nba_game_id, s3_client, bucket, prefix, dry_run=False):
     play_url = f"https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_{nba_game_id}.json"
     box_url = f"https://cdn.nba.com/static/json/liveData/boxscore/boxscore_{nba_game_id}.json"
-    play_data, _ = fetch_nba_data_urllib(play_url)
-    box_data, _ = fetch_nba_data_urllib(box_url)
+    play_data, _ = fetch_nba_data(play_url)
+    box_data, _ = fetch_nba_data(box_url)
 
     if not play_data or not box_data:
         print(f"Skip {game_key}: missing play or box data.")
@@ -448,7 +464,9 @@ def backfill_gamepack_for_game(game_key, nba_game_id, s3_client, bucket, prefix,
 
 
 def main():
+    global fetch_mode
     args = parse_args()
+    fetch_mode = args.fetch_mode
     s3_client = boto3.client("s3", region_name=args.region)
     if args.game_id_map_prefix and not args.game_id_map_prefix.endswith("/"):
         args.game_id_map_prefix += "/"
