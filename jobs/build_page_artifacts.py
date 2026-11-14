@@ -642,6 +642,13 @@ def pick_team_leader(players, stat_key):
     return best or {"id": None, "name": "", "value": 0}
 
 
+def game_period_count(flow):
+    """Periods the game lasted (4, or more with overtime), for every player in it."""
+    flow = flow if isinstance(flow, dict) else {}
+    last = flow.get("last") or {}
+    return max(4, safe_int(flow.get("periods")), safe_int(last.get("quarter")))
+
+
 def build_team_game_row(
     *,
     season,
@@ -657,6 +664,7 @@ def build_team_game_row(
     team_score,
     opp_score,
     gamepack_key,
+    periods,
 ):
     team_stats = aggregate_team_player_stats(team_players)
     return {
@@ -673,6 +681,7 @@ def build_team_game_row(
         "result": "W" if team_score > opp_score else "L" if team_score < opp_score else "T",
         "teamScore": team_score,
         "oppScore": opp_score,
+        "periods": periods,
         "teamStats": team_stats,
         "leaders": {
             "pts": pick_team_leader(team_players, "pts"),
@@ -802,6 +811,7 @@ def build_player_game_row(
     result,
     team_score,
     opp_score,
+    periods,
     player,
     box_stats,
     actions,
@@ -819,6 +829,7 @@ def build_player_game_row(
         "result": result,
         "teamScore": team_score,
         "oppScore": opp_score,
+        "periods": periods,
         "teamId": safe_int(team.get("id")),
         "teamAbbr": team.get("abbr"),
         "teamName": team.get("name"),
@@ -869,6 +880,7 @@ def derive_game_artifacts(
     season = derive_season_label(date_str)
     season_type = derive_season_type(gamepack, box, nba_game_id=nba_game_id)
     gamepack_key = f"{root_prefix}{gamepack_prefix}{game_id}.json.gz"
+    periods = game_period_count(flow)
 
     last = flow.get("last") or {}
     away_score = safe_int(last.get("awayScore"))
@@ -895,6 +907,7 @@ def derive_game_artifacts(
                 team_score=away_score,
                 opp_score=home_score,
                 gamepack_key=gamepack_key,
+                periods=periods,
             ),
         },
         {
@@ -914,6 +927,7 @@ def derive_game_artifacts(
                 team_score=home_score,
                 opp_score=away_score,
                 gamepack_key=gamepack_key,
+                periods=periods,
             ),
         },
     ]
@@ -946,6 +960,7 @@ def derive_game_artifacts(
                 result=result,
                 team_score=team_score,
                 opp_score=opp_score,
+                periods=periods,
                 player=player,
                 box_stats=box_stats,
                 actions=actions,

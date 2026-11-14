@@ -364,7 +364,14 @@ def _player_has_output(box_stats, actions, segments):
     return False
 
 
-def _build_team_game_row(*, season, season_type, game_id, nba_game_id, start, date_str, side, team, opponent, team_players, team_score, opp_score, gamepack_key):
+def _game_period_count(flow):
+    """Periods the game lasted (4, or more with overtime), for every player in it."""
+    flow = flow if isinstance(flow, dict) else {}
+    last = flow.get("last") or {}
+    return max(4, _safe_int(flow.get("periods")), _safe_int(last.get("quarter")))
+
+
+def _build_team_game_row(*, season, season_type, game_id, nba_game_id, start, date_str, side, team, opponent, team_players, team_score, opp_score, gamepack_key, periods):
     team_stats = _aggregate_team_player_stats(team_players)
     return {
         "gameId": game_id,
@@ -380,6 +387,7 @@ def _build_team_game_row(*, season, season_type, game_id, nba_game_id, start, da
         "result": "W" if team_score > opp_score else "L" if team_score < opp_score else "T",
         "teamScore": team_score,
         "oppScore": opp_score,
+        "periods": periods,
         "teamStats": team_stats,
         "leaders": {
             "pts": _pick_team_leader(team_players, "pts"),
@@ -424,7 +432,7 @@ def _build_live_team_game_row(*, season, season_type, schedule_game, side, oppon
     }
 
 
-def _build_player_game_row(*, season, season_type, date_str, game_id, nba_game_id, start, gamepack_key, team, opponent, side, result, team_score, opp_score, player, box_stats, actions, segments):
+def _build_player_game_row(*, season, season_type, date_str, game_id, nba_game_id, start, gamepack_key, team, opponent, side, result, team_score, opp_score, periods, player, box_stats, actions, segments):
     row = {
         "gameId": game_id,
         "nbaGameId": nba_game_id,
@@ -436,6 +444,7 @@ def _build_player_game_row(*, season, season_type, date_str, game_id, nba_game_i
         "result": result,
         "teamScore": team_score,
         "oppScore": opp_score,
+        "periods": periods,
         "teamId": _safe_int(team.get("id")),
         "teamAbbr": team.get("abbr"),
         "teamName": team.get("name"),
@@ -1439,6 +1448,7 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
     season = _derive_season_label(date_str)
     season_type = derive_season_type(gamepack, box, nba_game_id=nba_game_id)
     gamepack_key = f"{root_prefix}gamepack/{game_id}.json.gz"
+    periods = _game_period_count(flow)
 
     last = flow.get("last") or {}
     away_score = _safe_int(last.get("awayScore"))
@@ -1482,6 +1492,7 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
             team_score=team_score,
             opp_score=opp_score,
             gamepack_key=gamepack_key,
+            periods=periods,
         )
         _fill_missing_team_name(artifact, team)
         artifact["games"] = _upsert_game_row(artifact.get("games"), row)
@@ -1554,6 +1565,7 @@ def update_page_artifacts_for_gamepack(*, s3_client, bucket, root_prefix, page_p
                 result=result,
                 team_score=team_score,
                 opp_score=opp_score,
+                periods=periods,
                 player=player,
                 box_stats=box_stats,
                 actions=actions,

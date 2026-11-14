@@ -357,6 +357,26 @@ def test_derive_game_artifacts_builds_team_and_player_rows():
     assert maxey["row"]["playerKey"] == "201939"
     assert len(maxey["row"]["detail"]["actions"]) == 4
     assert len(maxey["row"]["detail"]["segments"]) == 2
+    assert maxey["row"]["periods"] == 4
+    assert away_team["row"]["periods"] == 4
+
+
+def test_derive_game_artifacts_records_overtime_for_players_who_sat_it():
+    gamepack = sample_gamepack()
+    gamepack["flow"]["periods"] = 5
+    gamepack["flow"]["last"]["quarter"] = 5
+    derived = module.derive_game_artifacts(
+        gamepack=gamepack,
+        root_prefix="data/",
+        gamepack_prefix="gamepack/",
+        page_prefix="pages/",
+        identity_registry=module.build_identity_registry([gamepack]),
+    )
+
+    maxey = next(item for item in derived["players"] if item["player"]["name"] == "Tyrese Maxey")
+    assert all(seg["quarter"] <= 4 for seg in maxey["row"]["detail"]["segments"])
+    assert {item["row"]["periods"] for item in derived["players"]} == {5}
+    assert {item["row"]["periods"] for item in derived["teams"]} == {5}
 
 
 def test_derive_game_artifacts_matches_abbreviated_flow_labels():
