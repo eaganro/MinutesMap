@@ -19,6 +19,7 @@ import {
   MIN_BLUR_MS,
   MIN_DATE_SWITCH_BLUR_MS,
 } from '../constants/loadingUiTimings';
+import DatePickerPanel from './DatePickerPanel';
 import TeamLogo from './TeamLogo';
 import TeamPickerPanel from './TeamPickerPanel';
 
@@ -103,15 +104,18 @@ export default function Schedule({
   const { scrollRef, dragHandlers, didDrag, scrollBy, resetScrollPosition } =
     useHorizontalDragScroll();
 
-  // The native input sits invisibly over the "Wed, Nov 4" text, so open its
-  // calendar from anywhere on the field rather than only from its own icon.
-  const dateInputRef = useRef(null);
-  const openDatePicker = () => {
-    try {
-      dateInputRef.current?.showPicker?.();
-    } catch {
-      // Unsupported or blocked; the focused input still accepts typed dates.
-    }
+  // Our own calendar rather than the native date input's: a native picker
+  // changes the value (and so loads a new date) when it moves between months.
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const datePickerTriggerRef = useRef(null);
+  const datePickerId = useId();
+  const closeDatePicker = useCallback(({ restoreFocus = false } = {}) => {
+    setIsDatePickerOpen(false);
+    if (restoreFocus) datePickerTriggerRef.current?.focus();
+  }, []);
+  const pickDate = (nextDate) => {
+    setIsDatePickerOpen(false);
+    if (nextDate !== date) handleDateChange(nextDate);
   };
 
   const isTeamMode = Boolean(teamMode);
@@ -464,33 +468,25 @@ export default function Schedule({
           </div>
         ) : (
           <div className="datePick">
-            <label className="visuallyHidden" htmlFor="scheduleDate">
-              Select game date
-            </label>
             <IconButton className="scheduleButton" onClick={dateDown} aria-label="Previous date">
               <NavigateBefore />
             </IconButton>
-            <div className="dateField">
+            <button
+              ref={datePickerTriggerRef}
+              type="button"
+              className="dateField"
+              onClick={() => setIsDatePickerOpen((open) => !open)}
+              aria-label={`Select game date, ${formatPickerDate(shownHeader.date)}`}
+              aria-haspopup="dialog"
+              aria-expanded={isDatePickerOpen}
+              aria-controls={isDatePickerOpen ? datePickerId : undefined}
+              data-date={shownHeader.date}
+            >
               <span className="dateFieldText" aria-hidden="true">
                 {formatPickerDate(shownHeader.date)}
               </span>
               <CalendarTodayOutlined className="dateFieldIcon" aria-hidden="true" />
-              <input
-                id="scheduleDate"
-                ref={dateInputRef}
-                className="dateInput"
-                type="date"
-                value={shownHeader.date}
-                onChange={(e) => handleDateChange(e.target.value)}
-                onClick={openDatePicker}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    openDatePicker();
-                  }
-                }}
-              />
-            </div>
+            </button>
             <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
               <NavigateNext />
             </IconButton>
@@ -574,6 +570,15 @@ export default function Schedule({
           </IconButton>
         </div>
       </div>
+      {isDatePickerOpen && !isTeamHeader && (
+        <DatePickerPanel
+          id={datePickerId}
+          date={date}
+          onSelect={pickDate}
+          onClose={closeDatePicker}
+          triggerRef={datePickerTriggerRef}
+        />
+      )}
       {isTeamPickerOpen && (
         <TeamPickerPanel
           id={teamPickerId}

@@ -196,9 +196,11 @@
         color: var(--input-text);
         border: 1px solid var(--input-border);
         border-radius: 4px;
+        font: inherit;
         font-size: 0.85rem;
         font-weight: 500;
         white-space: nowrap;
+        cursor: pointer;
         transition:
           background-color 0.3s ease,
           border-color 0.3s ease,
@@ -208,7 +210,7 @@
           background-color: var(--bg-hover);
         }
 
-        &:focus-within {
+        &:focus-visible {
           outline: 2px solid var(--focus-ring-color);
           outline-offset: 2px;
         }
@@ -217,20 +219,6 @@
           font-size: 15px;
           color: var(--text-tertiary);
         }
-      }
-
-      // Invisible but on top, so taps and the calendar popup still belong to
-      // the native date input.
-      .dateInput {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        border: 0;
-        opacity: 0;
-        cursor: pointer;
       }
     }
     .gamePick {
@@ -539,5 +527,79 @@
     }
 
     @include team-logo-slot(28px);
+  }
+}
+
+// The calendar opened from the date field, where the team picker opens.
+.datePickerPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 16px;
+  z-index: 40;
+  width: 280px;
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px var(--tooltip-shadow);
+  color: var(--text-primary);
+
+  .datePickerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .datePickerMonth {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .datePickerNav {
+    color: var(--text-secondary);
+  }
+
+  .datePickerGrid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  .datePickerWeekday {
+    padding: 4px 0;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .datePickerDay {
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--bg-hover);
+    }
+
+    &.isSelected {
+      background-color: var(--bg-selected);
+      border-color: var(--bg-selected);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-ring-color);
+      outline-offset: 2px;
+    }
   }
 }
