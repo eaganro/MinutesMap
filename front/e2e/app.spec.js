@@ -183,9 +183,14 @@ async function mockGameData(page) {
   );
 }
 
+// The schedule's date field, which opens the calendar.
+function datePickerTrigger(page) {
+  return page.getByRole('button', { name: /^Select game date/ });
+}
+
 async function waitForAppReady(page) {
   await expect(page.locator('.topLevel')).toBeVisible();
-  await expect(page.locator('input[type="date"]')).toBeVisible();
+  await expect(datePickerTrigger(page)).toBeVisible();
   await expect(page.locator('.scoreElement')).toBeVisible();
   await expect(page.getByRole('button', { name: /Show schedule for/ })).toBeEnabled();
 }
@@ -219,8 +224,7 @@ test.describe('MinutesMap Smoke', () => {
     await page.goto('/?date=2025-01-15');
     await waitForAppReady(page);
 
-    const datePicker = page.locator('input[type="date"]');
-    await expect(datePicker).toHaveValue('2025-01-15');
+    await expect(datePickerTrigger(page)).toHaveAttribute('data-date', '2025-01-15');
 
     const firstGame = page.locator('.games .game').first();
     await expect(firstGame).toBeVisible();
@@ -229,13 +233,34 @@ test.describe('MinutesMap Smoke', () => {
     await expect(page).toHaveURL(/\/2025-01-15-[a-z0-9]+-[a-z0-9]+$/i);
   });
 
+  test('date calendar changes the date only when a day is picked @smoke', async ({ page }) => {
+    await page.goto('/?date=2025-01-15');
+    await waitForAppReady(page);
+
+    const trigger = datePickerTrigger(page);
+    await trigger.click();
+    const calendar = page.getByRole('dialog', { name: 'Choose a date' });
+    await expect(calendar).toContainText('January 2025');
+
+    await calendar.getByRole('button', { name: 'Previous month' }).click();
+    await calendar.getByRole('button', { name: 'Previous month' }).click();
+    await expect(calendar).toContainText('November 2024');
+    await expect(trigger).toHaveAttribute('data-date', '2025-01-15');
+
+    await calendar.getByRole('button', { name: 'Next month' }).click();
+    await calendar.getByRole('button', { name: 'Next month' }).click();
+    await calendar.getByRole('button', { name: /^Thu, Jan 16/ }).click();
+    await expect(calendar).toHaveCount(0);
+    await expect(trigger).toHaveAttribute('data-date', '2025-01-16');
+  });
+
   test('team mode browses one team season from the scoreboard logo @smoke', async ({ page }) => {
     await page.goto(`/${SMOKE_GAME_ID}`);
     await waitForAppReady(page);
 
     await page.getByRole('button', { name: 'Show GSW season games' }).click();
     await expect(page).toHaveURL(new RegExp(`/${SMOKE_GAME_ID}\\?team=GSW$`));
-    await expect(page.locator('input[type="date"]')).toHaveCount(0);
+    await expect(datePickerTrigger(page)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Jan 15, vs PHI, L 98-102' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -250,7 +275,7 @@ test.describe('MinutesMap Smoke', () => {
 
     await page.getByRole('button', { name: 'Show all games' }).click();
     await expect(page).toHaveURL(/\/2025-01-12-gsw-mia$/);
-    await expect(page.locator('input[type="date"]')).toHaveValue('2025-01-12');
+    await expect(datePickerTrigger(page)).toHaveAttribute('data-date', '2025-01-12');
   });
 
   test('browser back restores the previous selected game @smoke', async ({ page }) => {
@@ -295,17 +320,17 @@ test.describe('MinutesMap Smoke', () => {
     await page.keyboard.press('Enter');
     await expect(missToggle).toHaveAttribute('aria-pressed', 'true');
 
-    const datePicker = page.getByLabel('Select game date');
+    const datePicker = datePickerTrigger(page);
     const nextDateButton = page.getByRole('button', { name: 'Next date' });
     await nextDateButton.focus();
     await page.keyboard.press('Enter');
-    await expect(datePicker).toHaveValue('2025-01-16');
+    await expect(datePicker).toHaveAttribute('data-date', '2025-01-16');
 
     const scoreDateButton = page.getByRole('button', { name: /Show schedule for/ });
     await expect(scoreDateButton).toBeEnabled();
     await scoreDateButton.focus();
     await page.keyboard.press('Space');
-    await expect(datePicker).toHaveValue('2025-01-15');
+    await expect(datePicker).toHaveAttribute('data-date', '2025-01-15');
   });
 
   test('mobile browser back closes player detail @smoke', async ({ page }) => {

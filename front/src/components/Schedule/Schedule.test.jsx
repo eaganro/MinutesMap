@@ -92,10 +92,10 @@ describe('Schedule', () => {
     render(<Schedule {...buildProps()} />);
 
     expect(screen.getByText(/^Tue, Feb 3/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Select game date'), {
-      target: { value: '2026-02-04' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: /^Select game date/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Wed, Feb 4/ }));
     expect(mocks.handleDateChangeMock).toHaveBeenCalledWith('2026-02-04');
+    expect(screen.queryByRole('dialog', { name: 'Choose a date' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Previous date'));
     fireEvent.click(screen.getByLabelText('Next date'));
@@ -104,6 +104,48 @@ describe('Schedule', () => {
     expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(2, 1);
     // Scrolling back to the start waits for the new date's games.
     expect(mocks.resetScrollPositionMock).not.toHaveBeenCalled();
+  });
+
+  describe('date picker', () => {
+    it('browses months without changing the date until a day is picked', () => {
+      render(<Schedule {...buildProps()} />);
+      const trigger = screen.getByRole('button', { name: /^Select game date/ });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByText('February 2026')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Tue, Feb 3/ })).toHaveFocus();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+      expect(screen.getByText('December 2025')).toBeInTheDocument();
+      expect(mocks.handleDateChangeMock).not.toHaveBeenCalled();
+      expect(screen.getByRole('dialog', { name: 'Choose a date' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /^Thu, Dec 25/ }));
+      expect(mocks.handleDateChangeMock).toHaveBeenCalledWith('2025-12-25');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('closes without a change on Escape, a press outside, or the current day', () => {
+      render(<Schedule {...buildProps()} />);
+      const trigger = screen.getByRole('button', { name: /^Select game date/ });
+
+      fireEvent.click(trigger);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+
+      fireEvent.click(trigger);
+      fireEvent.pointerDown(document.body);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+      fireEvent.click(trigger);
+      fireEvent.click(screen.getByRole('button', { name: /^Tue, Feb 3/ }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(mocks.handleDateChangeMock).not.toHaveBeenCalled();
+    });
   });
 
   it('suppresses game selection click when the drag hook reports dragging', () => {
@@ -365,7 +407,7 @@ describe('Schedule', () => {
       // The whole date view stays, blurred, until the swap.
       expect(container.querySelector('.scheduleContent')).toHaveClass('isSwitchingView');
       expect(container.querySelector('.games')).toHaveClass('isLoading');
-      expect(screen.getByLabelText('Select game date')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Select game date/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
       expect(mocks.resetScrollPositionMock).not.toHaveBeenCalled();
 
@@ -397,7 +439,7 @@ describe('Schedule', () => {
       act(() => vi.advanceTimersByTime(150));
       expect(container.querySelector('.scheduleContent')).not.toHaveClass('isSwitchingView');
       expect(container.querySelector('.games')).not.toHaveClass('isLoading');
-      expect(screen.getByLabelText('Select game date')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Select game date/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
       expect(mocks.resetScrollPositionMock).toHaveBeenCalled();
     });
@@ -521,7 +563,7 @@ describe('Schedule', () => {
         />,
       );
 
-      expect(screen.queryByLabelText('Select game date')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Select game date/)).not.toBeInTheDocument();
       expect(screen.getByRole('region', { name: 'BOS schedule' })).toBeInTheDocument();
       expect(screen.getByText('0-1 · 2026-27')).toBeInTheDocument();
 
