@@ -436,7 +436,10 @@ export default function (
     <div>
       <div className="teamRow">
         <div className="team">
-          <span style={teamColor ? { color: teamColor } : undefined}>{team?.name}</span>
+          <span className="teamLabel">
+            {teamColor && <i className="teamSwatch" style={{ background: teamColor }} />}
+            {team?.name}
+          </span>
           {showButton && (
             <div className="showMore">
               <IconButton

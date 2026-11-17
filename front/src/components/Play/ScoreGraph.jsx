@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import { getSecondsElapsed } from '../../helpers/playTimeline';
+
+const EMPTY_GRAPH = { pospoints: '', negpoints: '', edgepoints: '' };
 
 export default function ScoreGraph({
   scoreTimeline,
@@ -11,17 +13,22 @@ export default function ScoreGraph({
   showScoreDiff,
   awayColor,
   homeColor,
+  awayLineColor,
+  homeLineColor,
   startScoreDiff = 0,
 }) {
-  const { pospoints, negpoints } = useMemo(() => {
+  const clipId = useId();
+  const { pospoints, negpoints, edgepoints } = useMemo(() => {
     if (!showScoreDiff) {
-      return { pospoints: '', negpoints: '' };
+      return EMPTY_GRAPH;
     }
 
     let starty = (startScoreDiff * -300) / maxY;
     // Initial starting point at the center line (y=300 relative to SVG height)
     let pospointsArr = [`${leftMargin},300`];
     let negpointsArr = [`${leftMargin},300`];
+    // The lead itself as one stepped line; drawn over the fills as their edge.
+    const edgepointsArr = [`${leftMargin},${300 + starty}`];
     let pos = starty <= 0; // Tracks if we are currently in positive (Away lead) territory
 
     if (starty < 0) {
@@ -34,7 +41,7 @@ export default function ScoreGraph({
     const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
     const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
     if (windowDurationSeconds <= 0) {
-      return { pospoints: '', negpoints: '' };
+      return EMPTY_GRAPH;
     }
 
     const getXForAction = (action) => {
@@ -53,6 +60,7 @@ export default function ScoreGraph({
       // Calculate Y based on score differential, scaled to max lead
       // 300 is the center point of the 600px height SVG
       let y2 = (scoreDiff * -300) / maxY;
+      edgepointsArr.push(`${leftMargin + x2},${300 + y1}`, `${leftMargin + x2},${300 + y2}`);
 
       // Logic to handle crossing the x-axis (lead change)
       if (y1 <= 0) {
@@ -89,6 +97,7 @@ export default function ScoreGraph({
     // Close the shape at the last recorded action
     const endX = lastAction ? getXForAction(lastAction) : width;
     if (Number.isFinite(endX)) {
+      edgepointsArr.push(`${leftMargin + endX},${300 + starty}`);
       // Extend the graph to the final second
       if (pos) {
         pospointsArr.push(`${leftMargin + endX},${300 + starty}`);
@@ -105,6 +114,7 @@ export default function ScoreGraph({
     return {
       pospoints: pospointsArr.join(' '),
       negpoints: negpointsArr.join(' '),
+      edgepoints: edgepointsArr.join(' '),
     };
   }, [
     scoreTimeline,
@@ -121,10 +131,39 @@ export default function ScoreGraph({
     return null;
   }
 
+  // Each team's colour only on its side of the baseline; the band around the
+  // baseline is left out so a tied stretch doesn't paint over it.
+  const awayClipId = `${clipId}-away`;
+  const homeClipId = `${clipId}-home`;
+  const hasEdge = Boolean(edgepoints && awayLineColor && homeLineColor);
+  const edgePath = hasEdge ? `M${edgepoints.split(' ').join('L')}` : '';
+
   return (
     <>
       <polyline points={pospoints} style={{ fill: awayColor }} />
       <polyline points={negpoints} style={{ fill: homeColor }} />
+      {hasEdge && (
+        <>
+          <clipPath id={awayClipId}>
+            <rect x={leftMargin} y={0} width={width} height={299} />
+          </clipPath>
+          <clipPath id={homeClipId}>
+            <rect x={leftMargin} y={301} width={width} height={299} />
+          </clipPath>
+          <path
+            d={edgePath}
+            className="playScoreEdge"
+            clipPath={`url(#${awayClipId})`}
+            style={{ stroke: awayLineColor }}
+          />
+          <path
+            d={edgePath}
+            className="playScoreEdge"
+            clipPath={`url(#${homeClipId})`}
+            style={{ stroke: homeLineColor }}
+          />
+        </>
+      )}
     </>
   );
 }

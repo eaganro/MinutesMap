@@ -1,6 +1,7 @@
 .box {
-  min-height: 545px;
+  min-height: 500px;
   position: relative;
+  font-size: 0.875rem;
   transition: background-color 0.3s ease;
 
   &.isLoading {
@@ -24,9 +25,11 @@
     width: max-content;
     min-width: 100%;
 
+    font-variant-numeric: tabular-nums;
+
     span,
     .statHeadingButton {
-      padding: 6px 8px;
+      padding: 7px 8px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -34,9 +37,11 @@
   }
 
   .statHeadings {
-    font-weight: 600;
-    color: var(--text-heading);
-    border-bottom: 2px solid var(--divider);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-medium);
     background-color: var(--bg-table-header);
     transition:
       background-color 0.3s ease,
@@ -49,6 +54,7 @@
 
     .highlight-col {
       background-color: var(--bg-highlight-col-header);
+      color: var(--text-heading);
     }
   }
 
@@ -92,7 +98,8 @@
   }
 
   .playerNameCol {
-    font-weight: 500;
+    font-weight: 600;
+    color: var(--text-primary);
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
@@ -127,9 +134,23 @@
 
     .highlight-col {
       background-color: var(--bg-highlight-col);
+      font-weight: 700;
+      color: var(--text-primary);
+      transition: background-color 0.3s ease;
+    }
+
+    // The team totals close each table.
+    &:last-child {
+      border-top: 1px solid var(--border-medium);
       font-weight: 600;
       color: var(--text-heading);
-      transition: background-color 0.3s ease;
+
+      .playerNameCol {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+      }
     }
   }
 
@@ -150,17 +171,29 @@
   }
 
   .teamRow {
-    margin-top: 10px;
+    margin-top: 6px;
+  }
+
+  .boxContent > div + div .teamRow {
+    margin-top: 18px;
   }
 
   .team {
-    font-weight: bold;
+    font-size: 0.95rem;
+    font-weight: 700;
+    position: relative; // anchors the centred expand button
     display: flex;
     align-items: flex-end;
     color: var(--text-primary);
 
     > span {
-      padding: 0 8px 4px;
+      padding: 0 8px 6px;
+    }
+
+    .teamLabel {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
     }
   }
 
@@ -172,11 +205,14 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  // Centred between the two tables, sitting clear of the header row below so
+  // its hover circle isn't covered.
   .showMore {
-    position: relative;
-    left: 44%;
-    top: -5px;
-    color: var(--text-secondary);
+    position: absolute;
+    left: 50%;
+    bottom: 3px;
+    transform: translateX(-50%);
+    color: var(--text-muted);
 
     .MuiIconButton-root {
       color: inherit;
@@ -204,14 +240,14 @@
     justify-content: center;
     gap: 6px;
     width: 100%;
-    margin-top: 10px;
+    margin-top: 12px;
     padding: 8px 12px;
-    border: 1px solid var(--divider);
-    border-radius: 999px;
-    background: var(--bg-table-header);
+    border: 1px solid var(--control-border);
+    border-radius: 10px;
+    background: var(--control-bg);
     color: var(--text-secondary);
     font: inherit;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
     transition:

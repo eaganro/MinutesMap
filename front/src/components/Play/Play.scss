@@ -26,32 +26,32 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
-  margin: 0 auto 10px;
+  gap: 4px;
+  margin: 2px auto 6px;
   box-sizing: border-box;
 
   @media (max-width: 700px) {
-    padding-right: 48px;
+    padding-right: 44px;
   }
 }
 
 .playExportButton {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: var(--layout-card-padding);
+  right: var(--layout-card-padding);
   z-index: 3;
-  border: 1px solid var(--border-light);
-  background: var(--bg-play);
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-secondary);
-  border-radius: 10px;
-  min-height: 34px;
-  padding: 0 10px;
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -60,9 +60,9 @@
     border-color 0.2s ease;
 
   &:hover:not(:disabled) {
-    background: var(--text-primary);
-    border-color: var(--text-primary);
-    color: var(--bg-card);
+    background: var(--bg-hover);
+    border-color: var(--border-light);
+    color: var(--text-primary);
   }
 
   &:disabled {
@@ -71,7 +71,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--text-primary);
+    outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 }
@@ -109,10 +109,10 @@
   z-index: 4;
   width: min(360px, calc(100vw - 24px));
   background: var(--bg-tooltip);
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-  box-shadow: 0 10px 24px var(--tooltip-shadow);
-  padding: 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: 14px;
+  box-shadow: var(--popover-shadow);
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -148,16 +148,16 @@
   flex-direction: column;
   gap: 4px;
   flex: 1 1 90px;
-  color: var(--text-secondary);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .playExportOption select {
-  border: 1px solid var(--border-light);
-  background: var(--bg-play);
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-primary);
   border-radius: 8px;
   padding: 6px 8px;
@@ -166,8 +166,8 @@
 }
 
 .playExportOption textarea {
-  border: 1px solid var(--border-light);
-  background: var(--bg-play);
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-primary);
   border-radius: 8px;
   padding: 7px 9px;
@@ -207,8 +207,8 @@
 
 .playExportCaptionApplyButton,
 .playExportCaptionClearButton {
-  border: 1px solid var(--border-light);
-  background: var(--bg-game);
+  border: 1px solid var(--control-border);
+  background: var(--bg-card-alt);
   color: var(--text-primary);
   border-radius: 6px;
   padding: 3px 8px;
@@ -246,7 +246,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--text-primary);
+    outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 }
@@ -257,9 +257,9 @@
   height: auto;
   max-height: 200px;
   object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid var(--border-light);
-  background: var(--bg-play);
+  border-radius: 10px;
+  border: 1px solid var(--border-medium);
+  background: var(--bg-card-alt);
 }
 
 .playExportPreviewActions {
@@ -283,25 +283,28 @@
 .mobilePlayerSheetTitle {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 1.1;
   text-align: left;
 }
 
 .mobilePlayerSheetClose {
   margin-left: auto;
-  border: 1px solid var(--border-light);
-  background: var(--bg-play);
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-primary);
   border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 0.82rem;
-  font-weight: 700;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
   cursor: pointer;
   transition: border-color 0.4s ease;
 
   &:focus-visible {
-    outline: 2px solid var(--text-primary);
+    outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 
@@ -320,8 +323,8 @@
 }
 
 .mobilePlayerSheetCard {
-  background: var(--bg-play);
-  border-radius: 16px;
+  background: var(--bg-card-alt);
+  border-radius: 14px;
   padding: 14px 12px 12px;
 }
 
@@ -370,8 +373,8 @@
 }
 
 .mobilePlayerSheetSectionTitle {
-  color: var(--text-secondary);
-  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -462,8 +465,9 @@
   padding: 8px 4px;
   text-align: center;
   color: var(--text-primary);
-  font-size: 0.63rem;
+  font-size: 0.66rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .mobilePlayerBoxScoreHeader .mobilePlayerBoxScoreCell {
@@ -493,11 +497,12 @@
 .playExportActionButton {
   flex: 1;
   padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border-light);
-  background: var(--bg-game);
+  border-radius: 10px;
+  border: 1px solid var(--control-border);
+  background: var(--bg-card-alt);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font: inherit;
+  font-size: 0.86rem;
   font-weight: 600;
   text-align: center;
   text-decoration: none;
@@ -514,7 +519,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--text-primary);
+    outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 }
@@ -544,9 +549,9 @@
   z-index: 5;
   width: min(360px, calc(100vw - 24px));
   background: var(--bg-tooltip);
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
-  box-shadow: 0 8px 18px var(--tooltip-shadow);
+  border: 1px solid var(--border-medium);
+  border-radius: 12px;
+  box-shadow: var(--popover-shadow);
   padding: 8px 10px;
   display: flex;
   align-items: center;
@@ -557,8 +562,8 @@
 
 .playExportErrorDismiss {
   margin-left: auto;
-  border: 1px solid var(--border-light);
-  background: var(--bg-game);
+  border: 1px solid var(--control-border);
+  background: var(--bg-card-alt);
   color: var(--text-primary);
   padding: 4px 8px;
   border-radius: 6px;
@@ -572,7 +577,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--text-primary);
+    outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 }
@@ -608,16 +613,24 @@
   }
 }
 
+// With the period tabs above it, the chart doesn't need its own top gap.
+.playQuarterSwitcher ~ .play {
+  margin-top: 8px;
+}
+
 .playQuarterSwitcher .quarterTab {
-  border: 1px solid var(--border-light);
-  background: var(--bg-play);
+  min-width: 44px;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-secondary);
   border-radius: 999px;
-  padding: 5px 10px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition:
     background-color 0.2s ease,
     color 0.2s ease,
@@ -631,14 +644,20 @@
 }
 
 .playQuarterSwitcher .quarterTab:disabled {
-  opacity: 0.6;
+  opacity: 0.45;
   cursor: default;
+}
+
+.playQuarterSwitcher .quarterTab:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 .play {
   position: relative; // so locked tooltip (absolute) is anchored to this container
   margin: auto;
-  margin-top: 20px;
+  // Clears the share button, which sits over the card's top-right corner.
+  margin-top: 28px;
   background-color: var(--bg-play);
   // touch-action: none;
   touch-action: pan-y;
@@ -666,24 +685,88 @@
     position: absolute;
   }
 
+  // The 600px grid: a 25px label band, 275px of rows, the baseline at 300,
+  // then the same again for the home team.
   .playGrid {
-    top: -2px;
+    top: 0;
+    left: 0;
+  }
+
+  // Grid furniture stays lighter than the data it frames.
+  .playGridBaseline {
+    stroke: var(--chart-axis);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+  }
+
+  .playGridPeriodLine {
+    stroke: var(--chart-grid);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+  }
+
+  .playGridPeriodLabel {
+    fill: var(--quarter-label-color);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .playScoreEdge {
+    fill: none;
+    stroke-width: 1;
+    stroke-linejoin: round;
+    stroke-opacity: 0.6;
+
+    // A whole game on a phone packs the steps too tightly for an outline.
+    @media (max-width: 700px) {
+      stroke-opacity: 0.3;
+    }
+  }
+
+  .playCursorLine {
+    stroke: var(--mouse-line-color);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
   }
 
   .teamSection {
     height: 275px;
     display: flex;
     flex-direction: column;
-    font-weight: bold;
+  }
+
+  .teamName {
+    position: relative; // above the grid svg
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 25px;
+    width: max-content;
+    max-width: 100%;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    line-height: 1;
+    color: var(--text-primary);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .teamNameSwatch {
+    width: 4px;
+    height: 13px;
+    border-radius: 2px;
+    flex-shrink: 0;
   }
 
   .descriptionArea {
     background: var(--bg-tooltip);
-    border: 1px solid var(--border-light);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px var(--tooltip-shadow);
-    padding: 12px 16px;
-    font-size: 1rem;
+    border: 1px solid var(--border-medium);
+    border-radius: 12px;
+    box-shadow: var(--popover-shadow);
+    padding: 10px 12px 11px;
+    font-size: 0.875rem;
     color: var(--text-primary);
     width: 300px;
     pointer-events: none;
@@ -695,34 +778,40 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      padding: 8px 0;
+      padding: 0 0 8px;
       font-weight: 600;
-      border-bottom: 2px solid var(--border-medium);
+      border-bottom: 1px solid var(--divider);
       margin-bottom: 8px;
 
       .headerRow {
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: baseline;
       }
 
       .time {
-        color: var(--text-tertiary);
-        font-size: 0.9em;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-variant-numeric: tabular-nums;
       }
 
       .score {
         color: var(--text-primary);
-        font-size: 1.1em;
+        font-size: 1.05rem;
         font-weight: 700;
+        font-variant-numeric: tabular-nums;
         display: flex;
-        align-items: center;
+        align-items: baseline;
         gap: 6px;
 
         .team-tricode {
-          font-size: 0.85em;
-          font-weight: 600;
-          color: var(--text-tertiary);
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          color: var(--text-muted);
         }
       }
 
@@ -731,10 +820,11 @@
         justify-content: space-between;
         align-items: center;
         gap: 10px;
-        font-size: 0.88em;
+        font-size: 0.8rem;
+        font-variant-numeric: tabular-nums;
 
         .label {
-          color: var(--text-tertiary);
+          color: var(--text-muted);
           font-weight: 600;
           white-space: nowrap;
         }
@@ -749,14 +839,14 @@
         }
 
         .team-tricode {
-          font-size: 0.95em;
+          font-size: 0.9em;
           font-weight: 700;
-          color: var(--text-tertiary);
+          color: var(--text-muted);
         }
 
         .separator {
           margin: 0 4px;
-          color: var(--text-tertiary);
+          color: var(--text-muted);
         }
       }
     }
@@ -773,7 +863,7 @@
         }
 
         .jersey-tab {
-          width: 4px;
+          width: 3px;
           flex-shrink: 0;
           border-radius: 2px;
         }
@@ -793,7 +883,7 @@
         }
 
         .action-description {
-          color: var(--text-secondary);
+          color: var(--text-primary);
           line-height: 1.4;
           font-size: 0.95em;
         }
@@ -803,34 +893,30 @@
     .tooltipNav {
       display: flex;
       gap: 8px;
-      margin-top: 8px;
+      margin-top: 10px;
     }
 
     .tooltipNavButton {
       flex: 1;
       padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--border-light);
-      background: var(--bg-game);
+      border-radius: 8px;
+      border: 1px solid var(--control-border);
+      background: var(--bg-card-alt);
       color: var(--text-primary);
-      font-size: 0.9em;
+      font: inherit;
+      font-size: 0.85em;
       font-weight: 600;
       cursor: pointer;
 
+      &:hover:not(:disabled) {
+        background: var(--bg-hover);
+      }
+
       &:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: default;
       }
     }
-  }
-
-  .teamName {
-    font-weight: bold;
-  }
-
-  .playerName {
-    font-weight: 500;
-    font-size: 10px;
   }
 
   .loadingIndicator {

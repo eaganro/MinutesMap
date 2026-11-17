@@ -16,9 +16,9 @@
   box-sizing: border-box;
   background: var(--tip-bg);
   color: var(--tip-text);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px 12px;
-  box-shadow: 0 8px 20px var(--tooltip-shadow);
+  box-shadow: var(--popover-shadow);
   font-size: 0.85rem;
   font-weight: 500;
   line-height: 1.35;

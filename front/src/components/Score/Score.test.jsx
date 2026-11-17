@@ -2,6 +2,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Score from './Score';
 
+vi.mock('../hooks/ui/useTheme', () => ({
+  useTheme: () => ({ isDarkMode: false }),
+}));
+
 const buildProps = (overrides = {}) => ({
   homeTeam: 'GSW',
   awayTeam: 'PHI',

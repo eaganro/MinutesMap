@@ -9,17 +9,21 @@
 .lineupsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 0;
 }
 
+// Two open columns split by a hairline, instead of a card inside the card.
 .lineupsTeamPanel {
-  border: 1px solid var(--divider);
-  border-radius: 14px;
-  padding: 10px;
-  background: var(--bg-card-alt);
+  padding: 4px 16px 4px 6px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lineupsTeamPanel + .lineupsTeamPanel {
+  padding: 4px 6px 4px 16px;
+  border-left: 1px solid var(--divider);
 }
 
 .lineupsPanelTop {
@@ -36,12 +40,16 @@
 }
 
 .lineupsTeamName {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .lineupsCount {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   font-weight: 600;
 }
@@ -67,25 +75,30 @@
 
 .lineupsFilterMode {
   display: inline-flex;
-  border: 1px solid var(--divider);
+  gap: 2px;
+  padding: 2px;
   border-radius: 999px;
-  overflow: hidden;
-  background: var(--bg-table-header);
+  background: var(--bg-hover);
 }
 
 .lineupsFilterModeButton {
   border: none;
+  border-radius: 999px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 3px 10px;
   cursor: pointer;
 }
 
 .lineupsFilterModeButton.isActive {
-  background: var(--bg-highlight-col-header);
-  color: var(--text-heading);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow:
+    0 0 0 1px var(--control-border),
+    0 1px 2px rgba(16, 24, 40, 0.08);
 }
 
 .lineupsFilterModeButton:focus-visible {
@@ -102,11 +115,12 @@
 }
 
 .lineupsFilterPill {
-  border: 1px solid var(--divider);
-  background: var(--bg-table-header);
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-secondary);
   border-radius: 999px;
   padding: 4px 10px;
+  font: inherit;
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
@@ -123,9 +137,9 @@
 }
 
 .lineupsFilterPill.isSelected {
-  background: var(--bg-highlight-col-header);
-  border-color: var(--bg-highlight-col-header);
-  color: var(--text-heading);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .lineupsFilterPill.isDisabled,
@@ -140,11 +154,13 @@
 }
 
 .lineupsFilterClear {
-  border: 1px solid var(--divider);
+  border: 0;
   background: transparent;
   color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
   cursor: pointer;
 }
@@ -155,8 +171,10 @@
 }
 
 .lineupsFilterClear:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  opacity: 0.45;
+  cursor: default;
+  background: transparent;
+  color: var(--text-muted);
 }
 
 .lineupsFilterClear:focus-visible {
@@ -170,35 +188,38 @@
   gap: 8px;
   align-items: center;
   font-size: 0.85rem;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: 8px;
   background: var(--bg-table-even);
 }
 
 .lineupsRow:nth-child(even) {
-  background: var(--bg-table-odd);
+  background: transparent;
 }
 
-.lineupsRowHeader {
-  font-size: 0.72rem;
+.lineupsRowHeader,
+.lineupsRow.lineupsRowHeader:nth-child(n) {
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
-  background: var(--bg-table-header);
-  border: 1px solid var(--divider);
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  background: transparent;
+  border-bottom: 1px solid var(--border-medium);
+  border-radius: 0;
+  padding-bottom: 6px;
 }
 
-.lineupsRowSummary {
-  border: 1px solid var(--divider);
-  background: var(--bg-table-header);
+.lineupsRowSummary,
+.lineupsRow.lineupsRowSummary:nth-child(n) {
+  background: var(--accent-soft);
   font-weight: 600;
 }
 
 .lineupsSummaryLabel {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   color: var(--text-secondary);
   font-weight: 700;
 }
@@ -220,7 +241,7 @@
 }
 
 .lineupsSortButton.isActive {
-  color: var(--text-secondary);
+  color: var(--text-heading);
 }
 
 .lineupsSortButton:focus-visible {
@@ -257,12 +278,12 @@
   min-height: 22px;
   width: 80px;
   padding: 2px 3px;
-  border-radius: 999px;
-  background: var(--bg-table-header);
-  border: 1px solid var(--divider);
-  font-size: 0.72rem;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 0.76rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -282,9 +303,9 @@ button.lineupsPill:hover {
 }
 
 .lineupsPill.isSelected {
-  background: var(--bg-highlight-col-header);
-  border-color: var(--bg-highlight-col-header);
-  color: var(--text-heading);
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-strong);
 }
 
 button.lineupsPill.isDisabled,
@@ -299,7 +320,7 @@ button.lineupsPill:focus-visible {
 }
 
 .lineupsBadge {
-  background: var(--bg-highlight-col-header);
+  background: var(--accent-soft);
   color: var(--text-heading);
   border-radius: 999px;
   padding: 2px 8px;
@@ -314,23 +335,25 @@ button.lineupsPill:focus-visible {
 }
 
 .lineupsPlusMinus.isPositive {
-  color: #16a34a;
+  color: var(--positive);
   font-weight: 700;
 }
 
 .lineupsPlusMinus.isNegative {
-  color: #dc2626;
+  color: var(--negative);
   font-weight: 700;
 }
 
 .lineupsToggle {
   align-self: flex-start;
   margin-top: auto;
-  border: 1px solid var(--divider);
-  background: transparent;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   cursor: pointer;
 }
@@ -384,6 +407,7 @@ button.lineupsPill:focus-visible {
 }
 
 .lineupsDisclosureTitle {
+  font-size: 0.95rem;
   font-weight: 700;
 }
 
@@ -406,14 +430,15 @@ button.lineupsPill:focus-visible {
 .lineupsTeamTabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border: 1px solid var(--divider);
+  gap: 2px;
+  padding: 3px;
   border-radius: 999px;
-  overflow: hidden;
-  background: var(--bg-table-header);
+  background: var(--bg-hover);
 }
 
 .lineupsTeamTab {
   border: none;
+  border-radius: 999px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
@@ -427,7 +452,10 @@ button.lineupsPill:focus-visible {
 }
 
 .lineupsTeamTab.isActive {
-  background: var(--bg-highlight-col-header);
+  background: var(--bg-card);
+  box-shadow:
+    0 0 0 1px var(--control-border),
+    0 1px 2px rgba(16, 24, 40, 0.08);
 }
 
 .lineupsTeamTab:focus-visible {
@@ -436,9 +464,10 @@ button.lineupsPill:focus-visible {
 }
 
 .lineupsFilterToggle {
-  border: 1px solid var(--divider);
-  background: transparent;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-secondary);
+  font: inherit;
   font-size: 0.75rem;
   font-weight: 600;
   padding: 4px 10px;
@@ -447,9 +476,9 @@ button.lineupsPill:focus-visible {
 }
 
 .lineupsFilterToggle.isOpen {
-  background: var(--bg-highlight-col-header);
-  border-color: var(--bg-highlight-col-header);
-  color: var(--text-heading);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .lineupsFilterToggle:focus-visible {
@@ -462,7 +491,6 @@ button.lineupsPill:focus-visible {
 .lineupsTeamPanel.isCompact {
   border: none;
   padding: 0;
-  background: transparent;
 
   .lineupsNames {
     flex: 1 1 auto;
@@ -480,6 +508,12 @@ button.lineupsPill:focus-visible {
 @media (max-width: 920px) {
   .lineupsGrid {
     grid-template-columns: 1fr;
+  }
+
+  .lineupsTeamPanel,
+  .lineupsTeamPanel + .lineupsTeamPanel {
+    padding: 4px 6px;
+    border-left: 0;
   }
 }
 

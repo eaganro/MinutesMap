@@ -83,7 +83,6 @@ export default function Play({
     teamColors,
     awayColor,
     homeColor,
-    maxLead,
     maxY,
     stablePlayData,
     periodData,
@@ -658,12 +657,8 @@ export default function Play({
                   leftMargin={leftMargin}
                   qWidth={qWidth}
                   numQs={displayNumQs}
-                  maxLead={maxLead}
-                  maxY={maxY}
-                  showScoreDiff={showScoreDiff}
                   awayTeamName={displayAwayTeamNames.name}
                   homeTeamName={displayHomeTeamNames.name}
-                  teamColors={teamColors}
                   isQuarterView={isQuarterFocus}
                   activePeriodLabel={activePeriodLabel}
                 />
@@ -678,6 +673,8 @@ export default function Play({
                   showScoreDiff={showScoreDiff}
                   awayColor={awayColor}
                   homeColor={homeColor}
+                  awayLineColor={teamColors.away}
+                  homeLineColor={teamColors.home}
                   startScoreDiff={startScoreDiff}
                 />
 
@@ -694,15 +691,16 @@ export default function Play({
                 {mouseLinePos !== null && (
                   <line
                     x1={mouseLinePos}
-                    y1={10}
+                    y1={6}
                     x2={mouseLinePos}
-                    y2={590}
-                    style={{ stroke: 'var(--mouse-line-color)', strokeWidth: 1 }}
+                    y2={594}
+                    className="playCursorLine"
                   />
                 )}
               </svg>
 
-              <div className="teamName" style={{ color: teamColors.away }}>
+              <div className="teamName away">
+                <span className="teamNameSwatch" style={{ background: teamColors.away }} />
                 {displayAwayTeamNames.name}
               </div>
               <div className="teamSection">
@@ -719,6 +717,7 @@ export default function Play({
                     leftMargin={leftMargin}
                     timelineWindow={timelineWindow}
                     emphasizedStatIndex={emphasizedStatIndex}
+                    cursorX={mouseLinePos === null ? null : mouseLinePos - leftMargin}
                     onSelect={
                       isMobilePlayerSheetEnabled
                         ? () => handlePlayerSelect('away', name)
@@ -728,7 +727,8 @@ export default function Play({
                 ))}
               </div>
 
-              <div className="teamName" style={{ color: teamColors.home }}>
+              <div className="teamName home">
+                <span className="teamNameSwatch" style={{ background: teamColors.home }} />
                 {displayHomeTeamNames.name}
               </div>
               <div className="teamSection">
@@ -745,6 +745,7 @@ export default function Play({
                     leftMargin={leftMargin}
                     timelineWindow={timelineWindow}
                     emphasizedStatIndex={emphasizedStatIndex}
+                    cursorX={mouseLinePos === null ? null : mouseLinePos - leftMargin}
                     onSelect={
                       isMobilePlayerSheetEnabled
                         ? () => handlePlayerSelect('home', name)

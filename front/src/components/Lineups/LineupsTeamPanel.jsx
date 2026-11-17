@@ -63,7 +63,8 @@ export default function LineupsTeamPanel({
       >
         <div className="lineupsTeamHeader">
           {!isCompact && (
-            <span className="lineupsTeamName" style={teamColor ? { color: teamColor } : undefined}>
+            <span className="lineupsTeamName">
+              {teamColor && <i className="teamSwatch" style={{ background: teamColor }} />}
               {teamLabel}
             </span>
           )}

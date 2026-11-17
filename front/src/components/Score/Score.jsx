@@ -9,6 +9,8 @@ import { toDateInputValue } from '../hooks/schedule/useDateInputState';
 import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../constants/loadingUiTimings';
 import { parseGameStatus } from '../../domain/game-selection/status';
 import { useLoadedImage } from '../hooks/ui/useLoadedImage';
+import { useTheme } from '../hooks/ui/useTheme';
+import { getMatchupColors } from '../../helpers/teamColors';
 const LOGO_BASE_PATH = `${ASSET_PREFIX ? ASSET_PREFIX : ''}/img/teams`;
 const buildLogoSrc = (team) => `${LOGO_BASE_PATH}/${team}.svg`;
 
@@ -24,6 +26,7 @@ export default function Score({
   onSelectTeam,
 }) {
   const [showLoadingText, setShowLoadingText] = useState(false);
+  const { isDarkMode } = useTheme();
   const isBlurred = useMinimumLoadingState(isLoading, MIN_BLUR_MS, { skipFirstLoad: true });
 
   const incomingData = useMemo(
@@ -84,7 +87,7 @@ export default function Score({
   const rawStatusLabel =
     typeof displayData.gameStatus === 'string' ? displayData.gameStatus.trim() : '';
   const statusLabel = formatStatusText(rawStatusLabel);
-  const { isLive } = parseGameStatus(displayData.gameStatus);
+  const { isLive, isFinal } = parseGameStatus(displayData.gameStatus);
   const formattedPeriod = formatPeriod(displayData.lastAction?.period);
   const formattedClock = formatClock(displayData.lastAction?.clock);
   const hasActionTime = Boolean(formattedPeriod && formattedClock);
@@ -96,31 +99,48 @@ export default function Score({
     gameTimeLabel = `${formattedPeriod} ${formattedClock}`;
   }
 
-  const renderLogo = (team, logoImage, className, isPending) => {
+  // The same colours the chart's score-lead area uses, so the scoreboard keys them.
+  const matchupColors =
+    displayData.awayTeam && displayData.homeTeam
+      ? getMatchupColors(displayData.awayTeam, displayData.homeTeam, isDarkMode)
+      : null;
+  const awayScore = Number(displayData.score?.away);
+  const homeScore = Number(displayData.score?.home);
+  const hasWinner = isFinal && Number.isFinite(awayScore) && Number.isFinite(homeScore);
+  const awayLost = hasWinner && awayScore < homeScore;
+  const homeLost = hasWinner && homeScore < awayScore;
+
+  const renderTeam = (team, logoImage, side, isPending) => {
     const logo = (
       <img
         {...logoImage.imgProps}
-        height="80"
-        width="80"
-        className={`teamLogo ${className}`}
+        height="56"
+        width="56"
+        className={`teamLogo ${side}Img`}
         alt={onSelectTeam ? '' : team}
       />
     );
     return (
-      <div className={`logoWrapper${isPending ? ' isPending' : ''}`}>
-        {onSelectTeam ? (
-          <button
-            type="button"
-            className="teamLogoButton"
-            onClick={() => onSelectTeam(team, { source: 'scoreboard' })}
-            aria-label={`Show ${team} season games`}
-            title={`Show ${team} season games`}
-          >
-            {logo}
-          </button>
-        ) : (
-          logo
-        )}
+      <div className={`scoreTeam ${side}`}>
+        <div className={`logoWrapper${isPending ? ' isPending' : ''}`}>
+          {onSelectTeam ? (
+            <button
+              type="button"
+              className="teamLogoButton"
+              onClick={() => onSelectTeam(team, { source: 'scoreboard' })}
+              aria-label={`Show ${team} season games`}
+              title={`Show ${team} season games`}
+            >
+              {logo}
+            </button>
+          ) : (
+            logo
+          )}
+        </div>
+        <span className="scoreTeamCode" aria-hidden="true">
+          <span className="scoreTeamSwatch" />
+          {team}
+        </span>
       </div>
     );
   };
@@ -139,6 +159,11 @@ export default function Score({
       role="region"
       aria-label="Game score"
       aria-busy={isLoading}
+      style={
+        matchupColors
+          ? { '--away-color': matchupColors.away, '--home-color': matchupColors.home }
+          : undefined
+      }
     >
       {showOverlay && (
         <div className="loadingOverlay" role="status">
@@ -147,36 +172,47 @@ export default function Score({
         </div>
       )}
       <div className="scoreContent">
-        <button
-          type="button"
-          onClick={changeToGameDate}
-          className="gameDate"
-          disabled={!gameDate || isDataLoading}
-          aria-label={
-            gameDate ? `Show schedule for ${gameDate.toDateString().slice(4)}` : undefined
-          }
-        >
-          {gameDate ? gameDate.toDateString().slice(4) : '---'}
-        </button>
         <div className="scoreArea">
-          <div>{displayData.score ? displayData.score.away : '--'}</div>
-          {displayData.awayTeam &&
-            renderLogo(displayData.awayTeam, awayLogo, 'awayImg', awayLogoPending)}
-          <div className="at">AT</div>
-          {displayData.homeTeam &&
-            renderLogo(displayData.homeTeam, homeLogo, 'homeImg', homeLogoPending)}
-          <div>{displayData.score ? displayData.score.home : '--'}</div>
-        </div>
-        {gameTimeLabel && (
-          <div className="gameTime">
-            <span className="timeText">{gameTimeLabel}</span>
-            {isLive && (
-              <span className="liveDotIndicator" role="img" aria-label="Live game">
-                <span className="liveDot" />
-              </span>
-            )}
+          {displayData.awayTeam ? (
+            renderTeam(displayData.awayTeam, awayLogo, 'away', awayLogoPending)
+          ) : (
+            <div className="scoreTeam away" />
+          )}
+          <div className={`scoreValue away${awayLost ? ' isTrailing' : ''}`}>
+            {displayData.score ? displayData.score.away : '--'}
           </div>
-        )}
+          <div className="scoreMeta">
+            {gameTimeLabel && (
+              <div className={`gameTime${isLive ? ' isLive' : ''}`}>
+                {isLive && (
+                  <span className="liveDotIndicator" role="img" aria-label="Live game">
+                    <span className="liveDot" />
+                  </span>
+                )}
+                <span className="timeText">{gameTimeLabel}</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={changeToGameDate}
+              className="gameDate"
+              disabled={!gameDate || isDataLoading}
+              aria-label={
+                gameDate ? `Show schedule for ${gameDate.toDateString().slice(4)}` : undefined
+              }
+            >
+              {gameDate ? gameDate.toDateString().slice(4) : '---'}
+            </button>
+          </div>
+          <div className={`scoreValue home${homeLost ? ' isTrailing' : ''}`}>
+            {displayData.score ? displayData.score.home : '--'}
+          </div>
+          {displayData.homeTeam ? (
+            renderTeam(displayData.homeTeam, homeLogo, 'home', homeLogoPending)
+          ) : (
+            <div className="scoreTeam home" />
+          )}
+        </div>
       </div>
       {/* {statusMessage && (
         <div className='statusMessage'>{statusMessage}</div>

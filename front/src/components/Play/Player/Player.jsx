@@ -21,6 +21,7 @@ export default function Player({
   timelineWindow,
   onSelect,
   emphasizedStatIndex = null,
+  cursorX = null,
 }) {
   const playerName = name;
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
@@ -133,22 +134,26 @@ export default function Player({
     8,
   );
 
-  const playTimeLines = timeline
-    ?.filter((t) => {
-      if (!t.end) {
-        return false;
-      }
-      return true;
-    })
-    .map((t, i) => {
-      let x1 = getXPosition(t.period, t.start);
-      let x2 = getXPosition(t.period, t.end);
-      x2 = isNaN(x2) ? x1 : x2;
-      return <line key={i} x1={x1} y1={14} x2={x2} y2={14} className="playerTimeline" />;
+  const stints = (timeline || [])
+    .filter((t) => t.end)
+    .map((t) => {
+      const x1 = getXPosition(t.period, t.start);
+      const x2 = getXPosition(t.period, t.end);
+      return { x1, x2: isNaN(x2) ? x1 : x2 };
     });
 
+  const playTimeLines = stints.map(({ x1, x2 }, i) => (
+    <line key={i} x1={x1} y1={14} x2={x2} y2={14} className="playerTimeline" />
+  ));
+
+  // While a moment is being inspected, mark who was on the floor then.
+  const hasCursor = Number.isFinite(cursorX);
+  const isOnCourt =
+    hasCursor && stints.some(({ x1, x2 }) => cursorX >= x1 - 0.5 && cursorX <= x2 + 0.5);
+  const courtClassName = hasCursor ? (isOnCourt ? ' isOnCourt' : ' isOffCourt') : '';
+
   return (
-    <div className="player" style={{ height: `${275 / heightDivide}px` }}>
+    <div className={`player${courtClassName}`} style={{ height: `${275 / heightDivide}px` }}>
       <div className="playerName" style={{ width: 90 }}>
         {typeof onSelect === 'function' ? (
           <button

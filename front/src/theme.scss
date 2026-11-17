@@ -5,10 +5,15 @@
 :root,
 [data-theme='light'] {
   // Page backgrounds
-  --bg-page: rgb(234, 235, 237);
-  --bg-card: #fafafa;
-  --bg-card-alt: rgb(250, 250, 250);
-  --bg-footer: #f0f0f0;
+  --bg-page: #eef0f3;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f6f7f9;
+  --bg-footer: #f6f7f9;
+
+  // Cards: a hairline and a faint lift instead of a flat fill on grey
+  --card-border: #e4e7ec;
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 6px rgba(16, 24, 40, 0.03);
+  --popover-shadow: 0 12px 32px rgba(16, 24, 40, 0.16), 0 2px 6px rgba(16, 24, 40, 0.06);
 
   // Typography
   --font-sans:
@@ -16,57 +21,70 @@
     'Open Sans', 'Helvetica Neue', sans-serif;
 
   // Text colors
-  --text-primary: #222;
-  --text-secondary: #444;
-  --text-tertiary: #666;
-  --text-muted: #6c6d6f;
-  --text-heading: #374151;
+  --text-primary: #14171c;
+  --text-secondary: #3d4450;
+  --text-tertiary: #555d69;
+  // Muted text still has to clear 4.5:1 on the tinted surfaces (selected game, hover, page).
+  --text-muted: #5f6773;
+  --text-heading: #1f2630;
 
   // Borders and dividers
-  --border-light: #bbb;
-  --border-medium: #e0e0e0;
-  --border-strong: #e5e7eb;
-  --divider: #e5e7eb;
+  --border-light: #cfd4dc;
+  --border-medium: #e1e5ea;
+  --border-strong: #e1e5ea;
+  --divider: #e8ebef;
+
+  // Accent: one blue for selection, links and focus
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --accent-contrast: #ffffff;
 
   // Interactive elements
-  --bg-hover: rgba(0, 0, 0, 0.05);
-  --bg-selected: #e7f1ff;
-  --bg-game: rgb(240, 240, 240);
-  --bg-game-hover: rgb(230, 231, 233);
+  --bg-hover: rgba(16, 24, 40, 0.05);
+  --bg-selected: #e4edff;
+  --bg-game: #f3f5f8;
+  --bg-game-hover: #e9ecf1;
+  --control-bg: #ffffff;
+  --control-border: #d6dae1;
 
   // Table colors
-  --bg-table-header: rgb(255, 255, 255);
-  --bg-table-odd: rgb(255, 255, 255);
-  --bg-table-even: rgb(249, 250, 251);
-  --bg-table-hover: rgb(229, 236, 246);
-  --bg-highlight-col: rgba(59, 130, 246, 0.06);
-  --bg-highlight-col-header: rgba(59, 130, 246, 0.12);
+  --bg-table-header: #ffffff;
+  --bg-table-odd: #ffffff;
+  --bg-table-even: #f8f9fb;
+  --bg-table-hover: #eaf1fc;
+  --bg-highlight-col: rgba(37, 99, 235, 0.05);
+  --bg-highlight-col-header: rgba(37, 99, 235, 0.1);
 
   // Tooltip/popup
-  --bg-tooltip: #fff;
-  --tooltip-shadow: rgba(0, 0, 0, 0.15);
+  --bg-tooltip: #ffffff;
+  --tooltip-shadow: rgba(16, 24, 40, 0.16);
 
   // Play area specific
-  --bg-play: rgb(250, 250, 250);
-  --line-color: black;
-  --line-color-light: #4b5563;
-  --mouse-line-color: grey;
-  --quarter-label-color: #666;
+  --bg-play: #ffffff;
+  --line-color: #111827;
+  --line-color-light: #566070;
+  --mouse-line-color: #6b7280;
+  --quarter-label-color: #5f6773;
   --odds-line-color: #0f766e;
-  --playline-hover: #a0a11b;
+  --playline-hover: #14171c;
+  // Chart furniture: lighter than the data it frames
+  --chart-grid: #dde1e7;
+  --chart-axis: #9aa2ad;
+  --chart-row-hover: rgba(16, 24, 40, 0.045);
 
   // Score area colors (SVG fills)
   --score-fill-away: currentColor;
   --score-fill-home: currentColor;
 
   // Focus ring
-  --focus-ring-color: rgba(59, 130, 246, 0.5);
+  --focus-ring-color: rgba(37, 99, 235, 0.55);
 
   // Stat button label
-  --stat-label-color: #374151;
-  --stat-label-off: #475569;
-  --stat-chip-on-bg: rgba(59, 130, 246, 0.1);
-  --stat-chip-on-border: rgba(59, 130, 246, 0.45);
+  --stat-label-color: #1f2630;
+  --stat-label-off: #5f6773;
+  --stat-chip-on-bg: #f1f3f6;
+  --stat-chip-on-border: #d6dae1;
 
   // First-visit tips
   --tip-bg: #2563eb;
@@ -75,8 +93,12 @@
   --score-diff-icon-color: #6366f1;
 
   // Live indicator
-  --live-color: #22c55e;
-  --live-ring: rgba(34, 197, 94, 0.45);
+  --live-color: #16a34a;
+  --live-ring: rgba(22, 163, 74, 0.45);
+
+  // Results
+  --positive: #117536;
+  --negative: #c81e1e;
 
   // Stat event colors - these stay vibrant in both modes
   // but we define them here for potential tweaking
@@ -92,11 +114,11 @@
 
   // Input/form elements
   --input-bg: #fff;
-  --input-border: #ccc;
-  --input-text: #333;
+  --input-border: #d6dae1;
+  --input-text: #1f2630;
 
   // MUI overrides
-  --circular-progress-color: #6c6d6f;
+  --circular-progress-color: #5f6773;
 
   // Shared layout tokens
   --layout-content-width: #{layout.$content-width};
@@ -113,64 +135,79 @@
 // Dark mode
 [data-theme='dark'] {
   // Page backgrounds
-  --bg-page: #121212;
-  --bg-card: #1e1e1e;
-  --bg-card-alt: #1e1e1e;
+  --bg-page: #0d0f12;
+  --bg-card: #16191e;
+  --bg-card-alt: #1c2026;
+  --bg-footer: #111317;
+
+  --card-border: #23272e;
+  --card-shadow: none;
+  --popover-shadow: 0 14px 36px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
 
   // Typography
   --font-sans:
     system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
     'Open Sans', 'Helvetica Neue', sans-serif;
-  --bg-footer: #181818;
 
   // Text colors
-  --text-primary: #e8e8e8;
-  --text-secondary: #c4c4c4;
-  --text-tertiary: #a0a0a0;
-  --text-muted: #8a8a8a;
-  --text-heading: #d1d5db;
+  --text-primary: #eceef1;
+  --text-secondary: #c3c8d0;
+  --text-tertiary: #a3aab4;
+  --text-muted: #979ea9;
+  --text-heading: #dde1e6;
 
   // Borders and dividers
-  --border-light: #444;
-  --border-medium: #3a3a3a;
-  --border-strong: #333;
-  --divider: #333;
+  --border-light: #3a404a;
+  --border-medium: #2b3038;
+  --border-strong: #2b3038;
+  --divider: #262a31;
+
+  // Accent
+  --accent: #60a5fa;
+  --accent-strong: #93c5fd;
+  --accent-soft: rgba(96, 165, 250, 0.16);
+  --accent-contrast: #0d0f12;
 
   // Interactive elements
-  --bg-hover: rgba(255, 255, 255, 0.08);
-  --bg-selected: rgba(59, 130, 246, 0.25);
-  --bg-game: #2a2a2a;
-  --bg-game-hover: #333;
+  --bg-hover: rgba(255, 255, 255, 0.07);
+  --bg-selected: rgba(59, 130, 246, 0.24);
+  --bg-game: #1e2228;
+  --bg-game-hover: #272c34;
+  --control-bg: #1c2026;
+  --control-border: #333943;
 
   // Table colors (hover color stays opaque to avoid bleed on sticky player column)
-  --bg-table-header: #252525;
-  --bg-table-odd: #1e1e1e;
-  --bg-table-even: #252525;
-  --bg-table-hover: #253041;
-  --bg-highlight-col: #242b37;
-  --bg-highlight-col-header: #29384f;
+  --bg-table-header: #16191e;
+  --bg-table-odd: #16191e;
+  --bg-table-even: #1a1e24;
+  --bg-table-hover: #212b3b;
+  --bg-highlight-col: #1a2230;
+  --bg-highlight-col-header: #202c40;
 
   // Tooltip/popup
-  --bg-tooltip: #2a2a2a;
-  --tooltip-shadow: rgba(0, 0, 0, 0.4);
+  --bg-tooltip: #1f232a;
+  --tooltip-shadow: rgba(0, 0, 0, 0.5);
 
   // Play area specific
-  --bg-play: #1e1e1e;
-  --line-color: #888;
-  --line-color-light: #a3a3a3;
-  --mouse-line-color: #aaa;
-  --quarter-label-color: #999;
+  --bg-play: #16191e;
+  --line-color: #8b929c;
+  --line-color-light: #a0a7b2;
+  --mouse-line-color: #9ba2ad;
+  --quarter-label-color: #979ea9;
   --odds-line-color: #2dd4bf;
-  --playline-hover: #dadb39;
+  --playline-hover: #ffffff;
+  --chart-grid: #2a2f37;
+  --chart-axis: #555d69;
+  --chart-row-hover: rgba(255, 255, 255, 0.06);
 
   // Focus ring
-  --focus-ring-color: rgba(96, 165, 250, 0.5);
+  --focus-ring-color: rgba(96, 165, 250, 0.6);
 
   // Stat button label
-  --stat-label-color: #d1d5db;
-  --stat-label-off: #9ca3af;
-  --stat-chip-on-bg: rgba(96, 165, 250, 0.16);
-  --stat-chip-on-border: rgba(96, 165, 250, 0.5);
+  --stat-label-color: #dde1e6;
+  --stat-label-off: #979ea9;
+  --stat-chip-on-bg: #22262d;
+  --stat-chip-on-border: #363c46;
 
   // First-visit tips
   --tip-bg: #2563eb;
@@ -181,6 +218,10 @@
   // Live indicator
   --live-color: #4ade80;
   --live-ring: rgba(74, 222, 128, 0.55);
+
+  // Results
+  --positive: #4ade80;
+  --negative: #f87171;
 
   // Stat event colors - brighten slightly for dark mode visibility
   --event-point: #fbbf24;
@@ -194,12 +235,24 @@
   --event-3pt-marker: #ef4444;
 
   // Input/form elements
-  --input-bg: #2a2a2a;
-  --input-border: #444;
-  --input-text: #e0e0e0;
+  --input-bg: #1c2026;
+  --input-border: #333943;
+  --input-text: #dde1e6;
 
   // MUI overrides
-  --circular-progress-color: #888;
+  --circular-progress-color: #979ea9;
+}
+
+// Phones: the cards run closer to the screen edge so the chart gets the width.
+@media (max-width: 700px) {
+  :root,
+  [data-theme='light'],
+  [data-theme='dark'] {
+    --layout-content-max-width: calc(100% - 12px);
+    --layout-card-padding: 8px;
+    --layout-card-radius: 14px;
+    --layout-card-gap: 10px;
+  }
 }
 
 // Global resets and base styles
@@ -209,10 +262,27 @@
 
 body {
   background-color: var(--bg-page);
+  color: var(--text-primary);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   transition: background-color 0.3s ease;
   margin: 0;
   padding: 0;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+// A team's chart colour beside its name (chart labels, box score, lineups).
+.teamSwatch {
+  display: inline-block;
+  width: 4px;
+  height: 0.95em;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
 .liveDot {
@@ -247,7 +317,7 @@ body {
     background-color: var(--input-bg);
     color: var(--input-text);
     border: 1px solid var(--input-border);
-    border-radius: 4px;
+    border-radius: 8px;
 
     &::-webkit-calendar-picker-indicator {
       filter: invert(0.8);

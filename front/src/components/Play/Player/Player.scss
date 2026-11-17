@@ -1,13 +1,19 @@
 .player {
   position: relative;
+  border-radius: 6px;
+  transition: background-color 0.12s ease;
 
   .playerName {
     display: inline-block;
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 28px; // centres the name on the row's line (y = 14)
+    vertical-align: top;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--line-color-light);
-    transition: color 0.3s ease;
+    color: var(--text-secondary);
+    transition: color 0.2s ease;
   }
 
   .playerNameButton {
@@ -24,22 +30,46 @@
     cursor: pointer;
 
     &:focus-visible {
-      outline: 2px solid var(--text-primary);
-      outline-offset: 2px;
+      outline: 2px solid var(--focus-ring-color);
+      outline-offset: -2px;
       border-radius: 4px;
     }
   }
 
   .line {
     position: absolute;
+    top: 0;
   }
 
   .playerTimeline {
     stroke: var(--line-color-light);
-    stroke-width: 1.5;
-    transition:
-      stroke 0.2s ease,
-      stroke-width 0.2s ease;
+    stroke-width: 2;
+    stroke-linecap: round;
+    transition: stroke 0.2s ease;
+  }
+
+  // A ring in the surface colour keeps a marker legible where it overlaps a
+  // neighbour or sits on the line. Free throws are already rings.
+  svg > [data-event-type]:not([data-event-type='free-throw']):not(g),
+  svg > g[data-event-type] > :first-child {
+    stroke: var(--bg-play);
+    stroke-width: 1.5px;
+    stroke-linejoin: round;
+    paint-order: stroke;
+  }
+
+  // Inspecting a moment: the players on the floor then stand out from the bench.
+  &.isOnCourt .playerName {
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+
+  &.isOffCourt .playerName {
+    opacity: 0.5;
+  }
+
+  &.isOffCourt .playerTimeline {
+    stroke-opacity: 0.55;
   }
 
   .statHoverMatch,
@@ -60,12 +90,17 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      background-color: var(--chart-row-hover);
+    }
+
     &:hover .playerTimeline {
       stroke: var(--playline-hover);
     }
 
     &:hover .playerName {
       color: var(--playline-hover);
+      font-weight: 600;
     }
   }
 }

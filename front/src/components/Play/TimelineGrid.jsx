@@ -3,10 +3,6 @@ export default function TimelineGrid({
   leftMargin,
   qWidth,
   numQs,
-  maxLead,
-  maxY,
-  showScoreDiff,
-  teamColors,
   isQuarterView,
   activePeriodLabel,
 }) {
@@ -23,7 +19,7 @@ export default function TimelineGrid({
       y1={300}
       x2={leftMargin + width}
       y2={300}
-      style={{ stroke: 'var(--line-color)', strokeWidth: 1 }}
+      className="playGridBaseline"
     />,
   );
 
@@ -33,14 +29,7 @@ export default function TimelineGrid({
     for (let i = 1; i < regulationPeriods; i += 1) {
       const x = leftMargin + qWidth * i;
       timelineElements.push(
-        <line
-          key={`q${i}`}
-          x1={x}
-          y1={10}
-          x2={x}
-          y2={590}
-          style={{ stroke: 'var(--line-color)', strokeWidth: 1 }}
-        />,
+        <line key={`q${i}`} x1={x} y1={6} x2={x} y2={594} className="playGridPeriodLine" />,
       );
     }
 
@@ -49,21 +38,13 @@ export default function TimelineGrid({
       // OT periods are shorter (5 mins vs 12 mins), so they are 5/12th the width
       let x = leftMargin + qWidth * 4 + (5 / 12) * qWidth * (q - 4);
       timelineElements.push(
-        <line
-          key={`q${q}`}
-          x1={x}
-          y1={10}
-          x2={x}
-          y2={590}
-          style={{ stroke: 'var(--line-color)', strokeWidth: 1 }}
-        />,
+        <line key={`q${q}`} x1={x} y1={6} x2={x} y2={594} className="playGridPeriodLine" />,
       );
     }
   }
 
   // 3. Labels (Q1... Q4, O1...)
-  const labelStyle = { fontSize: '10px', fill: 'var(--quarter-label-color)', fontWeight: 500 };
-  const labelY = 12;
+  const labelY = 16;
   const otWidth = (5 / 12) * qWidth;
 
   if (isQuarterView) {
@@ -74,7 +55,7 @@ export default function TimelineGrid({
           x={leftMargin + width / 2}
           y={labelY}
           textAnchor="middle"
-          style={labelStyle}
+          className="playGridPeriodLabel"
         >
           {activePeriodLabel}
         </text>,
@@ -88,7 +69,7 @@ export default function TimelineGrid({
           x={leftMargin + qWidth * (i + 0.5)}
           y={labelY}
           textAnchor="middle"
-          style={labelStyle}
+          className="playGridPeriodLabel"
         >
           {label}
         </text>,
@@ -98,83 +79,15 @@ export default function TimelineGrid({
     for (let ot = 1; ot <= overtimePeriods; ot += 1) {
       const otCenterX = leftMargin + qWidth * 4 + otWidth * (ot - 0.5);
       timelineElements.push(
-        <text key={`label-o${ot}`} x={otCenterX} y={labelY} textAnchor="middle" style={labelStyle}>
+        <text
+          key={`label-o${ot}`}
+          x={otCenterX}
+          y={labelY}
+          textAnchor="middle"
+          className="playGridPeriodLabel"
+        >
           O{ot}
         </text>,
-      );
-    }
-  }
-
-  // 4. Score Differential Dashed Lines (Background Reference)
-  if (showScoreDiff) {
-    let numLines = 0;
-    let lineJump = 0;
-
-    // Determine density based on the Max Lead
-    if (maxLead / 5 < 5) {
-      numLines = Math.floor(maxLead / 5);
-      lineJump = 5;
-    } else if (maxLead / 10 < 5) {
-      numLines = Math.floor(maxLead / 10);
-      lineJump = 10;
-    } else if (maxLead / 15 < 5) {
-      numLines = Math.floor(maxLead / 15);
-      lineJump = 15;
-    } else {
-      // Fallback for very large leads
-      numLines = Math.floor(maxLead / 20);
-      lineJump = 20;
-    }
-
-    for (let i = 0; i < numLines; i += 1) {
-      const value = (i + 1) * lineJump;
-
-      const yOffset = value * (300 / maxY);
-
-      // Positive (Away Lead)
-      const posy = 300 - yOffset;
-      timelineElements.push(
-        <g key={`sp${i}`}>
-          <line
-            x1={leftMargin - 5}
-            y1={posy}
-            x2={leftMargin + width - 5}
-            y2={posy}
-            strokeDasharray="5,20"
-            style={{ stroke: teamColors.away, strokeWidth: 0.5, strokeOpacity: 0.7 }}
-          />
-          <text
-            x={leftMargin + width + 10}
-            y={posy + 4}
-            textAnchor="end"
-            style={{ ...labelStyle, fill: teamColors.away }}
-          >
-            {value}
-          </text>
-        </g>,
-      );
-
-      // Negative (Home Lead)
-      const negy = 300 + yOffset;
-      timelineElements.push(
-        <g key={`sn${i}`}>
-          <line
-            x1={leftMargin - 5}
-            y1={negy}
-            x2={leftMargin + width - 5}
-            y2={negy}
-            strokeDasharray="5,20"
-            style={{ stroke: teamColors.home, strokeWidth: 0.5, strokeOpacity: 0.7 }}
-          />
-          <text
-            x={leftMargin + width + 10}
-            y={negy + 4}
-            textAnchor="end"
-            style={{ ...labelStyle, fill: teamColors.home }}
-          >
-            {value}
-          </text>
-        </g>,
       );
     }
   }

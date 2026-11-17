@@ -1,11 +1,34 @@
+// Scoreboard: team, score, status, score, team. The edges carry a wash of each
+// team's chart colour (set as --away-color / --home-color in Score.jsx), which
+// keys the score-lead area in the chart below.
 .scoreElement {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 140px;
+  justify-content: center;
+  min-height: 112px;
+  overflow: hidden;
   color: var(--text-primary);
   transition: color 0.3s ease;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--away-color, transparent) 10%, transparent),
+        transparent 32%
+      ),
+      linear-gradient(
+        270deg,
+        color-mix(in srgb, var(--home-color, transparent) 10%, transparent),
+        transparent 32%
+      );
+  }
 
   &.isLoading {
     .scoreContent {
@@ -15,13 +38,140 @@
     }
   }
 
+  .scoreContent {
+    position: relative;
+    width: 100%;
+    filter: blur(0px);
+    transition:
+      filter 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .scoreArea {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(116px, auto) auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 18px;
+    width: 100%;
+  }
+
+  .scoreTeam {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+
+    &.away {
+      justify-self: end;
+    }
+
+    &.home {
+      justify-self: start;
+      flex-direction: row-reverse;
+    }
+  }
+
+  .scoreTeamCode {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+  }
+
+  .scoreTeam.home .scoreTeamCode {
+    flex-direction: row-reverse;
+  }
+
+  .scoreTeamSwatch {
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+  }
+
+  .scoreTeam.away .scoreTeamSwatch {
+    background: var(--away-color, transparent);
+  }
+
+  .scoreTeam.home .scoreTeamSwatch {
+    background: var(--home-color, transparent);
+  }
+
+  .scoreValue {
+    min-width: 2ch;
+    font-size: 2.75rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+    transition: color 0.3s ease;
+
+    &.away {
+      text-align: right;
+    }
+
+    &.home {
+      text-align: left;
+    }
+
+    &.isTrailing {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+  }
+
+  .scoreMeta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .gameTime {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+
+    &.isLive {
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .liveDotIndicator {
+      display: inline-flex;
+      align-items: center;
+    }
+  }
+
   .gameDate {
     cursor: pointer;
-    color: var(--text-secondary);
+    color: var(--text-muted);
     border: 0;
-    padding: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
     background: transparent;
     font: inherit;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
 
     &:focus-visible {
       outline: 2px solid var(--focus-ring-color);
@@ -33,131 +183,70 @@
     }
   }
 
-  .scoreContent {
-    width: 100%;
+  // The logos
+  .logoWrapper {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 2px;
-    filter: blur(0px);
+    justify-content: center;
+  }
+
+  .logoWrapper::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--bg-table-even);
+    border: 1px solid var(--divider);
+    opacity: 0;
     transition:
-      filter 0.15s ease,
-      opacity 0.15s ease;
+      opacity 0.2s ease,
+      filter 0.2s ease;
   }
 
-  .scoreArea {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto 1fr;
-    align-items: center;
-    width: 100%;
-    font-size: 2rem;
+  .logoWrapper.isPending::before {
+    opacity: 0.7;
+    filter: blur(2px);
+  }
 
-    // Target the first element (Left Score)
-    > div:first-child {
-      text-align: right;
-      padding-right: 15px; // Space between score and logo
+  .teamLogoButton {
+    position: relative;
+    display: block;
+    padding: 4px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+    transition:
+      transform 0.15s ease,
+      background-color 0.15s ease;
+
+    &:hover {
+      transform: scale(1.06);
+      background-color: var(--bg-hover);
     }
 
-    // Target the last element (Right Score)
-    > div:last-child {
-      text-align: left;
-      padding-left: 15px; // Space between score and logo
-    }
-
-    // The "AT" text in the middle
-    .at {
-      text-align: center;
-      margin: 0 10px;
-      color: var(--text-secondary);
-      font-size: 1rem;
-    }
-
-    // The logos
-    .logoWrapper {
-      position: relative;
-      width: 80px;
-      height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .logoWrapper::before {
-      content: '';
-      position: absolute;
-      inset: 6px;
-      border-radius: 50%;
-      background:
-        radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.08)),
-        var(--bg-table-even);
-      border: 1px solid var(--divider);
-      opacity: 0;
-      transition:
-        opacity 0.2s ease,
-        filter 0.2s ease;
-    }
-
-    .logoWrapper.isPending::before {
-      opacity: 0.7;
-      filter: blur(2px);
-    }
-
-    .teamLogoButton {
-      position: relative;
-      display: block;
-      padding: 0;
-      border: 0;
-      border-radius: 50%;
-      background: none;
-      cursor: pointer;
-      transition: transform 0.15s ease;
-
-      &:hover {
-        transform: scale(1.06);
-        background-color: var(--bg-hover);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--focus-ring-color);
-        outline-offset: 2px;
-      }
-    }
-
-    .teamLogo {
-      display: block;
-      object-fit: contain;
-      transition:
-        opacity 0.2s ease,
-        filter 0.2s ease;
-    }
-
-    .logoWrapper.isPending .teamLogo {
-      opacity: 0;
+    &:focus-visible {
+      outline: 2px solid var(--focus-ring-color);
+      outline-offset: 2px;
     }
   }
 
-  .gameTime {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    color: var(--text-tertiary);
-    font-size: 0.85rem;
-    text-align: center;
+  .teamLogo {
+    display: block;
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    transition:
+      opacity 0.2s ease,
+      filter 0.2s ease;
+  }
 
-    .timeText {
-      grid-column: 2;
-      justify-self: center;
-      white-space: nowrap;
-    }
-
-    .liveDotIndicator {
-      grid-column: 3;
-      justify-self: start;
-      display: inline-flex;
-      align-items: center;
-    }
+  .logoWrapper.isPending .teamLogo {
+    opacity: 0;
   }
 
   .loadingIndicator {
@@ -167,7 +256,7 @@
     color: var(--text-muted);
     font-weight: 500;
     gap: 10px;
-    min-height: 120px;
+    min-height: 86px;
   }
 
   .loadingOverlay {
@@ -188,5 +277,58 @@
     color: var(--text-muted);
     font-weight: 500;
     text-align: center;
+  }
+
+  // Phones: the tricode drops under its logo so both scores fit on one line.
+  @media (max-width: 600px) {
+    min-height: 104px;
+
+    .scoreArea {
+      grid-template-columns: minmax(0, 1fr) auto minmax(84px, auto) auto minmax(0, 1fr);
+      column-gap: 8px;
+    }
+
+    .scoreTeam,
+    .scoreTeam.home {
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .scoreTeam.away,
+    .scoreTeam.home {
+      justify-self: center;
+    }
+
+    .scoreTeamCode {
+      font-size: 0.78rem;
+    }
+
+    .scoreTeamSwatch {
+      width: 3px;
+      height: 11px;
+    }
+
+    .logoWrapper {
+      width: 52px;
+      height: 52px;
+    }
+
+    .teamLogo {
+      width: 44px;
+      height: 44px;
+    }
+
+    .scoreValue {
+      font-size: 2.1rem;
+    }
+
+    .gameTime {
+      font-size: 0.7rem;
+    }
+
+    .gameDate {
+      font-size: 0.74rem;
+      padding: 2px 4px;
+    }
   }
 }
