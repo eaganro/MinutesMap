@@ -45,6 +45,21 @@ describe('shared theme initialization', () => {
     },
   );
 
+  it('keeps the browser toolbar colour in step with the theme', () => {
+    const themeColor = document.createElement('meta');
+    themeColor.setAttribute('name', 'theme-color');
+    themeColor.setAttribute('content', '#eef0f3');
+    document.head.appendChild(themeColor);
+    localStorage.setItem('darkMode', 'true');
+
+    runScript(themeInitSource);
+    expect(themeColor).toHaveAttribute('content', '#0d0f12');
+
+    window.MinutesMapTheme.applyTheme(false);
+    expect(themeColor).toHaveAttribute('content', '#eef0f3');
+    themeColor.remove();
+  });
+
   it('initializes and toggles without crashing when localStorage is unavailable', () => {
     document.body.innerHTML = `
       <button class="dark-mode-toggle">

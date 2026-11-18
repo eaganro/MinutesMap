@@ -25,7 +25,13 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     writeStoredValue(DARK_MODE_STORAGE_KEY, isDarkMode);
-    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    // theme-init.js also keeps the browser toolbar colour in step.
+    const applyTheme = window.MinutesMapTheme?.applyTheme;
+    if (applyTheme) {
+      applyTheme(isDarkMode);
+    } else {
+      document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    }
   }, [isDarkMode]);
 
   // Listen for system preference changes

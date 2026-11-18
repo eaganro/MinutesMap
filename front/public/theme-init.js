@@ -57,8 +57,14 @@
     return true;
   }
 
+  // The page background (--bg-page) in each theme, for the browser's toolbar.
+  const THEME_COLORS = { dark: '#0d0f12', light: '#eef0f3' };
+
   function applyTheme(isDark) {
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    const theme = isDark ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.setAttribute('content', THEME_COLORS[theme]);
   }
 
   const theme = {
