@@ -174,8 +174,12 @@
     margin-top: 6px;
   }
 
-  // Phones: the team tabs name the team, so the table starts right below them.
+  // Phones, one team at a time: the tabs name the team, so the table starts right
+  // below them, and the box fits that team's rows rather than the usual minimum
+  // height, which would leave blank space under a short rotation.
   &.hasTeamTabs {
+    min-height: 0;
+
     .teamTabs {
       margin-bottom: 10px;
     }

@@ -10,6 +10,7 @@ import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
 import { useStableWhileLoading } from '../hooks/ui/useStableWhileLoading';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
+import { useMediaQuery } from '../hooks/ui/useMediaQuery';
 import { useLocalStorageState } from '../hooks/state/useLocalStorageState';
 import { isBooleanPreference } from '../hooks/state/storage';
 import { LOADING_TEXT_DELAY_MS, MIN_BLUR_MS } from '../constants/loadingUiTimings';
@@ -18,6 +19,9 @@ const INITIAL_SORT_CONFIG = { key: 'min', direction: 'desc' };
 const COLLAPSED_PLAYER_COUNT = 5;
 const BOXSCORE_EXPANDED_STORAGE_KEY = 'boxscoreExpanded';
 const BOXSCORE_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
+// Phones either way up: narrow screens, and touch screens too short to be a tablet
+// or laptop (a phone turned sideways).
+const TEAM_TABS_QUERY = '(max-width: 640px), (pointer: coarse) and (max-height: 500px)';
 
 export default function Boxscore({ gameId, box, isLoading, statusMessage, preferredTeam = null }) {
   const [showMore, setShowMore] = useLocalStorageState(
@@ -36,6 +40,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage, prefer
   const bottomToggleRef = useRef(null);
   const collapseAnchorTopRef = useRef(null);
   const trackBoxscoreFeatureUse = useTrackFeatureUseOnce('boxscore');
+  const hasTeamTabs = useMediaQuery(TEAM_TABS_QUERY);
   const [isCompact, setIsCompact] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 640px)').matches : false,
   );
@@ -93,7 +98,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage, prefer
     homeAbbr: displayBox?.teams?.home?.abbr,
     preferredTeam,
   });
-  const showAllPlayers = showMore || isCompact;
+  const showAllPlayers = showMore || hasTeamTabs;
 
   useEffect(() => {
     if (isLoading && hasBoxData) {
@@ -185,15 +190,17 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage, prefer
   );
 
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
+  // Whether a team's table is up under the tabs (not the loading or status view).
+  const isShowingTeamTabs = hasTeamTabs && !showLoadingIndicator && !showStatusMessage;
   const hasHiddenPlayers =
-    !isCompact &&
+    !hasTeamTabs &&
     ['away', 'home'].some(
       (side) => (displayBox?.teams?.[side]?.players?.length || 0) > COLLAPSED_PLAYER_COUNT,
     );
 
   return (
     <div
-      className={`box${isCompact ? ' hasTeamTabs' : ''}${isDataLoading ? ' isLoading' : ''}`}
+      className={`box${isShowingTeamTabs ? ' hasTeamTabs' : ''}${isDataLoading ? ' isLoading' : ''}`}
       role="region"
       aria-label="Box score"
       aria-busy={isLoading}
@@ -220,7 +227,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage, prefer
         </div>
       ) : (
         <div className="boxContent">
-          {isCompact ? (
+          {hasTeamTabs ? (
             <>
               <TeamTabs
                 label="Box score team"

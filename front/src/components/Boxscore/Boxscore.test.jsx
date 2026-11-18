@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Boxscore from './Boxscore';
+import processTeamStats from './processTeamStats';
 
 const mocks = vi.hoisted(() => ({
   trackBoxscoreFeatureUseMock: vi.fn(),
@@ -133,6 +134,35 @@ describe('Boxscore', () => {
       expect(screen.getByRole('button', { name: '76ers' })).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByTestId('home-box')).toHaveTextContent('PHI');
     });
+  });
+
+  it('uses team tabs and full columns on a phone turned sideways', () => {
+    window.matchMedia.mockImplementation((query) => ({
+      matches: query.includes('pointer: coarse'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    }));
+    render(
+      <Boxscore
+        box={{
+          teams: {
+            away: { abbr: 'PHI', name: '76ers', players: buildPlayers(9) },
+            home: { abbr: 'GSW', name: 'Warriors', players: buildPlayers(9) },
+          },
+        }}
+        isLoading={false}
+        statusMessage={null}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '76ers' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByTestId('home-box')).not.toBeInTheDocument();
+    // Every player, and the full column set rather than the narrow-phone one.
+    const [, , showAllPlayers, , , , isCompact] = processTeamStats.mock.calls.at(-1);
+    expect(showAllPlayers).toBe(true);
+    expect(isCompact).toBe(false);
   });
 
   it('shows status message when no box data exists', () => {
