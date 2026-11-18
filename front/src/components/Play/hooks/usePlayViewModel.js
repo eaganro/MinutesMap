@@ -99,8 +99,9 @@ export function usePlayViewModel({
     activePeriod,
     numPeriods,
     stablePlayData,
-    // Phones only: a live game's Game view and current quarter end where play is.
-    clipToPlayed: isQuarterView && !isFinal,
+    // Charts under 900px (phones either way up): a live game ends where play is.
+    // Desktop keeps the whole game as a frame for how much is left.
+    clipToPlayed: hasShortNames && !isFinal,
   });
   const timelineWindow = periodData.timelineWindow;
   const markerScale = getMarkerScale(width, timelineWindow.durationSeconds);

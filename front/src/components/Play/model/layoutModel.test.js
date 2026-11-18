@@ -22,25 +22,19 @@ describe('layoutModel', () => {
     // Halfway through Q2 (18:00 played) and a little past it.
     expect(clipWindowToPlayed(game, 1080)).toEqual({ startSeconds: 0, durationSeconds: 1080 });
     expect(clipWindowToPlayed(game, 1081)).toEqual({ startSeconds: 0, durationSeconds: 1260 });
-
-    // Two minutes into Q3, viewed on its own.
-    const q3 = { startSeconds: 1440, durationSeconds: 720 };
-    expect(clipWindowToPlayed(q3, 1560)).toEqual({ startSeconds: 1440, durationSeconds: 360 });
-    expect(clipWindowToPlayed(q3, 1440 + 400)).toEqual({
-      startSeconds: 1440,
-      durationSeconds: 540,
-    });
   });
 
-  it('shows at least 6 minutes of a live window and never more than the full one', () => {
+  it('shows at least a quarter of a live window and never more than the full one', () => {
     const game = { startSeconds: 0, durationSeconds: 2880 };
-    expect(clipWindowToPlayed(game, 30)).toEqual({ startSeconds: 0, durationSeconds: 360 });
+    // Two minutes into the game: all of Q1, so it doesn't look finished.
+    expect(clipWindowToPlayed(game, 120)).toEqual({ startSeconds: 0, durationSeconds: 720 });
 
-    const q4 = { startSeconds: 2160, durationSeconds: 720 };
-    expect(clipWindowToPlayed(q4, 2160 + 700)).toBe(q4);
-    expect(clipWindowToPlayed(q4, 3000)).toBe(q4);
+    // A quarter on its own is never cut short, at any point in it.
+    const q3 = { startSeconds: 1440, durationSeconds: 720 };
+    expect(clipWindowToPlayed(q3, 1440 + 120)).toBe(q3);
+    expect(clipWindowToPlayed(q3, 3000)).toBe(q3);
 
-    // An overtime period is only 5 minutes, so its minimum is the whole period.
+    // Nor is a 5-minute overtime.
     const ot = { startSeconds: 2880, durationSeconds: 300 };
     expect(clipWindowToPlayed(ot, 2900)).toBe(ot);
   });

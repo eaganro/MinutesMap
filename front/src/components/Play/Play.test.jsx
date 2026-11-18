@@ -373,7 +373,7 @@ describe('Play', () => {
     expect(container.querySelector('.teamName.home')).toHaveTextContent(/^GSW$/);
   });
 
-  it('ends a live game at the latest play on phones and shows the whole game on desktop', () => {
+  it('ends a live game at the latest play on phones either way up, not on desktop', () => {
     const liveInQ2 = {
       gameStatus: 'Q2 6:00',
       playData: buildPlayData({
@@ -389,8 +389,35 @@ describe('Play', () => {
     expect(periodLabels(phone.container)).toEqual(['Q1', 'Q2']);
     cleanup();
 
+    // A phone turned sideways has no Game tab, but its chart ends where play is too.
+    const sideways = renderPlay(buildProps({ ...liveInQ2, sectionWidth: 800 }));
+    expect(periodLabels(sideways.container)).toEqual(['Q1', 'Q2']);
+    cleanup();
+
     const desktop = renderPlay(buildProps({ ...liveInQ2, sectionWidth: 900 }));
     expect(periodLabels(desktop.container)).toEqual(['Q1', 'Q2', 'Q3', 'Q4']);
+  });
+
+  it.each([
+    ['upright', 360],
+    ['sideways', 800],
+  ])('shows at least a full quarter of a live game on a phone held %s', (_, sectionWidth) => {
+    // Embiid's make comes one minute into Q1, and the latest play is two minutes in.
+    const { container } = renderPlay(
+      buildProps({
+        sectionWidth,
+        gameStatus: 'Q1 10:00',
+        playData: buildPlayData({
+          numQs: 4,
+          lastAction: { period: 1, clock: 'PT10M00.00S', status: 'Q1 10:00' },
+        }),
+      }),
+    );
+
+    const marker = container.querySelector('[data-action-number="11"]');
+    const timelineWidth = Number(marker.closest('svg').getAttribute('width'));
+    // One minute of a 12-minute window, not of a shorter one.
+    expect(Number(marker.getAttribute('cx'))).toBeLessThan(timelineWidth / 10);
   });
 
   it('shows the whole game for a finished game on phones', () => {

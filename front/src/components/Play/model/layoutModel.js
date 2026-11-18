@@ -38,11 +38,12 @@ export function getMarkerScale(timelineWidth, durationSeconds) {
   return clamp(pxPerMinute / DENSE_PX_PER_MINUTE, MIN_MARKER_SCALE, 1);
 }
 
-// Live games on phones show only the part of the window that has been played. It
-// grows in steps rather than with every play, so the scale holds still while you
-// read it, and starts at a few minutes so an early lead-in isn't blown up.
+// Live games on phones (either way up) show only the part of the window that has
+// been played. It grows in steps rather than with every play, so the scale holds
+// still while you read it, and never shows less than a quarter, so a quarter that
+// has just started doesn't look finished.
 export const LIVE_WINDOW_STEP_SECONDS = 3 * 60;
-export const LIVE_WINDOW_MIN_SECONDS = 6 * 60;
+export const LIVE_WINDOW_MIN_SECONDS = 12 * 60;
 
 export function clipWindowToPlayed(timelineWindow, latestSeconds) {
   const { startSeconds, durationSeconds } = timelineWindow;
