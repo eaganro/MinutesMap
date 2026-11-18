@@ -44,6 +44,10 @@
   .line {
     position: absolute;
     top: 0;
+    // A marker at the very start or end of the timeline is centred on the edge, so
+    // let it draw past the row's bounds instead of being cut in half. The gap before
+    // the name column and the right margin leave room for it.
+    overflow: visible;
   }
 
   .playerTimeline {
