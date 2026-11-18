@@ -76,6 +76,65 @@ describe('Boxscore', () => {
     expect(screen.getByTestId('home-box')).toHaveTextContent('GSW');
   });
 
+  describe('on phones', () => {
+    const phoneBox = (home = { abbr: 'GSW', name: 'Warriors' }) => ({
+      teams: {
+        away: { abbr: 'PHI', name: '76ers', players: buildPlayers(9) },
+        home: { ...home, players: buildPlayers(9) },
+      },
+    });
+
+    beforeEach(() => {
+      window.matchMedia.mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      });
+    });
+
+    it('shows one team at a time with every player and no expand button', () => {
+      render(<Boxscore box={phoneBox()} isLoading={false} statusMessage={null} />);
+
+      expect(screen.getByRole('button', { name: '76ers' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('away-box')).toHaveTextContent('PHI');
+      expect(screen.queryByTestId('home-box')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /show all players/i })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Warriors' }));
+
+      expect(screen.getByTestId('home-box')).toHaveTextContent('GSW');
+      expect(screen.queryByTestId('away-box')).not.toBeInTheDocument();
+    });
+
+    it('opens on the followed team and keeps a chosen team across its games', () => {
+      const { rerender } = render(
+        <Boxscore gameId="g1" box={phoneBox()} preferredTeam="GSW" statusMessage={null} />,
+      );
+      expect(screen.getByTestId('home-box')).toHaveTextContent('GSW');
+
+      // Pick the 76ers, then open a game where they're the home side against the
+      // followed team: the choice wins over the followed team.
+      fireEvent.click(screen.getByRole('button', { name: '76ers' }));
+      rerender(
+        <Boxscore
+          gameId="g2"
+          box={{
+            teams: {
+              away: { abbr: 'GSW', name: 'Warriors', players: buildPlayers(9) },
+              home: { abbr: 'PHI', name: '76ers', players: buildPlayers(9) },
+            },
+          }}
+          preferredTeam="GSW"
+          statusMessage={null}
+        />,
+      );
+      expect(screen.getByRole('button', { name: '76ers' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('home-box')).toHaveTextContent('PHI');
+    });
+  });
+
   it('shows status message when no box data exists', () => {
     render(<Boxscore box={{}} isLoading={false} statusMessage="Game has not started." />);
 

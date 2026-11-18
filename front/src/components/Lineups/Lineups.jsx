@@ -7,6 +7,7 @@ import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnc
 import { useMediaQuery } from '../hooks/ui/useMediaQuery';
 import { useLocalStorageState } from '../hooks/state/useLocalStorageState';
 import { isBooleanPreference } from '../hooks/state/storage';
+import TeamTabs, { useTeamTab } from '../TeamTabs/TeamTabs';
 import LineupsTeamPanel from './LineupsTeamPanel';
 import LineupsTips from './LineupsTips';
 import { useLineupsTips } from './useLineupsTips';
@@ -33,6 +34,7 @@ export default function Lineups({
   homeLineups,
   isLoading,
   statusMessage,
+  preferredTeam = null,
 }) {
   const [sortConfig, setSortConfig] = useState(INITIAL_SORT_CONFIG);
   const [showAll, setShowAll] = useState(false);
@@ -41,7 +43,11 @@ export default function Lineups({
   const [awaySelectionMode, setAwaySelectionMode] = useState('filter');
   const [homeSelectionMode, setHomeSelectionMode] = useState('filter');
   const [topSectionMinHeight, setTopSectionMinHeight] = useState(0);
-  const [activeTeam, setActiveTeam] = useState('away');
+  const [activeTeam, setActiveTeam] = useTeamTab({
+    awayAbbr: awayTeam?.abr,
+    homeAbbr: homeTeam?.abr,
+    preferredTeam,
+  });
   const [isOpen, setIsOpen] = useLocalStorageState(
     LINEUPS_OPEN_STORAGE_KEY,
     false,
@@ -213,23 +219,15 @@ export default function Lineups({
     </div>
   ) : isStacked ? (
     <>
-      <div className="lineupsTeamTabs" role="group" aria-label="Lineups team">
-        {[
+      <TeamTabs
+        label="Lineups team"
+        teams={[
           { key: 'away', label: awayLabel, color: matchupColors?.away },
           { key: 'home', label: homeLabel, color: matchupColors?.home },
-        ].map((team) => (
-          <button
-            key={team.key}
-            type="button"
-            className={`lineupsTeamTab${activeTeam === team.key ? ' isActive' : ''}`}
-            onClick={() => setActiveTeam(team.key)}
-            aria-pressed={activeTeam === team.key}
-            style={activeTeam === team.key && team.color ? { color: team.color } : undefined}
-          >
-            {team.label}
-          </button>
-        ))}
-      </div>
+        ]}
+        activeKey={activeTeam}
+        onChange={setActiveTeam}
+      />
       {activeTeam === 'away' ? awayPanel : homePanel}
     </>
   ) : (

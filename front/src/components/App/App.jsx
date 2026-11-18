@@ -141,6 +141,7 @@ export default function App() {
           box={boxVm.box}
           isLoading={boxVm.isLoading}
           statusMessage={boxVm.statusMessage}
+          preferredTeam={scheduleVm.teamMode?.team ?? null}
         />
         <Lineups
           gameId={lineupsVm.gameId}
@@ -150,6 +151,7 @@ export default function App() {
           homeLineups={lineupsVm.homeLineups}
           isLoading={lineupsVm.isLoading}
           statusMessage={lineupsVm.statusMessage}
+          preferredTeam={scheduleVm.teamMode?.team ?? null}
         />
       </main>
       <Footer />

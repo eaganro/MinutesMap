@@ -3,6 +3,7 @@ import UnfoldMore from '@mui/icons-material/esm/UnfoldMore';
 import UnfoldLess from '@mui/icons-material/esm/UnfoldLess';
 import './Boxscore.scss';
 import processTeamStats from './processTeamStats';
+import TeamTabs, { useTeamTab } from '../TeamTabs/TeamTabs';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useMinimumLoadingState } from '../hooks/ui/useMinimumLoadingState';
 import { useTheme } from '../hooks/ui/useTheme';
@@ -18,7 +19,7 @@ const COLLAPSED_PLAYER_COUNT = 5;
 const BOXSCORE_EXPANDED_STORAGE_KEY = 'boxscoreExpanded';
 const BOXSCORE_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
 
-export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
+export default function Boxscore({ gameId, box, isLoading, statusMessage, preferredTeam = null }) {
   const [showMore, setShowMore] = useLocalStorageState(
     BOXSCORE_EXPANDED_STORAGE_KEY,
     false,
@@ -86,6 +87,13 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
     isDarkMode,
     true,
   );
+  // Phones show one team at a time, with every player, like the lineups.
+  const [activeSide, setActiveSide] = useTeamTab({
+    awayAbbr: displayBox?.teams?.away?.abbr,
+    homeAbbr: displayBox?.teams?.home?.abbr,
+    preferredTeam,
+  });
+  const showAllPlayers = showMore || isCompact;
 
   useEffect(() => {
     if (isLoading && hasBoxData) {
@@ -154,7 +162,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   const awayBox = processTeamStats(
     displayBox?.teams?.away,
     false,
-    showMore,
+    showAllPlayers,
     setShowMore,
     awayTableRef,
     () => syncScroll(awayTableRef, homeTableRef),
@@ -166,7 +174,7 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   const homeBox = processTeamStats(
     displayBox?.teams?.home,
     true,
-    showMore,
+    showAllPlayers,
     setShowMore,
     homeTableRef,
     () => syncScroll(homeTableRef, awayTableRef),
@@ -177,13 +185,15 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
   );
 
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
-  const hasHiddenPlayers = ['away', 'home'].some(
-    (side) => (displayBox?.teams?.[side]?.players?.length || 0) > COLLAPSED_PLAYER_COUNT,
-  );
+  const hasHiddenPlayers =
+    !isCompact &&
+    ['away', 'home'].some(
+      (side) => (displayBox?.teams?.[side]?.players?.length || 0) > COLLAPSED_PLAYER_COUNT,
+    );
 
   return (
     <div
-      className={`box ${isDataLoading ? 'isLoading' : ''}`}
+      className={`box${isCompact ? ' hasTeamTabs' : ''}${isDataLoading ? ' isLoading' : ''}`}
       role="region"
       aria-label="Box score"
       aria-busy={isLoading}
@@ -210,8 +220,25 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage }) {
         </div>
       ) : (
         <div className="boxContent">
-          {awayBox}
-          {homeBox}
+          {isCompact ? (
+            <>
+              <TeamTabs
+                label="Box score team"
+                teams={[
+                  { key: 'away', label: displayBox?.teams?.away?.name, color: matchupColors?.away },
+                  { key: 'home', label: displayBox?.teams?.home?.name, color: matchupColors?.home },
+                ]}
+                activeKey={activeSide}
+                onChange={setActiveSide}
+              />
+              {activeSide === 'home' ? homeBox : awayBox}
+            </>
+          ) : (
+            <>
+              {awayBox}
+              {homeBox}
+            </>
+          )}
           {hasHiddenPlayers && (
             <button
               type="button"
