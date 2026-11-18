@@ -439,6 +439,73 @@
   }
 }
 
+// Phones: a one-line team pill and slightly shorter game cards, so the chart starts
+// higher on the first screen. Same selector paths as the rules above, so these win.
+@media (max-width: 600px) {
+  .schedule .scheduleContent {
+    .datePick .teamChip {
+      height: 32px;
+      margin: 4px 10px;
+      gap: 6px;
+      padding-left: 8px;
+
+      .teamChipButton {
+        padding: 2px;
+        gap: 7px;
+      }
+
+      .teamLogo {
+        width: 22px;
+        height: 22px;
+      }
+
+      .teamChipText {
+        flex-direction: row;
+        align-items: baseline;
+        gap: 7px;
+        min-width: 0;
+      }
+
+      .teamChipName {
+        font-size: 0.9rem;
+      }
+
+      .teamChipClear {
+        padding: 3px;
+      }
+    }
+
+    // Three 17-18px rows plus the strip's 2px padding.
+    .gamePick {
+      height: 56px;
+
+      .games .game {
+        .iconRow {
+          height: 18px;
+        }
+
+        > div:not([class]) {
+          height: 17px;
+          line-height: 17px;
+        }
+
+        &.teamGame .dateRow {
+          height: 17px;
+          line-height: 18px;
+        }
+
+        .recordRow {
+          height: 17px;
+        }
+
+        .statusRow {
+          min-height: 17px;
+        }
+      }
+    }
+  }
+}
+
 .scheduleButton {
   height: 36px;
   width: 36px;

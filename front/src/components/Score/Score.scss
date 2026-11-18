@@ -279,24 +279,26 @@
     text-align: center;
   }
 
-  // Phones: the tricode drops under its logo so both scores fit on one line.
+  // Phones: one slim line (logo, tricode and score each side of the status), so the
+  // chart starts higher on the first screen.
   @media (max-width: 600px) {
-    min-height: 104px;
+    min-height: 48px;
 
     .scoreArea {
-      grid-template-columns: minmax(0, 1fr) auto minmax(84px, auto) auto minmax(0, 1fr);
-      column-gap: 8px;
+      grid-template-columns: minmax(0, 1fr) auto minmax(72px, auto) auto minmax(0, 1fr);
+      column-gap: 10px;
     }
 
-    .scoreTeam,
-    .scoreTeam.home {
-      flex-direction: column;
-      gap: 2px;
+    .scoreTeam {
+      gap: 6px;
     }
 
-    .scoreTeam.away,
+    .scoreTeam.away {
+      justify-self: start;
+    }
+
     .scoreTeam.home {
-      justify-self: center;
+      justify-self: end;
     }
 
     .scoreTeamCode {
@@ -309,26 +311,39 @@
     }
 
     .logoWrapper {
-      width: 52px;
-      height: 52px;
+      width: 30px;
+      height: 30px;
     }
 
     .teamLogo {
-      width: 44px;
-      height: 44px;
+      width: 26px;
+      height: 26px;
     }
 
     .scoreValue {
-      font-size: 2.1rem;
+      font-size: 1.5rem;
+    }
+
+    .scoreMeta {
+      gap: 0;
     }
 
     .gameTime {
-      font-size: 0.7rem;
+      font-size: 0.66rem;
     }
 
     .gameDate {
-      font-size: 0.74rem;
-      padding: 2px 4px;
+      font-size: 0.68rem;
+      padding: 0 4px;
+    }
+
+    // The narrowest phones can't fit the tricodes on that line, so only each team's
+    // colour swatch stays beside its logo.
+    @media (max-width: 380px) {
+      .scoreTeamCode {
+        font-size: 0;
+        gap: 0;
+      }
     }
   }
 }
