@@ -7,11 +7,13 @@ import { useStablePlayData } from './useStablePlayData';
 import { useActivePeriodSelection } from './useActivePeriodSelection';
 import { usePeriodFilteredData } from './usePeriodFilteredData';
 import {
+  PLAY_COMPACT_LEFT_MARGIN,
+  PLAY_COMPACT_RIGHT_MARGIN,
   PLAY_LEFT_MARGIN,
   PLAY_RIGHT_MARGIN,
-  getQuarterWidth,
   getScoreScale,
   getTimelineWidth,
+  isCompactPlayWidth,
 } from '../model/layoutModel';
 
 export function usePlayViewModel({
@@ -65,11 +67,10 @@ export function usePlayViewModel({
 
   const showLoadingOverlay = isLoading && hasDisplayData && showLoadingText;
 
-  const leftMargin = PLAY_LEFT_MARGIN;
-  const rightMargin = PLAY_RIGHT_MARGIN;
+  const hasCompactNames = isCompactPlayWidth(sectionWidth);
+  const leftMargin = hasCompactNames ? PLAY_COMPACT_LEFT_MARGIN : PLAY_LEFT_MARGIN;
+  const rightMargin = hasCompactNames ? PLAY_COMPACT_RIGHT_MARGIN : PLAY_RIGHT_MARGIN;
   const width = getTimelineWidth(sectionWidth, leftMargin, rightMargin);
-
-  const qWidth = useMemo(() => getQuarterWidth(width, displayNumQs), [width, displayNumQs]);
 
   const numPeriods = Number(displayNumQs) || 0;
   const {
@@ -94,6 +95,8 @@ export function usePlayViewModel({
     activePeriod,
     numPeriods,
     stablePlayData,
+    // Phones only: a live game's Game view and current quarter end where play is.
+    clipToPlayed: isQuarterView && !isFinal,
   });
   const timelineWindow = periodData.timelineWindow;
   const filteredAllActions = periodData.allActions;
@@ -127,10 +130,10 @@ export function usePlayViewModel({
     stablePlayData,
     periodData,
     playRef,
+    hasCompactNames,
     leftMargin,
     rightMargin,
     width,
-    qWidth,
     numPeriods,
     isFinal,
     activePeriod,

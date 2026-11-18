@@ -132,6 +132,20 @@
   max-width: none;
 }
 
+// Phones: the chart runs nearly to the card's edges to give the game more width. The
+// legend below keeps the usual inset, and so does a player's detail view.
+$play-section-compact-inset: 3px;
+
+@media (max-width: 700px) {
+  .playByPlaySection:not(.isPlayerDetailOpen) {
+    padding-inline: $play-section-compact-inset;
+
+    .playLegend {
+      padding-inline: calc(var(--layout-card-padding) - #{$play-section-compact-inset});
+    }
+  }
+}
+
 .dataRefresh {
   position: absolute;
   top: 16px;

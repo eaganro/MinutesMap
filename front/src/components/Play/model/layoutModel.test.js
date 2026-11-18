@@ -1,22 +1,52 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTooltipStyle,
+  clipWindowToPlayed,
   computeTooltipLayout,
-  getQuarterWidth,
   getScoreScale,
 } from './layoutModel';
 
 describe('layoutModel', () => {
-  it('computes quarter width and score scale values', () => {
-    expect(getQuarterWidth(400, 1)).toBe(400);
-    expect(getQuarterWidth(400, 4)).toBe(100);
-    expect(getQuarterWidth(400, 5)).toBeCloseTo(90.56, 1);
-
+  it('computes score scale values', () => {
     const scale = getScoreScale([
       { away: 10, home: 12 },
       { away: 30, home: 12 },
     ]);
     expect(scale).toEqual({ maxLead: 18, maxY: 25 });
+  });
+
+  it('ends a live window at the next 3-minute mark after the latest play', () => {
+    const game = { startSeconds: 0, durationSeconds: 2880 };
+    // Halfway through Q2 (18:00 played) and a little past it.
+    expect(clipWindowToPlayed(game, 1080)).toEqual({ startSeconds: 0, durationSeconds: 1080 });
+    expect(clipWindowToPlayed(game, 1081)).toEqual({ startSeconds: 0, durationSeconds: 1260 });
+
+    // Two minutes into Q3, viewed on its own.
+    const q3 = { startSeconds: 1440, durationSeconds: 720 };
+    expect(clipWindowToPlayed(q3, 1560)).toEqual({ startSeconds: 1440, durationSeconds: 360 });
+    expect(clipWindowToPlayed(q3, 1440 + 400)).toEqual({
+      startSeconds: 1440,
+      durationSeconds: 540,
+    });
+  });
+
+  it('shows at least 6 minutes of a live window and never more than the full one', () => {
+    const game = { startSeconds: 0, durationSeconds: 2880 };
+    expect(clipWindowToPlayed(game, 30)).toEqual({ startSeconds: 0, durationSeconds: 360 });
+
+    const q4 = { startSeconds: 2160, durationSeconds: 720 };
+    expect(clipWindowToPlayed(q4, 2160 + 700)).toBe(q4);
+    expect(clipWindowToPlayed(q4, 3000)).toBe(q4);
+
+    // An overtime period is only 5 minutes, so its minimum is the whole period.
+    const ot = { startSeconds: 2880, durationSeconds: 300 };
+    expect(clipWindowToPlayed(ot, 2900)).toBe(ot);
+  });
+
+  it('leaves the window alone without a latest play', () => {
+    const game = { startSeconds: 0, durationSeconds: 2880 };
+    expect(clipWindowToPlayed(game, null)).toBe(game);
+    expect(clipWindowToPlayed(game, Number.NaN)).toBe(game);
   });
 
   it('positions desktop tooltip as fixed and clamps inside container bounds', () => {

@@ -210,6 +210,9 @@ describe('Play', () => {
   it('opens a mobile player sheet from the player name and closes it', () => {
     renderPlay(buildProps());
 
+    // Phones open on the whole game; pick a quarter so closing the sheet has one to restore.
+    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Q1' }));
     fireEvent.click(screen.getByRole('button', { name: /open player detail for j\. embiid/i }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -298,7 +301,7 @@ describe('Play', () => {
     window.history.replaceState({}, '', '/2026-03-11-phi-gsw?q=3');
     renderPlay(buildProps());
 
-    expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true');
     expect(window.location.search).toBe('');
   });
 
@@ -358,6 +361,62 @@ describe('Play', () => {
       screen.queryByRole('button', { name: /open player detail for j\. embiid/i }),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
+  });
+
+  it('shows short names and team tricodes on phones', () => {
+    const { container } = renderPlay(buildProps());
+
+    const embiid = screen.getByRole('button', { name: /open player detail for j\. embiid/i });
+    expect(embiid).toHaveTextContent(/^Embiid$/);
+    expect(embiid.closest('.playerName')).toHaveClass('isCompact');
+    expect(container.querySelector('.teamName.away')).toHaveTextContent(/^PHI$/);
+    expect(container.querySelector('.teamName.home')).toHaveTextContent(/^GSW$/);
+  });
+
+  it('ends a live game at the latest play on phones and shows the whole game on desktop', () => {
+    const liveInQ2 = {
+      gameStatus: 'Q2 6:00',
+      playData: buildPlayData({
+        numQs: 4,
+        lastAction: { period: 2, clock: 'PT06M00.00S', status: 'Q2 6:00' },
+      }),
+    };
+    const periodLabels = (container) =>
+      [...container.querySelectorAll('.playGridPeriodLabel')].map((label) => label.textContent);
+
+    const phone = renderPlay(buildProps(liveInQ2));
+    fireEvent.click(screen.getByRole('button', { name: 'Game' }));
+    expect(periodLabels(phone.container)).toEqual(['Q1', 'Q2']);
+    cleanup();
+
+    const desktop = renderPlay(buildProps({ ...liveInQ2, sectionWidth: 900 }));
+    expect(periodLabels(desktop.container)).toEqual(['Q1', 'Q2', 'Q3', 'Q4']);
+  });
+
+  it('shows the whole game for a finished game on phones', () => {
+    const { container } = renderPlay(
+      buildProps({
+        gameStatus: 'Final',
+        playData: buildPlayData({
+          numQs: 4,
+          lastAction: { period: 2, clock: 'PT06M00.00S', status: 'Final' },
+        }),
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Game' }));
+
+    expect(
+      [...container.querySelectorAll('.playGridPeriodLabel')].map((label) => label.textContent),
+    ).toEqual(['Q1', 'Q2', 'Q3', 'Q4']);
+  });
+
+  it('keeps full names and team names in the desktop name column', () => {
+    const { container } = renderPlay(buildProps({ sectionWidth: 900 }));
+
+    const names = [...container.querySelectorAll('.playerName')];
+    expect(names.map((name) => name.textContent)).toContain('J. Embiid');
+    expect(names.every((name) => !name.classList.contains('isCompact'))).toBe(true);
+    expect(container.querySelector('.teamName.away')).toHaveTextContent('Philadelphia 76ers');
   });
 
   it('lets keyboard users inspect chart events and reach video actions', () => {

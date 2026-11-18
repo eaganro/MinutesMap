@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { resolveFullNameFromRoster } from './PlayExport/playExportModel';
 import MobilePlayerSheet from './MobilePlayerSheet';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -12,12 +12,13 @@ import ScoreGraph from './ScoreGraph';
 import PlayTooltip from './PlayTooltip';
 import PlayTips from './PlayTips';
 import TimelineGrid from './TimelineGrid';
-import { MOBILE_TOOLTIP_BREAKPOINT } from './model/layoutModel';
+import { PLAY_LEFT_MARGIN, isCompactPlayWidth } from './model/layoutModel';
 import { parseSharedView, removeSharedViewParams } from './model/sharedViewModel';
 import { usePlayInteraction } from './usePlayInteraction';
 import { useMediaQuery } from '../hooks/ui/useMediaQuery';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
 import { trackFeatureUse } from '../../helpers/analytics';
+import { shortPlayerNames } from '../../helpers/playerNames';
 import './Play.scss';
 
 const PLAYER_DETAIL_HISTORY_KEY = 'minutesMapPlayerDetail';
@@ -40,10 +41,10 @@ export default function Play({
 }) {
   const {
     playRef,
+    hasCompactNames,
     leftMargin,
     rightMargin,
     width,
-    qWidth,
     numPeriods,
     isFinal,
     activePeriod,
@@ -237,8 +238,7 @@ export default function Play({
     resetInteraction,
   });
 
-  const isMobilePlayerSheetEnabled =
-    Number.isFinite(sectionWidth) && sectionWidth > 0 && sectionWidth < MOBILE_TOOLTIP_BREAKPOINT;
+  const isMobilePlayerSheetEnabled = isCompactPlayWidth(sectionWidth);
   const isShowingMobilePlayerDetail = isMobilePlayerSheetEnabled && Boolean(selectedPlayer);
   const controlActivePeriod = isShowingMobilePlayerDetail ? playerDetailPeriod : activePeriod;
 
@@ -465,6 +465,35 @@ export default function Play({
     openPlayerDetail,
   ]);
 
+  // Phones show short names, and team tricodes so the first period label has room
+  // beside the team name.
+  const awayShortNames = useMemo(
+    () => (hasCompactNames ? shortPlayerNames(Object.keys(displayAwayPlayers || {})) : {}),
+    [hasCompactNames, displayAwayPlayers],
+  );
+  const homeShortNames = useMemo(
+    () => (hasCompactNames ? shortPlayerNames(Object.keys(displayHomePlayers || {})) : {}),
+    [hasCompactNames, displayHomePlayers],
+  );
+  const awayTeamLabel =
+    hasCompactNames && displayAwayTeamNames.abr
+      ? displayAwayTeamNames.abr
+      : displayAwayTeamNames.name;
+  const homeTeamLabel =
+    hasCompactNames && displayHomeTeamNames.abr
+      ? displayHomeTeamNames.abr
+      : displayHomeTeamNames.name;
+
+  const awayTeamNameRef = useRef(null);
+  const [awayTeamNameRight, setAwayTeamNameRight] = useState(0);
+  useLayoutEffect(() => {
+    const node = awayTeamNameRef.current;
+    if (!node) return;
+    const right = node.offsetLeft + node.offsetWidth;
+    if (right !== awayTeamNameRight) setAwayTeamNameRight(right);
+  });
+  const periodLabelMinX = hasCompactNames && awayTeamNameRight ? awayTeamNameRight + 6 : 0;
+
   const handlePlayerDetailClose = () => {
     if (isCurrentPlayerHistoryEntry()) {
       clearSelectedPlayer();
@@ -542,7 +571,8 @@ export default function Play({
           isDataLoading,
           isFinal,
           numPeriods,
-          leftMargin,
+          // Exported images keep the desktop name column.
+          leftMargin: PLAY_LEFT_MARGIN,
           rightMargin,
           showScoreDiff,
           showOdds,
@@ -655,12 +685,13 @@ export default function Play({
                 <TimelineGrid
                   width={width}
                   leftMargin={leftMargin}
-                  qWidth={qWidth}
+                  timelineWindow={timelineWindow}
                   numQs={displayNumQs}
                   awayTeamName={displayAwayTeamNames.name}
                   homeTeamName={displayHomeTeamNames.name}
                   isQuarterView={isQuarterFocus}
                   activePeriodLabel={activePeriodLabel}
+                  labelMinX={periodLabelMinX}
                 />
 
                 <ScoreGraph
@@ -699,9 +730,9 @@ export default function Play({
                 )}
               </svg>
 
-              <div className="teamName away">
+              <div className="teamName away" ref={awayTeamNameRef}>
                 <span className="teamNameSwatch" style={{ background: teamColors.away }} />
-                {displayAwayTeamNames.name}
+                {awayTeamLabel}
               </div>
               <div className="teamSection">
                 {Object.keys(filteredAwayPlayers).map((name) => (
@@ -718,6 +749,8 @@ export default function Play({
                     timelineWindow={timelineWindow}
                     emphasizedStatIndex={emphasizedStatIndex}
                     cursorX={mouseLinePos === null ? null : mouseLinePos - leftMargin}
+                    compactName={hasCompactNames}
+                    label={awayShortNames[name]}
                     onSelect={
                       isMobilePlayerSheetEnabled
                         ? () => handlePlayerSelect('away', name)
@@ -729,7 +762,7 @@ export default function Play({
 
               <div className="teamName home">
                 <span className="teamNameSwatch" style={{ background: teamColors.home }} />
-                {displayHomeTeamNames.name}
+                {homeTeamLabel}
               </div>
               <div className="teamSection">
                 {Object.keys(filteredHomePlayers).map((name) => (
@@ -746,6 +779,8 @@ export default function Play({
                     timelineWindow={timelineWindow}
                     emphasizedStatIndex={emphasizedStatIndex}
                     cursorX={mouseLinePos === null ? null : mouseLinePos - leftMargin}
+                    compactName={hasCompactNames}
+                    label={homeShortNames[name]}
                     onSelect={
                       isMobilePlayerSheetEnabled
                         ? () => handlePlayerSelect('home', name)

@@ -39,12 +39,9 @@ export function useActivePeriodSelection({
     return typeof status === 'string' && status.trim().startsWith('Final');
   }, [displayLastAction?.status, gameStatus]);
 
-  const defaultPeriod = useMemo(() => {
-    if (isFinal) return 1;
-    const fallback = Number(displayLastAction?.period || numPeriods || 4);
-    if (!Number.isFinite(fallback) || fallback <= 0) return 1;
-    return numPeriods > 0 ? Math.min(fallback, numPeriods) : fallback;
-  }, [displayLastAction?.period, numPeriods, isFinal]);
+  // Phones open every game on the whole game (period 0); a live game's Game view ends
+  // where play is, so it stays readable while the game is on.
+  const defaultPeriod = 0;
 
   const hasPeriodData = useMemo(() => {
     const period = Number(displayLastAction?.period);

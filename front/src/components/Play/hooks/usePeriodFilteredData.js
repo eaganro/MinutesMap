@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { clampWinProbability } from '../../../helpers/odds';
+import { clipWindowToPlayed } from '../model/layoutModel';
 import {
   getGameTotalSeconds,
   getPeriodDurationSeconds,
@@ -7,7 +8,12 @@ import {
   getSecondsElapsed,
 } from '../../../helpers/playTimeline';
 
-export function usePeriodFilteredData({ activePeriod, numPeriods, stablePlayData }) {
+export function usePeriodFilteredData({
+  activePeriod,
+  numPeriods,
+  stablePlayData,
+  clipToPlayed = false,
+}) {
   const stableAllActions = stablePlayData.allActions;
   const stableScoreTimeline = stablePlayData.scoreTimeline;
   const stableOddsTimeline = stablePlayData.oddsTimeline;
@@ -17,16 +23,19 @@ export function usePeriodFilteredData({ activePeriod, numPeriods, stablePlayData
   const stableHomePlayerTimeline = stablePlayData.homePlayerTimeline;
   const stableLastAction = stablePlayData.lastAction;
 
+  const latestSeconds = stableLastAction
+    ? getSecondsElapsed(stableLastAction.period, stableLastAction.clock)
+    : null;
+
   const timelineWindow = useMemo(() => {
-    const totalSeconds = getGameTotalSeconds(numPeriods);
-    if (!activePeriod) {
-      return { startSeconds: 0, durationSeconds: totalSeconds };
-    }
-    return {
-      startSeconds: getPeriodStartSeconds(activePeriod),
-      durationSeconds: getPeriodDurationSeconds(activePeriod),
-    };
-  }, [activePeriod, numPeriods]);
+    const fullWindow = activePeriod
+      ? {
+          startSeconds: getPeriodStartSeconds(activePeriod),
+          durationSeconds: getPeriodDurationSeconds(activePeriod),
+        }
+      : { startSeconds: 0, durationSeconds: getGameTotalSeconds(numPeriods) };
+    return clipToPlayed ? clipWindowToPlayed(fullWindow, latestSeconds) : fullWindow;
+  }, [activePeriod, numPeriods, clipToPlayed, latestSeconds]);
 
   const periodAllActions = useMemo(() => {
     if (!activePeriod) return stableAllActions;

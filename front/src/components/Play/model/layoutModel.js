@@ -1,11 +1,40 @@
 export const PLAY_LEFT_MARGIN = 96;
+// On phones, short last names in a 36px column (cutting off the longest, about 1 in
+// 5), plus the 6px gap before the timeline.
+export const PLAY_COMPACT_LEFT_MARGIN = 42;
 export const PLAY_RIGHT_MARGIN = 10;
+export const PLAY_COMPACT_RIGHT_MARGIN = 6;
 export const MOBILE_TOOLTIP_BREAKPOINT = 700;
+
+// Phone-sized chart: names go inside the chart and tapping one opens the player sheet.
+export function isCompactPlayWidth(sectionWidth) {
+  return (
+    Number.isFinite(sectionWidth) && sectionWidth > 0 && sectionWidth < MOBILE_TOOLTIP_BREAKPOINT
+  );
+}
 
 function clamp(value, min, max) {
   if (value < min) return min;
   if (value > max) return max;
   return value;
+}
+
+// Live games on phones show only the part of the window that has been played. It
+// grows in steps rather than with every play, so the scale holds still while you
+// read it, and starts at a few minutes so an early lead-in isn't blown up.
+export const LIVE_WINDOW_STEP_SECONDS = 3 * 60;
+export const LIVE_WINDOW_MIN_SECONDS = 6 * 60;
+
+export function clipWindowToPlayed(timelineWindow, latestSeconds) {
+  const { startSeconds, durationSeconds } = timelineWindow;
+  if (!Number.isFinite(latestSeconds)) return timelineWindow;
+  const played = Math.max(0, latestSeconds - startSeconds);
+  const shown = Math.max(
+    LIVE_WINDOW_MIN_SECONDS,
+    Math.ceil(played / LIVE_WINDOW_STEP_SECONDS) * LIVE_WINDOW_STEP_SECONDS,
+  );
+  if (shown >= durationSeconds) return timelineWindow;
+  return { startSeconds, durationSeconds: shown };
 }
 
 export function getTimelineWidth(
@@ -14,17 +43,6 @@ export function getTimelineWidth(
   rightMargin = PLAY_RIGHT_MARGIN,
 ) {
   return Math.max(0, sectionWidth - (leftMargin + rightMargin));
-}
-
-export function getQuarterWidth(width, numPeriods) {
-  const count = Number(numPeriods);
-  if (!Number.isFinite(count) || count <= 0) {
-    return width / 4;
-  }
-  if (count > 4) {
-    return width * (12 / (12 * 4 + 5 * (count - 4)));
-  }
-  return width / count;
 }
 
 export function getScoreScale(scoreTimeline) {

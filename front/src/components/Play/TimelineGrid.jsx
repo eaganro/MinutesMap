@@ -1,18 +1,32 @@
+import { getPeriodDurationSeconds, getPeriodStartSeconds } from '../../helpers/playTimeline';
+
+// About half the width of a "Q1" label, plus a little air.
+const PERIOD_LABEL_HALF_WIDTH = 11;
+// A period with less room than this on screen, like a live one that has just
+// started, goes unlabelled.
+const MIN_LABELLED_PERIOD_WIDTH = 2 * PERIOD_LABEL_HALF_WIDTH;
+
+const getPeriodLabel = (period) => (period <= 4 ? `Q${period}` : `O${period - 4}`);
+
 export default function TimelineGrid({
   width,
   leftMargin,
-  qWidth,
+  timelineWindow,
   numQs,
   isQuarterView,
   activePeriodLabel,
+  // Without a name column the first period label can sit on the team name, so labels
+  // stay to the right of this x.
+  labelMinX = 0,
 }) {
-  const timelineElements = [];
+  const clearLabelX = (x) => Math.max(x, labelMinX + PERIOD_LABEL_HALF_WIDTH);
   const totalPeriods = Number.isFinite(Number(numQs)) && Number(numQs) > 0 ? Number(numQs) : 4;
-  const regulationPeriods = Math.min(4, totalPeriods);
-  const overtimePeriods = Math.max(0, totalPeriods - 4);
+  const startSeconds = timelineWindow?.startSeconds ?? 0;
+  const durationSeconds = timelineWindow?.durationSeconds ?? 0;
+  const endSeconds = startSeconds + durationSeconds;
+  const toX = (seconds) => leftMargin + ((seconds - startSeconds) / durationSeconds) * width;
 
-  // 1. Horizontal Baseline
-  timelineElements.push(
+  const timelineElements = [
     <line
       key="baseline"
       x1={0}
@@ -21,75 +35,48 @@ export default function TimelineGrid({
       y2={300}
       className="playGridBaseline"
     />,
-  );
+  ];
 
-  // 2. Vertical Quarter Lines
-  if (!isQuarterView) {
-    // Regulation period separators.
-    for (let i = 1; i < regulationPeriods; i += 1) {
-      const x = leftMargin + qWidth * i;
+  if (durationSeconds <= 0) return <>{timelineElements}</>;
+
+  // Each period in the window gets a separator where it starts and a label centred
+  // on the part of it that is on screen (a live game's window can end mid-period).
+  for (let period = 1; period <= totalPeriods; period += 1) {
+    const periodStart = getPeriodStartSeconds(period);
+    const periodEnd = periodStart + getPeriodDurationSeconds(period);
+    const visibleStart = Math.max(periodStart, startSeconds);
+    const visibleEnd = Math.min(periodEnd, endSeconds);
+    if (visibleEnd <= visibleStart) continue;
+
+    if (periodStart > startSeconds) {
+      const x = toX(periodStart);
       timelineElements.push(
-        <line key={`q${i}`} x1={x} y1={6} x2={x} y2={594} className="playGridPeriodLine" />,
+        <line
+          key={`q${period - 1}`}
+          x1={x}
+          y1={6}
+          x2={x}
+          y2={594}
+          className="playGridPeriodLine"
+        />,
       );
     }
 
-    // OT separators (shorter than regulation periods).
-    for (let q = 4; q < totalPeriods; q += 1) {
-      // OT periods are shorter (5 mins vs 12 mins), so they are 5/12th the width
-      let x = leftMargin + qWidth * 4 + (5 / 12) * qWidth * (q - 4);
-      timelineElements.push(
-        <line key={`q${q}`} x1={x} y1={6} x2={x} y2={594} className="playGridPeriodLine" />,
-      );
-    }
-  }
-
-  // 3. Labels (Q1... Q4, O1...)
-  const labelY = 16;
-  const otWidth = (5 / 12) * qWidth;
-
-  if (isQuarterView) {
-    if (activePeriodLabel) {
-      timelineElements.push(
-        <text
-          key="label-active"
-          x={leftMargin + width / 2}
-          y={labelY}
-          textAnchor="middle"
-          className="playGridPeriodLabel"
-        >
-          {activePeriodLabel}
-        </text>,
-      );
-    }
-  } else {
-    Array.from({ length: regulationPeriods }, (_, idx) => `Q${idx + 1}`).forEach((label, i) => {
-      timelineElements.push(
-        <text
-          key={`label-${label}`}
-          x={leftMargin + qWidth * (i + 0.5)}
-          y={labelY}
-          textAnchor="middle"
-          className="playGridPeriodLabel"
-        >
-          {label}
-        </text>,
-      );
-    });
-
-    for (let ot = 1; ot <= overtimePeriods; ot += 1) {
-      const otCenterX = leftMargin + qWidth * 4 + otWidth * (ot - 0.5);
-      timelineElements.push(
-        <text
-          key={`label-o${ot}`}
-          x={otCenterX}
-          y={labelY}
-          textAnchor="middle"
-          className="playGridPeriodLabel"
-        >
-          O{ot}
-        </text>,
-      );
-    }
+    const labelStart = toX(visibleStart);
+    const labelEnd = toX(visibleEnd);
+    const label = isQuarterView ? activePeriodLabel : getPeriodLabel(period);
+    if (!label || labelEnd - labelStart < MIN_LABELLED_PERIOD_WIDTH) continue;
+    timelineElements.push(
+      <text
+        key={`label-${period}`}
+        x={clearLabelX((labelStart + labelEnd) / 2)}
+        y={16}
+        textAnchor="middle"
+        className="playGridPeriodLabel"
+      >
+        {label}
+      </text>,
+    );
   }
 
   return <>{timelineElements}</>;

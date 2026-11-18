@@ -9,6 +9,9 @@ import { renderEventShape, renderFreeThrowRing } from '../../../ui/eventShapes.j
 
 import './Player.scss';
 
+// Space between the name column and the start of the timeline.
+const NAME_GAP = 6;
+
 export default function Player({
   actions,
   timeline,
@@ -22,8 +25,13 @@ export default function Player({
   onSelect,
   emphasizedStatIndex = null,
   cursorX = null,
+  // Phones: a short label in a narrow name column.
+  compactName = false,
+  label = null,
 }) {
   const playerName = name;
+  const nameText = compactName && label ? label : playerName;
+
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
   const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
 
@@ -154,7 +162,11 @@ export default function Player({
 
   return (
     <div className={`player${courtClassName}`} style={{ height: `${275 / heightDivide}px` }}>
-      <div className="playerName" style={{ width: 90 }}>
+      <div
+        className={compactName ? 'playerName isCompact' : 'playerName'}
+        // The name column is the left margin less the gap, and cuts off longer names.
+        style={{ width: leftMargin - NAME_GAP }}
+      >
         {typeof onSelect === 'function' ? (
           <button
             type="button"
@@ -167,10 +179,10 @@ export default function Player({
             }}
             aria-label={`Open player detail for ${playerName}`}
           >
-            {playerName}
+            {nameText}
           </button>
         ) : (
-          playerName
+          nameText
         )}
       </div>
       <svg
