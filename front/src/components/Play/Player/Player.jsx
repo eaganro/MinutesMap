@@ -25,8 +25,10 @@ export default function Player({
   onSelect,
   emphasizedStatIndex = null,
   cursorX = null,
-  // Phones: a short label in a narrow name column.
+  // Narrower charts: a short label in a narrow name column.
   compactName = false,
+  // Below 1 where the chart is dense (see getMarkerScale).
+  markerScale = 1,
   label = null,
 }) {
   const playerName = name;
@@ -134,7 +136,7 @@ export default function Player({
   // Render non-highlighted dots first, then highlighted dots on top
   const nonHighlightedDots = buildActionShapes(
     filteredActions.filter((a) => !highlight.includes(a.actionNumber)),
-    4,
+    4 * markerScale,
   );
 
   const highlightedDots = buildActionShapes(

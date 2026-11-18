@@ -1,22 +1,41 @@
 export const PLAY_LEFT_MARGIN = 96;
-// On phones, short last names in a 36px column (cutting off the longest, about 1 in
-// 5), plus the 6px gap before the timeline.
-export const PLAY_COMPACT_LEFT_MARGIN = 42;
+// Charts narrower than this (phones either way up, portrait tablets) use short last
+// names in a 36px column, cutting off the longest (about 1 in 5), plus the 6px gap
+// before the timeline.
+export const SHORT_NAMES_MAX_WIDTH = 900;
+export const PLAY_SHORT_NAMES_LEFT_MARGIN = 42;
 export const PLAY_RIGHT_MARGIN = 10;
 export const PLAY_COMPACT_RIGHT_MARGIN = 6;
 export const MOBILE_TOOLTIP_BREAKPOINT = 700;
 
-// Phone-sized chart: names go inside the chart and tapping one opens the player sheet.
+const isPositiveWidthBelow = (sectionWidth, limit) =>
+  Number.isFinite(sectionWidth) && sectionWidth > 0 && sectionWidth < limit;
+
+// Phone-sized chart: quarter tabs, and tapping a name opens the player sheet.
 export function isCompactPlayWidth(sectionWidth) {
-  return (
-    Number.isFinite(sectionWidth) && sectionWidth > 0 && sectionWidth < MOBILE_TOOLTIP_BREAKPOINT
-  );
+  return isPositiveWidthBelow(sectionWidth, MOBILE_TOOLTIP_BREAKPOINT);
+}
+
+export function hasShortNamesAt(sectionWidth) {
+  return isPositiveWidthBelow(sectionWidth, SHORT_NAMES_MAX_WIDTH);
 }
 
 function clamp(value, min, max) {
   if (value < min) return min;
   if (value > max) return max;
   return value;
+}
+
+// Markers shrink where the chart is dense, under 10px per game minute (in practice a
+// phone's Game view), down to 80% of their size so busy stretches overlap less. The
+// scale changes gradually, so a live window that grows never makes them jump.
+const DENSE_PX_PER_MINUTE = 10;
+const MIN_MARKER_SCALE = 0.8;
+
+export function getMarkerScale(timelineWidth, durationSeconds) {
+  if (!(timelineWidth > 0) || !(durationSeconds > 0)) return 1;
+  const pxPerMinute = timelineWidth / (durationSeconds / 60);
+  return clamp(pxPerMinute / DENSE_PX_PER_MINUTE, MIN_MARKER_SCALE, 1);
 }
 
 // Live games on phones show only the part of the window that has been played. It

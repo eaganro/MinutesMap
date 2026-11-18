@@ -7,12 +7,14 @@ import { useStablePlayData } from './useStablePlayData';
 import { useActivePeriodSelection } from './useActivePeriodSelection';
 import { usePeriodFilteredData } from './usePeriodFilteredData';
 import {
-  PLAY_COMPACT_LEFT_MARGIN,
   PLAY_COMPACT_RIGHT_MARGIN,
   PLAY_LEFT_MARGIN,
   PLAY_RIGHT_MARGIN,
+  PLAY_SHORT_NAMES_LEFT_MARGIN,
+  getMarkerScale,
   getScoreScale,
   getTimelineWidth,
+  hasShortNamesAt,
   isCompactPlayWidth,
 } from '../model/layoutModel';
 
@@ -67,9 +69,11 @@ export function usePlayViewModel({
 
   const showLoadingOverlay = isLoading && hasDisplayData && showLoadingText;
 
-  const hasCompactNames = isCompactPlayWidth(sectionWidth);
-  const leftMargin = hasCompactNames ? PLAY_COMPACT_LEFT_MARGIN : PLAY_LEFT_MARGIN;
-  const rightMargin = hasCompactNames ? PLAY_COMPACT_RIGHT_MARGIN : PLAY_RIGHT_MARGIN;
+  const hasShortNames = hasShortNamesAt(sectionWidth);
+  const leftMargin = hasShortNames ? PLAY_SHORT_NAMES_LEFT_MARGIN : PLAY_LEFT_MARGIN;
+  const rightMargin = isCompactPlayWidth(sectionWidth)
+    ? PLAY_COMPACT_RIGHT_MARGIN
+    : PLAY_RIGHT_MARGIN;
   const width = getTimelineWidth(sectionWidth, leftMargin, rightMargin);
 
   const numPeriods = Number(displayNumQs) || 0;
@@ -99,6 +103,7 @@ export function usePlayViewModel({
     clipToPlayed: isQuarterView && !isFinal,
   });
   const timelineWindow = periodData.timelineWindow;
+  const markerScale = getMarkerScale(width, timelineWindow.durationSeconds);
   const filteredAllActions = periodData.allActions;
   const filteredScoreTimeline = periodData.scoreTimeline;
   const filteredOddsTimeline = periodData.oddsTimeline;
@@ -130,7 +135,8 @@ export function usePlayViewModel({
     stablePlayData,
     periodData,
     playRef,
-    hasCompactNames,
+    hasShortNames,
+    markerScale,
     leftMargin,
     rightMargin,
     width,

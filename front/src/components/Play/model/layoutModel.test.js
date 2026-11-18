@@ -3,7 +3,9 @@ import {
   buildTooltipStyle,
   clipWindowToPlayed,
   computeTooltipLayout,
+  getMarkerScale,
   getScoreScale,
+  hasShortNamesAt,
 } from './layoutModel';
 
 describe('layoutModel', () => {
@@ -41,6 +43,25 @@ describe('layoutModel', () => {
     // An overtime period is only 5 minutes, so its minimum is the whole period.
     const ot = { startSeconds: 2880, durationSeconds: 300 };
     expect(clipWindowToPlayed(ot, 2900)).toBe(ot);
+  });
+
+  it('shrinks markers gradually where a game minute gets under 10px', () => {
+    // A whole game on a phone (322px for 48 minutes) bottoms out at 80%.
+    expect(getMarkerScale(322, 2880)).toBe(0.8);
+    // A live phone Game view 36 minutes in sits part way.
+    expect(getMarkerScale(322, 2160)).toBeCloseTo(0.894, 3);
+    // A phone quarter, a sideways phone's whole game, and desktop keep full size.
+    expect(getMarkerScale(322, 720)).toBe(1);
+    expect(getMarkerScale(800, 2880)).toBe(1);
+    expect(getMarkerScale(1100, 2880)).toBe(1);
+    expect(getMarkerScale(0, 2880)).toBe(1);
+  });
+
+  it('uses short names on charts narrower than 900px', () => {
+    expect(hasShortNamesAt(360)).toBe(true);
+    expect(hasShortNamesAt(820)).toBe(true);
+    expect(hasShortNamesAt(900)).toBe(false);
+    expect(hasShortNamesAt(0)).toBe(false);
   });
 
   it('leaves the window alone without a latest play', () => {

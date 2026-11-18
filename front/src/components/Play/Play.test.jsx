@@ -410,6 +410,36 @@ describe('Play', () => {
     ).toEqual(['Q1', 'Q2', 'Q3', 'Q4']);
   });
 
+  it('shows short names with full team names on a phone turned sideways', () => {
+    const { container } = renderPlay(buildProps({ sectionWidth: 800 }));
+
+    const names = [...container.querySelectorAll('.playerName')].map((name) => name.textContent);
+    expect(names).toContain('Embiid');
+    expect(container.querySelector('.teamName.away')).toHaveTextContent('Philadelphia 76ers');
+    expect(
+      screen.queryByRole('button', { name: /open player detail for j\. embiid/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('draws smaller markers on a phone showing the whole game', () => {
+    const finishedGame = {
+      gameStatus: 'Final',
+      playData: buildPlayData({
+        numQs: 4,
+        lastAction: { period: 4, clock: 'PT00M00.00S', status: 'Final' },
+      }),
+    };
+    const pointRadius = (container) =>
+      Number(container.querySelector('[data-action-number="11"]').getAttribute('r'));
+
+    const phone = renderPlay(buildProps(finishedGame));
+    const phoneRadius = pointRadius(phone.container);
+    cleanup();
+    const desktop = renderPlay(buildProps({ ...finishedGame, sectionWidth: 900 }));
+
+    expect(phoneRadius).toBeCloseTo(pointRadius(desktop.container) * 0.8, 5);
+  });
+
   it('keeps full names and team names in the desktop name column', () => {
     const { container } = renderPlay(buildProps({ sectionWidth: 900 }));
 

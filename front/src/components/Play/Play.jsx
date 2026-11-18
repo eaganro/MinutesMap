@@ -41,7 +41,8 @@ export default function Play({
 }) {
   const {
     playRef,
-    hasCompactNames,
+    hasShortNames,
+    markerScale,
     leftMargin,
     rightMargin,
     width,
@@ -465,22 +466,22 @@ export default function Play({
     openPlayerDetail,
   ]);
 
-  // Phones show short names, and team tricodes so the first period label has room
-  // beside the team name.
+  // Narrower charts show short names. Phones also use team tricodes, so the first
+  // period label has room beside the team name.
   const awayShortNames = useMemo(
-    () => (hasCompactNames ? shortPlayerNames(Object.keys(displayAwayPlayers || {})) : {}),
-    [hasCompactNames, displayAwayPlayers],
+    () => (hasShortNames ? shortPlayerNames(Object.keys(displayAwayPlayers || {})) : {}),
+    [hasShortNames, displayAwayPlayers],
   );
   const homeShortNames = useMemo(
-    () => (hasCompactNames ? shortPlayerNames(Object.keys(displayHomePlayers || {})) : {}),
-    [hasCompactNames, displayHomePlayers],
+    () => (hasShortNames ? shortPlayerNames(Object.keys(displayHomePlayers || {})) : {}),
+    [hasShortNames, displayHomePlayers],
   );
   const awayTeamLabel =
-    hasCompactNames && displayAwayTeamNames.abr
+    isMobilePlayerSheetEnabled && displayAwayTeamNames.abr
       ? displayAwayTeamNames.abr
       : displayAwayTeamNames.name;
   const homeTeamLabel =
-    hasCompactNames && displayHomeTeamNames.abr
+    isMobilePlayerSheetEnabled && displayHomeTeamNames.abr
       ? displayHomeTeamNames.abr
       : displayHomeTeamNames.name;
 
@@ -492,7 +493,7 @@ export default function Play({
     const right = node.offsetLeft + node.offsetWidth;
     if (right !== awayTeamNameRight) setAwayTeamNameRight(right);
   });
-  const periodLabelMinX = hasCompactNames && awayTeamNameRight ? awayTeamNameRight + 6 : 0;
+  const periodLabelMinX = hasShortNames && awayTeamNameRight ? awayTeamNameRight + 6 : 0;
 
   const handlePlayerDetailClose = () => {
     if (isCurrentPlayerHistoryEntry()) {
@@ -749,7 +750,8 @@ export default function Play({
                     timelineWindow={timelineWindow}
                     emphasizedStatIndex={emphasizedStatIndex}
                     cursorX={mouseLinePos === null ? null : mouseLinePos - leftMargin}
-                    compactName={hasCompactNames}
+                    compactName={hasShortNames}
+                    markerScale={markerScale}
                     label={awayShortNames[name]}
                     onSelect={
                       isMobilePlayerSheetEnabled
@@ -779,7 +781,8 @@ export default function Play({
                     timelineWindow={timelineWindow}
                     emphasizedStatIndex={emphasizedStatIndex}
                     cursorX={mouseLinePos === null ? null : mouseLinePos - leftMargin}
-                    compactName={hasCompactNames}
+                    compactName={hasShortNames}
+                    markerScale={markerScale}
                     label={homeShortNames[name]}
                     onSelect={
                       isMobilePlayerSheetEnabled
