@@ -29,14 +29,23 @@ function isRecordingTurnedOff() {
   return readStoredValue(RECORDING_OFF_STORAGE_KEY, false, RECORDING_OFF_OPTIONS) === true;
 }
 
+// Scrapers driving Chrome through Puppeteer/Playwright/Selenium report navigator.webdriver, even
+// when they send a normal Chrome user agent that PostHog's own bot filter lets through.
+function isAutomatedBrowser() {
+  return typeof navigator !== 'undefined' && navigator.webdriver === true;
+}
+
 let analyticsConfig = null;
 let pendingCalls = null;
 let loadPromise = null;
 
-/** Sets up PostHog for this page; nothing loads until startAnalytics(). */
+/**
+ * Sets up PostHog for this page; nothing loads until startAnalytics(). Automated browsers get
+ * no analytics at all, so their visits stay out of the numbers and session recordings.
+ */
 export function configureAnalytics({ key, host }) {
   const isRecordingOff = isRecordingTurnedOff();
-  if (!key || analyticsConfig) return;
+  if (!key || analyticsConfig || isAutomatedBrowser()) return;
   analyticsConfig = { key, host, isRecordingOff };
   pendingCalls = [];
 }

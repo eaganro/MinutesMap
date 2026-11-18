@@ -88,6 +88,21 @@ describe('analytics helpers', () => {
     expect(mocks.posthog.init).toHaveBeenCalledTimes(1);
   });
 
+  it('sends nothing from an automated browser', async () => {
+    Object.defineProperty(navigator, 'webdriver', { value: true, configurable: true });
+    try {
+      configureAnalytics({ key: 'phc_test', host: '/ph' });
+      trackFeatureUse('lineups');
+      await startAnalytics();
+    } finally {
+      delete navigator.webdriver;
+    }
+
+    expect(mocks.posthog.init).not.toHaveBeenCalled();
+    expect(mocks.posthog.capture).not.toHaveBeenCalled();
+    expect(window.posthog).toBeUndefined();
+  });
+
   it('skips recordings, but keeps events, in a browser opened with ?recording=off', async () => {
     window.history.replaceState({}, '', '/2026-11-06-phi-cle?team=PHI&recording=off');
     configureAnalytics({ key: 'phc_test', host: '/ph' });
