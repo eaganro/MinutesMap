@@ -521,8 +521,11 @@ export default function Play({
   // The chart has its period buttons in its top band (PeriodButtons); a player's detail
   // view has no chart, so it keeps this switch above it.
   const showPeriodButtons = showQuarterSwitcher && !isShowingMobilePlayerDetail;
-  // With the buttons in the top band, the grid lines start below it.
+  // With the buttons in the top band, the grid lines start below it, and the score lead
+  // and win odds stop short of it (and by as much at the bottom, so both teams keep the
+  // same scale around the middle line).
   const gridLineTop = showPeriodButtons ? 25 : 6;
+  const overlayEdgeY = showPeriodButtons ? 28 : undefined;
   const quarterSwitcher =
     showQuarterSwitcher && isShowingMobilePlayerDetail ? (
       <div className="playQuarterSwitcher">
@@ -724,6 +727,7 @@ export default function Play({
                   awayLineColor={teamColors.away}
                   homeLineColor={teamColors.home}
                   startScoreDiff={startScoreDiff}
+                  edgeY={overlayEdgeY}
                 />
 
                 <OddsGraph
@@ -734,6 +738,7 @@ export default function Play({
                   timelineWindow={timelineWindow}
                   showOdds={showOdds}
                   startOddsProb={startOddsProb}
+                  edgeY={overlayEdgeY}
                 />
 
                 {mouseLinePos !== null && (

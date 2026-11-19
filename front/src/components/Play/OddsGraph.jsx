@@ -2,15 +2,15 @@ import { useMemo } from 'react';
 import { clampWinProbability } from '../../helpers/odds';
 import { getSecondsElapsed } from '../../helpers/playTimeline';
 
-const TOP_Y = 10;
-const BOTTOM_Y = 590;
 const MID_Y = 300;
 const ODDS_LINE_STROKE_WIDTH = 0.5;
 
-const probToY = (awayWinProb) => {
+// A certain win sits edgeY from the top (away) or bottom (home), 50/50 on the middle line.
+const probToY = (awayWinProb, edgeY) => {
   const prob = clampWinProbability(awayWinProb);
   if (prob === null) return null;
-  return BOTTOM_Y - prob * (BOTTOM_Y - TOP_Y);
+  const bottomY = 2 * MID_Y - edgeY;
+  return bottomY - prob * (bottomY - edgeY);
 };
 
 export default function OddsGraph({
@@ -21,6 +21,8 @@ export default function OddsGraph({
   timelineWindow,
   showOdds,
   startOddsProb = null,
+  // Larger on phones, where the period buttons fill the top band.
+  edgeY = 10,
 }) {
   const points = useMemo(() => {
     if (!showOdds) {
@@ -58,14 +60,14 @@ export default function OddsGraph({
       const nextX = getXForEntry(entry);
 
       if (!segments.length && currentProb !== null) {
-        segments.push(`${currentX},${probToY(currentProb)}`);
+        segments.push(`${currentX},${probToY(currentProb, edgeY)}`);
       }
 
       if (currentProb !== null) {
-        segments.push(`${nextX},${probToY(currentProb)}`);
+        segments.push(`${nextX},${probToY(currentProb, edgeY)}`);
       }
 
-      segments.push(`${nextX},${probToY(nextProb)}`);
+      segments.push(`${nextX},${probToY(nextProb, edgeY)}`);
       currentX = nextX;
       currentProb = nextProb;
     });
@@ -73,14 +75,14 @@ export default function OddsGraph({
     const lineEndX = lastAction ? getXForEntry(lastAction) : leftMargin + width;
     if (currentProb !== null) {
       if (!segments.length) {
-        segments.push(`${leftMargin},${probToY(currentProb)}`);
+        segments.push(`${leftMargin},${probToY(currentProb, edgeY)}`);
       }
       const finalX = Math.max(currentX, lineEndX);
-      segments.push(`${finalX},${probToY(currentProb)}`);
+      segments.push(`${finalX},${probToY(currentProb, edgeY)}`);
     }
 
     return segments.join(' ');
-  }, [oddsTimeline, lastAction, width, leftMargin, timelineWindow, showOdds, startOddsProb]);
+  }, [oddsTimeline, lastAction, width, leftMargin, timelineWindow, showOdds, startOddsProb, edgeY]);
 
   if (!showOdds || !points) {
     return null;

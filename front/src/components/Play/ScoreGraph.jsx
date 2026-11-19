@@ -16,14 +16,18 @@ export default function ScoreGraph({
   awayLineColor,
   homeLineColor,
   startScoreDiff = 0,
+  // How far short of the top (and, for the other team, the bottom) the biggest lead
+  // stops: the period buttons' band on phones.
+  edgeY = 0,
 }) {
   const clipId = useId();
+  const leadScale = 300 - edgeY;
   const { pospoints, negpoints, edgepoints } = useMemo(() => {
     if (!showScoreDiff) {
       return EMPTY_GRAPH;
     }
 
-    let starty = (startScoreDiff * -300) / maxY;
+    let starty = (startScoreDiff * -leadScale) / maxY;
     // Initial starting point at the center line (y=300 relative to SVG height)
     let pospointsArr = [`${leftMargin},300`];
     let negpointsArr = [`${leftMargin},300`];
@@ -59,7 +63,7 @@ export default function ScoreGraph({
       let y1 = starty;
       // Calculate Y based on score differential, scaled to max lead
       // 300 is the center point of the 600px height SVG
-      let y2 = (scoreDiff * -300) / maxY;
+      let y2 = (scoreDiff * -leadScale) / maxY;
       edgepointsArr.push(`${leftMargin + x2},${300 + y1}`, `${leftMargin + x2},${300 + y2}`);
 
       // Logic to handle crossing the x-axis (lead change)
@@ -125,6 +129,7 @@ export default function ScoreGraph({
     showScoreDiff,
     timelineWindow,
     startScoreDiff,
+    leadScale,
   ]);
 
   if (!showScoreDiff) {
