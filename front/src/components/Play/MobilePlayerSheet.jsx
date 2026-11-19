@@ -10,6 +10,7 @@ import {
   isThreePointAction,
 } from '../../domain/events/classification';
 import { renderEventShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
+import TeamLogo from '../Schedule/TeamLogo';
 import StatButtons from '../StatButtons/StatButtons';
 import { buildBoxScoreColumns, computePlayerBoxScore } from './PlayExport/playExportCore';
 import { formatPeriodLabel } from './PlayExport/playExportRange';
@@ -315,6 +316,8 @@ export default function MobilePlayerSheet({
   statOn,
   onToggleStat,
   teamColor,
+  team,
+  teamName,
   showBackHint = false,
   onClose,
 }) {
@@ -387,6 +390,11 @@ export default function MobilePlayerSheet({
       data-testid="mobile-player-sheet"
     >
       <div className="mobilePlayerSheetHeader">
+        {team && (
+          <span className="mobilePlayerSheetTeam" role="img" aria-label={teamName || team}>
+            <TeamLogo team={team} size={26} />
+          </span>
+        )}
         <h2 className="mobilePlayerSheetTitle" style={teamColor ? { color: teamColor } : undefined}>
           {playerDisplayName}
         </h2>

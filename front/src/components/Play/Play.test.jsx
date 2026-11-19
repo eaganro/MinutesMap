@@ -223,6 +223,8 @@ describe('Play', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-player-sheet')).toBeInTheDocument();
+    // The player's team, by its logo beside the name.
+    expect(screen.getByRole('img', { name: 'Philadelphia 76ers' })).toBeInTheDocument();
     expect(screen.getByLabelText('Legend')).toBeInTheDocument();
     const boxScore = screen.getByLabelText('Player box score');
     expect(boxScore).toBeInTheDocument();

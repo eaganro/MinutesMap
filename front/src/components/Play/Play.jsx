@@ -481,6 +481,9 @@ export default function Play({
     () => (hasShortNames ? shortPlayerNames(Object.keys(displayHomePlayers || {})) : {}),
     [hasShortNames, displayHomePlayers],
   );
+  // The open player's team, for the logo beside their name.
+  const playerTeamNames =
+    selectedPlayerDetail?.teamKey === 'away' ? displayAwayTeamNames : displayHomeTeamNames;
   const awayTeamLabel =
     isMobilePlayerSheetEnabled && displayAwayTeamNames.abr
       ? displayAwayTeamNames.abr
@@ -697,6 +700,8 @@ export default function Play({
               statOn={statOn}
               onToggleStat={changeStatOn}
               teamColor={selectedPlayerDetail.teamColor}
+              team={playerTeamNames?.abr}
+              teamName={playerTeamNames?.name}
               showBackHint={playTips.showBackHint}
               onClose={handlePlayerDetailClose}
             />

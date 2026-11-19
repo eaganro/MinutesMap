@@ -267,6 +267,14 @@
   text-align: left;
 }
 
+// The player's team logo, just before their name.
+.mobilePlayerSheetTeam {
+  display: flex;
+  flex: none;
+  align-self: center;
+  margin-right: -4px;
+}
+
 .mobilePlayerSheetTitle {
   margin: 0;
   color: var(--text-primary);
