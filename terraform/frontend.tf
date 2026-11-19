@@ -182,6 +182,15 @@ resource "aws_cloudfront_distribution" "main" {
     origin_access_control_id = "E3V205NEY044Q6"
   }
 
+  # Origin 2b: the Data Bucket's data/ folder, so /sitemap.xml serves data/sitemap.xml,
+  # which the poller writes (search engines only accept a sitemap at the site root).
+  origin {
+    domain_name              = aws_s3_bucket.data_bucket.bucket_regional_domain_name
+    origin_id                = "DataBucketDataFolder"
+    origin_path              = "/data"
+    origin_access_control_id = "E3V205NEY044Q6"
+  }
+
   # Origin 3: PostHog ingestion
   origin {
     domain_name = "us.i.posthog.com"
@@ -250,7 +259,21 @@ resource "aws_cloudfront_distribution" "main" {
     cached_methods         = ["GET", "HEAD"]
   }
 
-  # 4. DEFAULT RULE: Serve the App from the Frontend Bucket
+  # 4. SPECIAL RULE: Serve the sitemap the poller writes to the Data Bucket
+  ordered_cache_behavior {
+    path_pattern     = "/sitemap.xml"
+    target_origin_id = "DataBucketDataFolder"
+
+    cache_policy_id          = "cff81036-bd3d-46a6-8956-eafed459cbae"
+    origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+
+    compress               = true
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+  }
+
+  # 5. DEFAULT RULE: Serve the App from the Frontend Bucket
   default_cache_behavior {
     target_origin_id = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
 

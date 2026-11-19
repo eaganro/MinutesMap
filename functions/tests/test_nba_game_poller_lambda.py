@@ -154,11 +154,38 @@ class TestNbaGamePollerLambda:
         self.module.fetch_schedule_feed = MagicMock(return_value=None)
         self.module.reconcile_schedule_date = MagicMock()
         self.module.update_team_schedule_artifacts_for_schedule_games = MagicMock()
+        self.module.refresh_sitemap = MagicMock()
 
         self.module.reconcile_season_schedule()
 
         self.module.reconcile_schedule_date.assert_not_called()
         self.module.update_team_schedule_artifacts_for_schedule_games.assert_not_called()
+        # The sitemap doesn't depend on the feed, so it still refreshes.
+        self.module.refresh_sitemap.assert_called_once_with()
+
+    def test_refresh_sitemap_lists_games_before_today(self):
+        self.module.get_nba_date = MagicMock(return_value="2026-11-19")
+        self.module.list_game_pages = MagicMock(return_value={"2026-11-18-bos-phi": "2026-11-19"})
+        self.module.upload_sitemap = MagicMock()
+
+        self.module.refresh_sitemap()
+
+        listing = self.module.list_game_pages.call_args.kwargs
+        assert listing["gamepack_prefix"] == "data/gamepack/"
+        assert listing["before_date"] == "2026-11-19"
+        upload = self.module.upload_sitemap.call_args.kwargs
+        assert upload["key"] == "data/sitemap.xml"
+        assert upload["game_pages"] == {"2026-11-18-bos-phi": "2026-11-19"}
+
+    def test_refresh_sitemap_failure_is_logged_not_raised(self, capsys):
+        self.module.get_nba_date = MagicMock(return_value="2026-11-19")
+        self.module.list_game_pages = MagicMock(side_effect=RuntimeError("AccessDenied"))
+        self.module.upload_sitemap = MagicMock()
+
+        self.module.refresh_sitemap()
+
+        self.module.upload_sitemap.assert_not_called()
+        assert "Sitemap: Failed to update: AccessDenied" in capsys.readouterr().out
 
     def test_reconcile_schedule_date_replaces_future_tbd_time_from_feed(self):
         self.module.get_games_from_s3 = MagicMock(

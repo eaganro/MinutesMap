@@ -49,6 +49,7 @@ from nba_game_poller.page_artifacts import (
     update_team_live_artifacts_for_schedule_game,
 )
 from nba_game_poller.storage import upload_json_to_s3, upload_schedule_s3, update_manifest as update_manifest
+from nba_game_poller.sitemap import list_game_pages, upload_sitemap
 
 # --- Configuration & Environment ---
 REGION = os.environ.get('AWS_REGION', 'us-east-1')
@@ -60,6 +61,7 @@ POLLER_RULE_NAME = os.environ['POLLER_RULE_NAME']
 # 2. Optional / Defaults
 PREFIX = 'data/'
 MANIFEST_KEY = f'{PREFIX}manifest.json'
+SITEMAP_KEY = f'{PREFIX}sitemap.xml'
 KICKOFF_SCHEDULE_NAME = 'NBA_Daily_Kickoff'
 RECONCILE_SCHEDULE_PREFIX = 'NBA_Reconcile_'
 RECONCILE_LEAD_MINUTES = 15
@@ -1906,7 +1908,10 @@ def reconcile_season_schedule():
     """Daily sweep of every date from tomorrow to the feed's last game, so schedule files and
     team pages hold the whole season. It picks up games the NBA adds later (NBA Cup knockout
     games and the makeup games set after group play, play-in and playoff games) and drops
-    moved or cancelled ones. The hourly reconcile still covers the next few days."""
+    moved or cancelled ones. The hourly reconcile still covers the next few days.
+
+    It also refreshes the sitemap first, so that runs daily even when the feed is down."""
+    refresh_sitemap()
     today_str = get_nba_date()
     try:
         today = datetime.strptime(today_str, "%Y-%m-%d").date()
@@ -1956,6 +1961,21 @@ def reconcile_season_schedule():
             f"{artifact_result.get('teamStatusFiles', 0)} status file(s)."
         )
         request_minutesmap_revalidation(artifact_result)
+
+def refresh_sitemap():
+    """Rewrites the sitemap with every game played before today. Never raises: a failure
+    leaves yesterday's sitemap in place until the next daily run."""
+    try:
+        game_pages = list_game_pages(
+            s3_client=s3_client,
+            bucket=BUCKET,
+            gamepack_prefix=f"{PREFIX}{GAMEPACK_PREFIX}",
+            before_date=get_nba_date(),
+        )
+        upload_sitemap(s3_client=s3_client, bucket=BUCKET, key=SITEMAP_KEY, game_pages=game_pages)
+        print(f"Sitemap: Listed {len(game_pages)} games.")
+    except Exception as exc:
+        print(f"Sitemap: Failed to update: {exc}")
 
 def reconcile_schedule_date(date_str, feed_games, team_page_sync_today=None):
     existing = get_games_from_s3(date_str)
