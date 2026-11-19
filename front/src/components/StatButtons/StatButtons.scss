@@ -28,8 +28,9 @@
   align-items: center;
   gap: 4px;
   cursor: pointer;
-  border: 1px solid var(--stat-chip-on-border);
-  background: var(--stat-chip-on-bg);
+  // On: the soft blue the lineup player filters use; off: a plain outline.
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
   color: inherit;
   font: inherit;
   padding: 2px 10px 2px 7px;
@@ -77,9 +78,8 @@
   }
 
   &.off {
-    border-color: transparent;
+    border-color: var(--control-border);
     background: transparent;
-    box-shadow: inset 0 0 0 1px var(--divider);
 
     .shapeContainer {
       opacity: 0.35;
@@ -107,6 +107,10 @@
     text-transform: capitalize;
     transition: all 0.15s ease;
     white-space: nowrap;
+  }
+
+  .labelShort {
+    display: none;
   }
 
   &.subLegend {
@@ -164,9 +168,60 @@
   background-color: var(--border-medium);
   margin: 0 6px;
   align-self: center;
+}
 
-  // Wrapped onto several lines it would dangle at the end of one.
-  @media (max-width: 700px) {
-    display: none;
+// Phones: a grid that groups the key. Made and missed shots share a row, the six plays
+// (in box score abbreviations) take one each, then a divider and the two overlays.
+@media (max-width: 700px) {
+  .statButtons {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px 4px;
+    max-width: 480px;
+    margin: 12px auto 8px;
+    padding: 0;
+  }
+
+  .buttonGroup {
+    justify-content: center;
+    min-width: 0;
+    padding: 3px 4px;
+    gap: 3px;
+
+    &.subLegend,
+    &.scoreDiff,
+    &.oddsOverlay {
+      grid-column: span 3;
+    }
+
+    &.subLegend .subLegendRow {
+      gap: 7px;
+    }
+
+    .shapeContainer {
+      width: 16px;
+      height: 16px;
+    }
+
+    .label {
+      font-size: 11.5px;
+      letter-spacing: 0.02em;
+    }
+
+    .labelFull {
+      display: none;
+    }
+
+    .labelShort {
+      display: inline;
+    }
+  }
+
+  .separator {
+    grid-column: 1 / -1;
+    width: auto;
+    height: 1px;
+    margin: 2px 0;
+    background-color: var(--divider);
   }
 }

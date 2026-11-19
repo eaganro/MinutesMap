@@ -6,6 +6,15 @@ import './StatButtons.scss';
 const STAT_HOVER_PREVIEW_DELAY_MS = 500;
 const STAT_HOLD_ISOLATE_DELAY_MS = 500;
 const EVENT_KEYS = Object.keys(EVENT_TYPES);
+// The box score's column names, which phones show instead of the full words.
+const SHORT_LABELS = {
+  rebound: 'REB',
+  assist: 'AST',
+  turnover: 'TO',
+  block: 'BLK',
+  steal: 'STL',
+  foul: 'PF',
+};
 
 export default function StatButtons({
   statOn,
@@ -17,6 +26,8 @@ export default function StatButtons({
   isLoading,
   statusMessage,
   onStatHoverChange = () => {},
+  // Off in a player's detail view, which has no Score Lead or Win Odds.
+  showOverlays = true,
 }) {
   const isInteractive = !isLoading && !statusMessage;
   const hoverPreviewTimeoutRef = useRef(null);
@@ -232,7 +243,10 @@ export default function StatButtons({
             <div className="shapeContainer">
               <LegendShape eventType={key} size={18} />
             </div>
-            <span className="label">{EVENT_TYPES[key].label}</span>
+            <span className="label">
+              <span className="labelFull">{EVENT_TYPES[key].label}</span>
+              {SHORT_LABELS[key] && <span className="labelShort">{SHORT_LABELS[key]}</span>}
+            </span>
           </>
         )}
       </button>
@@ -304,9 +318,13 @@ export default function StatButtons({
       aria-label="Play filters"
     >
       {buttons}
-      <div className="separator" aria-hidden="true" />
-      {scoreDiffButton}
-      {oddsButton}
+      {showOverlays && (
+        <>
+          <div className="separator" aria-hidden="true" />
+          {scoreDiffButton}
+          {oddsButton}
+        </>
+      )}
     </div>
   );
 }

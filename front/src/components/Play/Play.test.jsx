@@ -367,7 +367,7 @@ describe('Play', () => {
     renderPlay(buildProps({ changeStatOn }));
 
     fireEvent.click(screen.getByRole('button', { name: /open player detail for j\. embiid/i }));
-    fireEvent.click(screen.getByRole('button', { name: /2pt 3pt ft/i }));
+    fireEvent.click(within(screen.getByLabelText('Legend')).getByRole('button', { name: 'Point' }));
 
     expect(changeStatOn).toHaveBeenCalledWith(0);
   });

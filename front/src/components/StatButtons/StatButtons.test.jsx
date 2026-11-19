@@ -27,6 +27,22 @@ afterEach(() => {
 });
 
 describe('StatButtons', () => {
+  it('leaves out Score Lead and Win Odds where there are no overlays', () => {
+    renderStatButtons({ showOverlays: false });
+
+    expect(screen.getByRole('button', { name: 'Rebound' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Score Lead' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Win Odds' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the full name for screen readers alongside the box score abbreviation', () => {
+    renderStatButtons();
+
+    const reboundButton = screen.getByRole('button', { name: 'Rebound' });
+    expect(reboundButton.querySelector('.labelShort')).toHaveTextContent('REB');
+    expect(reboundButton.querySelector('.labelFull')).toHaveTextContent('Rebound');
+  });
+
   it('exposes toggles as native buttons with pressed state', () => {
     const changeStatOn = vi.fn();
     const setShowScoreDiff = vi.fn();

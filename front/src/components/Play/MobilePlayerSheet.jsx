@@ -9,7 +9,8 @@ import {
   isFreeThrowAction,
   isThreePointAction,
 } from '../../domain/events/classification';
-import { LegendShape, renderEventShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
+import { renderEventShape, renderFreeThrowRing } from '../../ui/eventShapes.jsx';
+import StatButtons from '../StatButtons/StatButtons';
 import { buildBoxScoreColumns, computePlayerBoxScore } from './PlayExport/playExportCore';
 import { formatPeriodLabel } from './PlayExport/playExportRange';
 
@@ -19,41 +20,6 @@ const FREE_THROW_ONE_OF_ONE_PATTERN = /\b(?:ft|free throw)\b\s*1\s*(?:of|\/)\s*1
 const REGULATION_PERIOD_SECONDS = getPeriodDurationSeconds(1) || 1;
 const COMPACT_LAST_NAME_MAX = 12;
 const COMPACT_LAST_NAME_KEEP = 10;
-
-const LEGEND_GROUPS = [
-  {
-    key: 'point',
-    toggleIndex: 0,
-    items: [
-      { key: '2pt-made', label: '2PT', eventType: 'point' },
-      { key: '3pt-made', label: '3PT', eventType: 'point', is3PT: true },
-      { key: 'ft-made', label: 'FT', type: 'freeThrowMade' },
-    ],
-  },
-  {
-    key: 'miss',
-    toggleIndex: 1,
-    items: [
-      { key: '2pt-miss', label: 'MISS', eventType: 'miss' },
-      { key: '3pt-miss', label: '3PT', eventType: 'miss', is3PT: true },
-      { key: 'ft-miss', label: 'FT', type: 'freeThrowMiss' },
-    ],
-  },
-  { key: 'reb', toggleIndex: 2, items: [{ key: 'reb', label: 'REB', eventType: 'rebound' }] },
-  { key: 'ast', toggleIndex: 3, items: [{ key: 'ast', label: 'AST', eventType: 'assist' }] },
-  {
-    key: 'to',
-    toggleIndex: 4,
-    items: [{ key: 'to', label: 'TO', eventType: 'turnover' }],
-  },
-  { key: 'blk', toggleIndex: 5, items: [{ key: 'blk', label: 'BLK', eventType: 'block' }] },
-  { key: 'stl', toggleIndex: 6, items: [{ key: 'stl', label: 'STL', eventType: 'steal' }] },
-  {
-    key: 'foul',
-    toggleIndex: 7,
-    items: [{ key: 'foul', label: 'FOUL', eventType: 'foul' }],
-  },
-];
 
 function filterRenderableActions(actions) {
   return (actions || []).filter((action) => {
@@ -87,70 +53,17 @@ function buildPeriodRange(selectedPeriod, numPeriods, latestStartedPeriod, isFin
   };
 }
 
-function renderLegendIcon(item) {
-  if (item.type === 'freeThrowMade' || item.type === 'freeThrowMiss') {
-    const size = 8;
-    const iconPadding = 3;
-    const iconViewSize = size + iconPadding * 2;
-    const iconCenter = iconViewSize / 2;
-
-    return (
-      <svg
-        width={iconViewSize}
-        height={iconViewSize}
-        viewBox={`0 0 ${iconViewSize} ${iconViewSize}`}
-        style={{ display: 'inline-block', verticalAlign: 'middle' }}
-        aria-hidden="true"
-      >
-        {renderFreeThrowRing({
-          cx: iconCenter,
-          cy: iconCenter,
-          size: size / 2,
-          key: item.key,
-          description: item.type === 'freeThrowMiss' ? 'MISS FT 3 of 3' : 'FT 3 of 3',
-          subType: item.type === 'freeThrowMiss' ? 'MISS FT 3 of 3' : 'FT 3 of 3',
-        })}
-      </svg>
-    );
-  }
-
-  return <LegendShape eventType={item.eventType} size={12} is3PT={item.is3PT} />;
-}
-
+// The same key and toggles as under the chart, without Score Lead and Win Odds.
 function MobilePlayerLegend({ statOn, onToggleStat }) {
   return (
     <section className="mobilePlayerSheetSection" aria-label="Legend">
-      <div className="mobilePlayerLegend">
-        {LEGEND_GROUPS.map((group) => {
-          const isOff = Array.isArray(statOn) ? statOn[group.toggleIndex] === false : false;
-          const isSubLegend = group.items.length > 1;
-          return (
-            <button
-              key={group.key}
-              type="button"
-              className={`mobilePlayerLegendGroup${isOff ? ' isOff' : ''}${isSubLegend ? ' isSubLegend' : ''}`}
-              onClick={() => onToggleStat?.(group.toggleIndex)}
-              aria-pressed={!isOff}
-            >
-              {isSubLegend ? (
-                <div className="mobilePlayerLegendSubRow">
-                  {group.items.map((item) => (
-                    <div key={item.key} className="mobilePlayerLegendSubItem">
-                      <span className="mobilePlayerLegendIcon">{renderLegendIcon(item)}</span>
-                      <span>{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <span className="mobilePlayerLegendIcon">{renderLegendIcon(group.items[0])}</span>
-                  <span>{group.items[0].label}</span>
-                </>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <StatButtons
+        statOn={statOn}
+        changeStatOn={onToggleStat}
+        isLoading={false}
+        statusMessage={null}
+        showOverlays={false}
+      />
     </section>
   );
 }
