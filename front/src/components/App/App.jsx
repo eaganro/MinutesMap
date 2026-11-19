@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMinutesMap } from '../hooks/data/useMinutesMap';
+import { useGamePageMeta } from '../hooks/schedule/useGamePageMeta';
 
 import Schedule from '../Schedule/Schedule';
 import Score from '../Score/Score';
@@ -19,6 +20,7 @@ export default function App() {
   const { scheduleVm, scoreVm, playVm, statControlsVm, boxVm, lineupsVm } = useMinutesMap();
   const [isPlayerDetailOpen, setIsPlayerDetailOpen] = useState(false);
   const [emphasizedStatIndex, setEmphasizedStatIndex] = useState(null);
+  useGamePageMeta(scheduleVm.gameId);
 
   return (
     <div className="topLevel">

@@ -228,19 +228,19 @@ describe('Schedule', () => {
     const changeGame = vi.fn();
     render(<Schedule {...buildProps({ changeGame })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /PHI 54, GSW 49/ }), { detail: 1 });
+    fireEvent.click(screen.getByRole('link', { name: /PHI 54, GSW 49/ }), { detail: 1 });
 
     expect(changeGame).not.toHaveBeenCalled();
   });
 
-  it('exposes selected games as native buttons and allows keyboard-generated activation', () => {
+  it('exposes games as links to their pages and allows keyboard-generated activation', () => {
     mocks.didDragMock.mockReturnValue(true);
     const changeGame = vi.fn();
     const { container } = render(<Schedule {...buildProps({ changeGame })} />);
-    const gameButton = screen.getByRole('button', { name: /PHI 54, GSW 49/ });
+    const gameButton = screen.getByRole('link', { name: /PHI 54, GSW 49/ });
 
-    expect(gameButton.tagName).toBe('BUTTON');
-    expect(gameButton).toHaveAttribute('aria-pressed', 'true');
+    expect(gameButton).toHaveAttribute('href', '/2026-02-03-phi-gsw');
+    expect(gameButton).toHaveAttribute('aria-current', 'page');
     expect(container.querySelectorAll('.game img[alt=""][aria-hidden="true"]')).toHaveLength(2);
 
     gameButton.focus();
@@ -250,11 +250,33 @@ describe('Schedule', () => {
     expect(changeGame).toHaveBeenCalledWith('2026-02-03-phi-gsw');
   });
 
+  it('selects a game in place on a plain click and leaves modified clicks to the browser', () => {
+    const changeGame = vi.fn();
+    render(<Schedule {...buildProps({ changeGame })} />);
+    const game = screen.getByRole('link', { name: /PHI 54, GSW 49/ });
+    // Records whether the browser would follow the link, then stops jsdom from trying.
+    const followed = [];
+    const stopNavigation = (event) => {
+      followed.push(!event.defaultPrevented);
+      event.preventDefault();
+    };
+    window.addEventListener('click', stopNavigation);
+
+    fireEvent.click(game, { ctrlKey: true });
+    fireEvent.click(game, { metaKey: true });
+    expect(changeGame).not.toHaveBeenCalled();
+    fireEvent.click(game);
+    window.removeEventListener('click', stopNavigation);
+
+    expect(followed).toEqual([true, true, false]);
+    expect(changeGame).toHaveBeenCalledWith('2026-02-03-phi-gsw');
+  });
+
   it('supports game selection and horizontal scroll controls when not dragging', () => {
     const changeGame = vi.fn();
     render(<Schedule {...buildProps({ changeGame })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /PHI 54, GSW 49/ }));
+    fireEvent.click(screen.getByRole('link', { name: /PHI 54, GSW 49/ }));
     fireEvent.click(screen.getByLabelText('Scroll games left'));
     fireEvent.click(screen.getByLabelText('Scroll games right'));
 
@@ -329,7 +351,7 @@ describe('Schedule', () => {
       />,
     );
 
-    const card = screen.getByRole('button', { name: /^TBD at TBD/ });
+    const card = screen.getByRole('link', { name: /^TBD at TBD/ });
     expect([...card.querySelectorAll('.cardAbbr')].map((abbr) => abbr.textContent)).toEqual([
       'TBD',
       'TBD',
@@ -411,7 +433,7 @@ describe('Schedule', () => {
       );
       expect(container.querySelector('.games')).toHaveClass('isLoading');
       expect(screen.queryByText('Updating games…')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /PHI 54, GSW 49/ }), { detail: 1 });
+      fireEvent.click(screen.getByRole('link', { name: /PHI 54, GSW 49/ }), { detail: 1 });
       expect(changeGame).not.toHaveBeenCalled();
 
       act(() => vi.advanceTimersByTime(500));
@@ -430,7 +452,7 @@ describe('Schedule', () => {
       );
       act(() => vi.advanceTimersByTime(0));
       expect(container.querySelector('.games')).not.toHaveClass('isLoading');
-      expect(screen.getByRole('button', { name: /PHI 118, NYK 110/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /PHI 118, NYK 110/ })).toBeInTheDocument();
       expect(mocks.resetScrollPositionMock).toHaveBeenCalledTimes(1);
     });
 
@@ -441,14 +463,14 @@ describe('Schedule', () => {
       rerender(<Schedule {...buildProps({ games: [], status: 'loading', isPending: true })} />);
       rerender(<Schedule {...buildProps({ games: nextDateGames, isPending: false })} />);
       expect(container.querySelector('.games')).toHaveClass('isLoading');
-      expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
 
       act(() => vi.advanceTimersByTime(149));
       expect(container.querySelector('.games')).toHaveClass('isLoading');
 
       act(() => vi.advanceTimersByTime(1));
       expect(container.querySelector('.games')).not.toHaveClass('isLoading');
-      expect(screen.getByRole('button', { name: /PHI 118, NYK 110/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /PHI 118, NYK 110/ })).toBeInTheDocument();
     });
 
     it('does not blur live refreshes of the same date', () => {
@@ -491,14 +513,14 @@ describe('Schedule', () => {
       expect(container.querySelector('.scheduleContent')).toHaveClass('isSwitchingView');
       expect(container.querySelector('.games')).toHaveClass('isLoading');
       expect(screen.getByLabelText(/^Select game date/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
       expect(mocks.resetScrollPositionMock).not.toHaveBeenCalled();
 
       act(() => vi.advanceTimersByTime(300));
       expect(container.querySelector('.scheduleContent')).not.toHaveClass('isSwitchingView');
       expect(container.querySelector('.games')).not.toHaveClass('isLoading');
       expect(screen.getByRole('button', { name: 'Change team, now PHI' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /vs MIL/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /vs MIL/ })).toBeInTheDocument();
       expect(screen.getByText(/^1-0/)).toBeInTheDocument();
       expect(mocks.resetScrollPositionMock).toHaveBeenCalled();
     });
@@ -513,7 +535,7 @@ describe('Schedule', () => {
       expect(container.querySelector('.scheduleContent')).toHaveClass('isSwitchingView');
       expect(screen.getByRole('button', { name: 'Change team, now PHI' })).toBeInTheDocument();
       expect(screen.getByText(/^1-0/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /vs MIL/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /vs MIL/ })).toBeInTheDocument();
 
       // A view switch keeps the longer minimum, even into the date view.
       act(() => vi.advanceTimersByTime(150));
@@ -523,7 +545,7 @@ describe('Schedule', () => {
       expect(container.querySelector('.scheduleContent')).not.toHaveClass('isSwitchingView');
       expect(container.querySelector('.games')).not.toHaveClass('isLoading');
       expect(screen.getByLabelText(/^Select game date/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /PHI 54, GSW 49/ })).toBeInTheDocument();
       expect(mocks.resetScrollPositionMock).toHaveBeenCalled();
     });
 
@@ -544,7 +566,7 @@ describe('Schedule', () => {
       expect(container.querySelector('.scheduleContent')).not.toHaveClass('isSwitchingView');
       expect(screen.queryByText(/^1-0/)).not.toBeInTheDocument();
       expect(container.querySelector('.games')).toHaveClass('isLoading');
-      fireEvent.click(screen.getByRole('button', { name: /vs MIL/ }), { detail: 1 });
+      fireEvent.click(screen.getByRole('link', { name: /vs MIL/ }), { detail: 1 });
       expect(phiMode.changeGame).not.toHaveBeenCalled();
     });
   });
@@ -650,17 +672,19 @@ describe('Schedule', () => {
       expect(screen.getByRole('region', { name: 'BOS schedule' })).toBeInTheDocument();
       expect(screen.getByText('0-1 · 2026-27')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Tue, Oct 20, at DET, L 113-121' }));
+      const detroitGame = screen.getByRole('link', { name: 'Tue, Oct 20, at DET, L 113-121' });
+      expect(detroitGame).toHaveAttribute('href', '/2026-10-20-bos-det?team=BOS');
+      fireEvent.click(detroitGame);
       expect(teamMode.changeGame).toHaveBeenCalledWith('2026-10-20-bos-det');
       expect(changeGame).not.toHaveBeenCalled();
 
       expect(
-        screen.getByRole('button', { name: 'Fri, Oct 23, vs NYK, 74-70, Q3 05:12' }),
-      ).toHaveAttribute('aria-pressed', 'true');
+        screen.getByRole('link', { name: 'Fri, Oct 23, vs NYK, 74-70, Q3 05:12' }),
+      ).toHaveAttribute('aria-current', 'page');
       expect(screen.getByLabelText('Live game')).toBeInTheDocument();
       expect(
         screen
-          .getByRole('button', { name: 'Mon, Oct 26, vs CHI, 7:30 pm ET' })
+          .getByRole('link', { name: 'Mon, Oct 26, vs CHI, 7:30 pm ET' })
           .querySelector('.statusText'),
       ).toHaveTextContent(/^7:30 pm$/);
 

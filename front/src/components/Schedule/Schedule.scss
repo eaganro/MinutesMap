@@ -386,8 +386,14 @@
           user-select: none;
         }
 
+        // Links, so each game has a URL to open or crawl; laid out like the buttons they
+        // replaced, with their content centred top to bottom.
         .game {
           flex: 0 0 auto;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          text-decoration: none;
           background-color: var(--bg-game);
           border: 0;
           border-radius: 12px;

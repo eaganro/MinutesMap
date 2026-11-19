@@ -30,6 +30,10 @@ import './Schedule.scss';
 const teamLabel = (team) => team || 'TBD';
 // Start times on the cards read "8:00 pm"; every game is in ET, and the labels keep it.
 const withoutTimeZone = (text) => text.replace(/\s+ET$/i, '');
+// The URL a game card links to, as the app shows it once the game is picked, so
+// opening the card in a new tab (or following it as a search engine) lands there.
+const gameHref = (id, team) =>
+  `/${encodeURIComponent(id)}${team ? `?team=${encodeURIComponent(team)}` : ''}`;
 
 function LiveDot() {
   return (
@@ -39,7 +43,7 @@ function LiveDot() {
   );
 }
 
-function TeamGameButton({ game, isSelected, onClick }) {
+function TeamGameLink({ game, href, isSelected, onClick }) {
   const { isLive, isUpcoming } = parseGameStatus(game.status);
   const hasScore = !isUpcoming && game.teamScore !== null && game.oppScore !== null;
   const dateText = formatShortDate(game.date, { weekday: true });
@@ -57,12 +61,13 @@ function TeamGameButton({ game, isSelected, onClick }) {
     .join(', ');
 
   return (
-    <button
-      type="button"
+    <a
+      href={href}
+      draggable={false}
       className={`game teamGame${isSelected ? ' selected' : ''}`}
       onClick={onClick}
       aria-label={label}
-      aria-pressed={isSelected}
+      aria-current={isSelected ? 'page' : undefined}
       data-game-id={game.id}
     >
       <div className="dateRow">{dateText}</div>
@@ -79,7 +84,7 @@ function TeamGameButton({ game, isSelected, onClick }) {
         </span>
         {isLive && <LiveDot />}
       </div>
-    </button>
+    </a>
   );
 }
 
@@ -224,6 +229,11 @@ export default function Schedule({
   }, [isListSwitching]);
 
   const handleGameClick = (event, id) => {
+    // A modified click opens the card's link in a new tab or window as usual.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
     if (isShowingPreviousList) return;
     // Keyboard-generated clicks have no click count and should not inherit a
     // previous pointer drag's suppression state.
@@ -238,9 +248,10 @@ export default function Schedule({
   const teamGamesList =
     shownList.mode === 'team'
       ? shownList.games.map((game) => (
-          <TeamGameButton
+          <TeamGameLink
             key={game.id}
             game={game}
+            href={gameHref(game.id, shownList.team)}
             isSelected={game.id === selectedGameId}
             onClick={(event) => handleGameClick(event, game.id)}
           />
@@ -280,14 +291,15 @@ export default function Schedule({
       </span>
     );
     return (
-      <button
-        type="button"
+      <a
+        href={gameHref(g.id)}
+        draggable={false}
         className={`${gameClassName} scoreCard${showScores ? '' : ' isScoreless'}`}
         key={g.id}
         data-game-id={g.id}
         onClick={(event) => handleGameClick(event, g.id)}
         aria-label={gameLabel}
-        aria-pressed={isSelected}
+        aria-current={isSelected ? 'page' : undefined}
       >
         <span className="cardTeams">
           {teamLine(g.awayteam, g.awayscore, awayLost)}
@@ -297,7 +309,7 @@ export default function Schedule({
           <span className="statusText">{withoutTimeZone(statusText)}</span>
           {isLive && <LiveDot />}
         </span>
-      </button>
+      </a>
     );
   });
   const gamesList = shownList.mode === 'team' ? teamGamesList : dateGamesList;

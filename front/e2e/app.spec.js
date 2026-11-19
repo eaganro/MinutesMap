@@ -261,16 +261,16 @@ test.describe('MinutesMap Smoke', () => {
     await page.getByRole('button', { name: 'Show GSW season games' }).click();
     await expect(page).toHaveURL(new RegExp(`/${SMOKE_GAME_ID}\\?team=GSW$`));
     await expect(datePickerTrigger(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Jan 15, vs PHI, L 98-102' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    await expect(page.getByRole('link', { name: 'Jan 15, vs PHI, L 98-102' })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
 
-    await page.getByRole('button', { name: 'Jan 12, at MIA, W 101-95' }).click();
+    await page.getByRole('link', { name: 'Jan 12, at MIA, W 101-95' }).click();
     await expect(page).toHaveURL(/\/2025-01-12-gsw-mia\?team=GSW$/);
-    await expect(page.getByRole('button', { name: 'Jan 12, at MIA, W 101-95' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    await expect(page.getByRole('link', { name: 'Jan 12, at MIA, W 101-95' })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
 
     await page.getByRole('button', { name: 'Show all games' }).click();
@@ -282,8 +282,8 @@ test.describe('MinutesMap Smoke', () => {
     await page.goto(`/${SMOKE_GAME_ID}`);
     await waitForAppReady(page);
 
-    const firstGame = page.getByRole('button', { name: /^PHI \d+, GSW \d+/ });
-    const secondGame = page.getByRole('button', { name: /^LAL \d+, BOS \d+/ });
+    const firstGame = page.getByRole('link', { name: /^PHI \d+, GSW \d+/ });
+    const secondGame = page.getByRole('link', { name: /^LAL \d+, BOS \d+/ });
     await expect(firstGame).toHaveClass(/selected/);
 
     await secondGame.click();
@@ -299,12 +299,12 @@ test.describe('MinutesMap Smoke', () => {
     await page.goto(`/${SMOKE_GAME_ID}`);
     await waitForAppReady(page);
 
-    const secondGame = page.getByRole('button', { name: /LAL 110, BOS 107, Final/i });
+    const secondGame = page.getByRole('link', { name: /LAL 110, BOS 107, Final/i });
     await secondGame.focus();
     await expect(secondGame).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(new RegExp(`/${ALT_SMOKE_GAME_ID}$`));
-    await expect(secondGame).toHaveAttribute('aria-pressed', 'true');
+    await expect(secondGame).toHaveAttribute('aria-current', 'page');
 
     const pointToggle = page.getByRole('button', { name: 'Point' });
     const missToggle = page.getByRole('button', { name: 'Miss' });
