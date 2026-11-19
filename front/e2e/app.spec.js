@@ -282,8 +282,8 @@ test.describe('MinutesMap Smoke', () => {
     await page.goto(`/${SMOKE_GAME_ID}`);
     await waitForAppReady(page);
 
-    const firstGame = page.locator('.games .game', { hasText: 'PHI - GSW' });
-    const secondGame = page.locator('.games .game', { hasText: 'LAL - BOS' });
+    const firstGame = page.getByRole('button', { name: /^PHI \d+, GSW \d+/ });
+    const secondGame = page.getByRole('button', { name: /^LAL \d+, BOS \d+/ });
     await expect(firstGame).toHaveClass(/selected/);
 
     await secondGame.click();
@@ -321,7 +321,10 @@ test.describe('MinutesMap Smoke', () => {
     await expect(missToggle).toHaveAttribute('aria-pressed', 'true');
 
     const datePicker = datePickerTrigger(page);
-    const nextDateButton = page.getByRole('button', { name: 'Next date' });
+    // The day after, in the strip of days around the picked one.
+    const nextDateButton = page
+      .getByRole('group', { name: 'Day' })
+      .getByRole('button', { name: /^Thu, Jan 16/ });
     await nextDateButton.focus();
     await page.keyboard.press('Enter');
     await expect(datePicker).toHaveAttribute('data-date', '2025-01-16');
