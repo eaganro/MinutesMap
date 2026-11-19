@@ -392,6 +392,16 @@ button.lineupsPill:focus-visible {
     min-width: 0;
     padding: 2px 4px;
   }
+
+  // The "Selected total" label takes its own line, so the picked names below it
+  // get the same width as in the lineup rows.
+  .lineupsRowSummary .lineupsPlayers {
+    row-gap: 4px;
+  }
+
+  .lineupsSummaryLabel {
+    flex: 0 0 100%;
+  }
 }
 
 @media (max-width: 920px) {
