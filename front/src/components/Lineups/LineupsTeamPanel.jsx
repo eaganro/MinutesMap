@@ -159,7 +159,9 @@ export default function LineupsTeamPanel({
             {summary && (
               <div className="lineupsRow lineupsRowSummary">
                 <div className="lineupsPlayers">
-                  <span className="lineupsSummaryLabel">Selected total</span>
+                  <span className="lineupsSummaryLabel">
+                    {isCompact ? 'Total' : 'Selected total'}
+                  </span>
                   <span className="lineupsNames">
                     {selectedPlayers.map((player) => (
                       <button

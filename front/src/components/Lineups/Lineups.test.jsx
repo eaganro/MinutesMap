@@ -170,6 +170,15 @@ describe('Lineups', () => {
       }
     });
 
+    it('labels the picked players\' row "Total"', () => {
+      renderLineups();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Away Player 1A' }));
+
+      expect(screen.getByText('Total')).toBeInTheDocument();
+      expect(screen.queryByText('Selected total')).not.toBeInTheDocument();
+    });
+
     it('shows one team at a time with filters behind a toggle', () => {
       renderLineups();
 
