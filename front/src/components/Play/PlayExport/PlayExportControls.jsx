@@ -1,9 +1,13 @@
 import { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { usePlayExportController } from './usePlayExportController';
 import PlayExportTips from './PlayExportTips';
 import { usePlayExportTips } from './usePlayExportTips';
 
+// The share button renders into `buttonContainer` (the bottom-right of the chart card),
+// and only once there is one; the preview and errors float over the page.
 export default function PlayExportControls({
+  buttonContainer,
   playRef,
   gameId,
   gameStatus,
@@ -17,7 +21,6 @@ export default function PlayExportControls({
   const wasPreviewOpenRef = useRef(false);
   const captionTextareaId = useId();
   const hasDisplayData = exportData.hasDisplayData;
-  const isOvertimeGame = Number(exportData?.numPeriods) > 4;
 
   const {
     isExporting,
@@ -133,37 +136,38 @@ export default function PlayExportControls({
 
   return (
     <>
-      {hasDisplayData && (
-        <button
-          ref={exportTriggerRef}
-          type="button"
-          className={`playExportButton${isOvertimeGame ? ' isIconOnlyDesktop' : ''}`}
-          onClick={handleExportImage}
-          disabled={exportDisabled}
-          aria-label={isExporting ? 'Preparing share image' : 'Share image'}
-          title={isExporting ? 'Preparing share image...' : 'Share image'}
-        >
-          <svg
-            className="playExportButtonIcon"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+      {hasDisplayData &&
+        buttonContainer &&
+        createPortal(
+          <button
+            ref={exportTriggerRef}
+            type="button"
+            className="playExportButton"
+            onClick={handleExportImage}
+            disabled={exportDisabled}
+            aria-label={isExporting ? 'Preparing share image' : 'Share image'}
+            title={isExporting ? 'Preparing share image...' : 'Share image'}
           >
-            <path d="M12 3v12" />
-            <path d="M8 7l4-4 4 4" />
-            <path d="M4 14v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6" />
-          </svg>
-          <span className="playExportButtonLabel">
-            {isExporting ? 'Preparing...' : 'Share Image'}
-          </span>
-        </button>
-      )}
+            <svg
+              className="playExportButtonIcon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3v12" />
+              <path d="M8 7l4-4 4 4" />
+              <path d="M4 14v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6" />
+            </svg>
+            <span className="playExportButtonLabel">{isExporting ? 'Preparing...' : 'Share'}</span>
+          </button>,
+          buttonContainer,
+        )}
 
       {exportError && (
         <div className="playExportError" role="status" aria-live="polite">

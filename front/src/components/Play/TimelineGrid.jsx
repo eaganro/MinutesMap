@@ -18,6 +18,10 @@ export default function TimelineGrid({
   // Without a name column the first period label can sit on the team name, so labels
   // stay to the right of this x.
   labelMinX = 0,
+  // Off when the period buttons sit in the top band instead (phones); the separators
+  // then start below them, at lineTop.
+  showPeriodLabels = true,
+  lineTop = 6,
 }) {
   const clearLabelX = (x) => Math.max(x, labelMinX + PERIOD_LABEL_HALF_WIDTH);
   const totalPeriods = Number.isFinite(Number(numQs)) && Number(numQs) > 0 ? Number(numQs) : 4;
@@ -54,7 +58,7 @@ export default function TimelineGrid({
         <line
           key={`q${period - 1}`}
           x1={x}
-          y1={6}
+          y1={lineTop}
           x2={x}
           y2={594}
           className="playGridPeriodLine"
@@ -62,6 +66,7 @@ export default function TimelineGrid({
       );
     }
 
+    if (!showPeriodLabels) continue;
     const labelStart = toX(visibleStart);
     const labelEnd = toX(visibleEnd);
     const label = isQuarterView ? activePeriodLabel : getPeriodLabel(period);

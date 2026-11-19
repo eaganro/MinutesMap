@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { resolveFullNameFromRoster } from './PlayExport/playExportModel';
 import MobilePlayerSheet from './MobilePlayerSheet';
+import PeriodButtons from './PeriodButtons';
+import { useShareButtonSlot } from './PlayExport/ShareButtonSlot';
 import CircularProgress from '@mui/material/CircularProgress';
 import OddsGraph from './OddsGraph';
 import PlayExportControls from './PlayExport/PlayExportControls';
@@ -98,6 +100,9 @@ export default function Play({
   });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [playerDetailPeriod, setPlayerDetailPeriod] = useState(0);
+  const [shareButtonSlot] = useShareButtonSlot();
+  // A player's detail view hides the legend (and the share slot in it), so it has its own.
+  const [detailShareSlot, setDetailShareSlot] = useState(null);
   const chartInstructionsId = useId();
   const chartAnnouncementId = useId();
 
@@ -504,29 +509,37 @@ export default function Play({
     clearSelectedPlayer();
   };
 
-  const quarterSwitcher = showQuarterSwitcher ? (
-    <div className="playQuarterSwitcher" style={{ width: sectionWidth }}>
-      {periodOptions.map(({ period, label }) => (
-        <button
-          key={period}
-          type="button"
-          className={`quarterTab ${period === controlActivePeriod ? 'isActive' : ''}`}
-          onClick={() => {
-            trackQuarterSelect({ period: label });
-            if (isShowingMobilePlayerDetail) {
-              setPlayerDetailPeriod(period);
-              return;
-            }
-            selectPeriod(period);
-          }}
-          disabled={isDataLoading || (period !== 0 && period > latestStartedPeriod)}
-          aria-pressed={period === controlActivePeriod}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  ) : null;
+  const handlePeriodSelect = (period, label) => {
+    trackQuarterSelect({ period: label });
+    if (isShowingMobilePlayerDetail) {
+      setPlayerDetailPeriod(period);
+      return;
+    }
+    selectPeriod(period);
+  };
+
+  // The chart has its period buttons in its top band (PeriodButtons); a player's detail
+  // view has no chart, so it keeps this switch above it.
+  const showPeriodButtons = showQuarterSwitcher && !isShowingMobilePlayerDetail;
+  // With the buttons in the top band, the grid lines start below it.
+  const gridLineTop = showPeriodButtons ? 25 : 6;
+  const quarterSwitcher =
+    showQuarterSwitcher && isShowingMobilePlayerDetail ? (
+      <div className="playQuarterSwitcher">
+        {periodOptions.map(({ period, label }) => (
+          <button
+            key={period}
+            type="button"
+            className={`quarterTab ${period === controlActivePeriod ? 'isActive' : ''}`}
+            onClick={() => handlePeriodSelect(period, label)}
+            disabled={isDataLoading || (period !== 0 && period > latestStartedPeriod)}
+            aria-pressed={period === controlActivePeriod}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    ) : null;
 
   if (showLoadingIndicator) {
     return (
@@ -561,6 +574,7 @@ export default function Play({
     <div className="playWrapper">
       {quarterSwitcher}
       <PlayExportControls
+        buttonContainer={isShowingMobilePlayerDetail ? detailShareSlot : shareButtonSlot}
         playRef={playRef}
         gameId={gameId}
         gameStatus={gameStatus}
@@ -693,6 +707,8 @@ export default function Play({
                   isQuarterView={isQuarterFocus}
                   activePeriodLabel={activePeriodLabel}
                   labelMinX={periodLabelMinX}
+                  showPeriodLabels={!showPeriodButtons}
+                  lineTop={gridLineTop}
                 />
 
                 <ScoreGraph
@@ -723,13 +739,27 @@ export default function Play({
                 {mouseLinePos !== null && (
                   <line
                     x1={mouseLinePos}
-                    y1={6}
+                    y1={gridLineTop}
                     x2={mouseLinePos}
                     y2={594}
                     className="playCursorLine"
                   />
                 )}
               </svg>
+
+              {showPeriodButtons && (
+                <PeriodButtons
+                  activePeriod={activePeriod}
+                  periodOptions={periodOptions}
+                  timelineWindow={timelineWindow}
+                  leftMargin={leftMargin}
+                  width={width}
+                  minX={awayTeamNameRight ? awayTeamNameRight + 6 : 0}
+                  latestStartedPeriod={latestStartedPeriod}
+                  disabled={isDataLoading}
+                  onSelect={handlePeriodSelect}
+                />
+              )}
 
               <div className="teamName away" ref={awayTeamNameRef}>
                 <span className="teamNameSwatch" style={{ background: teamColors.away }} />
@@ -796,6 +826,7 @@ export default function Play({
           )}
         </div>
       </div>
+      {isShowingMobilePlayerDetail && <div className="playShareRow" ref={setDetailShareSlot} />}
     </div>
   );
 }

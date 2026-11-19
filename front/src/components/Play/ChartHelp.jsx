@@ -8,9 +8,9 @@ import './ChartHelp.scss';
 
 /**
  * "How to read this chart", under the stat legend: closed until asked for, and still there
- * after the first-visit tips are done or skipped.
+ * after the first-visit tips are done or skipped. `action` sits at the right of its row.
  */
-export default function ChartHelp({ sectionWidth }) {
+export default function ChartHelp({ sectionWidth, action = null }) {
   const [isOpen, setIsOpen] = useState(false);
   const panelId = useId();
   const isFinePointer = useMediaQuery('(hover: hover) and (pointer: fine)');
@@ -26,17 +26,20 @@ export default function ChartHelp({ sectionWidth }) {
 
   return (
     <div className="chartHelp">
-      <button
-        type="button"
-        className={`chartHelpToggle${isOpen ? ' isOpen' : ''}`}
-        onClick={toggle}
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-      >
-        <HelpOutline className="chartHelpIcon" aria-hidden="true" />
-        How to read this chart
-        <ExpandMore className="chartHelpChevron" aria-hidden="true" />
-      </button>
+      <div className="chartHelpRow">
+        <button
+          type="button"
+          className={`chartHelpToggle${isOpen ? ' isOpen' : ''}`}
+          onClick={toggle}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+        >
+          <HelpOutline className="chartHelpIcon" aria-hidden="true" />
+          How to read this chart
+          <ExpandMore className="chartHelpChevron" aria-hidden="true" />
+        </button>
+        {action && <div className="chartHelpAction">{action}</div>}
+      </div>
       <div id={panelId} className="chartHelpPanel" hidden={!isOpen}>
         <ul>
           <li>
@@ -63,8 +66,8 @@ export default function ChartHelp({ sectionWidth }) {
           )}
           {isCompact && (
             <li>
-              <strong>Game, Q1, Q2…</strong> above the chart switch between the whole game and one
-              quarter.
+              {isFinePointer ? 'Click' : 'Tap'} <strong>Q1, Q2…</strong> at the top of the chart to
+              see one quarter, and <strong>Game</strong> to see the whole game again.
             </li>
           )}
           <li>

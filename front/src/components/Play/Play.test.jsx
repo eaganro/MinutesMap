@@ -206,12 +206,18 @@ afterEach(() => {
   window.history.replaceState({}, '', '/');
 });
 
+// The chart's whole-game view has a button over each quarter and none for Game.
+const expectWholeGameView = () => {
+  expect(screen.queryByRole('button', { name: 'Game' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'false');
+};
+
 describe('Play', () => {
   it('opens a mobile player sheet from the player name and closes it', () => {
     renderPlay(buildProps());
 
     // Phones open on the whole game; pick a quarter so closing the sheet has one to restore.
-    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true');
+    expectWholeGameView();
     fireEvent.click(screen.getByRole('button', { name: 'Q1' }));
     fireEvent.click(screen.getByRole('button', { name: /open player detail for j\. embiid/i }));
 
@@ -251,6 +257,18 @@ describe('Play', () => {
 
     expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('switches between the whole game and a quarter from the top of the chart', () => {
+    renderPlay(buildProps());
+    expectWholeGameView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Q1' }));
+    expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Game' }));
+    expectWholeGameView();
   });
 
   it('highlights the Back button the first time a player sheet opens, until its pulse ends', () => {
@@ -293,7 +311,7 @@ describe('Play', () => {
     // Back returns to the chart, on the shared period, rather than leaving the site.
     fireEvent.click(screen.getByRole('button', { name: /close joel embiid detail view/i }));
     expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true');
+    expectWholeGameView();
     delete window.posthog;
   });
 
@@ -301,7 +319,7 @@ describe('Play', () => {
     window.history.replaceState({}, '', '/2026-03-11-phi-gsw?q=3');
     renderPlay(buildProps());
 
-    expect(screen.getByRole('button', { name: 'Game' })).toHaveAttribute('aria-pressed', 'true');
+    expectWholeGameView();
     expect(window.location.search).toBe('');
   });
 
@@ -383,10 +401,13 @@ describe('Play', () => {
     };
     const periodLabels = (container) =>
       [...container.querySelectorAll('.playGridPeriodLabel')].map((label) => label.textContent);
+    // An upright phone labels its periods with buttons at the top of the chart.
+    const periodButtons = (container) =>
+      [...container.querySelectorAll('.playPeriodButton')].map((button) => button.textContent);
 
     const phone = renderPlay(buildProps(liveInQ2));
-    fireEvent.click(screen.getByRole('button', { name: 'Game' }));
-    expect(periodLabels(phone.container)).toEqual(['Q1', 'Q2']);
+    expect(periodButtons(phone.container)).toEqual(['Q1', 'Q2']);
+    expect(periodLabels(phone.container)).toEqual([]);
     cleanup();
 
     // A phone turned sideways has no Game tab, but its chart ends where play is too.
@@ -430,10 +451,8 @@ describe('Play', () => {
         }),
       }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Game' }));
-
     expect(
-      [...container.querySelectorAll('.playGridPeriodLabel')].map((label) => label.textContent),
+      [...container.querySelectorAll('.playPeriodButton')].map((button) => button.textContent),
     ).toEqual(['Q1', 'Q2', 'Q3', 'Q4']);
   });
 

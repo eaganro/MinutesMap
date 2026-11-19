@@ -133,15 +133,18 @@
 }
 
 // Phones: the chart runs nearly to the card's edges to give the game more width. The
-// legend below keeps the usual inset, and so does a player's detail view.
+// legend below and the period switch above keep the usual inset (by
+// --play-section-bleed, how far the section reaches past the card padding), and so
+// does a player's detail view.
 $play-section-compact-inset: 3px;
 
 @media (max-width: 700px) {
   .playByPlaySection:not(.isPlayerDetailOpen) {
+    --play-section-bleed: calc(var(--layout-card-padding) - #{$play-section-compact-inset});
     padding-inline: $play-section-compact-inset;
 
     .playLegend {
-      padding-inline: calc(var(--layout-card-padding) - #{$play-section-compact-inset});
+      padding-inline: var(--play-section-bleed);
     }
   }
 }

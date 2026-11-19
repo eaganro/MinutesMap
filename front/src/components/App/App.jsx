@@ -10,6 +10,7 @@ import StatButtons from '../StatButtons/StatButtons';
 import ChartHelp from '../Play/ChartHelp';
 import DarkModeToggle from '../DarkModeToggle/DarkModeToggle';
 import Footer from '../Footer/Footer';
+import { ShareButtonSlot, ShareButtonSlotProvider } from '../Play/PlayExport/ShareButtonSlot';
 import { TeamChoiceProvider } from '../TeamTabs/TeamTabs';
 
 import './App.scss';
@@ -103,38 +104,43 @@ export default function App() {
           className={`playByPlaySection${isPlayerDetailOpen ? ' isPlayerDetailOpen' : ''}`}
           ref={playVm.playByPlaySectionRef}
         >
-          <Play
-            gameId={playVm.gameId}
-            nbaGameId={playVm.nbaGameId}
-            gameStatus={playVm.gameStatus}
-            box={playVm.box}
-            playData={playVm.playData}
-            sectionWidth={playVm.playByPlaySectionWidth}
-            isLoading={playVm.isLoading}
-            statusMessage={playVm.statusMessage}
-            showScoreDiff={playVm.showScoreDiff}
-            showOdds={playVm.showOdds}
-            statOn={playVm.statOn}
-            changeStatOn={statControlsVm.changeStatOn}
-            emphasizedStatIndex={emphasizedStatIndex}
-            onPlayerDetailModeChange={setIsPlayerDetailOpen}
-          />
-          {!isPlayerDetailOpen && (
-            <div className="playLegend">
-              <StatButtons
-                statOn={statControlsVm.statOn}
-                changeStatOn={statControlsVm.changeStatOn}
-                showScoreDiff={statControlsVm.showScoreDiff}
-                setShowScoreDiff={statControlsVm.setShowScoreDiff}
-                showOdds={statControlsVm.showOdds}
-                setShowOdds={statControlsVm.setShowOdds}
-                isLoading={statControlsVm.isLoading}
-                statusMessage={statControlsVm.statusMessage}
-                onStatHoverChange={setEmphasizedStatIndex}
-              />
-              <ChartHelp sectionWidth={playVm.playByPlaySectionWidth} />
-            </div>
-          )}
+          <ShareButtonSlotProvider>
+            <Play
+              gameId={playVm.gameId}
+              nbaGameId={playVm.nbaGameId}
+              gameStatus={playVm.gameStatus}
+              box={playVm.box}
+              playData={playVm.playData}
+              sectionWidth={playVm.playByPlaySectionWidth}
+              isLoading={playVm.isLoading}
+              statusMessage={playVm.statusMessage}
+              showScoreDiff={playVm.showScoreDiff}
+              showOdds={playVm.showOdds}
+              statOn={playVm.statOn}
+              changeStatOn={statControlsVm.changeStatOn}
+              emphasizedStatIndex={emphasizedStatIndex}
+              onPlayerDetailModeChange={setIsPlayerDetailOpen}
+            />
+            {!isPlayerDetailOpen && (
+              <div className="playLegend">
+                <StatButtons
+                  statOn={statControlsVm.statOn}
+                  changeStatOn={statControlsVm.changeStatOn}
+                  showScoreDiff={statControlsVm.showScoreDiff}
+                  setShowScoreDiff={statControlsVm.setShowScoreDiff}
+                  showOdds={statControlsVm.showOdds}
+                  setShowOdds={statControlsVm.setShowOdds}
+                  isLoading={statControlsVm.isLoading}
+                  statusMessage={statControlsVm.statusMessage}
+                  onStatHoverChange={setEmphasizedStatIndex}
+                />
+                <ChartHelp
+                  sectionWidth={playVm.playByPlaySectionWidth}
+                  action={<ShareButtonSlot className="playShareSlot" />}
+                />
+              </div>
+            )}
+          </ShareButtonSlotProvider>
         </div>
 
         {/* Picking a team in the box score or lineups switches both. */}

@@ -40,7 +40,7 @@ describe('ChartHelp', () => {
     expect(panel).toBeVisible();
     expect(screen.getByText('Drag')).toBeInTheDocument();
     expect(screen.getByText('Tap a name')).toBeInTheDocument();
-    expect(screen.getByText('Game, Q1, Q2…')).toBeInTheDocument();
+    expect(screen.getByText('Q1, Q2…')).toBeInTheDocument();
     expect(screen.queryByText('Hover')).not.toBeInTheDocument();
 
     fireEvent.click(toggle);
@@ -55,7 +55,7 @@ describe('ChartHelp', () => {
     expect(screen.getByText('Hover')).toBeInTheDocument();
     expect(screen.queryByText('Drag')).not.toBeInTheDocument();
     expect(screen.queryByText(/a name/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Game, Q1, Q2…')).not.toBeInTheDocument();
+    expect(screen.queryByText('Q1, Q2…')).not.toBeInTheDocument();
   });
 
   it('records the first opening only', () => {

@@ -22,30 +22,28 @@
   outline-offset: 2px;
 }
 
+// A player's detail view: the same switch as the box score and lineups team tabs, across
+// the card. (The chart itself has PeriodButtons in its top band instead.)
 .playQuarterSwitcher {
+  align-self: stretch;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-  margin: 2px auto 6px;
+  gap: 2px;
+  padding: 3px;
+  margin: 2px var(--play-section-bleed, 0px) 6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
   box-sizing: border-box;
-
-  @media (max-width: 700px) {
-    padding-right: 44px;
-  }
 }
 
+// Bottom right of the chart card, in the "How to read this chart" row.
 .playExportButton {
-  position: absolute;
-  top: var(--layout-card-padding);
-  right: var(--layout-card-padding);
-  z-index: 3;
+  gap: 6px;
   border: 1px solid var(--control-border);
   background: var(--control-bg);
   color: var(--text-secondary);
   border-radius: 999px;
-  min-height: 32px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 0 12px 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -77,29 +75,15 @@
 }
 
 .playExportButtonIcon {
-  display: none;
   flex-shrink: 0;
 }
 
-.playExportButtonLabel {
-  display: inline;
-}
-
-@media (min-width: 701px) {
-  .playExportButton.isIconOnlyDesktop {
-    width: 34px;
-    min-height: 34px;
-    height: 34px;
-    padding: 0;
-  }
-
-  .playExportButton.isIconOnlyDesktop .playExportButtonIcon {
-    display: block;
-  }
-
-  .playExportButton.isIconOnlyDesktop .playExportButtonLabel {
-    display: none;
-  }
+// A player's detail view has no legend, so the share button goes under the detail card.
+.playShareRow {
+  align-self: stretch;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
 .playExportPreview {
@@ -583,21 +567,6 @@
 }
 
 @media (max-width: 700px) {
-  .playExportButton {
-    width: 34px;
-    min-height: 34px;
-    height: 34px;
-    padding: 0;
-  }
-
-  .playExportButtonIcon {
-    display: block;
-  }
-
-  .playExportButtonLabel {
-    display: none;
-  }
-
   .playExportPreview {
     left: 12px;
     right: 12px;
@@ -613,34 +582,29 @@
   }
 }
 
-// With the period tabs above it, the chart doesn't need its own top gap.
-.playQuarterSwitcher ~ .play {
-  margin-top: 8px;
-}
-
+// Equal widths while they fit; a long label (Game, 2OT) keeps its width when they don't.
 .playQuarterSwitcher .quarterTab {
-  min-width: 44px;
-  border: 1px solid var(--control-border);
-  background: var(--control-bg);
+  flex: 1 1 0;
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
   border-radius: 999px;
-  padding: 7px 12px;
+  padding: 6px 4px;
   font: inherit;
-  font-size: 0.74rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  line-height: 20px;
+  white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
 }
 
 .playQuarterSwitcher .quarterTab.isActive {
-  background: var(--text-primary);
-  border-color: var(--text-primary);
-  color: var(--bg-card);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow:
+    0 0 0 1px var(--control-border),
+    0 1px 2px rgba(16, 24, 40, 0.08);
 }
 
 .playQuarterSwitcher .quarterTab:disabled {
@@ -650,14 +614,67 @@
 
 .playQuarterSwitcher .quarterTab:focus-visible {
   outline: 2px solid var(--focus-ring-color);
-  outline-offset: 2px;
+  outline-offset: -2px;
+}
+
+// The chart's period buttons, in its 25px top band beside the team name (phones).
+.playPeriodButtons {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 25px;
+  z-index: 1;
+}
+
+.playPeriodButton {
+  position: absolute;
+  top: 3px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  // A taller tap area than the button shows.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
+  }
+
+  &.isActive {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow:
+      0 0 0 1px var(--control-border),
+      0 1px 2px rgba(16, 24, 40, 0.08);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 1px;
+  }
 }
 
 .play {
   position: relative; // so locked tooltip (absolute) is anchored to this container
   margin: auto;
-  // Clears the share button, which sits over the card's top-right corner.
-  margin-top: 28px;
+  margin-top: 8px;
   background-color: var(--bg-play);
   // touch-action: none;
   touch-action: pan-y;

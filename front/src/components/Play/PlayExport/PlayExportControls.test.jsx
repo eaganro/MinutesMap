@@ -51,6 +51,7 @@ afterEach(() => {
 const renderControls = () =>
   render(
     <PlayExportControls
+      buttonContainer={document.body}
       playRef={createRef()}
       gameId="game-1"
       gameStatus="Final"
@@ -74,6 +75,7 @@ describe('PlayExportControls accessibility', () => {
     });
     rerender(
       <PlayExportControls
+        buttonContainer={document.body}
         playRef={createRef()}
         gameId="game-1"
         gameStatus="Final"
@@ -101,6 +103,7 @@ describe('PlayExportControls accessibility', () => {
     mocks.controller = buildController();
     rerender(
       <PlayExportControls
+        buttonContainer={document.body}
         playRef={createRef()}
         gameId="game-1"
         gameStatus="Final"
