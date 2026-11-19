@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Schedule from './Schedule';
 
@@ -90,18 +90,36 @@ describe('Schedule', () => {
 
   it('uses value-based date changes and date navigation controls', () => {
     render(<Schedule {...buildProps()} />);
+    const days = within(screen.getByRole('group', { name: 'Day' }));
 
-    expect(screen.getByText(/^Tue, Feb 3/)).toBeInTheDocument();
+    // The picked day sits in the middle of five.
+    expect(days.getAllByRole('button').map((day) => day.getAttribute('aria-label'))).toEqual([
+      expect.stringMatching(/^Sun, Feb 1/),
+      expect.stringMatching(/^Mon, Feb 2/),
+      expect.stringMatching(/^Tue, Feb 3/),
+      expect.stringMatching(/^Wed, Feb 4/),
+      expect.stringMatching(/^Thu, Feb 5/),
+    ]);
+    expect(days.getByRole('button', { name: /^Tue, Feb 3/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
     fireEvent.click(screen.getByRole('button', { name: /^Select game date/ }));
-    fireEvent.click(screen.getByRole('button', { name: /^Wed, Feb 4/ }));
-    expect(mocks.handleDateChangeMock).toHaveBeenCalledWith('2026-02-04');
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: /^Fri, Feb 6/ }),
+    );
+    expect(mocks.handleDateChangeMock).toHaveBeenCalledWith('2026-02-06');
     expect(screen.queryByRole('dialog', { name: 'Choose a date' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Previous date'));
-    fireEvent.click(screen.getByLabelText('Next date'));
+    fireEvent.click(days.getByRole('button', { name: /^Mon, Feb 2/ }));
+    fireEvent.click(days.getByRole('button', { name: /^Thu, Feb 5/ }));
+    fireEvent.click(days.getByRole('button', { name: /^Tue, Feb 3/ }));
 
     expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(1, -1);
-    expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(2, 1);
+    expect(mocks.shiftDateMock).toHaveBeenNthCalledWith(2, 2);
+    // The picked day itself does nothing.
+    expect(mocks.shiftDateMock).toHaveBeenCalledTimes(2);
     // Scrolling back to the start waits for the new date's games.
     expect(mocks.resetScrollPositionMock).not.toHaveBeenCalled();
   });
@@ -115,7 +133,8 @@ describe('Schedule', () => {
       fireEvent.click(trigger);
       expect(trigger).toHaveAttribute('aria-expanded', 'true');
       expect(screen.getByText('February 2026')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Tue, Feb 3/ })).toHaveFocus();
+      const calendar = () => within(screen.getByRole('dialog'));
+      expect(calendar().getByRole('button', { name: /^Tue, Feb 3/ })).toHaveFocus();
 
       fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
       fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
@@ -123,7 +142,7 @@ describe('Schedule', () => {
       expect(mocks.handleDateChangeMock).not.toHaveBeenCalled();
       expect(screen.getByRole('dialog', { name: 'Choose a date' })).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: /^Thu, Dec 25/ }));
+      fireEvent.click(calendar().getByRole('button', { name: /^Thu, Dec 25/ }));
       expect(mocks.handleDateChangeMock).toHaveBeenCalledWith('2025-12-25');
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -142,9 +161,65 @@ describe('Schedule', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
       fireEvent.click(trigger);
-      fireEvent.click(screen.getByRole('button', { name: /^Tue, Feb 3/ }));
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: /^Tue, Feb 3/ }),
+      );
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(mocks.handleDateChangeMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('keeping the picked game in view', () => {
+    const originalRect = HTMLElement.prototype.getBoundingClientRect;
+    const originalScrollTo = HTMLElement.prototype.scrollTo;
+    const dayOfGames = ['phi-gsw', 'nyk-bos', 'mia-chi', 'lal-den', 'sas-dal'].map((teams, i) => ({
+      id: `2026-02-03-${teams}`,
+      status: 'Final',
+      awayteam: teams.slice(0, 3).toUpperCase(),
+      hometeam: teams.slice(4).toUpperCase(),
+      awayscore: 100 + i,
+      homescore: 90 + i,
+    }));
+
+    // A 360px strip of 96px cards, 6px apart: the fourth card runs past the edge.
+    const layOutStrip = () => {
+      HTMLElement.prototype.getBoundingClientRect = function getRect() {
+        if (this.classList?.contains('games')) {
+          return { left: 0, right: 360, width: 360, top: 0, bottom: 56, height: 56 };
+        }
+        if (this.dataset?.gameId) {
+          const left = [...this.parentElement.children].indexOf(this) * 102;
+          return { left, right: left + 96, width: 96, top: 0, bottom: 50, height: 50 };
+        }
+        return originalRect.call(this);
+      };
+      const scrollTo = vi.fn();
+      HTMLElement.prototype.scrollTo = scrollTo;
+      return scrollTo;
+    };
+
+    afterEach(() => {
+      HTMLElement.prototype.getBoundingClientRect = originalRect;
+      HTMLElement.prototype.scrollTo = originalScrollTo;
+    });
+
+    it("scrolls a day's games to a linked game that would start off screen", () => {
+      const scrollTo = layOutStrip();
+      render(
+        <Schedule {...buildProps({ games: dayOfGames, selectedGameId: '2026-02-03-lal-den' })} />,
+      );
+
+      // Centred: the card's left (306) less half the strip's spare room ((360 - 96) / 2).
+      expect(scrollTo).toHaveBeenCalledWith({ left: 174, behavior: 'auto' });
+    });
+
+    it('leaves the day alone when the picked game is already on screen', () => {
+      const scrollTo = layOutStrip();
+      render(
+        <Schedule {...buildProps({ games: dayOfGames, selectedGameId: '2026-02-03-nyk-bos' })} />,
+      );
+
+      expect(scrollTo).not.toHaveBeenCalled();
     });
   });
 
@@ -254,7 +329,15 @@ describe('Schedule', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: /^TBD at TBD/ })).toHaveTextContent('TBD - TBD');
+    const card = screen.getByRole('button', { name: /^TBD at TBD/ });
+    expect([...card.querySelectorAll('.cardAbbr')].map((abbr) => abbr.textContent)).toEqual([
+      'TBD',
+      'TBD',
+    ]);
+    // No score before the game, just its start time (every game is ET, so the card drops it).
+    expect(card.querySelectorAll('.cardScore')).toHaveLength(0);
+    expect(card).toHaveClass('isScoreless');
+    expect(card.querySelector('.statusText')).toHaveTextContent(/^8:30 pm$/);
   });
 
   it('shows schedule errors with a retry action instead of an empty-schedule message', () => {
@@ -576,8 +659,10 @@ describe('Schedule', () => {
       ).toHaveAttribute('aria-pressed', 'true');
       expect(screen.getByLabelText('Live game')).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: /^Mon, Oct 26, vs CHI, 7:30/ }),
-      ).toBeInTheDocument();
+        screen
+          .getByRole('button', { name: 'Mon, Oct 26, vs CHI, 7:30 pm ET' })
+          .querySelector('.statusText'),
+      ).toHaveTextContent(/^7:30 pm$/);
 
       fireEvent.click(screen.getByLabelText('Show all games'));
       expect(onSelectTeam).toHaveBeenCalledWith(null);

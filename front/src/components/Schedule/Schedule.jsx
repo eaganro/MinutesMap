@@ -20,14 +20,16 @@ import {
   MIN_DATE_SWITCH_BLUR_MS,
 } from '../constants/loadingUiTimings';
 import DatePickerPanel from './DatePickerPanel';
+import DayStrip from './DayStrip';
 import TeamLogo from './TeamLogo';
 import TeamPickerPanel from './TeamPickerPanel';
 
 import './Schedule.scss';
 
-const DATE_NAVIGATION_STEP_DAYS = 1;
 // Knockout and playoff games are scheduled before their teams are known.
 const teamLabel = (team) => team || 'TBD';
+// Start times on the cards read "8:00 pm"; every game is in ET, and the labels keep it.
+const withoutTimeZone = (text) => text.replace(/\s+ET$/i, '');
 
 function LiveDot() {
   return (
@@ -65,14 +67,15 @@ function TeamGameButton({ game, isSelected, onClick }) {
     >
       <div className="dateRow">{dateText}</div>
       <div className="iconRow">
-        <TeamLogo team={game.team} />
         <span className="matchupPrefix">{game.isHome ? 'vs' : '@'}</span>
         <TeamLogo team={game.opponent} />
         {game.opponent}
       </div>
       <div className="statusRow">
         <span className={`statusText${game.result ? ` result${game.result}` : ''}`}>
-          {isLive ? [scoreText, statusText].filter(Boolean).join(' · ') : outcomeText}
+          {isLive
+            ? [scoreText, statusText].filter(Boolean).join(' · ')
+            : withoutTimeZone(outcomeText)}
         </span>
         {isLive && <LiveDot />}
       </div>
@@ -244,8 +247,11 @@ export default function Schedule({
         ))
       : null;
 
+  // Each game of a day as a small score card: a line per team (logo, tricode, score,
+  // the loser greyed once it's final) and the status centred under them. Before a game
+  // has a score, its two teams sit together in the middle of the card.
   const dateGamesList = (shownList.mode === 'date' ? shownList.games : []).map((g) => {
-    const { isLive, isUpcoming } = parseGameStatus(g.status);
+    const { isLive, isUpcoming, isFinal } = parseGameStatus(g.status);
     const isSelected = g.id === selectedGameId;
     const gameClassName = `game${isSelected ? ' selected' : ''}`;
     const statusText = formatStatusText(g.status);
@@ -263,56 +269,36 @@ export default function Schedule({
       .filter(Boolean)
       .join(', ');
 
-    if (!isUpcoming) {
-      return (
-        <button
-          type="button"
-          className={gameClassName}
-          key={g.id}
-          onClick={(event) => handleGameClick(event, g.id)}
-          aria-label={gameLabel}
-          aria-pressed={isSelected}
-        >
-          <div className="iconRow">
-            <TeamLogo team={g.awayteam} />
-            {teamLabel(g.awayteam)} - {teamLabel(g.hometeam)}
-            <TeamLogo team={g.hometeam} />
-          </div>
-          <div>
-            {g.awayscore} - {g.homescore}
-          </div>
-          <div className="statusRow">
-            <span className="statusText">{statusText}</span>
-            {isLive && <LiveDot />}
-          </div>
-        </button>
-      );
-    } else {
-      return (
-        <button
-          type="button"
-          className={gameClassName}
-          key={g.id}
-          onClick={(event) => handleGameClick(event, g.id)}
-          aria-label={gameLabel}
-          aria-pressed={isSelected}
-        >
-          <div className="iconRow">
-            <TeamLogo team={g.awayteam} />
-            {teamLabel(g.awayteam)} - {teamLabel(g.hometeam)}
-            <TeamLogo team={g.hometeam} />
-          </div>
-          <div className="recordRow">
-            {/* <span>{g.awayrecord}</span>
-            <span>{g.homerecord}</span> */}
-          </div>
-          <div className="statusRow">
-            <span className="statusText">{statusText}</span>
-            {isLive && <LiveDot />}
-          </div>
-        </button>
-      );
-    }
+    const showScores = !isUpcoming && hasScore;
+    const awayLost = isFinal && showScores && Number(g.awayscore) < Number(g.homescore);
+    const homeLost = isFinal && showScores && Number(g.homescore) < Number(g.awayscore);
+    const teamLine = (team, score, lost) => (
+      <span className={`cardTeam${lost ? ' isLoser' : ''}`}>
+        <TeamLogo team={team} />
+        <span className="cardAbbr">{teamLabel(team)}</span>
+        {showScores && <span className="cardScore">{score}</span>}
+      </span>
+    );
+    return (
+      <button
+        type="button"
+        className={`${gameClassName} scoreCard${showScores ? '' : ' isScoreless'}`}
+        key={g.id}
+        data-game-id={g.id}
+        onClick={(event) => handleGameClick(event, g.id)}
+        aria-label={gameLabel}
+        aria-pressed={isSelected}
+      >
+        <span className="cardTeams">
+          {teamLine(g.awayteam, g.awayscore, awayLost)}
+          {teamLine(g.hometeam, g.homescore, homeLost)}
+        </span>
+        <span className="statusRow">
+          <span className="statusText">{withoutTimeZone(statusText)}</span>
+          {isLive && <LiveDot />}
+        </span>
+      </button>
+    );
   });
   const gamesList = shownList.mode === 'team' ? teamGamesList : dateGamesList;
   const scrollScheduleRight = () => {
@@ -354,12 +340,30 @@ export default function Schedule({
     };
   }, [shownList.games, gamesList.length, scrollRef]);
 
-  const dateDown = () => {
-    shiftDate(-DATE_NAVIGATION_STEP_DAYS);
-  };
-  const dateUp = () => {
-    shiftDate(DATE_NAVIGATION_STEP_DAYS);
-  };
+  // Mark which edges of the strip have more games past them, for the fades phones show
+  // in place of the scroll arrows. Classes, not state, so scrolling doesn't re-render.
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return undefined;
+    const update = () => {
+      node.classList.toggle('hasMoreLeft', node.scrollLeft > 1);
+      node.classList.toggle(
+        'hasMoreRight',
+        node.scrollLeft + node.clientWidth < node.scrollWidth - 1,
+      );
+    };
+    update();
+    node.addEventListener('scroll', update, { passive: true });
+    let resizeObserver;
+    if (typeof ResizeObserver === 'function') {
+      resizeObserver = new ResizeObserver(update);
+      resizeObserver.observe(node);
+    }
+    return () => {
+      node.removeEventListener('scroll', update);
+      resizeObserver?.disconnect();
+    };
+  }, [shownList.games, gamesList.length, scrollRef, selectedGameId]);
 
   // The blurred previous list keeps its scroll position; the new games start
   // from the beginning once they replace it (before they are painted). A team
@@ -372,21 +376,20 @@ export default function Schedule({
     wasShowingPreviousListRef.current = isShowingPreviousList;
   }, [isShowingPreviousList, resetScrollPosition]);
 
-  // Team seasons are long: keep the selected game in view, jumping straight
-  // there when the list is (re)built and gliding on ordinary selection changes.
-  // Track the team whose games are on screen, which lags the chip while a
-  // new team's list loads.
+  // Keep the selected game in view, jumping straight there when the list is
+  // (re)built and gliding on ordinary selection changes. Team seasons are long,
+  // so a new team list always centres its game; a day's list only moves when the
+  // game (say, from a link) would otherwise start off screen. Track the list on
+  // screen, which lags the chip or day while a new one loads.
   const listTeam = shownList.mode === 'team' ? shownList.team : null;
-  const listGameCount = shownList.mode === 'team' ? shownList.games.length : 0;
-  const lastTeamListRef = useRef({ team: null, count: 0 });
+  const listKey = listTeam ? `team:${listTeam}` : `date:${shownList.date}`;
+  const listGameCount = shownList.games.length;
+  const lastListRef = useRef({ key: null, team: null, count: 0 });
   useLayoutEffect(() => {
-    const previous = lastTeamListRef.current;
-    lastTeamListRef.current = { team: listTeam, count: listGameCount };
-    if (!listTeam) {
-      if (previous.team) {
-        resetScrollPosition();
-      }
-      return;
+    const previous = lastListRef.current;
+    lastListRef.current = { key: listKey, team: listTeam, count: listGameCount };
+    if (!listTeam && previous.team) {
+      resetScrollPosition();
     }
     const node = scrollRef.current;
     if (!node || !selectedGameId) return;
@@ -395,11 +398,11 @@ export default function Schedule({
     );
     if (!element) return;
 
-    const isListRebuilt = previous.team !== listTeam || previous.count !== listGameCount;
+    const isListRebuilt = previous.key !== listKey || previous.count !== listGameCount;
     const nodeRect = node.getBoundingClientRect();
     const elementRect = element.getBoundingClientRect();
     const isVisible = elementRect.left >= nodeRect.left && elementRect.right <= nodeRect.right;
-    if (isVisible && !isListRebuilt) return;
+    if (isVisible && (!isListRebuilt || !listTeam)) return;
 
     const left =
       node.scrollLeft + elementRect.left - nodeRect.left - (nodeRect.width - elementRect.width) / 2;
@@ -408,7 +411,7 @@ export default function Schedule({
     } else {
       node.scrollLeft = left;
     }
-  }, [listTeam, listGameCount, selectedGameId, scrollRef, resetScrollPosition]);
+  }, [listKey, listTeam, listGameCount, selectedGameId, scrollRef, resetScrollPosition]);
 
   // The previous team's record would be wrong next to the new team's chip.
   const record = isShowingPreviousList && !isShowingPreviousView ? null : shownHeader.record;
@@ -468,28 +471,21 @@ export default function Schedule({
           </div>
         ) : (
           <div className="datePick">
-            <IconButton className="scheduleButton" onClick={dateDown} aria-label="Previous date">
-              <NavigateBefore />
-            </IconButton>
             <button
               ref={datePickerTriggerRef}
               type="button"
-              className="dateField"
+              className="dateCalendarButton"
               onClick={() => setIsDatePickerOpen((open) => !open)}
               aria-label={`Select game date, ${formatPickerDate(shownHeader.date)}`}
+              title="Pick a date"
               aria-haspopup="dialog"
               aria-expanded={isDatePickerOpen}
               aria-controls={isDatePickerOpen ? datePickerId : undefined}
               data-date={shownHeader.date}
             >
-              <span className="dateFieldText" aria-hidden="true">
-                {formatPickerDate(shownHeader.date)}
-              </span>
-              <CalendarTodayOutlined className="dateFieldIcon" aria-hidden="true" />
+              <CalendarTodayOutlined aria-hidden="true" />
             </button>
-            <IconButton className="scheduleButton" onClick={dateUp} aria-label="Next date">
-              <NavigateNext />
-            </IconButton>
+            <DayStrip date={shownHeader.date} onShift={shiftDate} />
             {onSelectTeam && (
               <button {...teamPickerTriggerProps} className="teamPickerTrigger">
                 Teams
