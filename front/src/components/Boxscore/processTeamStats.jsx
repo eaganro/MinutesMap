@@ -23,25 +23,24 @@ const DEFAULT_COLUMN_ORDER = [
   'pf',
   'pm',
 ];
+// Phones: the most-read stats first (all on screen before any scrolling), +/- among
+// them, and made-attempts without the percentage columns.
 const COMPACT_COLUMN_ORDER = [
   'player',
   'min',
   'pts',
   'reb',
   'ast',
+  'pm',
   'fgm-a',
-  'fg%',
   '3pm-a',
-  '3p%',
   'ftm-a',
-  'ft%',
-  'oreb',
-  'dreb',
   'stl',
   'blk',
   'to',
   'pf',
-  'pm',
+  'oreb',
+  'dreb',
 ];
 const COLUMN_LABELS = {
   player: 'PLAYER',
@@ -62,6 +61,13 @@ const COLUMN_LABELS = {
   to: 'TO',
   pf: 'PF',
   pm: '+/-',
+};
+// Shorter headings for the narrower phone columns.
+const COMPACT_COLUMN_LABELS = {
+  ...COLUMN_LABELS,
+  'fgm-a': 'FG',
+  '3pm-a': '3P',
+  'ftm-a': 'FT',
 };
 const HIGHLIGHT_COLUMNS = new Set(['pts', 'reb', 'ast']);
 
@@ -125,6 +131,10 @@ export default function (
     return (Number(mins) || 0) * 60 + (Number(secs) || 0);
   };
 
+  // Phones show whole minutes ("43"), and "<1" for under half a minute.
+  const formatCompactMinutes = (seconds) =>
+    seconds < 30 ? '<1' : String(Math.round(seconds / 60));
+
   const formatPercentage = (made, attempted) => {
     if (!attempted) {
       return '0.0';
@@ -155,6 +165,7 @@ export default function (
   };
 
   const columnOrder = isCompact ? COMPACT_COLUMN_ORDER : DEFAULT_COLUMN_ORDER;
+  const columnLabels = isCompact ? COMPACT_COLUMN_LABELS : COLUMN_LABELS;
 
   const getSortName = (player) => {
     const last = (player?.last || '').trim();
@@ -261,7 +272,7 @@ export default function (
         case 'player':
           return getDisplayName(p);
         case 'min':
-          return minutes;
+          return isCompact ? formatCompactMinutes(item.seconds) : minutes;
         case 'pts':
           return getStat('pts');
         case 'fgm-a':
@@ -300,15 +311,20 @@ export default function (
     };
     return (
       <div key={rowKey} className={'rowGrid stat ' + (i % 2 === 0 ? 'even' : 'odd')} role="row">
-        {columnOrder.map((key) => (
-          <span
-            key={`${rowKey}-${key}`}
-            className={getCellClassName(key)}
-            role={key === 'player' ? 'rowheader' : 'cell'}
-          >
-            {getPlayerValue(key)}
-          </span>
-        ))}
+        {columnOrder.map((key) => {
+          const plusMinus = getStat('pm');
+          const plusMinusClass =
+            key === 'pm' && plusMinus ? (plusMinus > 0 ? ' isPositive' : ' isNegative') : '';
+          return (
+            <span
+              key={`${rowKey}-${key}`}
+              className={getCellClassName(key) + plusMinusClass}
+              role={key === 'player' ? 'rowheader' : 'cell'}
+            >
+              {getPlayerValue(key)}
+            </span>
+          );
+        })}
       </div>
     );
   });
@@ -419,9 +435,9 @@ export default function (
               data-indicator={
                 isActiveSort ? (sortConfig?.direction === 'desc' ? '▼' : '▲') : undefined
               }
-              aria-label={`${COLUMN_LABELS[key]}${isActiveSort ? `, sorted ${sortDirection}` : ''}. Sort ${nextDirection}.`}
+              aria-label={`${columnLabels[key]}${isActiveSort ? `, sorted ${sortDirection}` : ''}. Sort ${nextDirection}.`}
             >
-              {COLUMN_LABELS[key]}
+              {columnLabels[key]}
             </button>
           </span>
         );
@@ -452,16 +468,19 @@ export default function (
           )}
         </div>
       </div>
-      <div
-        ref={tableWrapperRef}
-        className="tableWrapper"
-        role="table"
-        aria-label={`${team?.name || team?.abbr || 'Team'} box score`}
-        aria-colcount={columnOrder.length}
-        tabIndex={0}
-        onScroll={onScroll}
-      >
-        {teamBox}
+      {/* Boxscore marks this frame isScrolled / hasMoreRight as the table scrolls. */}
+      <div className="tableFrame">
+        <div
+          ref={tableWrapperRef}
+          className="tableWrapper"
+          role="table"
+          aria-label={`${team?.name || team?.abbr || 'Team'} box score`}
+          aria-colcount={columnOrder.length}
+          tabIndex={0}
+          onScroll={onScroll}
+        >
+          {teamBox}
+        </div>
       </div>
     </div>
   );

@@ -189,6 +189,38 @@ export default function Boxscore({ gameId, box, isLoading, statusMessage, prefer
     handleSort,
   );
 
+  // Mark each table's frame while it scrolls sideways: isScrolled gives the sticky name
+  // column an edge, hasMoreRight fades the right edge to say there are more columns.
+  // Classes, not state, so scrolling doesn't re-render the table.
+  useEffect(() => {
+    const tables = [awayTableRef.current, homeTableRef.current].filter(Boolean);
+    if (!tables.length) return undefined;
+    const update = (table) => {
+      const frame = table.parentElement;
+      if (!frame) return;
+      frame.classList.toggle('isScrolled', table.scrollLeft > 0);
+      frame.classList.toggle(
+        'hasMoreRight',
+        table.scrollLeft + table.clientWidth < table.scrollWidth - 1,
+      );
+    };
+    const listeners = tables.map((table) => {
+      const onScroll = () => update(table);
+      table.addEventListener('scroll', onScroll, { passive: true });
+      update(table);
+      return () => table.removeEventListener('scroll', onScroll);
+    });
+    let resizeObserver;
+    if (typeof ResizeObserver === 'function') {
+      resizeObserver = new ResizeObserver(() => tables.forEach(update));
+      tables.forEach((table) => resizeObserver.observe(table));
+    }
+    return () => {
+      listeners.forEach((remove) => remove());
+      resizeObserver?.disconnect();
+    };
+  }, [displayBox, activeSide, hasTeamTabs, isCompact, showAllPlayers]);
+
   const showLoadingIndicator = isLoading && !hasBoxData && !showStatusMessage;
   // Whether a team's table is up under the tabs (not the loading or status view).
   const isShowingTeamTabs = hasTeamTabs && !showLoadingIndicator && !showStatusMessage;

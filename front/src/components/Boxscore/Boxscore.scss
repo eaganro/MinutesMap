@@ -33,6 +33,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      white-space: nowrap;
     }
   }
 
@@ -212,6 +213,46 @@
     }
   }
 
+  // While the table scrolls sideways: an edge on the sticky name column once columns
+  // pass under it, and a fade at the right while there are more to see.
+  .tableFrame {
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 3;
+      width: 24px;
+      pointer-events: none;
+      opacity: 0;
+      background: linear-gradient(90deg, transparent, var(--bg-card));
+      transition: opacity 0.2s ease;
+    }
+
+    &.hasMoreRight::after {
+      opacity: 1;
+    }
+
+    &.isScrolled .playerNameCol {
+      box-shadow:
+        1px 0 0 var(--divider),
+        6px 0 6px -5px rgba(16, 24, 40, 0.28);
+    }
+  }
+
+  .stat .isPositive {
+    color: var(--positive);
+    font-weight: 700;
+  }
+
+  .stat .isNegative {
+    color: var(--negative);
+    font-weight: 700;
+  }
+
   .tableWrapper {
     overflow-x: auto;
     position: relative;
@@ -315,10 +356,11 @@
   }
 
   @media (max-width: 640px) {
+    // Player, MIN, PTS, REB, AST and +/- fill the first screen; FG peeks in at the edge.
     .rowGrid {
       grid-template-columns:
         minmax(90px, 90px)
-        75px 55px 55px 55px 70px 55px 70px 55px 70px 55px repeat(7, 55px);
+        44px repeat(4, 48px) repeat(3, 58px) 44px 44px 40px 40px 48px 48px;
     }
 
     .rowGrid .playerNameCol {
