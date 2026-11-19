@@ -510,12 +510,15 @@ export default function Play({
   };
 
   const handlePeriodSelect = (period, label) => {
-    trackQuarterSelect({ period: label });
+    // Tapping the period that's already open goes back to the whole game.
+    const isClosing = period !== 0 && period === controlActivePeriod;
+    const nextPeriod = isClosing ? 0 : period;
+    trackQuarterSelect({ period: isClosing ? 'Game' : label });
     if (isShowingMobilePlayerDetail) {
-      setPlayerDetailPeriod(period);
+      setPlayerDetailPeriod(nextPeriod);
       return;
     }
-    selectPeriod(period);
+    selectPeriod(nextPeriod);
   };
 
   // The chart has its period buttons in its top band (PeriodButtons); a player's detail

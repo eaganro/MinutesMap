@@ -269,6 +269,12 @@ describe('Play', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Game' }));
     expectWholeGameView();
+
+    // Tapping the open quarter again closes it too.
+    fireEvent.click(screen.getByRole('button', { name: 'Q1' }));
+    expect(screen.getByRole('button', { name: 'Q1' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Q1' }));
+    expectWholeGameView();
   });
 
   it('highlights the Back button the first time a player sheet opens, until its pulse ends', () => {
