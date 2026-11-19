@@ -14,7 +14,7 @@ export function useLineupsTips({ lineupsRef, enabled, hasSelectedPlayers }) {
     enabled,
   });
 
-  // Picking any player (to filter or highlight) means they found it.
+  // Picking any player means they found the filter.
   useEffect(() => {
     if (hasSelectedPlayers && !progress.filter && !progress.skipped) {
       markTip('filter', 'completed');

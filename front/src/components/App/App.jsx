@@ -10,6 +10,7 @@ import StatButtons from '../StatButtons/StatButtons';
 import ChartHelp from '../Play/ChartHelp';
 import DarkModeToggle from '../DarkModeToggle/DarkModeToggle';
 import Footer from '../Footer/Footer';
+import { TeamChoiceProvider } from '../TeamTabs/TeamTabs';
 
 import './App.scss';
 
@@ -136,23 +137,26 @@ export default function App() {
           )}
         </div>
 
-        <Boxscore
-          gameId={boxVm.gameId}
-          box={boxVm.box}
-          isLoading={boxVm.isLoading}
-          statusMessage={boxVm.statusMessage}
-          preferredTeam={scheduleVm.teamMode?.team ?? null}
-        />
-        <Lineups
-          gameId={lineupsVm.gameId}
-          awayTeam={lineupsVm.awayTeam}
-          homeTeam={lineupsVm.homeTeam}
-          awayLineups={lineupsVm.awayLineups}
-          homeLineups={lineupsVm.homeLineups}
-          isLoading={lineupsVm.isLoading}
-          statusMessage={lineupsVm.statusMessage}
-          preferredTeam={scheduleVm.teamMode?.team ?? null}
-        />
+        {/* Picking a team in the box score or lineups switches both. */}
+        <TeamChoiceProvider>
+          <Boxscore
+            gameId={boxVm.gameId}
+            box={boxVm.box}
+            isLoading={boxVm.isLoading}
+            statusMessage={boxVm.statusMessage}
+            preferredTeam={scheduleVm.teamMode?.team ?? null}
+          />
+          <Lineups
+            gameId={lineupsVm.gameId}
+            awayTeam={lineupsVm.awayTeam}
+            homeTeam={lineupsVm.homeTeam}
+            awayLineups={lineupsVm.awayLineups}
+            homeLineups={lineupsVm.homeLineups}
+            isLoading={lineupsVm.isLoading}
+            statusMessage={lineupsVm.statusMessage}
+            preferredTeam={scheduleVm.teamMode?.team ?? null}
+          />
+        </TeamChoiceProvider>
       </main>
       <Footer />
     </div>

@@ -86,7 +86,7 @@ describe('Lineups', () => {
     expect(screen.queryByRole('button', { name: 'Show top lineups' })).not.toBeInTheDocument();
   });
 
-  it('lets lineup row player pills apply the active filter mode', () => {
+  it('filters to the lineups of a player picked in a row', () => {
     renderLineups();
 
     const playerButtons = screen.getAllByRole('button', { name: 'Away Player 1A' });
@@ -108,19 +108,6 @@ describe('Lineups', () => {
 
     expect(screen.queryByText('Selected total')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Away Player 1A' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(2);
-  });
-
-  it('lets lineup row player pills apply the active highlight mode', () => {
-    renderLineups();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Highlight' })[0]);
-    const playerButtons = screen.getAllByRole('button', { name: 'Away Player 1A' });
-    fireEvent.click(playerButtons[1]);
-
-    expect(screen.queryByText('Selected total')).not.toBeInTheDocument();
-    expect(playerButtons[0]).toHaveAttribute('aria-pressed', 'true');
-    expect(playerButtons[1]).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('button', { name: 'Show all (6)' })).toHaveLength(2);
   });
 
@@ -169,14 +156,13 @@ describe('Lineups', () => {
       vi.unstubAllGlobals();
     });
 
-    it('only shows tips once the section has been opened', () => {
+    it('shows the lineups and their tips without opening anything', () => {
       vi.useFakeTimers();
       try {
         renderLineups();
-        showTips();
-        expect(screen.queryByRole('note')).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: /Lineups/ }));
+        expect(screen.getByText('6 lineups')).toBeInTheDocument();
+
         showTips();
         expect(screen.getByText(/Each row is a group of five/)).toBeInTheDocument();
       } finally {
@@ -184,30 +170,15 @@ describe('Lineups', () => {
       }
     });
 
-    it('starts collapsed and remembers when it is opened', () => {
-      renderLineups();
-
-      const disclosure = screen.getByRole('button', { name: /Lineups/ });
-      expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-      expect(disclosure).toHaveTextContent('6 AWY · 6 HME');
-      expect(screen.queryByText('6 lineups')).not.toBeInTheDocument();
-
-      fireEvent.click(disclosure);
-
-      expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-      expect(localStorage.getItem('lineupsOpen')).toBe('true');
-    });
-
     it('shows one team at a time with filters behind a toggle', () => {
-      localStorage.setItem('lineupsOpen', 'true');
       renderLineups();
 
       expect(screen.getAllByRole('button', { name: 'Away Player 1A' })).toHaveLength(1);
       expect(screen.queryByRole('button', { name: 'Home Player 1A' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Highlight' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Filter players' }));
-      expect(screen.getByRole('button', { name: 'Highlight' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
       expect(screen.getAllByRole('button', { name: 'Away Player 1A' })).toHaveLength(2);
 
       fireEvent.click(screen.getByRole('button', { name: 'Home Team' }));

@@ -18,8 +18,6 @@ export default function LineupsTeamPanel({
   teamColor,
   selectedPlayers,
   onSelectionChange,
-  selectionMode,
-  onSelectionModeChange,
   playerOptions,
   playerDisplayNames,
   sortConfig,
@@ -43,16 +41,15 @@ export default function LineupsTeamPanel({
     }
     onSelectionChange([...selectedPlayers, player]);
   };
-  const summary =
-    selectedPlayers.length && selectionMode === 'filter'
-      ? lineups.reduce(
-          (acc, lineup) => ({
-            seconds: acc.seconds + (lineup?.seconds || 0),
-            plusMinus: acc.plusMinus + (lineup?.plusMinus || 0),
-          }),
-          { seconds: 0, plusMinus: 0 },
-        )
-      : null;
+  const summary = selectedPlayers.length
+    ? lineups.reduce(
+        (acc, lineup) => ({
+          seconds: acc.seconds + (lineup?.seconds || 0),
+          plusMinus: acc.plusMinus + (lineup?.plusMinus || 0),
+        }),
+        { seconds: 0, plusMinus: 0 },
+      )
+    : null;
 
   return (
     <div className={`lineupsTeamPanel${isCompact ? ' isCompact' : ''}`}>
@@ -90,26 +87,6 @@ export default function LineupsTeamPanel({
                 : `Filter players (max ${MAX_SELECTED_PLAYERS})`}
             </span>
             <div
-              className="lineupsFilterMode"
-              role="group"
-              aria-label={`${teamLabel} selection mode`}
-            >
-              <button
-                type="button"
-                className={`lineupsFilterModeButton${selectionMode === 'filter' ? ' isActive' : ''}`}
-                onClick={() => onSelectionModeChange('filter')}
-              >
-                Filter
-              </button>
-              <button
-                type="button"
-                className={`lineupsFilterModeButton${selectionMode === 'highlight' ? ' isActive' : ''}`}
-                onClick={() => onSelectionModeChange('highlight')}
-              >
-                Highlight
-              </button>
-            </div>
-            <div
               className="lineupsFilterPills"
               role="group"
               aria-label={`${teamLabel} player filters`}
@@ -145,7 +122,7 @@ export default function LineupsTeamPanel({
       </div>
       {lineups.length === 0 ? (
         <div className="lineupsEmpty">
-          {selectedPlayers.length && selectionMode === 'filter'
+          {selectedPlayers.length
             ? 'No 5-man lineups match that selection.'
             : 'No lineup data yet.'}
         </div>

@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
-import ExpandMore from '@mui/icons-material/esm/ExpandMore';
 import { useTheme } from '../hooks/ui/useTheme';
 import { getMatchupColors } from '../../helpers/teamColors';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
 import { useMediaQuery } from '../hooks/ui/useMediaQuery';
-import { useLocalStorageState } from '../hooks/state/useLocalStorageState';
-import { isBooleanPreference } from '../hooks/state/storage';
 import TeamTabs, { useTeamTab } from '../TeamTabs/TeamTabs';
 import LineupsTeamPanel from './LineupsTeamPanel';
 import LineupsTips from './LineupsTips';
@@ -23,8 +20,6 @@ import './Lineups.scss';
 const INITIAL_SORT_CONFIG = { key: 'minutes', direction: 'desc' };
 // Matches the breakpoint where the two team panels stack in Lineups.scss.
 const STACKED_LAYOUT_QUERY = '(max-width: 920px)';
-const LINEUPS_OPEN_STORAGE_KEY = 'lineupsOpen';
-const LINEUPS_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
 
 export default function Lineups({
   gameId,
@@ -40,19 +35,12 @@ export default function Lineups({
   const [showAll, setShowAll] = useState(false);
   const [selectedAwayPlayers, setSelectedAwayPlayers] = useState([]);
   const [selectedHomePlayers, setSelectedHomePlayers] = useState([]);
-  const [awaySelectionMode, setAwaySelectionMode] = useState('filter');
-  const [homeSelectionMode, setHomeSelectionMode] = useState('filter');
   const [topSectionMinHeight, setTopSectionMinHeight] = useState(0);
   const [activeTeam, setActiveTeam] = useTeamTab({
     awayAbbr: awayTeam?.abr,
     homeAbbr: homeTeam?.abr,
     preferredTeam,
   });
-  const [isOpen, setIsOpen] = useLocalStorageState(
-    LINEUPS_OPEN_STORAGE_KEY,
-    false,
-    LINEUPS_PREFERENCE_OPTIONS,
-  );
   const isStacked = useMediaQuery(STACKED_LAYOUT_QUERY);
   const isFinePointer = useMediaQuery('(hover: hover) and (pointer: fine)');
   const lineupsRef = useRef(null);
@@ -67,10 +55,7 @@ export default function Lineups({
     setShowAll(false);
     setSelectedAwayPlayers([]);
     setSelectedHomePlayers([]);
-    setAwaySelectionMode('filter');
-    setHomeSelectionMode('filter');
     setTopSectionMinHeight(0);
-    setActiveTeam('away');
   }, [gameId]);
 
   const awayOptions = useMemo(() => buildPlayerOptions(awayLineups), [awayLineups]);
@@ -85,12 +70,12 @@ export default function Lineups({
   }, [homeOptions]);
 
   const awayFiltered = useMemo(
-    () => filterLineupsByPlayers(awayLineups, selectedAwayPlayers, awaySelectionMode),
-    [awayLineups, selectedAwayPlayers, awaySelectionMode],
+    () => filterLineupsByPlayers(awayLineups, selectedAwayPlayers),
+    [awayLineups, selectedAwayPlayers],
   );
   const homeFiltered = useMemo(
-    () => filterLineupsByPlayers(homeLineups, selectedHomePlayers, homeSelectionMode),
-    [homeLineups, selectedHomePlayers, homeSelectionMode],
+    () => filterLineupsByPlayers(homeLineups, selectedHomePlayers),
+    [homeLineups, selectedHomePlayers],
   );
 
   const awaySorted = useMemo(
@@ -175,8 +160,6 @@ export default function Lineups({
       teamColor={matchupColors?.away}
       selectedPlayers={selectedAwayPlayers}
       onSelectionChange={setSelectedAwayPlayers}
-      selectionMode={awaySelectionMode}
-      onSelectionModeChange={setAwaySelectionMode}
       playerOptions={awayOptions}
       playerDisplayNames={awayPlayerDisplayNames}
       sortConfig={sortConfig}
@@ -196,8 +179,6 @@ export default function Lineups({
       teamColor={matchupColors?.home}
       selectedPlayers={selectedHomePlayers}
       onSelectionChange={setSelectedHomePlayers}
-      selectionMode={homeSelectionMode}
-      onSelectionModeChange={setHomeSelectionMode}
       playerOptions={homeOptions}
       playerDisplayNames={homePlayerDisplayNames}
       sortConfig={sortConfig}
@@ -239,19 +220,10 @@ export default function Lineups({
 
   const awayCount = awayLineups?.length || 0;
   const homeCount = homeLineups?.length || 0;
-  const disclosureMeta =
-    awayCount || homeCount
-      ? `${awayCount} ${awayTeam?.abr || 'away'} · ${homeCount} ${homeTeam?.abr || 'home'}`
-      : null;
 
-  // On stacked layouts the tips wait until the section has been opened.
   const lineupsTips = useLineupsTips({
     lineupsRef,
-    enabled:
-      awayCount + homeCount > 0 &&
-      !showLoadingIndicator &&
-      !showStatusMessage &&
-      (!isStacked || isOpen),
+    enabled: awayCount + homeCount > 0 && !showLoadingIndicator && !showStatusMessage,
     hasSelectedPlayers: selectedAwayPlayers.length + selectedHomePlayers.length > 0,
   });
 
@@ -263,30 +235,14 @@ export default function Lineups({
       aria-label="Lineups"
       aria-busy={isLoading}
       onClick={trackLineupsFeatureUse}
-      onTouchStart={isStacked && !isOpen ? undefined : trackLineupsFeatureUse}
+      onTouchStart={trackLineupsFeatureUse}
     >
-      {isStacked ? (
-        <>
-          <button
-            type="button"
-            className={`lineupsDisclosure${isOpen ? ' isOpen' : ''}`}
-            onClick={() => setIsOpen((prev) => !prev)}
-            aria-expanded={isOpen}
-          >
-            <span className="lineupsDisclosureTitle">Lineups</span>
-            {disclosureMeta && <span className="lineupsDisclosureMeta">{disclosureMeta}</span>}
-            <ExpandMore className="lineupsDisclosureIcon" aria-hidden="true" />
-          </button>
-          {isOpen && content}
-        </>
-      ) : (
-        content
-      )}
+      {content}
       {lineupsTips.activeTip && (
         <LineupsTips
           activeTip={lineupsTips.activeTip}
           lineupsRef={lineupsRef}
-          layoutKey={`${isStacked}|${isOpen}|${activeTeam}|${showAll}|${sortConfig.key}|${sortConfig.direction}`}
+          layoutKey={`${isStacked}|${activeTeam}|${showAll}|${sortConfig.key}|${sortConfig.direction}`}
           isFinePointer={isFinePointer}
           onDismiss={lineupsTips.dismissTip}
           onSkip={lineupsTips.skipTips}

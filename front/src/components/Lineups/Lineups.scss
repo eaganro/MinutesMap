@@ -73,39 +73,6 @@
   color: var(--text-muted);
 }
 
-.lineupsFilterMode {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--bg-hover);
-}
-
-.lineupsFilterModeButton {
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 3px 10px;
-  cursor: pointer;
-}
-
-.lineupsFilterModeButton.isActive {
-  background: var(--bg-card);
-  color: var(--text-primary);
-  box-shadow:
-    0 0 0 1px var(--control-border),
-    0 1px 2px rgba(16, 24, 40, 0.08);
-}
-
-.lineupsFilterModeButton:focus-visible {
-  outline: 2px solid var(--focus-ring-color);
-  outline-offset: 2px;
-}
-
 .lineupsFilterPills {
   display: flex;
   flex-wrap: wrap;
@@ -383,48 +350,6 @@ button.lineupsPill:focus-visible {
 
 .lineupsLoading {
   min-height: 160px;
-}
-
-// Stacked layout (mobile/tablet): collapsed by default, one team at a time.
-.lineupsDisclosure {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  padding: 2px 4px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.lineupsDisclosure:focus-visible {
-  outline: 2px solid var(--focus-ring-color);
-  outline-offset: 2px;
-  border-radius: 8px;
-}
-
-.lineupsDisclosureTitle {
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-
-.lineupsDisclosureMeta {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.lineupsDisclosureIcon {
-  margin-left: auto;
-  color: var(--text-secondary);
-  transition: transform 0.2s ease;
-}
-
-.lineupsDisclosure.isOpen .lineupsDisclosureIcon {
-  transform: rotate(180deg);
 }
 
 .lineupsFilterToggle {

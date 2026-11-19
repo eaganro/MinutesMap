@@ -58,9 +58,9 @@ export const buildPlayerOptions = (lineups) => {
 };
 
 // Filter to 5-man lineups containing every selected player.
-export const filterLineupsByPlayers = (lineups, selectedPlayers, mode) => {
+export const filterLineupsByPlayers = (lineups, selectedPlayers) => {
   const selected = selectedPlayers || [];
-  if (!selected.length || mode !== 'filter') return lineups || [];
+  if (!selected.length) return lineups || [];
   return (lineups || []).filter((lineup) => {
     const players = lineup?.players || [];
     if (players.length !== 5) return false;
