@@ -35,15 +35,16 @@
   box-sizing: border-box;
 }
 
-// Bottom right of the chart card, in the "How to read this chart" row.
+// Bottom right of the chart card, in the "How to read this chart" row, at the same 24px
+// as the stat chips and the help toggle beside it.
 .playExportButton {
-  gap: 6px;
+  gap: 5px;
   border: 1px solid var(--control-border);
   background: var(--control-bg);
   color: var(--text-secondary);
   border-radius: 999px;
-  min-height: 30px;
-  padding: 0 12px 0 10px;
+  min-height: 24px;
+  padding: 0 10px 0 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -76,6 +77,8 @@
 
 .playExportButtonIcon {
   flex-shrink: 0;
+  width: 14px;
+  height: 14px;
 }
 
 // A player's detail view has no legend, so the share button goes under the detail card.

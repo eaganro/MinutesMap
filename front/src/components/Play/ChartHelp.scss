@@ -1,8 +1,10 @@
+// 12px above (the legend's smaller bottom margin collapses into it) and 12px below (with
+// the card's padding), so the row sits centred between the legend and the card's edge.
 .chartHelp {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: -4px 0 8px;
+  margin: 12px 0 max(0px, 12px - var(--layout-card-padding));
   width: 100%;
   box-sizing: border-box;
 }
