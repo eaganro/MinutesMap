@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { getSecondsElapsed } from '../../../helpers/playTimeline';
 import {
   getEventType,
@@ -7,6 +8,7 @@ import {
 import { getActionStatToggleIndex } from '../../../domain/game-data/filterActions';
 import { renderEventShape, renderFreeThrowRing } from '../../../ui/eventShapes.jsx';
 
+import { fitCompactName, measureCompactName } from './nameFit';
 import './Player.scss';
 
 // Space between the name column and the start of the timeline.
@@ -33,6 +35,19 @@ export default function Player({
 }) {
   const playerName = name;
   const nameText = compactName && label ? label : playerName;
+  const nameWidth = leftMargin - NAME_GAP;
+
+  // Short names shrink a little to fit, and fade out where they still don't.
+  const nameTextRef = useRef(null);
+  const [nameFit, setNameFit] = useState(null);
+  useLayoutEffect(() => {
+    const textElement = nameTextRef.current;
+    setNameFit(
+      compactName && textElement
+        ? fitCompactName({ ...measureCompactName(textElement), maxWidth: nameWidth })
+        : null,
+    );
+  }, [compactName, nameText, nameWidth]);
 
   const windowStartSeconds = timelineWindow?.startSeconds ?? 0;
   const windowDurationSeconds = timelineWindow?.durationSeconds ?? 0;
@@ -161,13 +176,21 @@ export default function Player({
   const isOnCourt =
     hasCursor && stints.some(({ x1, x2 }) => cursorX >= x1 - 0.5 && cursorX <= x2 + 0.5);
   const courtClassName = hasCursor ? (isOnCourt ? ' isOnCourt' : ' isOffCourt') : '';
+  const nameClassName = [
+    'playerName',
+    compactName && 'isCompact',
+    nameFit?.isClipped && 'isClipped',
+    nameFit?.isEmphasisClipped && 'isEmphasisClipped',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className={`player${courtClassName}`} style={{ height: `${275 / heightDivide}px` }}>
       <div
-        className={compactName ? 'playerName isCompact' : 'playerName'}
+        className={nameClassName}
         // The name column is the left margin less the gap, and cuts off longer names.
-        style={{ width: leftMargin - NAME_GAP }}
+        style={{ width: nameWidth, fontSize: nameFit ? `${nameFit.fontSize}px` : undefined }}
       >
         {typeof onSelect === 'function' ? (
           <button
@@ -181,10 +204,10 @@ export default function Player({
             }}
             aria-label={`Open player detail for ${playerName}`}
           >
-            {nameText}
+            <span ref={nameTextRef}>{nameText}</span>
           </button>
         ) : (
-          nameText
+          <span ref={nameTextRef}>{nameText}</span>
         )}
       </div>
       <svg

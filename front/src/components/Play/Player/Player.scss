@@ -1,3 +1,8 @@
+@mixin fade-out-end {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 8px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 8px), transparent);
+}
+
 .player {
   position: relative;
   border-radius: 6px;
@@ -36,9 +41,21 @@
     }
   }
 
-  // Narrower charts: a short last name in a narrow column (see Player.jsx).
+  // Narrower charts: a short last name in a narrow column, shrunk a little to fit
+  // (see nameFit.js). One that still doesn't fit fades out at the edge instead of
+  // giving up a letter or two to "…".
   .playerName.isCompact {
     font-size: 9.5px;
+    text-overflow: clip;
+
+    .playerNameButton {
+      text-overflow: clip;
+    }
+  }
+
+  .playerName.isClipped,
+  &.isOnCourt .playerName.isEmphasisClipped {
+    @include fade-out-end;
   }
 
   .line {
@@ -110,6 +127,10 @@
     &:hover .playerName {
       color: var(--playline-hover);
       font-weight: 600;
+    }
+
+    &:hover .playerName.isEmphasisClipped {
+      @include fade-out-end;
     }
   }
 }
