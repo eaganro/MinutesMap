@@ -2,6 +2,8 @@ import { useCallback, useRef } from 'react';
 
 const DEFAULT_DRAG_THRESHOLD_PX = 3;
 
+// Mouse dragging for a sideways strip. Touch needs none of this: the strip scrolls
+// natively, so a sideways swipe moves it and an upward one still scrolls the page.
 export function useHorizontalDragScroll({
   draggingClassName = 'dragging',
   dragThresholdPx = DEFAULT_DRAG_THRESHOLD_PX,
@@ -73,30 +75,6 @@ export function useHorizontalDragScroll({
     [moveDrag],
   );
 
-  const onTouchStart = useCallback(
-    (e) => {
-      if (!e.touches[0]) {
-        return;
-      }
-      startDrag(e.touches[0].pageX);
-    },
-    [startDrag],
-  );
-  const onTouchEnd = stopDrag;
-  const onTouchCancel = stopDrag;
-  const onTouchMove = useCallback(
-    (e) => {
-      if (!isDraggingRef.current || !scrollRef.current || !e.touches[0]) {
-        return;
-      }
-      if (e.cancelable) {
-        e.preventDefault();
-      }
-      moveDrag(e.touches[0].pageX);
-    },
-    [moveDrag],
-  );
-
   const didDrag = useCallback(() => dragMovedRef.current, []);
 
   const scrollBy = useCallback((amount) => {
@@ -120,10 +98,6 @@ export function useHorizontalDragScroll({
       onMouseLeave,
       onMouseUp,
       onMouseMove,
-      onTouchStart,
-      onTouchEnd,
-      onTouchCancel,
-      onTouchMove,
     },
     didDrag,
     scrollBy,

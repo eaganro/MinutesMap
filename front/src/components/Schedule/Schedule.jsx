@@ -533,10 +533,6 @@ export default function Schedule({
                 onMouseLeave={dragHandlers.onMouseLeave}
                 onMouseUp={dragHandlers.onMouseUp}
                 onMouseMove={dragHandlers.onMouseMove}
-                onTouchStart={dragHandlers.onTouchStart}
-                onTouchEnd={dragHandlers.onTouchEnd}
-                onTouchCancel={dragHandlers.onTouchCancel}
-                onTouchMove={dragHandlers.onTouchMove}
               >
                 {gamesList}
               </div>

@@ -49,10 +49,6 @@ const makeDragHandlers = () => ({
   onMouseLeave: vi.fn(),
   onMouseUp: vi.fn(),
   onMouseMove: vi.fn(),
-  onTouchStart: vi.fn(),
-  onTouchEnd: vi.fn(),
-  onTouchCancel: vi.fn(),
-  onTouchMove: vi.fn(),
 });
 
 describe('Schedule', () => {
