@@ -1,13 +1,33 @@
+@use 'sass:math';
+
 // Scoreboard: team, score, status, score, team. The edges carry a wash of each
 // team's chart colour (set as --away-color / --home-color in Score.jsx), which
 // keys the score-lead area in the chart below.
+
+// Phones keep one slim line; past phone widths the sizes grow steadily up to the
+// full size at 1000px, so there is no width where the scoreboard jumps. The
+// horizontal sizes (gaps, logos, the status column) start growing from 320px, so
+// the narrowest phones still fit both tricodes.
+$fluid-from: 480px;
+$fluid-to: 1000px;
+
+@function rem($px) {
+  @return math.div($px, 16px) * 1rem;
+}
+
+@function fluid($min, $max, $from: $fluid-from, $to: $fluid-to) {
+  $slope: math.div($max - $min, $to - $from);
+  $intercept: $min - $slope * $from;
+  @return clamp(#{rem($min)}, #{rem($intercept)} + #{$slope * 100}vw, #{rem($max)});
+}
+
 .scoreElement {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 112px;
+  min-height: fluid(48px, 72px);
   overflow: hidden;
   color: var(--text-primary);
   transition: color 0.3s ease;
@@ -49,16 +69,18 @@
 
   .scoreArea {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(116px, auto) auto minmax(0, 1fr);
+    $status-min: fluid(64px, 116px, 320px);
+    grid-template-columns: minmax(0, 1fr) auto minmax($status-min, auto) auto minmax(0, 1fr);
     align-items: center;
-    column-gap: 18px;
+    // 6px on the narrowest phones, 10px from about 380px, then growing.
+    column-gap: min(fluid(6px, 18px, 320px, 500px), fluid(10px, 18px));
     width: 100%;
   }
 
   .scoreTeam {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: fluid(3px, 10px, 320px);
     min-width: 0;
 
     &.away {
@@ -74,8 +96,8 @@
   .scoreTeamCode {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.95rem;
+    gap: fluid(3px, 6px, 320px);
+    font-size: fluid(12.5px, 14.5px);
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--text-secondary);
@@ -86,8 +108,8 @@
   }
 
   .scoreTeamSwatch {
-    width: 4px;
-    height: 16px;
+    width: 3px;
+    height: fluid(11px, 15px);
     border-radius: 2px;
   }
 
@@ -101,7 +123,7 @@
 
   .scoreValue {
     min-width: 2ch;
-    font-size: 2.75rem;
+    font-size: fluid(24px, 34px);
     font-weight: 700;
     line-height: 1;
     letter-spacing: -0.03em;
@@ -127,7 +149,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: fluid(0px, 3px);
     min-width: 0;
   }
 
@@ -136,7 +158,7 @@
     align-items: center;
     gap: 6px;
     color: var(--text-secondary);
-    font-size: 0.78rem;
+    font-size: fluid(10.5px, 12.5px);
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
@@ -158,11 +180,11 @@
     cursor: pointer;
     color: var(--text-muted);
     border: 0;
-    padding: 2px 8px;
+    padding: fluid(0px, 1px) fluid(4px, 8px);
     border-radius: 999px;
     background: transparent;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: fluid(11px, 12.5px);
     white-space: nowrap;
     transition:
       background-color 0.15s ease,
@@ -186,8 +208,8 @@
   // The logos
   .logoWrapper {
     position: relative;
-    width: 64px;
-    height: 64px;
+    width: fluid(26px, 48px, 320px);
+    height: fluid(26px, 48px, 320px);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -237,8 +259,8 @@
 
   .teamLogo {
     display: block;
-    width: 56px;
-    height: 56px;
+    width: fluid(22px, 42px, 320px);
+    height: fluid(22px, 42px, 320px);
     object-fit: contain;
     transition:
       opacity 0.2s ease,
@@ -256,7 +278,6 @@
     color: var(--text-muted);
     font-weight: 500;
     gap: 10px;
-    min-height: 86px;
   }
 
   .loadingOverlay {
@@ -277,73 +298,5 @@
     color: var(--text-muted);
     font-weight: 500;
     text-align: center;
-  }
-
-  // Phones: one slim line (logo, tricode and score each side of the status), so the
-  // chart starts higher on the first screen.
-  @media (max-width: 600px) {
-    min-height: 48px;
-
-    .scoreArea {
-      grid-template-columns: minmax(0, 1fr) auto minmax(72px, auto) auto minmax(0, 1fr);
-      column-gap: 10px;
-    }
-
-    .scoreTeam {
-      gap: 6px;
-    }
-
-    .scoreTeam.away {
-      justify-self: start;
-    }
-
-    .scoreTeam.home {
-      justify-self: end;
-    }
-
-    .scoreTeamCode {
-      font-size: 0.78rem;
-    }
-
-    .scoreTeamSwatch {
-      width: 3px;
-      height: 11px;
-    }
-
-    .logoWrapper {
-      width: 30px;
-      height: 30px;
-    }
-
-    .teamLogo {
-      width: 26px;
-      height: 26px;
-    }
-
-    .scoreValue {
-      font-size: 1.5rem;
-    }
-
-    .scoreMeta {
-      gap: 0;
-    }
-
-    .gameTime {
-      font-size: 0.66rem;
-    }
-
-    .gameDate {
-      font-size: 0.68rem;
-      padding: 0 4px;
-    }
-
-    // The narrowest phones can't fit the tricodes on that line, so only each team's
-    // colour swatch stays beside its logo.
-    @media (max-width: 380px) {
-      .scoreTeamCode {
-        font-size: 0;
-        gap: 0;
-      }
-    }
   }
 }
