@@ -316,9 +316,9 @@ test.describe('MinutesMap Smoke', () => {
 
     await page.keyboard.press('Tab');
     await expect(missToggle).toBeFocused();
-    await expect(missToggle).toHaveAttribute('aria-pressed', 'false');
-    await page.keyboard.press('Enter');
     await expect(missToggle).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Enter');
+    await expect(missToggle).toHaveAttribute('aria-pressed', 'false');
 
     const datePicker = datePickerTrigger(page);
     // The day after, in the strip of days around the picked one.

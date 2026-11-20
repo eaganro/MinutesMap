@@ -364,12 +364,12 @@ describe('useMinutesMap', () => {
         statusMessage: null,
         showScoreDiff: true,
         showOdds: false,
-        statOn: [true, false, false, true, false, false, false, false],
+        statOn: [true, true, false, false, false, false, false, false],
       }),
     );
     expect(result.current.statControlsVm).toEqual(
       expect.objectContaining({
-        statOn: [true, false, false, true, false, false, false, false],
+        statOn: [true, true, false, false, false, false, false, false],
         changeStatOn: expect.any(Function),
         showScoreDiff: true,
         setShowScoreDiff: mocks.setShowScoreDiffMock,

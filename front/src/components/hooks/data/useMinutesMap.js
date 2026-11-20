@@ -23,7 +23,8 @@ import {
   summarizeTeamRecord,
 } from '../../../domain/game-selection/teamSchedule';
 
-const DEFAULT_STAT_ON = [true, false, false, true, false, false, false, false];
+// New visitors start with makes and misses (shooting) on; everything else is a tap away.
+const DEFAULT_STAT_ON = [true, true, false, false, false, false, false, false];
 const BOOLEAN_PREFERENCE_OPTIONS = { validate: isBooleanPreference };
 const STAT_PREFERENCE_OPTIONS = {
   validate: isBooleanArrayPreference(DEFAULT_STAT_ON.length),
