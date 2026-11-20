@@ -671,6 +671,18 @@
       }
     }
 
+    // Below 360px even that row runs past the card, so the strip drops to the picked
+    // day and one either side, at the full day width.
+    @media (max-width: 359px) {
+      .datePick .dayStrip .dayStripDay {
+        width: 44px;
+
+        &.isOuter {
+          display: none;
+        }
+      }
+    }
+
     // The strip swipes, so no arrows; a fade at the right edge shows there are more
     // games.
     .gamePick {

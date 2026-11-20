@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef } from 'react';
 import { shiftDateString } from '../../domain/game-selection/time';
 import { formatPickerDate, formatWeekday } from '../../domain/game-selection/teamSchedule';
 
-// The picked day in the middle, two days either side.
+// The picked day in the middle, two days either side (one on the narrowest phones,
+// where Schedule.scss hides the outer pair).
 const DAY_OFFSETS = [-2, -1, 0, 1, 2];
 const SLIDE_MS = 220;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -25,10 +26,11 @@ export default function DayStrip({ date, onShift }) {
     const node = daysRef.current;
     if (!node || !previousDate || !date || previousDate === date) return;
     const shift = daysBetween(previousDate, date);
+    const shownDays = [...node.children].filter((day) => day.offsetWidth > 0);
     // Only days that were on screen slide in; a jump from the calendar just appears.
-    if (!shift || Math.abs(shift) >= DAY_OFFSETS.length) return;
+    if (!shift || Math.abs(shift) >= shownDays.length) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const [first, second] = node.children;
+    const [first, second] = shownDays;
     if (!first || !second) return;
     const pitch = second.offsetLeft - first.offsetLeft;
     // Start the new days where their dates sat a moment ago, then slide them home.
@@ -52,7 +54,9 @@ export default function DayStrip({ date, onShift }) {
             <button
               key={day}
               type="button"
-              className={`dayStripDay${isPicked ? ' isPicked' : ''}`}
+              className={`dayStripDay${isPicked ? ' isPicked' : ''}${
+                Math.abs(offset) > 1 ? ' isOuter' : ''
+              }`}
               onClick={() => {
                 if (!isPicked) onShift(offset);
               }}
