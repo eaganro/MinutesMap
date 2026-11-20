@@ -473,13 +473,15 @@ describe('Schedule', () => {
       expect(screen.getByRole('link', { name: /PHI 118, NYK 110/ })).toBeInTheDocument();
     });
 
-    it('does not blur live refreshes of the same date', () => {
+    it('does not blur or flag live refreshes of the same date', () => {
+      vi.useFakeTimers();
       const { container, rerender } = render(<Schedule {...buildProps()} />);
 
       rerender(<Schedule {...buildProps({ isPending: true })} />);
+      act(() => vi.advanceTimersByTime(1000));
 
       expect(container.querySelector('.games')).not.toHaveClass('isLoading');
-      expect(screen.getByText('Updating games…')).toBeInTheDocument();
+      expect(screen.queryByText('Updating games…')).not.toBeInTheDocument();
     });
 
     const phiTeamMode = () => ({

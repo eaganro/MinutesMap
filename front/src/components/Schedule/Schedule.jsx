@@ -519,7 +519,9 @@ export default function Schedule({
           </IconButton>
           {gamesList.length ? (
             <div className="gamesState">
-              {(isShowingPreviousList ? isSlowListSwitch : listIsPending) && (
+              {/* Live refreshes of the same date swap the games in silently; only a slow
+                  switch to another date or team says it's still working. */}
+              {isShowingPreviousList && isSlowListSwitch && (
                 <span className="scheduleUpdating" role="status">
                   Updating games…
                 </span>
