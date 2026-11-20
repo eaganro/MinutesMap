@@ -43,12 +43,19 @@
   }
 }
 
+// Thinner top and bottom than the other cards (App.scss sets theirs on `.appMain > div`,
+// so this needs the same weight to win): the same few pixels above the date row and
+// under the games, at every width.
+.appMain > .schedule {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 .schedule {
   position: relative; // anchors the team picker panel
   background-color: var(--bg-card);
   width: var(--layout-content-width);
   max-width: var(--layout-content-max-width);
-  padding: 6px var(--layout-card-padding);
   border: 1px solid var(--card-border);
   border-radius: var(--layout-card-radius);
   box-shadow: var(--card-shadow);
@@ -59,14 +66,12 @@
     border-color 0.3s ease;
 
   .scheduleContent {
-    // Sized by the page, not its contents, so the rules at the end of this file can ask
-    // whether the date row has room beside the games.
-    container: schedule / inline-size;
     width: 100%;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    // Room between the date row and the games when they stack (phones).
+    // The date row, then the games under it at every width, so the controls stay put
+    // however many games a day has.
     row-gap: 8px;
     margin: auto;
 
@@ -144,13 +149,15 @@
         }
       }
 
+      // One line, the date row's height, so switching between the team and date views
+      // doesn't move the games or the chart under them.
       .teamChip {
         display: flex;
         align-items: center;
-        gap: 10px;
-        height: 44px;
-        margin: 8px 10px;
-        padding: 0 4px 0 10px;
+        gap: 6px;
+        height: 34px;
+        margin: 0 10px;
+        padding: 0 4px 0 8px;
         border: 0;
         border-radius: 12px;
         background-color: var(--bg-hover);
@@ -166,8 +173,8 @@
         .teamChipButton {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 4px 2px;
+          gap: 7px;
+          padding: 2px;
           border: 0;
           border-radius: 10px;
           background: transparent;
@@ -184,13 +191,13 @@
 
         .teamChipText {
           display: flex;
-          flex-direction: column;
+          align-items: baseline;
+          gap: 7px;
           line-height: 1.15;
-          min-width: 72px;
         }
 
         .teamChipName {
-          font-size: 0.95rem;
+          font-size: 0.9rem;
           font-weight: 700;
           letter-spacing: 0.02em;
         }
@@ -203,6 +210,7 @@
         }
 
         .teamChipClear {
+          padding: 3px;
           color: var(--text-secondary);
 
           &:hover {
@@ -291,7 +299,7 @@
       }
     }
     .gamePick {
-      flex: 1 1 350px;
+      flex: 1 1 100%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -420,6 +428,14 @@
           &:focus-visible {
             outline: 2px solid var(--focus-ring-color);
             outline-offset: 1px;
+          }
+          // A day that fits sits in the middle, under the date row; one that scrolls
+          // starts at its first game, as the margins drop to 0.
+          &:first-child {
+            margin-left: auto;
+          }
+          &:last-child {
+            margin-right: auto;
           }
           .iconRow {
             display: flex;
@@ -582,42 +598,62 @@
   }
 }
 
-// Phones: a one-line team pill and slightly shorter game cards, so the chart starts
-// higher on the first screen. Same selector paths as the rules above, so these win.
-@media (max-width: 600px) {
-  .schedule .scheduleContent {
-    .datePick .teamChip {
-      height: 34px;
-      margin: 0 10px;
-      gap: 6px;
-      padding-left: 8px;
+// Three 17-18px rows plus 2px of room above them, and none below, so the space under the
+// cards matches the space above the date row. Same selector paths as the rules above, so
+// these win.
+.schedule .scheduleContent .gamePick {
+  height: 54px;
 
-      .teamChipButton {
-        padding: 2px;
-        gap: 7px;
-      }
+  .games {
+    padding-bottom: 0;
+  }
 
-      .teamLogo {
-        width: 22px;
-        height: 22px;
-      }
+  // The strip has no room around the cards for an outer focus ring.
+  .games .game:focus-visible {
+    outline-offset: -2px;
+  }
 
-      .teamChipText {
-        flex-direction: row;
-        align-items: baseline;
-        gap: 7px;
-        min-width: 0;
-      }
-
-      .teamChipName {
-        font-size: 0.9rem;
-      }
-
-      .teamChipClear {
-        padding: 3px;
-      }
+  .games .game {
+    .iconRow {
+      height: 18px;
     }
 
+    > div:not([class]) {
+      height: 17px;
+      line-height: 17px;
+    }
+
+    &.teamGame .dateRow {
+      height: 17px;
+      line-height: 18px;
+    }
+
+    .recordRow {
+      height: 17px;
+    }
+
+    .statusRow {
+      min-height: 17px;
+    }
+
+    // Two 16px team lines and a 15px status, with a little room under it.
+    &.scoreCard {
+      padding: 1px 8px 3px;
+
+      .cardTeam {
+        height: 16px;
+      }
+
+      .statusRow {
+        min-height: 15px;
+      }
+    }
+  }
+}
+
+// Phones: narrower days and a strip you swipe.
+@media (max-width: 600px) {
+  .schedule .scheduleContent {
     // Five narrower days, so the row fits beside the calendar and Teams; narrower again
     // (and a tighter Teams) on the smallest phones.
     .datePick .dayStrip .dayStripDay {
@@ -634,24 +670,15 @@
       }
     }
 
-    // Three 17-18px rows plus 2px of room above them, and none below, so the space under
-    // the cards matches the space above the date row. The strip swipes, so no arrows;
-    // a fade at the right edge shows there are more games.
+    // The strip swipes, so no arrows; a fade at the right edge shows there are more
+    // games.
     .gamePick {
-      height: 54px;
-
       .scheduleButton {
         display: none;
       }
 
       .games {
         margin-left: 0;
-        padding-bottom: 0;
-      }
-
-      // The strip has no room around the cards for an outer focus ring.
-      .games .game:focus-visible {
-        outline-offset: -2px;
       }
 
       .games.hasMoreRight {
@@ -680,43 +707,6 @@
           transparent
         );
       }
-
-      .games .game {
-        .iconRow {
-          height: 18px;
-        }
-
-        > div:not([class]) {
-          height: 17px;
-          line-height: 17px;
-        }
-
-        &.teamGame .dateRow {
-          height: 17px;
-          line-height: 18px;
-        }
-
-        .recordRow {
-          height: 17px;
-        }
-
-        .statusRow {
-          min-height: 17px;
-        }
-
-        // Two 16px team lines and a 15px status, with a little room under it.
-        &.scoreCard {
-          padding: 1px 8px 3px;
-
-          .cardTeam {
-            height: 16px;
-          }
-
-          .statusRow {
-            min-height: 15px;
-          }
-        }
-      }
     }
   }
 }
@@ -724,7 +714,7 @@
 .scheduleButton {
   height: 36px;
   width: 36px;
-  margin: 10px 4px;
+  margin: 0 4px;
   color: var(--text-secondary);
 
   &.isHidden {
@@ -749,10 +739,12 @@
   border: 0;
 }
 
+// Centred under the card, like the date row it opens from.
 .teamPickerPanel {
   position: absolute;
   top: calc(100% + 6px);
-  left: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 40;
   width: min(620px, calc(100% - 32px));
   box-sizing: border-box;
@@ -836,11 +828,12 @@
   }
 }
 
-// The calendar opened from the date field, where the team picker opens.
+// The calendar opened from the date row, where the team picker opens.
 .datePickerPanel {
   position: absolute;
   top: calc(100% + 6px);
-  left: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 40;
   width: 280px;
   box-sizing: border-box;
@@ -907,51 +900,5 @@
       outline: 2px solid var(--focus-ring-color);
       outline-offset: 2px;
     }
-  }
-}
-
-// Wide enough for the date row to sit beside the games (the row is about 380px, the
-// games at least 350px): its controls grow to the game cards' height, so the two read as
-// one band. Narrower, the row stacks above the games at the phone height.
-@container schedule (min-width: 740px) {
-  .schedule .scheduleContent .datePick {
-    .teamPickerTrigger,
-    .dateCalendarButton {
-      height: 50px;
-    }
-
-    .dateCalendarButton {
-      width: 44px;
-
-      svg {
-        font-size: 19px;
-      }
-    }
-
-    .dayStrip {
-      padding: 3px;
-    }
-
-    .dayStripDay {
-      height: 44px;
-
-      .dayStripWeekday {
-        font-size: 0.7rem;
-      }
-
-      .dayStripNumber {
-        font-size: 1rem;
-      }
-    }
-  }
-}
-
-// The team view's chip is narrower, so it sits beside the games from about 560px; there
-// it matches their cards, which are taller (three lines).
-@container schedule (min-width: 580px) {
-  .schedule .scheduleContent .datePick .teamChip {
-    height: 60px;
-    margin: 0 10px;
-    padding-left: 12px;
   }
 }

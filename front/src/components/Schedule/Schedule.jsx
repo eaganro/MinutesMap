@@ -462,7 +462,7 @@ export default function Schedule({
                 aria-label={`Change team, now ${headerTeam}`}
                 title="Change team"
               >
-                <TeamLogo team={headerTeam} size={28} />
+                <TeamLogo team={headerTeam} size={22} />
                 <div className="teamChipText">
                   <span className="teamChipName">{headerTeam}</span>
                   <span className="teamChipMeta">
