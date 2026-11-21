@@ -22,6 +22,8 @@ from datetime import datetime, timedelta, timezone
 TICK_SECONDS = 30  # same cadence as the Lambda poller (1-minute rule plus half-minute schedule)
 RECONCILE_SECONDS = 3600
 MANAGER_HOUR_UTC = 11  # the Lambda's NBADailyManager runs cron(0 11 * * ? *)
+# From this hour (US Eastern) the site lands on today's date, before the first tip.
+LANDING_SWITCH_HOUR_ET = 15
 READY_HOSTS = ("cdn.nba.com", "s3.us-east-1.amazonaws.com")
 TIME_SYNC_MARKER = "/run/systemd/timesync/synchronized"  # created by systemd-timesyncd
 HEARTBEAT_SECONDS = 60
@@ -139,6 +141,7 @@ class PiRunner:
         self.done_date = None  # NBA date whose games all finished
         self.next_manager_at = 0  # run the manager at start-up
         self.next_reconcile_at = 0
+        self.landing_date = None  # NBA date init.json was last moved to before tip
         self.captions = caption_executor or ThreadPoolExecutor(max_workers=1)
 
         poller.enable_poller_logic = self.enable
@@ -214,6 +217,14 @@ class PiRunner:
                 # run missed games (feed or S3 outage) or games were added since.
                 self._step("manager", self.poller.manager_logic)
             self.next_reconcile_at = now + RECONCILE_SECONDS
+
+        today = self.poller.get_nba_date()
+        if (
+            self.landing_date != today
+            and datetime.fromtimestamp(now, self.poller.ET_ZONE).hour >= LANDING_SWITCH_HOUR_ET
+        ):
+            if self._step("landing date", lambda: self.poller.advance_init_date_before_tip(today)):
+                self.landing_date = today
 
         if self.kickoff_at is not None and now >= self.kickoff_at:
             self.enable()

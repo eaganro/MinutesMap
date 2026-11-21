@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import run_poller
 from run_poller import PiRunner, next_manager_time
@@ -21,6 +22,8 @@ def fake_poller(**overrides):
     poller.poller_logic = lambda context, schedule_half=True: calls.append(("poll", context, schedule_half))
     poller.caption_worker_logic = lambda event: calls.append(("caption", event))
     poller.get_nba_date = lambda: "2026-10-06"
+    poller.ET_ZONE = ZoneInfo("America/New_York")
+    poller.advance_init_date_before_tip = lambda today: True
     for name, value in overrides.items():
         setattr(poller, name, value)
     return poller
@@ -321,3 +324,38 @@ def test_stop_finishes_the_tick_and_waits_for_captions():
     run_poller.run_loop(runner, stop)
     assert poller.calls == ["manager", "season"]
     assert executor.waited is True
+
+
+def test_landing_date_moves_to_today_once_after_mid_afternoon():
+    poller = fake_poller()
+    poller.advance_init_date_before_tip = lambda today: poller.calls.append(("landing", today)) or True
+    runner = PiRunner(poller, InlineExecutor())
+    runner.next_manager_at = runner.next_reconcile_at = float("inf")
+    afternoon = datetime(2026, 10, 6, 18, 59, tzinfo=timezone.utc).timestamp()  # 14:59 ET
+
+    runner.tick(afternoon)
+    assert ("landing", "2026-10-06") not in poller.calls
+
+    runner.tick(afternoon + 60)
+    runner.tick(afternoon + 120)
+    assert poller.calls.count(("landing", "2026-10-06")) == 1
+
+
+def test_landing_date_retries_after_a_failure():
+    poller = fake_poller()
+    attempts = []
+
+    def flaky(today):
+        attempts.append(today)
+        if len(attempts) == 1:
+            raise RuntimeError("S3 down")
+        return True
+
+    poller.advance_init_date_before_tip = flaky
+    runner = PiRunner(poller, InlineExecutor())
+    runner.next_manager_at = runner.next_reconcile_at = float("inf")
+    evening = datetime(2026, 10, 6, 21, tzinfo=timezone.utc).timestamp()  # 17:00 ET
+    runner.tick(evening)
+    runner.tick(evening + 30)
+    runner.tick(evening + 60)
+    assert attempts == ["2026-10-06", "2026-10-06"]

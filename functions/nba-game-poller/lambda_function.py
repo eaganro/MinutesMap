@@ -3,6 +3,7 @@ import json
 import boto3
 import os
 import random
+import re
 import threading
 import time
 import urllib.error
@@ -472,14 +473,15 @@ def upload_init_state(games_today, date_str):
         games_today.sort(key=lambda x: x.get('starttime', ''))
         best_game_id = games_today[0]['id']
 
-    # Payload
+    write_init_state(date_str, best_game_id)
+
+
+def write_init_state(date_str, game_id):
     init_data = {
         "date": date_str,
-        "autoSelectGameId": best_game_id,
+        "autoSelectGameId": game_id,
         "lastUpdated": datetime.now(UTC_ZONE).isoformat()
     }
-    
-    # Upload to S3
     s3_client.put_object(
         Bucket=BUCKET,
         Key=f"{PREFIX}init.json",
@@ -487,7 +489,35 @@ def upload_init_state(games_today, date_str):
         ContentType='application/json',
         CacheControl='max-age=60'
     )
-    print(f"Updated init.json -> Date: {date_str}, Game: {best_game_id}")
+    print(f"Updated init.json -> Date: {date_str}, Game: {game_id}")
+
+
+def read_init_state():
+    try:
+        resp = s3_client.get_object(Bucket=BUCKET, Key=f"{PREFIX}init.json")
+        data = json.loads(resp["Body"].read().decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") in ("NoSuchKey", "404", "NotFound"):
+            return {}
+        raise
+
+
+def advance_init_date_before_tip(today_str):
+    """Before today's first tip, land visitors on today's date but keep last night's
+    featured game on the chart: an upcoming game has no chart to show. The poller
+    points init.json at the live game once games start. Off days keep the last game day.
+
+    Returns True when there is nothing left to do today.
+    """
+    if not get_games_from_s3(today_str):
+        return True
+    current = read_init_state()
+    current_date = str(current.get("date") or "")
+    if current_date >= today_str:
+        return True
+    write_init_state(today_str, current.get("autoSelectGameId") or None)
+    return True
 
 def calculate_safe_sleep(context, current_index, total_items, window_seconds=None, window_start_time=None):
     """
@@ -899,6 +929,14 @@ def process_game(game_item, user_agent=None, date_str=None):
             'seasonType': season_type,
         })
 
+        # Keep the last good status (e.g. "END Q1") over a premature "Q2 0:00".
+        existing_status = (game_item.get('status') or '').strip()
+        if existing_status and is_premature_zero_clock_status(
+            status_text, box_game.get('gameClock', ''), last_action, existing_status
+        ):
+            updates['status'] = existing_status
+            updates['time'] = game_item.get('time') or ''
+
     # If the play feed ended but box status regressed (or lags), promote schedule state to Final.
     if is_play_final:
         if not is_final_status(updates.get('status')):
@@ -1255,6 +1293,42 @@ def should_use_play_clock_for_zero_box_clock(period, box_clock, last_action):
 
     action_clock = (last_action.get("clock") or "").strip()
     return bool(action_clock) and not is_zero_clock_value(action_clock)
+
+
+LIVE_PERIOD_STATUS_RE = re.compile(r"^(q\d|\d*ot)\b")
+
+
+def is_premature_zero_clock_status(status_text, box_clock, last_action, existing_status):
+    """True when the boxscore reports a period at 0:00 that has not been played through.
+
+    Around quarter breaks the boxscore can flip to the next period with a zero clock
+    ("Q2 0:00") before it resets to 12:00, and it sometimes zeroes the clock mid-period.
+    A period can only be at 0:00 once it has been played, so the play feed (or, when it
+    has not changed, the stored status) must already be in that period, with the plays
+    run down to zero.
+    """
+    if not is_zero_clock_value(box_clock):
+        return False
+    if not LIVE_PERIOD_STATUS_RE.match(normalize_status(status_text)):
+        return False
+    period = parse_live_period(status_text)
+    if not period:
+        return False
+
+    if isinstance(last_action, dict):
+        action_period = parse_positive_int(last_action.get("period"), fallback=0)
+        if action_period <= 0:
+            return False
+        if action_period < period:
+            return True
+        action_clock = (last_action.get("clock") or "").strip()
+        return action_period == period and bool(action_clock) and not is_zero_clock_value(action_clock)
+
+    existing_text = normalize_status(existing_status)
+    if existing_text.startswith("end "):
+        existing_text = existing_text[4:]
+    existing_period = parse_live_period(existing_text)
+    return bool(existing_period) and existing_period < period
 
 
 def resolve_game_team_codes(game_item, box_game):

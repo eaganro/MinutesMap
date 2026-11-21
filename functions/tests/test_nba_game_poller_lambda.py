@@ -490,6 +490,94 @@ class TestNbaGamePollerLambda:
         assert isinstance(updates.get("finalPendingSince"), str)
         assert updates["finalPendingSince"]
 
+    def _landing(self, games, current_init):
+        self.module.get_games_from_s3 = MagicMock(return_value=games)
+        self.module.read_init_state = MagicMock(return_value=current_init)
+        self.module.write_init_state = MagicMock()
+        done = self.module.advance_init_date_before_tip("2026-11-21")
+        return done, self.module.write_init_state
+
+    def test_landing_moves_to_today_and_keeps_last_nights_game(self):
+        done, write = self._landing(
+            [{"id": "2026-11-21-phi-nyk"}],
+            {"date": "2026-11-20", "autoSelectGameId": "2026-11-20-sac-lal"},
+        )
+        assert done is True
+        write.assert_called_once_with("2026-11-21", "2026-11-20-sac-lal")
+
+    def test_landing_leaves_init_alone_once_on_today(self):
+        done, write = self._landing(
+            [{"id": "2026-11-21-phi-nyk"}],
+            {"date": "2026-11-21", "autoSelectGameId": "2026-11-21-phi-nyk"},
+        )
+        assert done is True
+        write.assert_not_called()
+
+    def test_landing_keeps_last_game_day_on_off_days(self):
+        done, write = self._landing([], {"date": "2026-11-20", "autoSelectGameId": "2026-11-20-sac-lal"})
+        assert done is True
+        write.assert_not_called()
+
+    def test_landing_without_init_file_points_at_today(self):
+        done, write = self._landing([{"id": "2026-11-21-phi-nyk"}], {})
+        write.assert_called_once_with("2026-11-21", None)
+
+    def _process_with_box_status(self, game_item, box_status, box_clock, actions):
+        play_payload = {"game": {"homeTeamId": 1, "awayTeamId": 2, "actions": actions}}
+        box_payload = {
+            "game": {
+                "gameStatusText": box_status,
+                "gameClock": box_clock,
+                "homeTeam": {"teamId": 1, "score": 30, "wins": 0, "losses": 0},
+                "awayTeam": {"teamId": 2, "score": 28, "wins": 0, "losses": 0},
+            }
+        }
+
+        def fake_fetch(url, _etag=None, _ua=None):
+            if "playbyplay" in url:
+                return (play_payload, "play-etag") if actions is not None else (None, "play-etag")
+            return box_payload, "box-etag"
+
+        self.module.fetch_nba_data = fake_fetch
+        self.module.process_playbyplay_payload = MagicMock(return_value={"v": 2})
+        self.module.build_box_payload = MagicMock(return_value={"teams": {}})
+        self.module.upload_json_to_s3 = MagicMock()
+        self.module.load_gamepack = MagicMock(return_value=None)
+        return self.module.process_game(game_item, user_agent="ua", date_str="2026-02-04")
+
+    def test_process_game_keeps_end_of_quarter_over_premature_next_period_zero_clock(self):
+        game_item = {"id": "2026-02-04-phi-lal", "nbaGameId": "0022500001", "status": "END Q1", "time": "000.00"}
+        actions = [{"description": "Period End", "period": 1, "clock": "PT00M00.00S"}]
+
+        _, updates = self._process_with_box_status(game_item, "Q2 :00.0", "PT00M00.00S", actions)
+
+        assert updates["status"] == "END Q1"
+        assert updates["time"] == "000.00"
+
+    def test_process_game_keeps_real_end_of_period_zero_clock(self):
+        game_item = {"id": "2026-02-04-phi-lal", "nbaGameId": "0022500001", "status": "Q2 :03.1"}
+        actions = [{"description": "Period End", "period": 2, "clock": "PT00M00.00S"}]
+
+        _, updates = self._process_with_box_status(game_item, "Q2 :00.0", "PT00M00.00S", actions)
+
+        assert updates["status"] == "Q2 :00.0"
+
+    def test_premature_zero_clock_status_detection(self):
+        detect = self.module.is_premature_zero_clock_status
+        zero = "PT00M00.00S"
+        # Next period not started yet, per the play feed or (play feed unchanged) the stored status.
+        assert detect("Q2 :00.0", zero, {"period": 1, "clock": zero}, "END Q1")
+        assert detect("Q3 00:00", zero, None, "Half")
+        assert detect("OT 0:00", zero, None, "END Q4")
+        # Clock zeroed mid-period.
+        assert detect("Q2 00:00", zero, {"period": 2, "clock": "PT05M27.00S"}, "Q2 5:27")
+        # Not premature: running clock, real period end, or break statuses.
+        assert detect("Q2 11:06", "PT11M06.00S", {"period": 1, "clock": zero}, "END Q1") is False
+        assert detect("Q2 :00.0", zero, {"period": 2, "clock": zero}, "Q2 :03.1") is False
+        assert detect("Half", zero, {"period": 2, "clock": zero}, "Q2 :00.0") is False
+        assert detect("END Q1", zero, {"period": 1, "clock": zero}, "Q1 :00.0") is False
+        assert detect("Q2 :00.0", zero, None, "Q2 :03.1") is False
+
     def test_process_game_updates_page_artifacts_after_confirmed_final_upload(self):
         game_item = {
             "id": "2026-02-04-phi-lal",
