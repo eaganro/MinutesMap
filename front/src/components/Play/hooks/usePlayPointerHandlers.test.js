@@ -95,6 +95,7 @@ describe('usePlayPointerHandlers', () => {
     const setInfoLocked = vi.fn();
     const setMousePosition = vi.fn();
     const resetInteraction = vi.fn();
+    const updateHoverAt = vi.fn();
 
     const { result, rerender } = renderHook((hookProps) => usePlayPointerHandlers(hookProps), {
       initialProps: createHookProps({
@@ -103,6 +104,7 @@ describe('usePlayPointerHandlers', () => {
         setInfoLocked,
         setMousePosition,
         resetInteraction,
+        updateHoverAt,
       }),
     });
 
@@ -124,6 +126,7 @@ describe('usePlayPointerHandlers', () => {
         setInfoLocked,
         setMousePosition,
         resetInteraction,
+        updateHoverAt,
       }),
     );
 
@@ -136,7 +139,8 @@ describe('usePlayPointerHandlers', () => {
     });
 
     expect(setInfoLocked).toHaveBeenCalledWith(false);
-    expect(resetInteraction).toHaveBeenCalled();
+    // Straight back to the play under the pointer, without waiting for it to move.
+    expect(updateHoverAt).toHaveBeenCalledWith(42, 62, container, true);
   });
 
   it('unlocks and forces hover update while horizontally dragging on touch', () => {

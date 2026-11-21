@@ -53,8 +53,7 @@
     }
   }
 
-  .playerName.isClipped,
-  &.isOnCourt .playerName.isEmphasisClipped {
+  .playerName.isClipped {
     @include fade-out-end;
   }
 
@@ -84,10 +83,10 @@
     paint-order: stroke;
   }
 
-  // Inspecting a moment: the players on the floor then stand out from the bench.
+  // Inspecting a moment: the players on the floor then stand out from the bench. Colour
+  // only: going bold would widen the names and shift them as the cursor moves.
   &.isOnCourt .playerName {
     color: var(--text-primary);
-    font-weight: 700;
   }
 
   &.isOffCourt .playerName {
@@ -96,6 +95,31 @@
 
   &.isOffCourt .playerTimeline {
     stroke-opacity: 0.55;
+  }
+
+  // A player highlighted on the chart: their row stands out and everyone else's fades,
+  // whatever moment is being inspected.
+  &.isFocused {
+    background-color: color-mix(
+      in srgb,
+      var(--player-focus-color, var(--text-secondary)) 14%,
+      transparent
+    );
+
+    .playerName {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    .playerTimeline {
+      stroke: var(--text-secondary);
+    }
+  }
+
+  &.isDimmed .playerName,
+  &.isDimmed .line {
+    opacity: 0.22;
+    transition: opacity 0.2s ease;
   }
 
   .statHoverMatch,

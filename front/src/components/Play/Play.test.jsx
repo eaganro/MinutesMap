@@ -312,8 +312,10 @@ describe('Play', () => {
       feature: 'shared-view',
       period: 0,
       hasPlayer: true,
+      hasFocus: false,
       shownPeriod: true,
       shownPlayer: true,
+      shownFocus: false,
     });
 
     // Back returns to the chart, on the shared period, rather than leaving the site.
@@ -321,6 +323,87 @@ describe('Play', () => {
     expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
     expectWholeGameView();
     delete window.posthog;
+  });
+
+  it('highlights a player on a wider chart from their name, until clicked again', () => {
+    renderPlay(buildProps({ sectionWidth: 900 }));
+    const rowOf = (name) => screen.getByRole('button', { name }).closest('.player');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Highlight J. Embiid' }));
+    // Their row stands out and the others fade.
+    expect(rowOf('Stop highlighting J. Embiid')).toHaveClass('isFocused');
+    expect(document.querySelectorAll('.player.isDimmed').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop highlighting J. Embiid' }));
+    expect(document.querySelector('.player.isFocused, .player.isDimmed')).toBeNull();
+  });
+
+  it('clears a highlight on a click on the chart (rather than pinning) or outside it', () => {
+    renderPlay(buildProps({ sectionWidth: 900 }));
+    const chart = screen.getByRole('region', { name: 'Play-by-play chart' });
+    fireEvent.click(screen.getByRole('button', { name: 'Highlight J. Embiid' }));
+
+    fireEvent.click(document.querySelector('.player.isDimmed svg'));
+    expect(document.querySelector('.player.isFocused, .player.isDimmed')).toBeNull();
+    expect(screen.queryByText(/click anywhere to unlock/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Highlight J. Embiid' }));
+    fireEvent.click(document.body);
+    expect(document.querySelector('.player.isFocused, .player.isDimmed')).toBeNull();
+    expect(chart).toBeInTheDocument();
+  });
+
+  it('steps through the highlighted player plays with the arrow keys, without pinning', () => {
+    renderPlay(buildProps({ sectionWidth: 900 }));
+    const chart = screen.getByRole('region', { name: 'Play-by-play chart' });
+    const nameButton = screen.getByRole('button', { name: 'Highlight J. Embiid' });
+    fireEvent.click(nameButton);
+
+    // From the name just clicked.
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Stop highlighting J. Embiid' }), {
+      key: 'ArrowRight',
+    });
+    expect(within(chart).getByRole('status')).toHaveTextContent('J. Embiid');
+    expect(within(chart).getByRole('status')).not.toHaveTextContent('S. Curry');
+    expect(screen.queryByText(/click anywhere to unlock/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Click to clear highlight')).toBeInTheDocument();
+  });
+
+  it('clears a highlight with Esc, on the chart or elsewhere', () => {
+    renderPlay(buildProps({ sectionWidth: 900 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Highlight J. Embiid' }));
+    const chart = screen.getByRole('region', { name: 'Play-by-play chart' });
+    chart.focus();
+    fireEvent.focus(chart);
+
+    // Tabbing in doesn't pin while highlighted, so one Esc clears it.
+    fireEvent.keyDown(chart, { key: 'Escape' });
+    expect(document.querySelector('.player.isFocused, .player.isDimmed')).toBeNull();
+
+    // Esc from a name button returns focus to the chart without pinning a play.
+    const nameButton = screen.getByRole('button', { name: 'Highlight J. Embiid' });
+    nameButton.focus();
+    fireEvent.keyDown(nameButton, { key: 'Escape' });
+    expect(chart).toHaveFocus();
+    expect(within(chart).getByRole('status')).toHaveTextContent('No chart event selected.');
+
+    // And from elsewhere on the page.
+    fireEvent.click(screen.getByRole('button', { name: 'Highlight J. Embiid' }));
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(document.querySelector('.player.isFocused')).toBeNull();
+  });
+
+  it('opens a shared link with its highlighted player on a wider chart only', () => {
+    window.history.replaceState({}, '', '/2026-03-11-phi-gsw?q=game&focus=J.+Embiid');
+    renderPlay(buildProps({ sectionWidth: 900 }));
+    expect(document.querySelector('.player.isFocused')).not.toBeNull();
+    expect(window.location.search).toBe('');
+    cleanup();
+
+    window.history.replaceState({}, '', '/2026-03-11-phi-gsw?q=game&focus=J.+Embiid');
+    renderPlay(buildProps());
+    expect(document.querySelector('.player.isFocused, .player.isDimmed')).toBeNull();
+    expect(screen.queryByTestId('mobile-player-sheet')).not.toBeInTheDocument();
   });
 
   it('ignores a shared period the game has not reached', () => {
@@ -519,6 +602,36 @@ describe('Play', () => {
 
     fireEvent.keyDown(chart, { key: 'End' });
     expect(within(chart).getByRole('status')).toHaveTextContent('J. Embiid defensive rebound');
+  });
+
+  it('leaves a mouse press that focuses the chart to its own click', () => {
+    renderPlay(buildProps({ sectionWidth: 900 }));
+
+    const chart = screen.getByRole('region', { name: 'Play-by-play chart' });
+    fireEvent.pointerDown(chart);
+    chart.focus();
+    fireEvent.focus(chart);
+
+    // Not opened on the first play as for the keyboard, which the click would then undo.
+    expect(within(chart).getByRole('status')).toHaveTextContent('No chart event selected.');
+  });
+
+  it('keeps a pinned play as it was across switching window or tab', () => {
+    renderPlay(buildProps({ sectionWidth: 900 }));
+    const chart = screen.getByRole('region', { name: 'Play-by-play chart' });
+    chart.focus();
+    fireEvent.focus(chart);
+    fireEvent.keyDown(chart, { key: 'ArrowRight' });
+    expect(within(chart).getByRole('status')).toHaveTextContent('S. Curry misses 3PT jump shot');
+
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    fireEvent.blur(chart);
+    hasFocus.mockReturnValue(true);
+    fireEvent.focus(chart);
+
+    // Not closed, and not reopened on the first play.
+    expect(within(chart).getByRole('status')).toHaveTextContent('S. Curry misses 3PT jump shot');
+    hasFocus.mockRestore();
   });
 
   it('renders the win-odds overlay when enabled', () => {

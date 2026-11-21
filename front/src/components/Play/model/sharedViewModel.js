@@ -1,17 +1,21 @@
 // A shared link opens the game on the view its image showed: `?q=` is a period number (or
-// `game` for the whole game) and `?player=` a player's name, which opens that player's view
-// where there is one (phones). Read once when the page loads, then removed from the URL.
+// `game` for the whole game), `?player=` a player's name, which opens that player's view
+// where there is one (phones), and `?focus=` a player highlighted on the full chart. Read
+// once when the page loads, then removed from the URL.
 export const SHARED_PERIOD_PARAM = 'q';
 export const SHARED_PLAYER_PARAM = 'player';
+export const SHARED_FOCUS_PARAM = 'focus';
 const WHOLE_GAME_VALUE = 'game';
 
 /** The view a share image shows: one period, or the whole game (0) for longer ranges. */
-export function buildSharedView({ exportView, exportRange, playerName }) {
+export function buildSharedView({ exportView, exportRange, playerName, focusName }) {
   const start = Number(exportRange?.start);
   const end = Number(exportRange?.end);
   const period = Number.isInteger(start) && start > 0 && start === end ? start : 0;
   const name = String(playerName || '').trim();
-  return exportView !== 'full' && name ? { period, playerName: name } : { period };
+  if (exportView !== 'full') return name ? { period, playerName: name } : { period };
+  const focus = String(focusName || '').trim();
+  return focus ? { period, focusName: focus } : { period };
 }
 
 /** The share-link query string for a view, e.g. `?q=4&player=Joel+Embiid` (or ''). */
@@ -22,6 +26,7 @@ export function buildSharedViewQuery(view) {
     params.set(SHARED_PERIOD_PARAM, view.period === 0 ? WHOLE_GAME_VALUE : String(view.period));
   }
   if (view.playerName) params.set(SHARED_PLAYER_PARAM, view.playerName);
+  if (view.focusName) params.set(SHARED_FOCUS_PARAM, view.focusName);
   const query = params.toString();
   return query ? `?${query}` : '';
 }
@@ -37,8 +42,9 @@ export function parseSharedView(search) {
     period = Number(rawPeriod);
   }
   const playerName = (params.get(SHARED_PLAYER_PARAM) || '').trim() || null;
-  if (period === null && !playerName) return null;
-  return { period, playerName };
+  const focusName = (params.get(SHARED_FOCUS_PARAM) || '').trim() || null;
+  if (period === null && !playerName && !focusName) return null;
+  return { period, playerName, focusName };
 }
 
 /** `href` without the shared-view parameters, keeping everything else. */
@@ -46,5 +52,6 @@ export function removeSharedViewParams(href) {
   const url = new URL(href);
   url.searchParams.delete(SHARED_PERIOD_PARAM);
   url.searchParams.delete(SHARED_PLAYER_PARAM);
+  url.searchParams.delete(SHARED_FOCUS_PARAM);
   return `${url.pathname}${url.search}${url.hash}`;
 }

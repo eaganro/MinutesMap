@@ -5,6 +5,7 @@ export const buildExportRequestSnapshot = ({
   resolvedExportRange,
   exportView,
   exportPlayerKey,
+  exportFocusKey = '',
   isFinal,
 }) => {
   const exportRangeSnapshot = resolvedExportRange;
@@ -12,6 +13,7 @@ export const buildExportRequestSnapshot = ({
     exportRange: exportRangeSnapshot,
     exportView,
     exportPlayerKey,
+    exportFocusKey,
   });
   const exportIsFullGameRange = exportRangeSnapshot.isFullGame;
   const exportRangeLabel = buildRangeLabel(exportRangeSnapshot);

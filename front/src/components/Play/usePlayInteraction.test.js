@@ -65,6 +65,14 @@ const buildHook = () =>
   });
 
 describe('usePlayInteraction', () => {
+  it('never stays pinned with nothing to show, which would block hovering', () => {
+    const { result } = buildHook();
+    act(() => {
+      result.current.setInfoLocked(true);
+    });
+    expect(result.current.infoLocked).toBe(false);
+  });
+
   it('navigates across distinct timestamps and keeps grouped same-time actions together', () => {
     const { result } = buildHook();
 
@@ -170,5 +178,82 @@ describe('usePlayInteraction', () => {
       actionNumber: 3,
       awayWinProb: 0.67,
     });
+  });
+});
+
+describe('usePlayInteraction with a highlighted player', () => {
+  const at = (actionNumber, minutesLeft, extra = {}) => ({
+    actionNumber,
+    period: 1,
+    clock: `PT${String(minutesLeft).padStart(2, '0')}M00.00S`,
+    actionType: 'rebound',
+    description: `Action ${actionNumber}`,
+    ...extra,
+  });
+  const gameActions = [at(1, 11), at(2, 10), at(3, 10), at(4, 9), at(5, 8)];
+  // Their events: #3 (shares 10:00 with #2) and #5.
+  const theirActions = [gameActions[2], gameActions[4]];
+  const container = document.createElement('div');
+  container.getBoundingClientRect = () => ({ left: 0, top: 0, right: 600, bottom: 300 });
+
+  const buildFocusedHook = () =>
+    renderHook(() =>
+      usePlayInteraction({
+        allActions: gameActions,
+        focusActions: theirActions,
+        oddsTimeline: [],
+        leftMargin: 0,
+        // One pixel a second over the first period.
+        timelineWidth: 720,
+        timelineWindow: { startSeconds: 0, durationSeconds: 720 },
+        playRef: { current: container },
+      }),
+    );
+
+  it('steps Previous/Next through their events only, from any moment', () => {
+    const { result } = buildFocusedHook();
+    act(() => {
+      result.current.setDescriptionArray([gameActions[0]]);
+    });
+    expect(result.current.hasPrevAction).toBe(false);
+
+    act(() => {
+      result.current.navigateAction(1);
+    });
+    // Their event, shown with everything else at that moment.
+    expect(result.current.descriptionArray.map((action) => action.actionNumber)).toEqual([2, 3]);
+
+    act(() => {
+      result.current.navigateAction(1);
+    });
+    expect(result.current.descriptionArray.map((action) => action.actionNumber)).toEqual([5]);
+    expect(result.current.hasNextAction).toBe(false);
+
+    act(() => {
+      result.current.navigateAction(-1);
+    });
+    expect(result.current.descriptionArray.map((action) => action.actionNumber)).toEqual([2, 3]);
+  });
+
+  it('snaps hovering to their nearest event either side of the cursor', () => {
+    const { result } = buildFocusedHook();
+    // Their events are at 10:00 (120s in) and 8:00 (240s in).
+    act(() => {
+      result.current.updateHoverAt(150, 10, null);
+    });
+    expect(result.current.descriptionArray.map((action) => action.actionNumber)).toEqual([2, 3]);
+    expect(result.current.mouseLinePos).toBe(120);
+
+    act(() => {
+      result.current.updateHoverAt(200, 10, null);
+    });
+    expect(result.current.descriptionArray.map((action) => action.actionNumber)).toEqual([5]);
+    expect(result.current.mouseLinePos).toBe(240);
+
+    // Before their first event too.
+    act(() => {
+      result.current.updateHoverAt(30, 10, null);
+    });
+    expect(result.current.descriptionArray.map((action) => action.actionNumber)).toEqual([2, 3]);
   });
 });

@@ -32,6 +32,9 @@ import {
 } from './renderSharedPrimitives';
 
 const ODDS_LINE_STROKE_WIDTH = 0.5;
+// With a player highlighted, everyone else's row fades to this.
+const UNFOCUSED_ROW_ALPHA = 0.2;
+const FOCUSED_ROW_BAND_ALPHA = 0.12;
 
 const drawOddsOverlay = ({
   ctx,
@@ -112,6 +115,7 @@ export const renderFullExportCanvas = ({
   displayScoreTimeline,
   captionText,
   teamLogos,
+  focusedPlayer = null,
   endAtLastScore,
   endAtSeconds,
   statusLabel,
@@ -361,7 +365,20 @@ export const renderFullExportCanvas = ({
     return getXForSeconds(elapsed);
   };
 
-  const drawTeamSection = (teamLabel, teamColor, names, players, timelines, startY, rowHeight) => {
+  const focusTeamKey = focusedPlayer?.teamKey === 'away' ? 'away' : 'home';
+  const focusNames = focusTeamKey === 'away' ? awayNames : homeNames;
+  const hasFocus = Boolean(focusedPlayer?.name) && focusNames.includes(focusedPlayer.name);
+
+  const drawTeamSection = (
+    teamKey,
+    teamLabel,
+    teamColor,
+    names,
+    players,
+    timelines,
+    startY,
+    rowHeight,
+  ) => {
     ctx.fillStyle = teamColor || textPrimary;
     ctx.font = '600 13px system-ui, -apple-system, sans-serif';
     ctx.textBaseline = 'top';
@@ -372,15 +389,32 @@ export const renderFullExportCanvas = ({
     ctx.textBaseline = 'middle';
     names.forEach((name) => {
       const centerY = rowTop + rowHeight / 2;
+      const isFocused = hasFocus && teamKey === focusTeamKey && name === focusedPlayer.name;
+      ctx.save();
+      if (hasFocus && !isFocused) ctx.globalAlpha = UNFOCUSED_ROW_ALPHA;
+      if (isFocused) {
+        ctx.save();
+        ctx.globalAlpha = FOCUSED_ROW_BAND_ALPHA;
+        ctx.fillStyle = teamColor || lineLight;
+        const bandWidth = chartLeft + chartWidth - 2;
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(2, rowTop, bandWidth, rowHeight, 6);
+          ctx.fill();
+        } else {
+          ctx.fillRect(2, rowTop, bandWidth, rowHeight);
+        }
+        ctx.restore();
+      }
       const fontSize = Math.max(9, Math.min(12, rowHeight * 0.6));
-      ctx.font = `500 ${fontSize}px system-ui, -apple-system, sans-serif`;
-      ctx.fillStyle = lineLight;
+      ctx.font = `${isFocused ? 700 : 500} ${fontSize}px system-ui, -apple-system, sans-serif`;
+      ctx.fillStyle = isFocused ? textPrimary : lineLight;
       const clippedName = truncateText(ctx, name, nameAreaWidth);
       ctx.fillText(clippedName, 6, centerY);
 
       const timeline = timelines?.[name] || [];
-      ctx.strokeStyle = lineLight;
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = isFocused ? textSecondary : lineLight;
+      ctx.lineWidth = isFocused ? 1.5 : 1;
       timeline.forEach((entry) => {
         if (!entry?.end) return;
         const x1 = getXForTime(entry.period, entry.start);
@@ -403,6 +437,7 @@ export const renderFullExportCanvas = ({
         size,
         computedStyle: computed,
       });
+      ctx.restore();
 
       rowTop += rowHeight;
     });
@@ -411,6 +446,7 @@ export const renderFullExportCanvas = ({
 
   let cursorY = playAreaTop + 4;
   cursorY = drawTeamSection(
+    'away',
     displayAwayTeamNames?.name || awayLabel,
     teamColors.away,
     awayNames,
@@ -421,6 +457,7 @@ export const renderFullExportCanvas = ({
   );
 
   drawTeamSection(
+    'home',
     displayHomeTeamNames?.name || homeLabel,
     teamColors.home,
     homeNames,

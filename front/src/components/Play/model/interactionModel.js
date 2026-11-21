@@ -73,6 +73,26 @@ export function findClosestActionByPosition({
   return allActions[actionIndex] || null;
 }
 
+export function findNearestActionByPosition({
+  actions,
+  rawPosition,
+  leftMargin,
+  calculateXPosition,
+}) {
+  let nearest = null;
+  let nearestDistance = Infinity;
+  (actions || []).forEach((action) => {
+    const distance = Math.abs(
+      calculateXPosition(action.clock, action.period) - leftMargin - rawPosition,
+    );
+    if (distance < nearestDistance) {
+      nearest = action;
+      nearestDistance = distance;
+    }
+  });
+  return nearest;
+}
+
 export function findActionMetaFromTarget(targetEl, containerEl) {
   let checkEl = targetEl;
   while (checkEl && checkEl !== containerEl) {

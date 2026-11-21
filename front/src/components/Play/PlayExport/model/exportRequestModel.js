@@ -5,6 +5,7 @@ export const buildExportRenderRequest = ({
   snapshot,
   exportView,
   selectedExportPlayer,
+  focusedExportPlayer = null,
   exportPlayerDisplayName,
   captionText,
   teamLogos,
@@ -99,6 +100,8 @@ export const buildExportRenderRequest = ({
     renderInput: {
       exportView,
       selectedPlayer: selectedExportPlayer,
+      // The full timeline's highlighted player, whose row stays bright while the rest fade.
+      focusedPlayer: exportView === 'full' ? focusedExportPlayer : null,
       playerDisplayName: exportPlayerDisplayName,
       captionText: String(captionText || ''),
       teamLogos: teamLogos || null,

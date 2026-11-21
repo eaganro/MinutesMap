@@ -32,6 +32,12 @@ export default function Player({
   // Below 1 where the chart is dense (see getMarkerScale).
   markerScale = 1,
   label = null,
+  // 'focused' or 'dimmed' while a player is highlighted on the chart.
+  focus = null,
+  focusColor = null,
+  selectLabel = null,
+  // Set where the name toggles a highlight, for aria-pressed.
+  selectPressed = undefined,
 }) {
   const playerName = name;
   const nameText = compactName && label ? label : playerName;
@@ -176,6 +182,7 @@ export default function Player({
   const isOnCourt =
     hasCursor && stints.some(({ x1, x2 }) => cursorX >= x1 - 0.5 && cursorX <= x2 + 0.5);
   const courtClassName = hasCursor ? (isOnCourt ? ' isOnCourt' : ' isOffCourt') : '';
+  const focusClassName = focus === 'focused' ? ' isFocused' : focus === 'dimmed' ? ' isDimmed' : '';
   const nameClassName = [
     'playerName',
     compactName && 'isCompact',
@@ -186,7 +193,13 @@ export default function Player({
     .join(' ');
 
   return (
-    <div className={`player${courtClassName}`} style={{ height: `${275 / heightDivide}px` }}>
+    <div
+      className={`player${courtClassName}${focusClassName}`}
+      style={{
+        height: `${275 / heightDivide}px`,
+        ...(focus === 'focused' && focusColor ? { '--player-focus-color': focusColor } : null),
+      }}
+    >
       <div
         className={nameClassName}
         // The name column is the left margin less the gap, and cuts off longer names.
@@ -202,7 +215,8 @@ export default function Player({
               event.stopPropagation();
               onSelect();
             }}
-            aria-label={`Open player detail for ${playerName}`}
+            aria-label={selectLabel || `Open player detail for ${playerName}`}
+            aria-pressed={selectPressed}
           >
             <span ref={nameTextRef}>{nameText}</span>
           </button>

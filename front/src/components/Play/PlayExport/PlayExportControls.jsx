@@ -30,6 +30,8 @@ export default function PlayExportControls({
     exportPlayerKey,
     exportViewOptions,
     exportPlayerOptions,
+    exportFocusKey,
+    exportFocusOptions = [],
     resolvedExportRange,
     exportRangeOptions,
     filteredRangeEndOptions,
@@ -41,6 +43,7 @@ export default function PlayExportControls({
     exportDisabled,
     setExportView,
     setExportPlayerKey,
+    setExportFocusKey,
     handleExportRangeStartChange,
     handleExportRangeEndChange,
     handleExportImage,
@@ -233,6 +236,23 @@ export default function PlayExportControls({
                 ))}
               </select>
             </label>
+            {exportView === 'full' && exportFocusOptions.length > 0 && (
+              <label className="playExportOption">
+                <span>Highlight</span>
+                <select
+                  value={exportFocusKey}
+                  onChange={(event) => setExportFocusKey(event.target.value)}
+                  disabled={isExporting || previewIsUpdating}
+                >
+                  <option value="">No one</option>
+                  {exportFocusOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {exportView !== 'full' && (
               <label className="playExportOption">
                 <span>Player</span>

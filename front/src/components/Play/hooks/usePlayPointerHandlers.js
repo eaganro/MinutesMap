@@ -98,7 +98,8 @@ export function usePlayPointerHandlers({
         if (!canOpenVideoOnClick) {
           resetInteraction(true);
         } else {
-          resetInteraction();
+          // Back to following the pointer straight away, from where it is now.
+          updateHoverAt(e.clientX, e.clientY, e.target, true);
         }
       }
     },
@@ -112,6 +113,7 @@ export function usePlayPointerHandlers({
       setInfoLocked,
       setMousePosition,
       resetInteraction,
+      updateHoverAt,
     ],
   );
 

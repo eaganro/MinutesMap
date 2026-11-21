@@ -3,7 +3,7 @@
 // off with a fade rather than "…", which would take up a letter or two of the column.
 export const COMPACT_NAME_FONT_PX = 9.5;
 export const COMPACT_NAME_MIN_FONT_PX = 8;
-// Names go bold while a moment is inspected (and on hover), which makes them wider.
+// Names go bold on hover, which makes them wider.
 export const NAME_WEIGHT = 500;
 export const NAME_EMPHASIS_WEIGHT = 700;
 

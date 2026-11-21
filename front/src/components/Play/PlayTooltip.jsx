@@ -54,6 +54,7 @@ export default function PlayTooltip({
   homeTeamNames,
   teamColors,
   leftMargin,
+  hasPlayerHighlight = false,
 }) {
   const tooltipRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 300, height: 0 });
@@ -218,7 +219,14 @@ export default function PlayTooltip({
               lineHeight: 1.4,
             }}
           >
-            <div>Click to lock</div>
+            {hasPlayerHighlight ? (
+              <>
+                <div>Click to clear highlight</div>
+                <div style={{ marginTop: 2 }}>← → to step through their plays</div>
+              </>
+            ) : (
+              <div>Click to lock</div>
+            )}
           </div>
         )
       )}

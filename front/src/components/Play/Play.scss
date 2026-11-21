@@ -22,6 +22,11 @@
   outline-offset: 2px;
 }
 
+// Clicked or tapped into, not tabbed to (see Play.jsx).
+.play.isPointerFocused:focus-visible {
+  outline: none;
+}
+
 // A player's detail view: the same switch as the box score and lineups team tabs, across
 // the card. (The chart itself has PeriodButtons in its top band instead.)
 .playQuarterSwitcher {

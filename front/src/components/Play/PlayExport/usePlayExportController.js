@@ -84,6 +84,8 @@ export const usePlayExportController = ({
   const [exportError, setExportError] = useState(null);
   const [exportView, setExportView] = useState(DEFAULT_EXPORT_VIEW);
   const [exportPlayerKey, setExportPlayerKey] = useState('');
+  // The full timeline's highlighted player ('' for none).
+  const [exportFocusKey, setExportFocusKey] = useState('');
   const [captionDraft, setCaptionDraft] = useState('');
 
   const exportPreviewUrlRef = useRef(null);
@@ -175,6 +177,24 @@ export const usePlayExportController = ({
     resolvedExportRange,
   ]);
 
+  // Highlight choices for the full timeline, in the chart's order.
+  const exportFocusOptions = useMemo(
+    () =>
+      buildExportPlayerOptions({
+        displayAwayPlayers,
+        displayHomePlayers,
+        displayAwayTeamNames,
+        displayHomeTeamNames,
+      }),
+    [displayAwayPlayers, displayHomePlayers, displayAwayTeamNames, displayHomeTeamNames],
+  );
+
+  useEffect(() => {
+    if (exportFocusKey && !exportFocusOptions.some((option) => option.key === exportFocusKey)) {
+      setExportFocusKey('');
+    }
+  }, [exportFocusOptions, exportFocusKey]);
+
   const selectedExportPlayer = useMemo(
     () => exportPlayerOptions.find((option) => option.key === exportPlayerKey) || null,
     [exportPlayerOptions, exportPlayerKey],
@@ -215,6 +235,7 @@ export const usePlayExportController = ({
     setExportError(null);
     setExportView(DEFAULT_EXPORT_VIEW);
     setExportPlayerKey('');
+    setExportFocusKey('');
     setCaptionDraft('');
   }, [gameId, setExportPreviewState]);
 
@@ -224,8 +245,9 @@ export const usePlayExportController = ({
         exportRange: resolvedExportRange,
         exportView,
         exportPlayerKey,
+        exportFocusKey,
       }),
-    [resolvedExportRange, exportView, exportPlayerKey],
+    [resolvedExportRange, exportView, exportPlayerKey, exportFocusKey],
   );
 
   const handleExportImage = useCallback(
@@ -260,6 +282,12 @@ export const usePlayExportController = ({
       const effectiveExportView = preferredContext?.exportView || exportView;
       const effectiveExportPlayerKey = preferredContext?.exportPlayerKey || exportPlayerKey;
       const effectiveExportRange = preferredContext?.exportRange || resolvedExportRange;
+      const effectiveExportFocusKey =
+        preferredContext && 'exportFocusKey' in preferredContext
+          ? preferredContext.exportFocusKey || ''
+          : exportFocusKey;
+      const effectiveFocusedExportPlayer =
+        exportFocusOptions.find((option) => option.key === effectiveExportFocusKey) || null;
       const effectiveSelectedExportPlayer =
         exportPlayerOptions.find((option) => option.key === effectiveExportPlayerKey) || null;
       const effectiveExportPlayerDisplayName = resolveExportPlayerDisplayName(
@@ -269,6 +297,7 @@ export const usePlayExportController = ({
       if (preferredContext) {
         setExportView(effectiveExportView);
         setExportPlayerKey(effectiveExportPlayerKey);
+        setExportFocusKey(effectiveFocusedExportPlayer ? effectiveExportFocusKey : '');
         if (effectiveExportRange?.start && effectiveExportRange?.end) {
           setExportRange({
             start: effectiveExportRange.start,
@@ -281,6 +310,7 @@ export const usePlayExportController = ({
         resolvedExportRange: effectiveExportRange,
         exportView: effectiveExportView,
         exportPlayerKey: effectiveExportPlayerKey,
+        exportFocusKey: effectiveFocusedExportPlayer ? effectiveExportFocusKey : '',
         isFinal,
       });
       exportPreviewKeyRef.current = snapshot.exportPreviewKey;
@@ -310,6 +340,7 @@ export const usePlayExportController = ({
           snapshot,
           exportView: effectiveExportView,
           selectedExportPlayer: effectiveSelectedExportPlayer,
+          focusedExportPlayer: effectiveFocusedExportPlayer,
           exportPlayerDisplayName: effectiveExportPlayerDisplayName,
           captionText: resolvedCaption,
           teamLogos,
@@ -374,6 +405,7 @@ export const usePlayExportController = ({
             exportView: effectiveExportView,
             exportRange: snapshot.exportRangeSnapshot,
             playerName: effectiveSelectedExportPlayer?.name,
+            focusName: effectiveFocusedExportPlayer?.name,
           }),
         });
         const { file, errorMessage: fileError } = createPngFile({ blob, fileName });
@@ -425,6 +457,8 @@ export const usePlayExportController = ({
       resolvedExportRange,
       exportView,
       exportPlayerKey,
+      exportFocusKey,
+      exportFocusOptions,
       isFinal,
       onExportInteractionStart,
       displayAwayPlayers,
@@ -585,6 +619,8 @@ export const usePlayExportController = ({
     exportPlayerKey,
     exportViewOptions: EXPORT_VIEW_OPTIONS,
     exportPlayerOptions,
+    exportFocusKey,
+    exportFocusOptions,
     resolvedExportRange,
     exportRangeOptions,
     filteredRangeEndOptions,
@@ -596,6 +632,7 @@ export const usePlayExportController = ({
     exportDisabled,
     setExportView,
     setExportPlayerKey,
+    setExportFocusKey,
     handleExportRangeStartChange,
     handleExportRangeEndChange,
     handleExportImage,

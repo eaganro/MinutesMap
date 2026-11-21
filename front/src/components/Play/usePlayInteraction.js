@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getEventType, isFreeThrowAction } from '../../domain/events/classification';
 import { findWinProbabilityAtOrBefore } from '../../helpers/odds';
+import { getSecondsElapsed } from '../../helpers/playTimeline';
 import {
   calculateTimelineXPosition,
   findClosestActionByPosition,
+  findNearestActionByPosition,
   getAdjacentAction as resolveAdjacentAction,
   getCurrentActionIndex as resolveCurrentActionIndex,
   groupActionsByTimestamp,
@@ -11,6 +13,9 @@ import {
 
 export const usePlayInteraction = ({
   allActions,
+  // A highlighted player's events, in order: hovering snaps to these and Previous/Next
+  // steps through them. Null when no one is highlighted.
+  focusActions = null,
   oddsTimeline,
   leftMargin,
   timelineWidth,
@@ -23,6 +28,19 @@ export const usePlayInteraction = ({
   const [infoLocked, setInfoLocked] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [focusActionMeta, setFocusActionMeta] = useState(null);
+
+  const isFocused = Array.isArray(focusActions);
+  // What hovering snaps to and Previous/Next steps through.
+  const navActions = isFocused ? focusActions : allActions;
+  const navActionNumbers = useMemo(
+    () => (isFocused ? new Set(focusActions.map((action) => String(action.actionNumber))) : null),
+    [isFocused, focusActions],
+  );
+  const navElapsed = useMemo(
+    () =>
+      isFocused ? focusActions.map((action) => getSecondsElapsed(action.period, action.clock)) : [],
+    [isFocused, focusActions],
+  );
 
   const getCurrentActionIndex = useCallback(
     () => resolveCurrentActionIndex(allActions, highlightActionIds, descriptionArray),
@@ -70,10 +88,24 @@ export const usePlayInteraction = ({
 
   const getAdjacentAction = useCallback(
     (direction) => {
+      if (isFocused) {
+        // By time, so it also works from a moment that isn't one of theirs.
+        const current = descriptionArray[0];
+        if (!current) return null;
+        const currentElapsed = getSecondsElapsed(current.period, current.clock);
+        if (direction > 0) {
+          const index = navElapsed.findIndex((elapsed) => elapsed > currentElapsed);
+          return index >= 0 ? focusActions[index] : null;
+        }
+        for (let index = navElapsed.length - 1; index >= 0; index -= 1) {
+          if (navElapsed[index] < currentElapsed) return focusActions[index];
+        }
+        return null;
+      }
       const currentIndex = getCurrentActionIndex();
       return resolveAdjacentAction(allActions, currentIndex, direction);
     },
-    [allActions, getCurrentActionIndex],
+    [isFocused, descriptionArray, navElapsed, focusActions, allActions, getCurrentActionIndex],
   );
 
   const navigateAction = useCallback(
@@ -86,15 +118,20 @@ export const usePlayInteraction = ({
 
   const selectBoundaryAction = useCallback(
     (boundary) => {
-      if (!allActions?.length) return false;
-      const action = boundary === 'last' ? allActions[allActions.length - 1] : allActions[0];
+      if (!navActions?.length) return false;
+      const action = boundary === 'last' ? navActions[navActions.length - 1] : navActions[0];
       return applyActionSelection(action);
     },
-    [allActions, applyActionSelection],
+    [navActions, applyActionSelection],
   );
 
   const hasPrevAction = useMemo(() => Boolean(getAdjacentAction(-1)), [getAdjacentAction]);
   const hasNextAction = useMemo(() => Boolean(getAdjacentAction(1)), [getAdjacentAction]);
+
+  // A pinned tooltip with nothing in it would only block hovering, so let it go.
+  useEffect(() => {
+    if (infoLocked && descriptionArray.length === 0) setInfoLocked(false);
+  }, [infoLocked, descriptionArray.length]);
 
   const closeLockedTooltip = useCallback(() => {
     setInfoLocked(false);
@@ -113,7 +150,7 @@ export const usePlayInteraction = ({
         return;
       }
       if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
-      if (!allActions || allActions.length === 0) return;
+      if (!navActions || navActions.length === 0) return;
       ev.preventDefault();
       const direction = ev.key === 'ArrowLeft' ? -1 : 1;
       navigateAction(direction);
@@ -121,7 +158,7 @@ export const usePlayInteraction = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [infoLocked, allActions, navigateAction, closeLockedTooltip]);
+  }, [infoLocked, navActions, navigateAction, closeLockedTooltip]);
 
   useEffect(() => {
     const handleOutside = (ev) => {
@@ -178,7 +215,9 @@ export const usePlayInteraction = ({
           (action) => String(action.actionNumber) === String(hoveredActionNumber),
         );
 
-        if (hoveredAction) {
+        // With a player highlighted, only their own markers catch the cursor.
+        const isNavAction = !navActionNumbers || navActionNumbers.has(String(hoveredActionNumber));
+        if (hoveredAction && isNavAction) {
           const eventType = getEventType(
             hoveredAction.description,
             hoveredAction.actionType,
@@ -211,12 +250,21 @@ export const usePlayInteraction = ({
         }
       }
 
-      const matchedAction = findClosestActionByPosition({
-        allActions,
-        rawPosition: pos,
-        leftMargin,
-        calculateXPosition,
-      });
+      // A highlighted player's nearest event either side of the cursor; otherwise the
+      // latest play at or before it.
+      const matchedAction = isFocused
+        ? findNearestActionByPosition({
+            actions: navActions,
+            rawPosition: pos,
+            leftMargin,
+            calculateXPosition,
+          })
+        : findClosestActionByPosition({
+            allActions: navActions,
+            rawPosition: pos,
+            leftMargin,
+            calculateXPosition,
+          });
 
       if (matchedAction) {
         const sameTimeActions = groupActionsByTimestamp(allActions, matchedAction);
@@ -224,7 +272,12 @@ export const usePlayInteraction = ({
 
         setHighlightActionIds(sameTimeIds);
         setDescriptionArray(sameTimeActions);
-        setMouseLinePos(pos + leftMargin);
+        // A highlighted player's events pull the cursor line onto them.
+        setMouseLinePos(
+          isFocused
+            ? calculateXPosition(matchedAction.clock, matchedAction.period)
+            : pos + leftMargin,
+        );
         setFocusActionMeta(buildFocusActionMeta(matchedAction));
       } else {
         setFocusActionMeta(null);
@@ -236,6 +289,9 @@ export const usePlayInteraction = ({
       leftMargin,
       timelineWidth,
       allActions,
+      navActions,
+      navActionNumbers,
+      isFocused,
       calculateXPosition,
       buildFocusActionMeta,
     ],

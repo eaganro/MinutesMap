@@ -16,6 +16,7 @@ import PlayTips from './PlayTips';
 import TimelineGrid from './TimelineGrid';
 import { PLAY_LEFT_MARGIN, isCompactPlayWidth } from './model/layoutModel';
 import { parseSharedView, removeSharedViewParams } from './model/sharedViewModel';
+import { findActionMetaFromTarget } from './model/interactionModel';
 import { usePlayInteraction } from './usePlayInteraction';
 import { useMediaQuery } from '../hooks/ui/useMediaQuery';
 import { useTrackFeatureUseOnce } from '../hooks/analytics/useTrackFeatureUseOnce';
@@ -24,6 +25,9 @@ import { shortPlayerNames } from '../../helpers/playerNames';
 import './Play.scss';
 
 const PLAYER_DETAIL_HISTORY_KEY = 'minutesMapPlayerDetail';
+const POINTER_FOCUS_WINDOW_MS = 1500;
+// Actions a player's row doesn't draw a marker for (see Player.jsx).
+const UNMARKED_ACTION_TYPES = new Set(['substitution', 'jump ball', 'jumpball', 'violation']);
 
 export default function Play({
   gameId,
@@ -100,6 +104,24 @@ export default function Play({
   });
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [playerDetailPeriod, setPlayerDetailPeriod] = useState(0);
+  // A player highlighted on the full chart: their row stays bright and the rest fade.
+  const [focusedPlayer, setFocusedPlayer] = useState(null);
+  // The highlighted player's markers on the chart, which hovering and Previous/Next follow.
+  const focusActions = useMemo(() => {
+    if (!focusedPlayer) return null;
+    const players = focusedPlayer.teamKey === 'away' ? filteredAwayPlayers : filteredHomePlayers;
+    const actions = players?.[focusedPlayer.name];
+    if (!actions) return null;
+    const marked = actions.filter(
+      (action) => !UNMARKED_ACTION_TYPES.has((action?.actionType || '').toString().toLowerCase()),
+    );
+    // None in this view: hovering and Previous/Next go back to every play.
+    return marked.length ? marked : null;
+  }, [focusedPlayer, filteredAwayPlayers, filteredHomePlayers]);
+  // With a player highlighted, the tooltip already holds still on their row, so nothing
+  // pins: a click on the chart clears the highlight, and the arrow keys step through
+  // their plays.
+  const isHighlightMode = Boolean(focusActions);
   const [shareButtonSlot] = useShareButtonSlot();
   // A player's detail view hides the legend (and the share slot in it), so it has its own.
   const [detailShareSlot, setDetailShareSlot] = useState(null);
@@ -139,6 +161,7 @@ export default function Play({
     timelineWidth: width,
     timelineWindow,
     allActions: filteredAllActions,
+    focusActions,
     oddsTimeline: stablePlayData.oddsTimeline,
     playRef,
   });
@@ -151,9 +174,44 @@ export default function Play({
       .join('. ');
   }, [descriptionArray]);
 
+  // When a mouse or finger last pressed the chart. A press also focuses it, and that press's
+  // own click (or touch) handles the tooltip, so focusing shouldn't lock one first. A tap
+  // focuses only once the finger lifts, hence the allowance.
+  const lastPointerDownRef = useRef(0);
+  const isRefocusingRef = useRef(false);
+  // Set when the chart loses focus because the window or tab did, so coming back neither
+  // closes nor reopens anything.
+  const lostFocusToWindowRef = useRef(false);
+  useEffect(() => {
+    // The browser refocuses the chart as the window comes back, before this runs; if it
+    // went elsewhere instead, the next focus is a fresh one.
+    const handleWindowFocus = () => {
+      window.setTimeout(() => {
+        lostFocusToWindowRef.current = false;
+      }, 0);
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => window.removeEventListener('focus', handleWindowFocus);
+  }, []);
+  // Focused by a click or tap: no focus ring, even once a key is pressed (browsers show it
+  // then), since the chart already shows where you are.
+  const [isPointerFocused, setIsPointerFocused] = useState(false);
+  const handleChartPointerDown = useCallback(() => {
+    lastPointerDownRef.current = Date.now();
+  }, []);
+
+  // Tabbing to the chart opens the first play, ready for the arrow keys.
   const handleChartFocus = useCallback(
     (event) => {
       if (event.target !== event.currentTarget) return;
+      if (isRefocusingRef.current) return;
+      if (lostFocusToWindowRef.current) {
+        lostFocusToWindowRef.current = false;
+        return;
+      }
+      const isPointerFocus = Date.now() - lastPointerDownRef.current < POINTER_FOCUS_WINDOW_MS;
+      setIsPointerFocused(isPointerFocus);
+      if (isPointerFocus) return;
       const rect = event.currentTarget.getBoundingClientRect();
       setMousePosition({
         x: rect.left + rect.width / 2,
@@ -162,18 +220,44 @@ export default function Play({
       if (!descriptionArray.length) {
         selectBoundaryAction('first');
       }
-      setInfoLocked(true);
+      if (!isHighlightMode) setInfoLocked(true);
     },
-    [descriptionArray.length, selectBoundaryAction, setInfoLocked, setMousePosition],
+    [
+      descriptionArray.length,
+      isHighlightMode,
+      selectBoundaryAction,
+      setInfoLocked,
+      setMousePosition,
+    ],
   );
 
   const handleChartBlur = useCallback(
     (event) => {
       if (event.currentTarget.contains(event.relatedTarget)) return;
+      // Switching window or tab: keep a pinned tooltip as it is for coming back.
+      if (!document.hasFocus()) {
+        lostFocusToWindowRef.current = true;
+        return;
+      }
+      lostFocusToWindowRef.current = false;
+      setIsPointerFocused(false);
       setInfoLocked(false);
       resetInteraction(true);
     },
     [resetInteraction, setInfoLocked],
+  );
+
+  // One play along with the arrow keys. With nothing open yet, → starts at the first play
+  // and ← at the last; at either end it stays put.
+  const stepAction = useCallback(
+    (direction) => {
+      if (!descriptionArray.length) {
+        selectBoundaryAction(direction > 0 ? 'first' : 'last');
+        return;
+      }
+      if (!navigateAction(direction)) selectBoundaryAction(direction > 0 ? 'last' : 'first');
+    },
+    [descriptionArray.length, navigateAction, selectBoundaryAction],
   );
 
   const handleChartKeyDown = useCallback(
@@ -181,18 +265,23 @@ export default function Play({
       if (event.key === 'Escape' && event.currentTarget.contains(event.target)) {
         event.preventDefault();
         event.stopPropagation();
+        // Esc unpins a tooltip first, then clears a highlighted player.
+        if (!infoLocked) setFocusedPlayer(null);
         setInfoLocked(false);
         resetInteraction(true);
+        // Back to the chart from a button inside it, without opening a play as tabbing in does.
+        isRefocusingRef.current = true;
         event.currentTarget.focus({ preventScroll: true });
+        isRefocusingRef.current = false;
         return;
       }
       if (event.target !== event.currentTarget) return;
 
       let handled = true;
       if (event.key === 'ArrowLeft') {
-        if (!navigateAction(-1)) selectBoundaryAction('first');
+        stepAction(-1);
       } else if (event.key === 'ArrowRight') {
-        if (!navigateAction(1)) selectBoundaryAction('last');
+        stepAction(1);
       } else if (event.key === 'Home') {
         selectBoundaryAction('first');
       } else if (event.key === 'End') {
@@ -204,10 +293,17 @@ export default function Play({
       if (handled) {
         event.preventDefault();
         event.stopPropagation();
-        setInfoLocked(true);
+        if (!isHighlightMode) setInfoLocked(true);
       }
     },
-    [navigateAction, resetInteraction, selectBoundaryAction, setInfoLocked],
+    [
+      infoLocked,
+      isHighlightMode,
+      stepAction,
+      resetInteraction,
+      selectBoundaryAction,
+      setInfoLocked,
+    ],
   );
 
   useEffect(() => {
@@ -219,6 +315,7 @@ export default function Play({
 
   useEffect(() => {
     clearSelectedPlayer();
+    setFocusedPlayer(null);
   }, [clearSelectedPlayer, gameId]);
 
   const {
@@ -258,6 +355,7 @@ export default function Play({
   const trackPlayInspect = useTrackFeatureUseOnce('play-inspect');
   const trackQuarterSelect = useTrackFeatureUseOnce('quarter-select');
   const trackPlayerDetail = useTrackFeatureUseOnce('player-detail');
+  const trackPlayerFocus = useTrackFeatureUseOnce('player-focus');
   const hasOpenTooltip = descriptionArray.length > 0;
 
   // The first play someone opens (hover, drag, tap or keyboard), once per page load.
@@ -288,6 +386,11 @@ export default function Play({
       clearSelectedPlayer();
     }
   }, [clearSelectedPlayer, isMobilePlayerSheetEnabled, selectedPlayer]);
+
+  // Phones have no player highlight, so narrowing to one drops it.
+  useEffect(() => {
+    if (isMobilePlayerSheetEnabled) setFocusedPlayer(null);
+  }, [isMobilePlayerSheetEnabled]);
 
   useEffect(() => {
     const handlePopState = (event) => {
@@ -342,8 +445,13 @@ export default function Play({
     teamColors,
   ]);
 
+  const focusedPlayerKey = focusedPlayer ? `${focusedPlayer.teamKey}:${focusedPlayer.name}` : '';
+
   const preferredExportContext = useMemo(() => {
-    if (!selectedPlayerDetail || !isShowingMobilePlayerDetail) return null;
+    if (!selectedPlayerDetail || !isShowingMobilePlayerDetail) {
+      // Sharing the chart with a player highlighted starts the image the same way.
+      return focusedPlayerKey ? { exportView: 'full', exportFocusKey: focusedPlayerKey } : null;
+    }
 
     const exportRange =
       Number(playerDetailPeriod) > 0
@@ -365,6 +473,7 @@ export default function Play({
     isFinal,
     numPeriods,
     latestStartedPeriod,
+    focusedPlayerKey,
   ]);
 
   useEffect(() => {
@@ -398,6 +507,30 @@ export default function Play({
     openPlayerDetail(teamKey, name);
   };
 
+  const isFocusedPlayer = (teamKey, name) =>
+    focusedPlayer?.teamKey === teamKey && focusedPlayer?.name === name;
+
+  const toggleFocusedPlayer = (teamKey, name) => {
+    // A pinned play may not be theirs, so start fresh.
+    setInfoLocked(false);
+    resetInteraction(true);
+    if (isFocusedPlayer(teamKey, name)) {
+      setFocusedPlayer(null);
+      return;
+    }
+    trackPlayerFocus();
+    setFocusedPlayer({ teamKey, name });
+  };
+
+  // Phones open the player's own view from their name; wider charts highlight them instead.
+  const handlePlayerNameSelect = (teamKey, name) => {
+    if (isMobilePlayerSheetEnabled) {
+      handlePlayerSelect(teamKey, name);
+      return;
+    }
+    toggleFocusedPlayer(teamKey, name);
+  };
+
   // A shared link's view (see sharedViewModel), applied once to the first game shown.
   const [initialSharedView] = useState(() =>
     typeof window === 'undefined' ? null : parseSharedView(window.location.search),
@@ -422,7 +555,7 @@ export default function Play({
     );
     if (!isSharedGame) return;
 
-    const { period, playerName } = view;
+    const { period, playerName, focusName } = view;
     const canShowPeriod =
       period !== null &&
       period <= numPeriods &&
@@ -449,11 +582,30 @@ export default function Play({
       if (canShowPeriod) setPlayerDetailPeriod(period);
     }
 
+    let focusTeamKey = null;
+    // Highlighting is for wider charts; phones open players in their own view instead.
+    if (focusName && !isMobilePlayerSheetEnabled) {
+      const wanted = focusName.toLowerCase();
+      for (const [teamKey, players] of [
+        ['away', displayAwayPlayers],
+        ['home', displayHomePlayers],
+      ]) {
+        const focusKey = Object.keys(players || {}).find((name) => name.toLowerCase() === wanted);
+        if (focusKey) {
+          focusTeamKey = teamKey;
+          setFocusedPlayer({ teamKey, name: focusKey });
+          break;
+        }
+      }
+    }
+
     trackFeatureUse('shared-view', {
       period,
       hasPlayer: Boolean(playerName),
+      hasFocus: Boolean(focusName),
       shownPeriod: canShowPeriod && showQuarterSwitcher,
       shownPlayer: Boolean(playerTeamKey),
+      shownFocus: Boolean(focusTeamKey),
     });
   }, [
     gameId,
@@ -502,6 +654,111 @@ export default function Play({
     if (right !== awayTeamNameRight) setAwayTeamNameRight(right);
   });
   const periodLabelMinX = hasShortNames && awayTeamNameRight ? awayTeamNameRight + 6 : 0;
+
+  // A click outside the chart clears the highlight. Clicks on the chart inspect plays (which
+  // follow the highlighted player), and sharing keeps it so the image can show it; a name
+  // click changes it (and stops the click before it gets here).
+  useEffect(() => {
+    if (!focusedPlayer || isShowingMobilePlayerDetail) return undefined;
+    const handleDocumentClick = (event) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('.play, .playExportButton, .playExportPreview, .playExportError')
+      ) {
+        return;
+      }
+      setFocusedPlayer(null);
+    };
+    // Esc too, once no tooltip is pinned (the first Esc unpins it). The chart handles its
+    // own keys while it has focus; elsewhere (say on the name just clicked) the arrow keys
+    // still step through the highlighted player's plays.
+    const handleDocumentKeyDown = (event) => {
+      if (event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        if (!infoLocked) setFocusedPlayer(null);
+        return;
+      }
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      if (!isHighlightMode || event.target === playRef.current) return;
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        (target.closest('input, select, textarea') || target.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      stepAction(event.key === 'ArrowLeft' ? -1 : 1);
+    };
+    document.addEventListener('click', handleDocumentClick);
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+      document.removeEventListener('keydown', handleDocumentKeyDown);
+    };
+  }, [focusedPlayer, isShowingMobilePlayerDetail, infoLocked, isHighlightMode, stepAction]);
+
+  // Where a click that cleared the highlight was, so the tooltip can pick up from there.
+  const pendingHoverRef = useRef(null);
+  useEffect(() => {
+    const pending = pendingHoverRef.current;
+    if (!pending || focusedPlayer) return;
+    pendingHoverRef.current = null;
+    updateHoverAt(pending.x, pending.y, pending.target, true);
+  }, [focusedPlayer, updateHoverAt]);
+
+  const handleChartClick = (event) => {
+    if (isHighlightMode) {
+      // Their own marker still opens its video; any other click clears the highlight.
+      const actionMeta = findActionMetaFromTarget(event.target, playRef.current);
+      const isTheirMarker =
+        actionMeta?.actionNumber &&
+        focusActions.some((action) => String(action.actionNumber) === actionMeta.actionNumber);
+      if (!isTheirMarker) {
+        pendingHoverRef.current = { x: event.clientX, y: event.clientY, target: event.target };
+        setInfoLocked(false);
+        setFocusedPlayer(null);
+        return;
+      }
+    }
+    handleClick(event);
+  };
+
+  const focusedTeamPlayers =
+    focusedPlayer?.teamKey === 'away' ? filteredAwayPlayers : filteredHomePlayers;
+  // Only fade the others while the highlighted player has a row in this view.
+  const hasFocusInChart =
+    Boolean(focusedPlayer) &&
+    Object.prototype.hasOwnProperty.call(focusedTeamPlayers || {}, focusedPlayer.name);
+  // With a player highlighted, the tooltip sits where the cursor line crosses their row
+  // instead of following the pointer, so it only moves when the play it shows changes.
+  let tooltipPosition = mousePosition;
+  if (hasFocusInChart && mouseLinePos !== null && playRef.current) {
+    const chartRect = playRef.current.getBoundingClientRect();
+    const rowRect = playRef.current.querySelector('.player.isFocused')?.getBoundingClientRect();
+    if (rowRect) {
+      tooltipPosition = {
+        x: chartRect.left + mouseLinePos,
+        y: rowRect.top + rowRect.height / 2,
+      };
+    }
+  }
+
+  const getRowFocus = (teamKey, name) => {
+    if (!hasFocusInChart) return null;
+    return isFocusedPlayer(teamKey, name) ? 'focused' : 'dimmed';
+  };
+  const getNameSelectProps = (teamKey, name) => {
+    if (isMobilePlayerSheetEnabled) {
+      return { selectLabel: `Open player detail for ${name}` };
+    }
+    const isFocused = isFocusedPlayer(teamKey, name);
+    return {
+      selectLabel: isFocused ? `Stop highlighting ${name}` : `Highlight ${name}`,
+      selectPressed: isFocused,
+    };
+  };
 
   const handlePlayerDetailClose = () => {
     if (isCurrentPlayerHistoryEntry()) {
@@ -618,19 +875,20 @@ export default function Play({
       </p>
       <div
         ref={playRef}
-        className={`play ${isDataLoading ? 'isLoading' : ''}`}
+        className={`play${isDataLoading ? ' isLoading' : ''}${isPointerFocused ? ' isPointerFocused' : ''}`}
         style={{ width: sectionWidth }}
         role="region"
         aria-label="Play-by-play chart"
         aria-describedby={`${chartInstructionsId} ${chartAnnouncementId}`}
         aria-busy={isDataLoading}
         tabIndex={isDataLoading ? -1 : 0}
+        onPointerDown={handleChartPointerDown}
         onFocus={handleChartFocus}
         onBlur={handleChartBlur}
         onKeyDown={handleChartKeyDown}
         onMouseMove={isDataLoading ? undefined : handleMouseMove}
         onMouseLeave={isDataLoading ? undefined : handleMouseLeave}
-        onClick={isDataLoading ? undefined : handleClick}
+        onClick={isDataLoading ? undefined : handleChartClick}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -649,7 +907,8 @@ export default function Play({
           <PlayTooltip
             descriptionArray={descriptionArray}
             focusActionMeta={focusActionMeta}
-            mousePosition={mousePosition}
+            mousePosition={tooltipPosition}
+            hasPlayerHighlight={isHighlightMode}
             infoLocked={infoLocked}
             isHoveringIcon={isHoveringIcon}
             nbaGameId={nbaGameId}
@@ -796,11 +1055,10 @@ export default function Play({
                     compactName={hasShortNames}
                     markerScale={markerScale}
                     label={awayShortNames[name]}
-                    onSelect={
-                      isMobilePlayerSheetEnabled
-                        ? () => handlePlayerSelect('away', name)
-                        : undefined
-                    }
+                    focus={getRowFocus('away', name)}
+                    focusColor={teamColors.away}
+                    onSelect={() => handlePlayerNameSelect('away', name)}
+                    {...getNameSelectProps('away', name)}
                   />
                 ))}
               </div>
@@ -827,11 +1085,10 @@ export default function Play({
                     compactName={hasShortNames}
                     markerScale={markerScale}
                     label={homeShortNames[name]}
-                    onSelect={
-                      isMobilePlayerSheetEnabled
-                        ? () => handlePlayerSelect('home', name)
-                        : undefined
-                    }
+                    focus={getRowFocus('home', name)}
+                    focusColor={teamColors.home}
+                    onSelect={() => handlePlayerNameSelect('home', name)}
+                    {...getNameSelectProps('home', name)}
                   />
                 ))}
               </div>

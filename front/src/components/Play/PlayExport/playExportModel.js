@@ -115,12 +115,19 @@ export const buildShareMetadata = ({
   url: buildGameShareUrl({ gameId, origin, view }),
 });
 
-export const buildExportPreviewKey = ({ exportRange, exportView, exportPlayerKey }) => {
+export const buildExportPreviewKey = ({
+  exportRange,
+  exportView,
+  exportPlayerKey,
+  exportFocusKey = '',
+}) => {
   const rangeKey = `${exportRange.start}-${exportRange.end}`;
   if (exportView !== DEFAULT_EXPORT_VIEW) {
     return `${rangeKey}|${exportView}|${exportPlayerKey || ''}`;
   }
-  return `${rangeKey}|${exportView}`;
+  return exportFocusKey
+    ? `${rangeKey}|${exportView}|${exportFocusKey}`
+    : `${rangeKey}|${exportView}`;
 };
 
 export const buildExportPlayerOptions = ({
