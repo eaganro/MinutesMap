@@ -4,12 +4,17 @@
 
 # 1. NBA_Games Table (Schedule & Metadata)
 resource "aws_dynamodb_table" "nba_games" {
-  name           = "NBA_Games"
-  billing_mode   = "PROVISIONED" 
-  read_capacity  = 1
-  write_capacity = 1
-  hash_key       = "PK"
-  range_key      = "SK"
+  name         = "NBA_Games"
+  billing_mode = "PAY_PER_REQUEST"
+
+  # Ceiling on requests per second, so a spike or a bug cannot run up the bill.
+  on_demand_throughput {
+    max_read_request_units  = 50
+    max_write_request_units = 25
+  }
+
+  hash_key  = "PK"
+  range_key = "SK"
 
   stream_enabled   = true
   stream_view_type = "NEW_IMAGE"
@@ -39,8 +44,6 @@ resource "aws_dynamodb_table" "nba_games" {
     name            = "ByDate"
     hash_key        = "date"
     range_key       = "id"
-    write_capacity  = 1
-    read_capacity   = 1
     projection_type = "ALL"
   }
 }
@@ -48,11 +51,15 @@ resource "aws_dynamodb_table" "nba_games" {
 # 2. GameConnections Table (WebSocket Sessions)
 resource "aws_dynamodb_table" "game_connections" {
   name         = "GameConnections"
-  # billing_mode = "PAY_PER_REQUEST"
-  billing_mode   = "PROVISIONED" 
-  read_capacity  = 1
-  write_capacity = 1
-  hash_key     = "connectionId"
+  billing_mode = "PAY_PER_REQUEST"
+
+  # Ceiling on requests per second, so a spike or a bug cannot run up the bill.
+  on_demand_throughput {
+    max_read_request_units  = 50
+    max_write_request_units = 25
+  }
+
+  hash_key = "connectionId"
 
   attribute {
     name = "connectionId"
@@ -68,8 +75,6 @@ resource "aws_dynamodb_table" "game_connections" {
   global_secondary_index {
     name            = "gameId-index"
     hash_key        = "gameId"
-    write_capacity  = 1
-    read_capacity   = 1
     projection_type = "ALL"
   }
 }
@@ -77,11 +82,15 @@ resource "aws_dynamodb_table" "game_connections" {
 # TABLE 3: DateConnections (WebSocket Sessions for Schedule/Dates)
 resource "aws_dynamodb_table" "date_connections" {
   name         = "DateConnections"
-  # billing_mode = "PAY_PER_REQUEST"
-  billing_mode   = "PROVISIONED" 
-  read_capacity  = 1
-  write_capacity = 1
-  hash_key     = "connectionId"
+  billing_mode = "PAY_PER_REQUEST"
+
+  # Ceiling on requests per second, so a spike or a bug cannot run up the bill.
+  on_demand_throughput {
+    max_read_request_units  = 50
+    max_write_request_units = 25
+  }
+
+  hash_key = "connectionId"
 
   attribute {
     name = "connectionId"
@@ -96,8 +105,6 @@ resource "aws_dynamodb_table" "date_connections" {
   global_secondary_index {
     name            = "date-index"
     hash_key        = "dateString"
-    write_capacity  = 1
-    read_capacity   = 1
     projection_type = "ALL"
   }
 }
