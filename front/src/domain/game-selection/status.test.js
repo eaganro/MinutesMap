@@ -59,6 +59,8 @@ describe('game selection status utils', () => {
       isLive: true,
       status: 'Halftime',
     });
+    expect(parseGameStatus('END Q3')).toMatchObject({ isLive: true, isUpcoming: false });
+    expect(parseGameStatus('END OT')).toMatchObject({ isLive: true, isUpcoming: false });
     expect(parseGameStatus('OT')).toEqual({
       isFinal: false,
       isUpcoming: false,

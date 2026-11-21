@@ -38,7 +38,7 @@ function isLiveStatus(status) {
   if (!normalized) {
     return false;
   }
-  if (/^q\d/.test(normalized)) {
+  if (/^q\d/.test(normalized) || /^end\b/.test(normalized)) {
     return true;
   }
   if (

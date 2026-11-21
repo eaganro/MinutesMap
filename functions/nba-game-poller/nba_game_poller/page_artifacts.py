@@ -931,6 +931,8 @@ def _is_live_status_text(status):
         return False
     if text.startswith("q") and any(ch.isdigit() for ch in text):
         return True
+    if text.startswith("end "):
+        return True
     if any(token in text for token in ("qtr", "quarter", "half", "halftime", "in progress", "end of")):
         return True
     if "overtime" in text or text == "ot" or " ot" in text:
