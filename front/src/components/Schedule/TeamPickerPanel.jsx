@@ -8,7 +8,14 @@ import TeamLogo from './TeamLogo';
  * The team list opened from the schedule bar. Closes on a pick, Escape, or a press
  * outside it (and outside the button that opened it).
  */
-export default function TeamPickerPanel({ id, selectedTeam, onSelect, onClose, triggerRef, style }) {
+export default function TeamPickerPanel({
+  id,
+  selectedTeam,
+  onSelect,
+  onClose,
+  triggerRef,
+  style,
+}) {
   const panelRef = useRef(null);
 
   useEffect(() => {
