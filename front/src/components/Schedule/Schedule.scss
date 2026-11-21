@@ -52,7 +52,7 @@
 }
 
 .schedule {
-  position: relative; // anchors the team picker panel
+  position: relative; // anchors the date and team picker panels
   background-color: var(--bg-card);
   width: var(--layout-content-width);
   max-width: var(--layout-content-max-width);
@@ -760,7 +760,7 @@
   border: 0;
 }
 
-// Centred under the card, like the date row it opens from.
+// Centred under the date row it opens from (its top is set from that row), over the games.
 .teamPickerPanel {
   position: absolute;
   top: calc(100% + 6px);
@@ -769,24 +769,18 @@
   z-index: 40;
   width: min(620px, calc(100% - 32px));
   box-sizing: border-box;
-  padding: 10px 14px 14px;
+  padding: 12px 14px 14px;
   background-color: var(--bg-tooltip);
   border: 1px solid var(--border-medium);
   border-radius: 14px;
   box-shadow: var(--popover-shadow);
   color: var(--text-primary);
 
-  .teamPickerHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-  }
-
+  // Sits in the top-right corner, level with the conference names.
   .teamPickerClose {
+    position: absolute;
+    top: 4px;
+    right: 6px;
     color: var(--text-secondary);
   }
 

@@ -8,7 +8,7 @@ import TeamLogo from './TeamLogo';
  * The team list opened from the schedule bar. Closes on a pick, Escape, or a press
  * outside it (and outside the button that opened it).
  */
-export default function TeamPickerPanel({ id, selectedTeam, onSelect, onClose, triggerRef }) {
+export default function TeamPickerPanel({ id, selectedTeam, onSelect, onClose, triggerRef, style }) {
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -44,20 +44,18 @@ export default function TeamPickerPanel({ id, selectedTeam, onSelect, onClose, t
       ref={panelRef}
       id={id}
       className="teamPickerPanel"
+      style={style}
       role="dialog"
       aria-label="Choose a team"
     >
-      <div className="teamPickerHeader">
-        <span>Pick a team to browse its season</span>
-        <IconButton
-          size="small"
-          className="teamPickerClose"
-          onClick={() => onClose({ restoreFocus: true })}
-          aria-label="Close team list"
-        >
-          <Close fontSize="small" />
-        </IconButton>
-      </div>
+      <IconButton
+        size="small"
+        className="teamPickerClose"
+        onClick={() => onClose({ restoreFocus: true })}
+        aria-label="Close team list"
+      >
+        <Close fontSize="small" />
+      </IconButton>
       <div className="teamPickerConferences">
         {NBA_CONFERENCES.map((conference) => (
           <section

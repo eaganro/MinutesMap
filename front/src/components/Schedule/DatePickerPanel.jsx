@@ -40,7 +40,7 @@ function getMonthCells(month) {
  * moves the calendar; the date changes when a day is picked. Closes on a pick,
  * Escape, or a press outside it (and outside the field that opened it).
  */
-export default function DatePickerPanel({ id, date, onSelect, onClose, triggerRef }) {
+export default function DatePickerPanel({ id, date, onSelect, onClose, triggerRef, style }) {
   const panelRef = useRef(null);
   const [month, setMonth] = useState(() => (date || '').slice(0, 7));
 
@@ -81,6 +81,7 @@ export default function DatePickerPanel({ id, date, onSelect, onClose, triggerRe
       ref={panelRef}
       id={id}
       className="datePickerPanel"
+      style={style}
       role="dialog"
       aria-label="Choose a date"
     >

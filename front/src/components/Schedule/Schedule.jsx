@@ -147,6 +147,23 @@ export default function Schedule({
     'aria-haspopup': 'dialog',
   };
 
+  // The panels open just under the date/team row, over the games, rather than under
+  // the whole card.
+  const datePickRef = useRef(null);
+  const [pickerTop, setPickerTop] = useState(null);
+  const isAnyPickerOpen = isDatePickerOpen || isTeamPickerOpen;
+  useLayoutEffect(() => {
+    if (!isAnyPickerOpen) return undefined;
+    const measure = () => {
+      const row = datePickRef.current;
+      if (row) setPickerTop(row.offsetTop + row.offsetHeight + 6);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [isAnyPickerOpen]);
+  const pickerStyle = pickerTop == null ? undefined : { top: pickerTop };
+
   // Switching to another date or team keeps the previous games on screen,
   // blurred, until the new list arrives (like the game panels below); switching
   // between the date and team views does the same for the whole schedule,
@@ -454,7 +471,7 @@ export default function Schedule({
     >
       <div className={`scheduleContent${isShowingPreviousView ? ' isSwitchingView' : ''}`}>
         {isTeamHeader ? (
-          <div className="datePick">
+          <div className="datePick" ref={datePickRef}>
             <div className="teamChip">
               <button
                 {...teamPickerTriggerProps}
@@ -482,7 +499,7 @@ export default function Schedule({
             </div>
           </div>
         ) : (
-          <div className="datePick">
+          <div className="datePick" ref={datePickRef}>
             <button
               ref={datePickerTriggerRef}
               type="button"
@@ -583,6 +600,7 @@ export default function Schedule({
           onSelect={pickDate}
           onClose={closeDatePicker}
           triggerRef={datePickerTriggerRef}
+          style={pickerStyle}
         />
       )}
       {isTeamPickerOpen && (
@@ -592,6 +610,7 @@ export default function Schedule({
           onSelect={pickTeam}
           onClose={closeTeamPicker}
           triggerRef={teamPickerTriggerRef}
+          style={pickerStyle}
         />
       )}
     </div>
